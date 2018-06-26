@@ -7,6 +7,8 @@ from astropy import wcs
 
 from time import time
 
+import os
+
 
 def getCubeWcs(tableHeader,tableRow):
     """
@@ -82,6 +84,8 @@ def buildTpf(cubeFits, cutoutCube, cutoutWcs):
     # making the table HDU
     tableHdu = fits.BinTableHDU.from_columns(cols)
 
+    # TODO: Sort by time here?
+
     # adding the wcs keywords 
     wcsHeader = cutoutWcs.to_header()
     for entry in wcsHeader:
@@ -138,6 +142,9 @@ def cube_cut(cube_file, coordinates, cutout_size, target_pixel_file=None, verbos
     if not isinstance(coordinates, SkyCoord):
         coordinates = SkyCoord.from_name(coordinates) # TODO: more cheking here
 
+    if verbose:
+        print(coordinates)
+
     if isinstance(cutout_size, int): # TODO: more checking
         cutout_size = [cutout_size,cutout_size]
     elif len(cutout_size) < 2:
@@ -156,10 +163,14 @@ def cube_cut(cube_file, coordinates, cutout_size, target_pixel_file=None, verbos
 
     if not target_pixel_file:
         # TODO: also strip off excess path from cube file
-        target_pixel_file = "{}_{}_{}_{}x{}_cutout.fits".format(cube_file.strip('.fits'),
-                                                                coordinates.ra, coordinates.dec,
+        _, flename = os.path.split(cube_file)
+        target_pixel_file = "{}_{}_{}_{}x{}_cutout.fits".format(flename.rstrip('.fits'),
+                                                                coordinates.ra.value, coordinates.dec.value,
                                                                 cutout_size[0],cutout_size[1])
     
+    if verbose:
+        print(target_pixel_file)
+        
     # Write the TPF
     tpfObject.writeto(target_pixel_file, overwrite=True)
 
