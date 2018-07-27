@@ -48,19 +48,48 @@ def getCutoutLims(centerCoord, dims, cubeWcs):
     return xlim,ylim
 
 
-def getCutout(xlim,ylim,transposedCube):
+def getCutout(xlim,ylim,transposedCube, verbose=True):
     """
-    Making a cutout from an image cube that has been transposed 
+    Making a cutout from an image/uncertainty cube that has been transposed 
     to have time on the longest axis.
 
-    Returns the untransposed cutout.
+    Returns the untransposed image cutout and uncertainty cutout.
     """
 
-    cutout = transposedCube[xlim[0]:xlim[1]+1,ylim[0]:ylim[1]+1,:]
-    return cutout.transpose((2,0,1))
+    cutout = transposedCube[xlim[0]:xlim[1]+1,ylim[0]:ylim[1]+1,:,:]
+    imgCutout = cutout[:,:,:,0].transpose((2,0,1))
+    uncertCutout = cutout[:,:,:,1].transpose((2,0,1))
+
+    if verbose:
+        print("Image cutout cube shape: {}".format(imgCutout.shape))
+        print("Uncertainty cutout cube shape: {}".format(uncertCutout.shape))
+    
+    return imgCutout, uncertCutout
 
 
-def buildTpf(cubeFits, cutoutCube, cutoutWcs):
+def update_primary_header(primary_header, coordinates):
+
+    # Adding cutout specific headers
+    primary_header['RA_OBJ'] = (coordinates.ra.deg,'[deg] right ascension')
+    primary_header['DEC_OBJ'] = (coordinates.dec.deg,'[deg] declination')
+    
+    # These are all the things in the TESS pipeline tpfs about the object that we can't fill
+    primary_header['OBJECT'] = ("",'string version of target id ')
+    primary_header['TCID'] = (0,'unique tess target identifier')
+    primary_header['PXTABLE'] = (0,'pixel table id') 
+    primary_header['PMRA'] = (0.0,'[mas/yr] RA proper motion') 
+    primary_header['PMDEC'] = (0.0,'[mas/yr] Dec proper motion') 
+    primary_header['PMTOTAL'] = (0.0,'[mas/yr] total proper motion') 
+    primary_header['TESSMAG'] = (0.0,'[mag] TESS magnitude') 
+    primary_header['TEFF'] = (0.0,'[K] Effective temperature') 
+    primary_header['LOGG'] = (0.0,'[cm/s2] log10 surface gravity') 
+    primary_header['MH'] =(0.0,'[log10([M/H])] metallicity') 
+    primary_header['RADIUS'] = (0.0,'[solar radii] stellar radius')
+    primary_header['TICVER'] = (0,'TICVER') 
+
+
+
+def buildTpf(cubeFits, imgCube, uncertCube, cutoutWcs, coordinates, verbose=True):
     """
     Building the target pixel file.
     """
@@ -68,23 +97,51 @@ def buildTpf(cubeFits, cutoutCube, cutoutWcs):
     # The primary hdu is just the main header, which is the same
     # as the one on the cube file
     primaryHdu = cubeFits[0]
+    update_primary_header(primaryHdu.header, coordinates)
 
-    # We need to build a fits column of the cutouts
-    tform = str(cutoutCube[0].size) + "J"
-    dims = str(cutoutCube[0].shape)
-    cubeCol = fits.Column(name='CUTOUT', format=tform, dim=dims,
-                          array=cutoutCube) # Not sure what to call this b/c not sure whats in the image, must check
+    cols = list()
 
-    # TODO: REPLACE THESE WITH THE CORRECT COLUMNS
-    cols = [cubeCol]
-    for colname in ['TSTART','TSTOP','DATE-OBS','DATE-END']:
-        #print(type(cubeFits[2].data[colname]))
-        cols.append(cubeFits[2].columns[colname])
+    # Adding the Time relates columns
+    cols.append(fits.Column(name='TIME', format='D', unit='BJD - 2457000, days', disp='D14.7',
+                            array=(cubeFits[2].columns['TSTART'].array + cubeFits[2].columns['TSTOP'].array)/2))
 
+    cols.append(fits.Column(name='TIMECORR', format='E', unit='d', disp='E14.7',
+                            array=cubeFits[2].columns['BARYCORR'].array))
+
+    cols.append(fits.Column(name='CADENCENO', format='J', disp='I10', array=np.array(range(len(imgCube)))))
+    
+    # Adding the cutouts
+    tform = str(imgCube[0].size) + "E"
+    dims = str(imgCube[0].shape)
+    emptyArr = np.zeros(imgCube.shape)
+
+    if verbose:
+        print("TFORM: {}".format(tform))
+        print("DIMS: {}".format(dims))
+        print("Array shape: {}".format(emptyArr.shape))
+        
+
+    cols.append(fits.Column(name='RAW_CNTS', format=tform.replace('E','J'), unit='count', dim=dims, disp='I8',
+                            array=emptyArr)) 
+    cols.append(fits.Column(name='FLUX', format=tform, dim=dims, unit='e-/s', disp='E14.7', array=imgCube))
+    cols.append(fits.Column(name='FLUX_ERR', format=tform, dim=dims, unit='e-/s', disp='E14.7', array=uncertCube)) 
+   
+    # Adding the background info (zeros b.c we don't have this info)
+    cols.append(fits.Column(name='FLUX_BKG', format=tform, dim=dims, unit='e-/s', disp='E14.7',array=emptyArr))
+    cols.append(fits.Column(name='FLUX_BKG_ERR', format=tform, dim=dims, unit='e-/s', disp='E14.7',array=emptyArr))
+
+    # Adding the quality flags
+    #cols.append(fits.Column(name='QUALITY', format='j', disp='B16.16', array=cubeFits[2].columns['DQUALITY'].array))
+
+    # Adding the position correction info (zeros b.c we don't have this info)
+    cols.append(fits.Column(name='POS_CORR1', format='E', unit='pixel', disp='E14.7',array=emptyArr[:,0,0]))
+    cols.append(fits.Column(name='POS_CORR2', format='E', unit='pixel', disp='E14.7',array=emptyArr[:,0,0]))
+        
     # making the table HDU
     tableHdu = fits.BinTableHDU.from_columns(cols)
 
-    # TODO: Sort by time here?
+    tableHdu.header['EXTNAME'] = 'PIXELS'
+    
 
     # adding the wcs keywords 
     wcsHeader = cutoutWcs.to_header()
@@ -140,7 +197,7 @@ def cube_cut(cube_file, coordinates, cutout_size, target_pixel_file=None, verbos
     cubeWcs = getCubeWcs(cube[2].header, cube[2].data[wcsInd])
 
     if not isinstance(coordinates, SkyCoord):
-        coordinates = SkyCoord.from_name(coordinates) # TODO: more cheking here
+        coordinates = SkyCoord.from_name(coordinates) # TODO: more checking here
 
     if verbose:
         print(coordinates)
@@ -153,10 +210,10 @@ def cube_cut(cube_file, coordinates, cutout_size, target_pixel_file=None, verbos
     xlim,ylim = getCutoutLims(coordinates, cutout_size, cubeWcs) 
 
     # Make the cutout
-    cutoutCube = getCutout(xlim,ylim,cube[1].data)
+    imgCutout, uncertCutout = getCutout(xlim,ylim,cube[1].data)
 
     # Build the TPF
-    tpfObject = buildTpf(cube, cutoutCube, cubeWcs)
+    tpfObject = buildTpf(cube, imgCutout, uncertCutout, cubeWcs, coordinates)
 
     if verbose:
         writeTime = time()

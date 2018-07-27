@@ -4,6 +4,8 @@ from astropy.io import fits
 from astropy.table import Table,Column
 
 from time import time
+from datetime import date
+from os import path
 
 # TODO: Find a better solution to these unweildy lists
 specImgKwds = ['TSTART','TSTOP',
@@ -36,6 +38,23 @@ specImgKwdTypes = [np.float32,np.float32,
                    np.float32,np.float32,
                    'S16']
 
+
+def make_primary_header(ffi_main_header, ffi_img_header, sector=-1):
+    
+    header = ffi_main_header
+
+    #header.remove('DATE-OBS')
+    #header.remove('DATE-END')
+    header.remove('CHECKSUM')
+
+    header['ORIGIN'] = 'STScI/MAST'
+    header['DATE'] = str(date.today())
+    header['SECTOR'] = (sector, "Observing sector")
+    header['CAMERA'] = (ffi_img_header['CAMERA'], ffi_img_header.comments['CAMERA'])
+    header['CCD'] = (ffi_img_header['CCD'], ffi_img_header.comments['CCD'])
+
+    return header
+    
 
 def make_cube(file_list, cube_file="cube.fits", verbose=True):
     """
@@ -83,31 +102,36 @@ def make_cube(file_list, cube_file="cube.fits", verbose=True):
             # of the first ffi with keywords unique to specific ffis removed
             # relevant individual ffi specific keywords will be captured
             # in the imgInfoTable
-            primaryHeader = ffiData[0].header
-            primaryHeader.remove('DATE-OBS')
-            primaryHeader.remove('DATE-END')
-            primaryHeader.remove('CHECKSUM')
-
+            primaryHeader = make_primary_header(ffiData[0].header, ffiData[1].header)
+            
             secondaryHeader = ffiData[1].header
             
             ffiImg = ffiData[1].data
 
             # set up the cube array
-            imgCube = np.full((ffiImg.shape[0],ffiImg.shape[1],len(ffiFiles)),
+            imgCube = np.full((ffiImg.shape[0],ffiImg.shape[1],len(file_list),2),
                               np.nan, dtype=np.float32)
 
             # set up the img info table
             cols = []
             print(len(specImgKwds),len(specImgKwdTypes))
             for kwd,tpe in zip(specImgKwds[:-1],specImgKwdTypes[:-1]):
-                cols.append(Column(name=kwd,dtype=tpe,length=len(ffiFiles)))
+                cols.append(Column(name=kwd,dtype=tpe,length=len(file_list)))
+            cols.append(Column(name="FFI_FILE",dtype="S38",length=len(file_list)))
             imgInfoTable = Table(cols)
             print(imgInfoTable.columns)
 
         # add the image and info to the arrays
-        imgCube[:,:,i] = ffiData[1].data
+        imgCube[:,:,i,0] = ffiData[1].data
+        imgCube[:,:,i,1] = ffiData[2].data
         for kwd in imgInfoTable.columns:
-            imgInfoTable[kwd][i] = ffiData[1].header[kwd]
+            if kwd == "FFI_FILE":
+                imgInfoTable[kwd][i] = path.basename(fle)
+            else:
+                imgInfoTable[kwd][i] = ffiData[1].header[kwd]
+
+        if fle == file_list[-1]:
+            primaryHeader['DATE-END'] = ffiData[1].header['DATE-END']
 
         # close fits file
         ffiData.close()
@@ -115,29 +139,30 @@ def make_cube(file_list, cube_file="cube.fits", verbose=True):
         if verbose:
             print("Completed file {}".format(i))
 
-        for kwd in specImgKwds:
-            secondaryHeader.remove(kwd)
+    for kwd in specImgKwds:
+        secondaryHeader.remove(kwd)
 
-        # put it all in a fits file 
-        primaryHdu = fits.PrimaryHDU(header=primaryHeader)
-        cubeHdu = fits.ImageHDU(data=imgCube,header=secondaryHeader)
 
-        # make table hdu with the img info array
-        cols = []
-        for kwd in imgInfoTable.columns:
-            tpe = 'F' if (imgInfoTable[kwd].dtype == np.float32) else 'A24'
-            cols.append(fits.Column(name=kwd, format=tpe, array=imgInfoTable[kwd]))
-        tcDef = fits.ColDefs(cols)
-        timeHdu = fits.BinTableHDU.from_columns(tcDef)
+    # put it all in a fits file 
+    primaryHdu = fits.PrimaryHDU(header=primaryHeader)
+    cubeHdu = fits.ImageHDU(data=imgCube,header=secondaryHeader)
 
-        hduList = fits.HDUList([primaryHdu,cubeHdu,timeHdu])
+    # make table hdu with the img info array
+    cols = []
+    for kwd in imgInfoTable.columns:
+        tpe = 'F' if (imgInfoTable[kwd].dtype == np.float32) else 'A24'
+        cols.append(fits.Column(name=kwd, format=tpe, array=imgInfoTable[kwd]))
+    tcDef = fits.ColDefs(cols)
+    timeHdu = fits.BinTableHDU.from_columns(tcDef)
 
-        if verbose:
-            writeTime = time()
+    hduList = fits.HDUList([primaryHdu,cubeHdu,timeHdu])
+
+    if verbose:
+        writeTime = time()
     
-        hduList.writeto(cube_file, overwrite=True) 
+    hduList.writeto(cube_file, overwrite=True) 
 
-        if verbose:
-            endTime = time()
-            print("Total time elapsed:", endTime - beginTime)
-            print("File write time:", endTime - writeTime)
+    if verbose:
+        endTime = time()
+        print("Total time elapsed:", endTime - startTime)
+        print("File write time:", endTime - writeTime)
