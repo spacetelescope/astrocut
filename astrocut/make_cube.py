@@ -21,6 +21,7 @@ specImgKwds = ['TSTART','TSTOP',
                'AP_1_0','AP_0_1','AP_2_0','AP_0_2','AP_1_1',
                'BP_1_0','BP_0_1','BP_2_0','BP_0_2','BP_1_1',
                'A_DMAX','B_DMAX',
+               'DQUALITY',
                'CHECKSUM']
 
 specImgKwdTypes = [np.float32,np.float32,
@@ -36,6 +37,7 @@ specImgKwdTypes = [np.float32,np.float32,
                    np.float32,np.float32,np.float32,np.float32,np.float32,
                    np.float32,np.float32,np.float32,np.float32,np.float32,
                    np.float32,np.float32,
+                   np.int32,
                    'S16']
 
 

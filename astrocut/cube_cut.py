@@ -1,4 +1,5 @@
 import numpy as np
+import astropy.units as u
 
 from astropy.io import fits
 from astropy.table import Table,Column
@@ -6,6 +7,7 @@ from astropy.coordinates import SkyCoord
 from astropy import wcs
 
 from time import time
+from copy import deepcopy
 
 import os
 
@@ -30,25 +32,56 @@ def getCubeWcs(tableHeader,tableRow):
     return wcs.WCS(wcsHeader)
 
 
-def getCutoutLims(centerCoord, dims, cubeWcs):
+def get_cutout_limits(center_coord, cutout_size, cube_wcs):
     """
-    Takes the centra coordinates, cutout dimensions, and the wcs from
+    Takes the center coordinates, cutout size, and the wcs from
     which the cutout is being taken and returns the x and y pixel limits
     for the cutout.
+
+    cutout_size : array
+         [nx,ny] in with ints (pixels) or astropy quantities
     """
 
-    centerPixel = centerCoord.to_pixel(cubeWcs) # TODO: add checks!!
-      
-    xlim = (int(round(centerPixel[0] - dims[0])),
-            int(round(centerPixel[0] + dims[0])))
-    ylim = (int(round(centerPixel[1] - dims[1])),
-            int(round(centerPixel[1] + dims[1])))
-    # TODO: Make sure entire cutout is on image or adjust bounds
+    center_pixel = center_coord.to_pixel(cube_wcs)
 
-    return xlim,ylim
+    lims = np.zeros((2,2),dtype=int)
+
+    for axis, size in enumerate(cutout_size):
+        
+        if not isinstance(size, u.Quantity): # assume pixels
+            dim = size/2
+        elif size.unit == u.pixel: # also pixels
+            dim = size.value/2
+        elif size.unit.physical_type == 'angle':
+            pixel_scale = u.Quantity(proj_plane_pixel_scales(wcs)[axis], wcs.wcs.cunit[axis])
+            dim = (size / pixel_scale).decompose()/2
+
+        lims[axis,0] = int(np.round(center_pixel[axis] - dim))
+        lims[axis,1] = int(np.round(center_pixel[axis] + dim))
+
+        # Adjust bounds if necessary
+        lims[axis,0] = lims[axis,0] if lims[axis,0] >=0 else 0
+        lims[axis,1] = lims[axis,1]  if lims[axis,1] < cube_wcs._naxis[axis] else cube_wcs._naxis[axis]-1
+    
+    return lims
 
 
-def getCutout(xlim,ylim,transposedCube, verbose=True):
+def get_cutout_wcs(cutout_lims, cube_wcs):
+    """
+    Get cutout wcs object, with updated NAXIS keywords and crpix. 
+    """
+
+    cutout_wcs = deepcopy(cube_wcs)
+    
+    cutout_wcs.wcs.crpix -= cutout_lims[:,0]
+    
+    cutout_wcs._naxis = [cutout_lims[0,1]-cutout_lims[0,0],
+                         cutout_lims[1,1]-cutout_lims[1,0]]
+
+    return cutout_wcs
+
+
+def getCutout(cutout_lims,transposedCube, verbose=True):
     """
     Making a cutout from an image/uncertainty cube that has been transposed 
     to have time on the longest axis.
@@ -56,7 +89,11 @@ def getCutout(xlim,ylim,transposedCube, verbose=True):
     Returns the untransposed image cutout and uncertainty cutout.
     """
 
-    cutout = transposedCube[xlim[0]:xlim[1]+1,ylim[0]:ylim[1]+1,:,:]
+    xmin,xmax = cutout_lims[0]
+    ymin,ymax = cutout_lims[1]
+
+    cutout = transposedCube[xmin:xmax,ymin:ymax,:,:]
+    
     imgCutout = cutout[:,:,:,0].transpose((2,0,1))
     uncertCutout = cutout[:,:,:,1].transpose((2,0,1))
 
@@ -88,6 +125,34 @@ def update_primary_header(primary_header, coordinates):
     primary_header['TICVER'] = (0,'TICVER') 
 
 
+def add_column_wcs(header, colnums, wcs_info):
+    """
+    Take WCS info in wcs_info and add it to the header as 
+    """
+    
+    wcs_keywords = {'CTYPE1':'1CTYP{}',
+                    'CTYPE2':'2CTYP{}',
+                    'CRPIX1':'1CRPX{}',
+                    'CRPIX2':'2CRPX{}',
+                    'CRVAL1':'1CRVL{}',
+                    'CRVAL2':'2CRVL{}',
+                    'CUNIT1':'1CUNI{}',
+                    'CUNIT2':'2CUNI{}',
+                    'CDELT1':'1CDLT{}',
+                    'CDELT2':'2CDLT{}',
+                    'PC1_1':'11PC{}',
+                    'PC1_2':'12PC{}',
+                    'PC2_1':'21PC{}',
+                    'PC2_2':'22PC{}'}
+
+
+    for col in colnums:
+        for kw in wcs_keywords:
+            if kw not in wcs_info.keys():
+                continue ## TODO: Something better than this?
+            header[wcs_keywords[kw].format(col)] = wcs_info[kw]
+
+            
 
 def buildTpf(cubeFits, imgCube, uncertCube, cutoutWcs, coordinates, verbose=True):
     """
@@ -121,6 +186,8 @@ def buildTpf(cubeFits, imgCube, uncertCube, cutoutWcs, coordinates, verbose=True
         print("Array shape: {}".format(emptyArr.shape))
         
 
+    
+    
     cols.append(fits.Column(name='RAW_CNTS', format=tform.replace('E','J'), unit='count', dim=dims, disp='I8',
                             array=emptyArr)) 
     cols.append(fits.Column(name='FLUX', format=tform, dim=dims, unit='e-/s', disp='E14.7', array=imgCube))
@@ -131,24 +198,28 @@ def buildTpf(cubeFits, imgCube, uncertCube, cutoutWcs, coordinates, verbose=True
     cols.append(fits.Column(name='FLUX_BKG_ERR', format=tform, dim=dims, unit='e-/s', disp='E14.7',array=emptyArr))
 
     # Adding the quality flags
-    #cols.append(fits.Column(name='QUALITY', format='j', disp='B16.16', array=cubeFits[2].columns['DQUALITY'].array))
+    cols.append(fits.Column(name='QUALITY', format='j', disp='B16.16', array=cubeFits[2].columns['DQUALITY'].array))
 
     # Adding the position correction info (zeros b.c we don't have this info)
     cols.append(fits.Column(name='POS_CORR1', format='E', unit='pixel', disp='E14.7',array=emptyArr[:,0,0]))
     cols.append(fits.Column(name='POS_CORR2', format='E', unit='pixel', disp='E14.7',array=emptyArr[:,0,0]))
+
+    # Adding the FFI_FILE column (not in the pipeline tpfs)
+    cols.append(fits.Column(name='FFI_FILE', format='38A', unit='pixel',array=cubeFits[2].columns['FFI_FILE'].array))
         
     # making the table HDU
     tableHdu = fits.BinTableHDU.from_columns(cols)
 
+    #print('raw counts', tableHdu.data['RAW_CNTS'].shape)
+
     tableHdu.header['EXTNAME'] = 'PIXELS'
     
-
-    # adding the wcs keywords 
-    wcsHeader = cutoutWcs.to_header()
-    for entry in wcsHeader:
-        tableHdu.header[entry] = wcsHeader[entry]
-
-    # TODO: I think there is at lease one more hdu in a tpf
+    # Adding the wcs keywords to the columns and removing from the header
+    wcs_header = cutoutWcs.to_header()
+    add_column_wcs(tableHdu.header, [4,5,6,7,8], wcs_header) # TODO: can I not hard code the array?
+    for kword in wcs_header:
+        #del tableHdu.header[kword]
+        tableHdu.header.remove(kword, ignore_missing=True)
     
     cutoutHduList = fits.HDUList([primaryHdu,tableHdu])
 
@@ -169,10 +240,15 @@ def cube_cut(cube_file, coordinates, cutout_size, target_pixel_file=None, verbos
     coordinates : str or `astropy.coordinates` object
         The position around which to cutout. It may be specified as a
         string or as the appropriate `astropy.coordinates` object.
-    size : int or array 
+    cutout_size : int, array-like, `~astropy.units.Quantity`
         TODO: Is there a default size that makes sense?
-        The size in pixels of the cutout, if one int is given the cutout will be
-        square, otherwise it will be a rectangle with dimentions size[0]xsize[1]
+        The size of the cutout array. If ``size``
+        is a scalar number or a scalar `~astropy.units.Quantity`,
+        then a square cutout of ``size`` will be created.  If
+        ``size`` has two elements, they should be in ``(ny, nx)``
+        order.  Scalar numbers in ``size`` are assumed to be in
+        units of pixels. `~astropy.units.Quantity` objects must be in pixel or
+        angular units.
     target_pixel_file : str
         Optional. The name for the output target pixel file. 
         If no name is supplied, the file will be named: 
@@ -202,18 +278,35 @@ def cube_cut(cube_file, coordinates, cutout_size, target_pixel_file=None, verbos
     if verbose:
         print(coordinates)
 
-    if isinstance(cutout_size, int): # TODO: more checking
-        cutout_size = [cutout_size,cutout_size]
-    elif len(cutout_size) < 2:
-        cutout_size = [cutout_size[0],cutout_size[0]]
+    # making size into an array [nx, ny]
+    cutout_size = np.atleast_1d(cutout_size)
+    if len(cutout_size) == 1:
+        cutout_size = np.repeat(cutout_size, 2)
+
+    if len(cutout_size) > 2:
+        print("To many dimensions in cutout size, only the first two will be used") # TODO: Make this into a warning
         
-    xlim,ylim = getCutoutLims(coordinates, cutout_size, cubeWcs) 
+    # Get cutout limits
+    cutout_lims = get_cutout_limits(coordinates, cutout_size, cubeWcs)
+
+    if verbose:
+        print("xmin,xmax:",cutout_lims[0])
+        print("ymin,ymax:",cutout_lims[1])
 
     # Make the cutout
-    imgCutout, uncertCutout = getCutout(xlim,ylim,cube[1].data)
+    imgCutout, uncertCutout = getCutout(cutout_lims,cube[1].data)
 
+    # Get cutout wcs info
+    cutout_wcs = get_cutout_wcs(cutout_lims, cubeWcs)
+    
+    if verbose:
+        print(cubeWcs)
+        print(cutout_wcs)
+    
     # Build the TPF
-    tpfObject = buildTpf(cube, imgCutout, uncertCutout, cubeWcs, coordinates)
+    tpfObject = buildTpf(cube, imgCutout, uncertCutout, cutout_wcs, coordinates)
+
+    print("raw counts:",tpfObject[1].data['RAW_CNTS'].shape)
 
     if verbose:
         writeTime = time()
