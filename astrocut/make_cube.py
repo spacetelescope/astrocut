@@ -116,12 +116,10 @@ def make_cube(file_list, cube_file="cube.fits", verbose=True):
 
             # set up the img info table
             cols = []
-            print(len(specImgKwds),len(specImgKwdTypes))
             for kwd,tpe in zip(specImgKwds[:-1],specImgKwdTypes[:-1]):
                 cols.append(Column(name=kwd,dtype=tpe,length=len(file_list)))
             cols.append(Column(name="FFI_FILE",dtype="S38",length=len(file_list)))
             imgInfoTable = Table(cols)
-            print(imgInfoTable.columns)
 
         # add the image and info to the arrays
         imgCube[:,:,i,0] = ffiData[1].data
@@ -166,5 +164,7 @@ def make_cube(file_list, cube_file="cube.fits", verbose=True):
 
     if verbose:
         endTime = time()
-        print("Total time elapsed:", endTime - startTime)
-        print("File write time:", endTime - writeTime)
+        print("Total time elapsed: {:.2f} sec".format(endTime - startTime))
+        print("File write time: {:.2f} sec".format(endTime - writeTime))
+
+    return cube_file

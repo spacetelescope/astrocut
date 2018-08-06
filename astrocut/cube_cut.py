@@ -184,9 +184,6 @@ def buildTpf(cubeFits, imgCube, uncertCube, cutoutWcs, coordinates, verbose=True
         print("TFORM: {}".format(tform))
         print("DIMS: {}".format(dims))
         print("Array shape: {}".format(emptyArr.shape))
-        
-
-    
     
     cols.append(fits.Column(name='RAW_CNTS', format=tform.replace('E','J'), unit='count', dim=dims, disp='I8',
                             array=emptyArr)) 
@@ -209,8 +206,6 @@ def buildTpf(cubeFits, imgCube, uncertCube, cutoutWcs, coordinates, verbose=True
         
     # making the table HDU
     tableHdu = fits.BinTableHDU.from_columns(cols)
-
-    #print('raw counts', tableHdu.data['RAW_CNTS'].shape)
 
     tableHdu.header['EXTNAME'] = 'PIXELS'
     
@@ -276,7 +271,7 @@ def cube_cut(cube_file, coordinates, cutout_size, target_pixel_file=None, verbos
         coordinates = SkyCoord.from_name(coordinates) # TODO: more checking here
 
     if verbose:
-        print(coordinates)
+        print("Cutout center coordinate:",coordinates.ra.deg,coordinates.dec.deg)
 
     # making size into an array [nx, ny]
     cutout_size = np.atleast_1d(cutout_size)
@@ -299,14 +294,8 @@ def cube_cut(cube_file, coordinates, cutout_size, target_pixel_file=None, verbos
     # Get cutout wcs info
     cutout_wcs = get_cutout_wcs(cutout_lims, cubeWcs)
     
-    if verbose:
-        print(cubeWcs)
-        print(cutout_wcs)
-    
     # Build the TPF
     tpfObject = buildTpf(cube, imgCutout, uncertCutout, cutout_wcs, coordinates)
-
-    print("raw counts:",tpfObject[1].data['RAW_CNTS'].shape)
 
     if verbose:
         writeTime = time()
@@ -319,7 +308,7 @@ def cube_cut(cube_file, coordinates, cutout_size, target_pixel_file=None, verbos
                                                                 cutout_size[0],cutout_size[1])
     
     if verbose:
-        print(target_pixel_file)
+        print("Target pixel file:",target_pixel_file)
         
     # Write the TPF
     tpfObject.writeto(target_pixel_file, overwrite=True)
@@ -330,4 +319,6 @@ def cube_cut(cube_file, coordinates, cutout_size, target_pixel_file=None, verbos
     if verbose:
         print("Write time: {:.2} sec".format(time()-writeTime))
         print("Total time: {:.2} sec".format(time()-startTime))
+
+    return target_pixel_file
 
