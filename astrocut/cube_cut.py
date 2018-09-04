@@ -152,7 +152,7 @@ def add_column_wcs(header, colnums, wcs_info):
                 continue ## TODO: Something better than this?
             header[wcs_keywords[kw].format(col)] = wcs_info[kw]
 
-            
+
 
 def buildTpf(cubeFits, imgCube, uncertCube, cutoutWcs, coordinates, verbose=True):
     """
@@ -173,7 +173,7 @@ def buildTpf(cubeFits, imgCube, uncertCube, cutoutWcs, coordinates, verbose=True
     cols.append(fits.Column(name='TIMECORR', format='E', unit='d', disp='E14.7',
                             array=cubeFits[2].columns['BARYCORR'].array))
 
-    cols.append(fits.Column(name='CADENCENO', format='J', disp='I10', array=np.array(range(len(imgCube)))))
+    cols.append(fits.Column(name='CADENCENO', format='J', disp='I10', array=np.arange(1, len(imgCube) + 1)))
     
     # Adding the cutouts
     tform = str(imgCube[0].size) + "E"
@@ -207,13 +207,16 @@ def buildTpf(cubeFits, imgCube, uncertCube, cutoutWcs, coordinates, verbose=True
     # making the table HDU
     tableHdu = fits.BinTableHDU.from_columns(cols)
 
+    # Have to add the comment to the CADENCENO column Header manually
+    # (This is needed b/c the CADENCENO is not really the cadence number)
+    tableHdu.header.comments['TTYPE3'] = "Row counter, not true cadence number"
+    
     tableHdu.header['EXTNAME'] = 'PIXELS'
     
     # Adding the wcs keywords to the columns and removing from the header
     wcs_header = cutoutWcs.to_header()
     add_column_wcs(tableHdu.header, [4,5,6,7,8], wcs_header) # TODO: can I not hard code the array?
     for kword in wcs_header:
-        #del tableHdu.header[kword]
         tableHdu.header.remove(kword, ignore_missing=True)
     
     cutoutHduList = fits.HDUList([primaryHdu,tableHdu])
