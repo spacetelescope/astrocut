@@ -60,8 +60,8 @@ def get_cutout_limits(center_coord, cutout_size, cube_wcs):
         lims[axis,1] = int(np.round(center_pixel[axis] + dim))
 
         # Adjust bounds if necessary
-        lims[axis,0] = lims[axis,0] if lims[axis,0] >=0 else 0
-        lims[axis,1] = lims[axis,1]  if lims[axis,1] < cube_wcs._naxis[axis] else cube_wcs._naxis[axis]-1
+        #lims[axis,0] = lims[axis,0] if lims[axis,0] >=0 else 0
+        #lims[axis,1] = lims[axis,1]  if lims[axis,1] < cube_wcs._naxis[axis] else cube_wcs._naxis[axis]-1
     
     return lims
 
@@ -81,7 +81,7 @@ def get_cutout_wcs(cutout_lims, cube_wcs):
     return cutout_wcs
 
 
-def getCutout(cutout_lims,transposedCube, verbose=True):
+def get_cutout(cutout_lims, transposedCube, verbose=True):
     """
     Making a cutout from an image/uncertainty cube that has been transposed 
     to have time on the longest axis.
@@ -89,19 +89,48 @@ def getCutout(cutout_lims,transposedCube, verbose=True):
     Returns the untransposed image cutout and uncertainty cutout.
     """
 
+    # These limits are not guarenteed to be within the image footprint
     xmin,xmax = cutout_lims[0]
     ymin,ymax = cutout_lims[1]
 
+    # Get the image array limits
+    xmax_cube,ymax_cube,_,_ = transposedCube.shape
+
+    # Adjust limits and figuring out the padding
+    padding = np.zeros((3,2),dtype=int)
+    if xmin < 0:
+        padding[2,0] = -xmin
+        xmin = 0
+    if ymin < 0:
+        padding[1,0] = -ymin
+        ymin = 0
+    if xmax > xmax_cube:
+        padding[2,1] = xmax - xmax_cube
+        xmax = xmax_cube
+    if ymax > ymax_cube:
+        padding[1,1] = ymax - ymax_cube
+        ymax = ymax_cube       
+        
+    # Doing the cutout
     cutout = transposedCube[xmin:xmax,ymin:ymax,:,:]
     
     imgCutout = cutout[:,:,:,0].transpose((2,0,1))
     uncertCutout = cutout[:,:,:,1].transpose((2,0,1))
+    
+    # Making the footprint array
+    footprint = np.ones((xmax-xmin, ymax-ymin))
+
+    # Adding padding to the cutouts so that it's the expected size
+    if padding.any(): # only do if we need to pad
+        imgCutout = np.pad(imgCutout, padding, 'constant', constant_values=np.nan)
+        uncertCutout = np.pad(uncertCutout, padding, 'constant', constant_values=np.nan)
+        footprint = np.pad(footprint, padding[1:], 'constant', constant_values=np.nan)
 
     if verbose:
         print("Image cutout cube shape: {}".format(imgCutout.shape))
         print("Uncertainty cutout cube shape: {}".format(uncertCutout.shape))
     
-    return imgCutout, uncertCutout
+    return imgCutout, uncertCutout, footprint
 
 
 def update_primary_header(primary_header, coordinates):
@@ -292,7 +321,7 @@ def cube_cut(cube_file, coordinates, cutout_size, target_pixel_file=None, verbos
         print("ymin,ymax:",cutout_lims[1])
 
     # Make the cutout
-    imgCutout, uncertCutout = getCutout(cutout_lims,cube[1].data)
+    imgCutout, uncertCutout, footprint = get_cutout(cutout_lims, cube[1].data)
 
     # Get cutout wcs info
     cutout_wcs = get_cutout_wcs(cutout_lims, cubeWcs)
