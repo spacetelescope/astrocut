@@ -99,16 +99,16 @@ def get_cutout(cutout_lims, transposedCube, verbose=True):
     # Adjust limits and figuring out the padding
     padding = np.zeros((3,2),dtype=int)
     if xmin < 0:
-        padding[2,0] = -xmin
+        padding[1,0] = -xmin
         xmin = 0
     if ymin < 0:
-        padding[1,0] = -ymin
+        padding[2,0] = -ymin
         ymin = 0
     if xmax > xmax_cube:
-        padding[2,1] = xmax - xmax_cube
+        padding[1,1] = xmax - xmax_cube
         xmax = xmax_cube
     if ymax > ymax_cube:
-        padding[1,1] = ymax - ymax_cube
+        padding[2,1] = ymax - ymax_cube
         ymax = ymax_cube       
         
     # Doing the cutout
@@ -117,20 +117,20 @@ def get_cutout(cutout_lims, transposedCube, verbose=True):
     imgCutout = cutout[:,:,:,0].transpose((2,0,1))
     uncertCutout = cutout[:,:,:,1].transpose((2,0,1))
     
-    # Making the footprint array
-    footprint = np.ones((xmax-xmin, ymax-ymin))
+    # Making the aperture array
+    aperture = np.ones((xmax-xmin, ymax-ymin))
 
     # Adding padding to the cutouts so that it's the expected size
     if padding.any(): # only do if we need to pad
         imgCutout = np.pad(imgCutout, padding, 'constant', constant_values=np.nan)
         uncertCutout = np.pad(uncertCutout, padding, 'constant', constant_values=np.nan)
-        footprint = np.pad(footprint, padding[1:], 'constant', constant_values=np.nan)
+        aperture = np.pad(aperture, padding[1:], 'constant', constant_values=0)
 
     if verbose:
         print("Image cutout cube shape: {}".format(imgCutout.shape))
         print("Uncertainty cutout cube shape: {}".format(uncertCutout.shape))
     
-    return imgCutout, uncertCutout, footprint
+    return imgCutout, uncertCutout, aperture
 
 
 def update_primary_header(primary_header, coordinates):
@@ -183,7 +183,7 @@ def add_column_wcs(header, colnums, wcs_info):
 
 
 
-def buildTpf(cubeFits, imgCube, uncertCube, cutoutWcs, coordinates, verbose=True):
+def buildTpf(cubeFits, imgCube, uncertCube, cutoutWcs, aperture, coordinates, verbose=True):
     """
     Building the target pixel file.
     """
@@ -247,8 +247,12 @@ def buildTpf(cubeFits, imgCube, uncertCube, cutoutWcs, coordinates, verbose=True
     add_column_wcs(tableHdu.header, [4,5,6,7,8], wcs_header) # TODO: can I not hard code the array?
     for kword in wcs_header:
         tableHdu.header.remove(kword, ignore_missing=True)
+
+    # Building the aperture HDU
+    aperture_hdu = fits.ImageHDU(data=aperture)
+    aperture_hdu.header['EXTNAME'] = 'APERTURE'  
     
-    cutoutHduList = fits.HDUList([primaryHdu,tableHdu])
+    cutoutHduList = fits.HDUList([primaryHdu,tableHdu, aperture_hdu])
 
     return cutoutHduList
 
@@ -321,13 +325,13 @@ def cube_cut(cube_file, coordinates, cutout_size, target_pixel_file=None, verbos
         print("ymin,ymax:",cutout_lims[1])
 
     # Make the cutout
-    imgCutout, uncertCutout, footprint = get_cutout(cutout_lims, cube[1].data)
+    imgCutout, uncertCutout, aperture = get_cutout(cutout_lims, cube[1].data)
 
     # Get cutout wcs info
     cutout_wcs = get_cutout_wcs(cutout_lims, cubeWcs)
     
     # Build the TPF
-    tpfObject = buildTpf(cube, imgCutout, uncertCutout, cutout_wcs, coordinates)
+    tpfObject = buildTpf(cube, imgCutout, uncertCutout, cutout_wcs, aperture, coordinates)
 
     if verbose:
         writeTime = time()
