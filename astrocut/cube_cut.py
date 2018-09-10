@@ -12,24 +12,24 @@ from copy import deepcopy
 import os
 
 
-def getCubeWcs(tableHeader,tableRow):
+def get_cube_wcs(table_header,table_row):
     """
     Takes the header and one entry from the cube table of data and returns 
     a WCS object that encalpsulates the given WCS information.
     """
     
-    wcsHeader = fits.header.Header()
+    wcs_header = fits.header.Header()
 
-    for headerKey, headerVal in tableHeader.items():
-        if not 'TTYPE' in headerKey:
+    for header_key, header_val in table_header.items():
+        if not 'TTYPE' in header_key:
             continue
-        colNum = int(headerKey[5:])-1
-        if 'NAXIS' in headerVal:
-            wcsHeader[headerVal] =  int(tableRow[colNum])
+        colNum = int(header_key[5:])-1
+        if 'NAXIS' in header_val:
+            wcs_header[header_val] =  int(table_row[colNum])
         else:
-            wcsHeader[headerVal] =  tableRow[colNum]
+            wcs_header[header_val] =  table_row[colNum]
 
-    return wcs.WCS(wcsHeader)
+    return wcs.WCS(wcs_header)
 
 
 def get_cutout_limits(center_coord, cutout_size, cube_wcs):
@@ -58,10 +58,6 @@ def get_cutout_limits(center_coord, cutout_size, cube_wcs):
 
         lims[axis,0] = int(np.round(center_pixel[axis] - dim))
         lims[axis,1] = int(np.round(center_pixel[axis] + dim))
-
-        # Adjust bounds if necessary
-        #lims[axis,0] = lims[axis,0] if lims[axis,0] >=0 else 0
-        #lims[axis,1] = lims[axis,1]  if lims[axis,1] < cube_wcs._naxis[axis] else cube_wcs._naxis[axis]-1
     
     return lims
 
@@ -81,7 +77,7 @@ def get_cutout_wcs(cutout_lims, cube_wcs):
     return cutout_wcs
 
 
-def get_cutout(cutout_lims, transposedCube, verbose=True):
+def get_cutout(cutout_lims, transposed_cube, verbose=True):
     """
     Making a cutout from an image/uncertainty cube that has been transposed 
     to have time on the longest axis.
@@ -94,7 +90,7 @@ def get_cutout(cutout_lims, transposedCube, verbose=True):
     ymin,ymax = cutout_lims[1]
 
     # Get the image array limits
-    xmax_cube,ymax_cube,_,_ = transposedCube.shape
+    xmax_cube,ymax_cube,_,_ = transposed_cube.shape
 
     # Adjust limits and figuring out the padding
     padding = np.zeros((3,2),dtype=int)
@@ -112,25 +108,25 @@ def get_cutout(cutout_lims, transposedCube, verbose=True):
         ymax = ymax_cube       
         
     # Doing the cutout
-    cutout = transposedCube[xmin:xmax,ymin:ymax,:,:]
+    cutout = transposed_cube[xmin:xmax,ymin:ymax,:,:]
     
-    imgCutout = cutout[:,:,:,0].transpose((2,0,1))
-    uncertCutout = cutout[:,:,:,1].transpose((2,0,1))
+    img_cutout = cutout[:,:,:,0].transpose((2,0,1))
+    uncert_cutout = cutout[:,:,:,1].transpose((2,0,1))
     
     # Making the aperture array
     aperture = np.ones((xmax-xmin, ymax-ymin))
 
     # Adding padding to the cutouts so that it's the expected size
     if padding.any(): # only do if we need to pad
-        imgCutout = np.pad(imgCutout, padding, 'constant', constant_values=np.nan)
-        uncertCutout = np.pad(uncertCutout, padding, 'constant', constant_values=np.nan)
+        img_cutout = np.pad(img_cutout, padding, 'constant', constant_values=np.nan)
+        uncert_cutout = np.pad(uncert_cutout, padding, 'constant', constant_values=np.nan)
         aperture = np.pad(aperture, padding[1:], 'constant', constant_values=0)
 
     if verbose:
-        print("Image cutout cube shape: {}".format(imgCutout.shape))
-        print("Uncertainty cutout cube shape: {}".format(uncertCutout.shape))
+        print("Image cutout cube shape: {}".format(img_cutout.shape))
+        print("Uncertainty cutout cube shape: {}".format(uncert_cutout.shape))
     
-    return imgCutout, uncertCutout, aperture
+    return img_cutout, uncert_cutout, aperture
 
 
 def update_primary_header(primary_header, coordinates):
@@ -151,7 +147,8 @@ def update_primary_header(primary_header, coordinates):
     primary_header['LOGG'] = (0.0,'[cm/s2] log10 surface gravity') 
     primary_header['MH'] =(0.0,'[log10([M/H])] metallicity') 
     primary_header['RADIUS'] = (0.0,'[solar radii] stellar radius')
-    primary_header['TICVER'] = (0,'TICVER') 
+    primary_header['TICVER'] = (0,'TICVER')
+
 
 
 def add_column_wcs(header, colnums, wcs_info):
@@ -181,80 +178,97 @@ def add_column_wcs(header, colnums, wcs_info):
                 continue ## TODO: Something better than this?
             header[wcs_keywords[kw].format(col)] = wcs_info[kw]
 
+            
+def apply_header_inherit(hdu_list):
+    """Astropy fits functionality does not appy the INHERIT keyword, so we have to do it manually"""
+    
+    primary_header = hdu_list[0].header
 
+    reserved_kwds = ["COMMENT","SIMPLE","BITPIX", "EXTEND", "NEXTEND"]
 
-def buildTpf(cubeFits, imgCube, uncertCube, cutoutWcs, aperture, coordinates, verbose=True):
+    for hdu in hdu_list[1:]:
+        if hdu.header.get("INHERIT", False):
+            for kwd in primary_header:
+                if (kwd not in hdu.header) and (kwd not in reserved_kwds):
+                    hdu.header[kwd] = (primary_header[kwd], primary_header.comments[kwd])
+            
+
+def build_tpf(cube_fits, img_cube, uncert_cube, cutout_wcs, aperture, coordinates, verbose=True):
     """
     Building the target pixel file.
     """
 
     # The primary hdu is just the main header, which is the same
     # as the one on the cube file
-    primaryHdu = cubeFits[0]
-    update_primary_header(primaryHdu.header, coordinates)
+    primary_hdu = cube_fits[0]
+    update_primary_header(primary_hdu.header, coordinates)
 
     cols = list()
 
     # Adding the Time relates columns
     cols.append(fits.Column(name='TIME', format='D', unit='BJD - 2457000, days', disp='D14.7',
-                            array=(cubeFits[2].columns['TSTART'].array + cubeFits[2].columns['TSTOP'].array)/2))
+                            array=(cube_fits[2].columns['TSTART'].array + cube_fits[2].columns['TSTOP'].array)/2))
 
     cols.append(fits.Column(name='TIMECORR', format='E', unit='d', disp='E14.7',
-                            array=cubeFits[2].columns['BARYCORR'].array))
+                            array=cube_fits[2].columns['BARYCORR'].array))
 
-    cols.append(fits.Column(name='CADENCENO', format='J', disp='I10', array=np.arange(1, len(imgCube) + 1)))
+    cols.append(fits.Column(name='CADENCENO', format='J', disp='I10', array=np.arange(1, len(img_cube) + 1)))
     
     # Adding the cutouts
-    tform = str(imgCube[0].size) + "E"
-    dims = str(imgCube[0].shape)
-    emptyArr = np.zeros(imgCube.shape)
+    tform = str(img_cube[0].size) + "E"
+    dims = str(img_cube[0].shape)
+    empty_arr = np.zeros(img_cube.shape)
 
     if verbose:
         print("TFORM: {}".format(tform))
         print("DIMS: {}".format(dims))
-        print("Array shape: {}".format(emptyArr.shape))
+        print("Array shape: {}".format(empty_arr.shape))
     
     cols.append(fits.Column(name='RAW_CNTS', format=tform.replace('E','J'), unit='count', dim=dims, disp='I8',
-                            array=emptyArr)) 
-    cols.append(fits.Column(name='FLUX', format=tform, dim=dims, unit='e-/s', disp='E14.7', array=imgCube))
-    cols.append(fits.Column(name='FLUX_ERR', format=tform, dim=dims, unit='e-/s', disp='E14.7', array=uncertCube)) 
+                            array=empty_arr)) 
+    cols.append(fits.Column(name='FLUX', format=tform, dim=dims, unit='e-/s', disp='E14.7', array=img_cube))
+    cols.append(fits.Column(name='FLUX_ERR', format=tform, dim=dims, unit='e-/s', disp='E14.7', array=uncert_cube)) 
    
     # Adding the background info (zeros b.c we don't have this info)
-    cols.append(fits.Column(name='FLUX_BKG', format=tform, dim=dims, unit='e-/s', disp='E14.7',array=emptyArr))
-    cols.append(fits.Column(name='FLUX_BKG_ERR', format=tform, dim=dims, unit='e-/s', disp='E14.7',array=emptyArr))
+    cols.append(fits.Column(name='FLUX_BKG', format=tform, dim=dims, unit='e-/s', disp='E14.7',array=empty_arr))
+    cols.append(fits.Column(name='FLUX_BKG_ERR', format=tform, dim=dims, unit='e-/s', disp='E14.7',array=empty_arr))
 
     # Adding the quality flags
-    cols.append(fits.Column(name='QUALITY', format='j', disp='B16.16', array=cubeFits[2].columns['DQUALITY'].array))
+    cols.append(fits.Column(name='QUALITY', format='j', disp='B16.16', array=cube_fits[2].columns['DQUALITY'].array))
 
     # Adding the position correction info (zeros b.c we don't have this info)
-    cols.append(fits.Column(name='POS_CORR1', format='E', unit='pixel', disp='E14.7',array=emptyArr[:,0,0]))
-    cols.append(fits.Column(name='POS_CORR2', format='E', unit='pixel', disp='E14.7',array=emptyArr[:,0,0]))
+    cols.append(fits.Column(name='POS_CORR1', format='E', unit='pixel', disp='E14.7',array=empty_arr[:,0,0]))
+    cols.append(fits.Column(name='POS_CORR2', format='E', unit='pixel', disp='E14.7',array=empty_arr[:,0,0]))
 
     # Adding the FFI_FILE column (not in the pipeline tpfs)
-    cols.append(fits.Column(name='FFI_FILE', format='38A', unit='pixel',array=cubeFits[2].columns['FFI_FILE'].array))
+    cols.append(fits.Column(name='FFI_FILE', format='38A', unit='pixel',array=cube_fits[2].columns['FFI_FILE'].array))
         
     # making the table HDU
-    tableHdu = fits.BinTableHDU.from_columns(cols)
+    table_hdu = fits.BinTableHDU.from_columns(cols)
 
     # Have to add the comment to the CADENCENO column Header manually
     # (This is needed b/c the CADENCENO is not really the cadence number)
-    tableHdu.header.comments['TTYPE3'] = "Row counter, not true cadence number"
+    table_hdu.header.comments['TTYPE3'] = "Row counter, not true cadence number"
     
-    tableHdu.header['EXTNAME'] = 'PIXELS'
+    table_hdu.header['EXTNAME'] = 'PIXELS'
+    table_hdu.header['INHERIT'] = True
     
     # Adding the wcs keywords to the columns and removing from the header
-    wcs_header = cutoutWcs.to_header()
-    add_column_wcs(tableHdu.header, [4,5,6,7,8], wcs_header) # TODO: can I not hard code the array?
+    wcs_header = cutout_wcs.to_header()
+    add_column_wcs(table_hdu.header, [4,5,6,7,8], wcs_header) # TODO: can I not hard code the array?
     for kword in wcs_header:
-        tableHdu.header.remove(kword, ignore_missing=True)
+        table_hdu.header.remove(kword, ignore_missing=True)
 
     # Building the aperture HDU
     aperture_hdu = fits.ImageHDU(data=aperture)
-    aperture_hdu.header['EXTNAME'] = 'APERTURE'  
+    aperture_hdu.header['EXTNAME'] = 'APERTURE'
+    aperture_hdu.header['INHERIT'] = True
     
-    cutoutHduList = fits.HDUList([primaryHdu,tableHdu, aperture_hdu])
+    cutout_hdu_list = fits.HDUList([primary_hdu,table_hdu, aperture_hdu])
 
-    return cutoutHduList
+    apply_header_inherit(cutout_hdu_list)
+
+    return cutout_hdu_list
 
 
 
@@ -301,7 +315,7 @@ def cube_cut(cube_file, coordinates, cutout_size, target_pixel_file=None, verbos
 
     # Get the WCS and figure out which pixels are in the cutout
     wcsInd = int(len(cube[2].data)/2) # using the middle file for wcs info
-    cubeWcs = getCubeWcs(cube[2].header, cube[2].data[wcsInd])
+    cubeWcs = get_cube_wcs(cube[2].header, cube[2].data[wcsInd])
 
     if not isinstance(coordinates, SkyCoord):
         coordinates = SkyCoord.from_name(coordinates) # TODO: more checking here
@@ -325,13 +339,13 @@ def cube_cut(cube_file, coordinates, cutout_size, target_pixel_file=None, verbos
         print("ymin,ymax:",cutout_lims[1])
 
     # Make the cutout
-    imgCutout, uncertCutout, aperture = get_cutout(cutout_lims, cube[1].data)
+    img_cutout, uncert_cutout, aperture = get_cutout(cutout_lims, cube[1].data)
 
     # Get cutout wcs info
     cutout_wcs = get_cutout_wcs(cutout_lims, cubeWcs)
     
     # Build the TPF
-    tpfObject = buildTpf(cube, imgCutout, uncertCutout, cutout_wcs, aperture, coordinates)
+    tpf_object = build_tpf(cube, img_cutout, uncert_cutout, cutout_wcs, aperture, coordinates)
 
     if verbose:
         writeTime = time()
@@ -347,7 +361,7 @@ def cube_cut(cube_file, coordinates, cutout_size, target_pixel_file=None, verbos
         print("Target pixel file:",target_pixel_file)
         
     # Write the TPF
-    tpfObject.writeto(target_pixel_file, overwrite=True)
+    tpf_object.writeto(target_pixel_file, overwrite=True)
 
     # Close the cube file
     cube.close()
