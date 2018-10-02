@@ -45,8 +45,6 @@ def make_primary_header(ffi_main_header, ffi_img_header, sector=-1):
     
     header = ffi_main_header
 
-    #header.remove('DATE-OBS')
-    #header.remove('DATE-END')
     header.remove('CHECKSUM')
 
     header['ORIGIN'] = 'STScI/MAST'
@@ -85,6 +83,15 @@ def make_cube(file_list, cube_file="cube.fits", verbose=True):
 
     if verbose:
         startTime = time()
+
+    # Getting the time sorted indices for the files
+    file_list = np.array(file_list)
+    start_times = np.zeros(len(file_list))
+    
+    for i,ffi in enumerate(file_list):
+        start_times[i] = fits.getval(ffi, 'TSTART', 1)
+        
+    sorted_indices = np.argsort(start_times)      
     
     # these will be the arrays and headers
     imgCube = None
@@ -93,7 +100,7 @@ def make_cube(file_list, cube_file="cube.fits", verbose=True):
     secondaryHeader = None
 
     # Loop through files
-    for i,fle in enumerate(file_list):
+    for i,fle in enumerate(file_list[sorted_indices]):
         
         ffiData = fits.open(fle)
 
