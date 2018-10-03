@@ -53,7 +53,7 @@ def get_cutout_limits(center_coord, cutout_size, cube_wcs):
         elif size.unit == u.pixel: # also pixels
             dim = size.value/2
         elif size.unit.physical_type == 'angle':
-            pixel_scale = u.Quantity(proj_plane_pixel_scales(wcs)[axis], wcs.wcs.cunit[axis])
+            pixel_scale = u.Quantity(wcs.utils.proj_plane_pixel_scales(cube_wcs)[axis], cube_wcs.wcs.cunit[axis])
             dim = (size / pixel_scale).decompose()/2
 
         lims[axis,0] = int(np.round(center_pixel[axis] - dim))
@@ -86,8 +86,8 @@ def get_cutout(cutout_lims, transposed_cube, verbose=True):
     """
 
     # These limits are not guarenteed to be within the image footprint
-    xmin,xmax = cutout_lims[0]
-    ymin,ymax = cutout_lims[1]
+    xmin,xmax = cutout_lims[1]
+    ymin,ymax = cutout_lims[0]
 
     # Get the image array limits
     xmax_cube,ymax_cube,_,_ = transposed_cube.shape
@@ -234,7 +234,7 @@ def build_tpf(cube_fits, img_cube, uncert_cube, cutout_wcs, aperture, coordinate
     cols.append(fits.Column(name='FLUX_BKG_ERR', format=tform, dim=dims, unit='e-/s', disp='E14.7',array=empty_arr))
 
     # Adding the quality flags
-    cols.append(fits.Column(name='QUALITY', format='j', disp='B16.16', array=cube_fits[2].columns['DQUALITY'].array))
+    cols.append(fits.Column(name='QUALITY', format='J', disp='B16.16', array=cube_fits[2].columns['DQUALITY'].array))
 
     # Adding the position correction info (zeros b.c we don't have this info)
     cols.append(fits.Column(name='POS_CORR1', format='E', unit='pixel', disp='E14.7',array=empty_arr[:,0,0]))
@@ -272,7 +272,7 @@ def build_tpf(cube_fits, img_cube, uncert_cube, cutout_wcs, aperture, coordinate
 
 
 
-def cube_cut(cube_file, coordinates, cutout_size, target_pixel_file=None, verbose=None):
+def cube_cut(cube_file, coordinates, cutout_size, target_pixel_file=None, output_path=".", verbose=None):
     """
     Takes a cube file (as created by ~astrocut.make_cube), 
     and makes a cutout stak of the given size around the given coordinates.
@@ -297,7 +297,10 @@ def cube_cut(cube_file, coordinates, cutout_size, target_pixel_file=None, verbos
     target_pixel_file : str
         Optional. The name for the output target pixel file. 
         If no name is supplied, the file will be named: 
-        <cube_file>_<ra>_<dec>_<cutout_size>_cutout.fits
+        <cube_file>_<ra>_<dec>_<cutout_size>_astrocut.fits
+    output_path : str
+        Optional. The path where the output file is saved. 
+        The current directory is default.
     verbose : bool
         Optional. If true intermediate information is printed. 
 
@@ -323,20 +326,21 @@ def cube_cut(cube_file, coordinates, cutout_size, target_pixel_file=None, verbos
     if verbose:
         print("Cutout center coordinate:",coordinates.ra.deg,coordinates.dec.deg)
 
-    # making size into an array [nx, ny]
+
+    # making size into an array [ny, nx] TODO: MAKE SURE I AM USING THEM AS NY,NX
     cutout_size = np.atleast_1d(cutout_size)
     if len(cutout_size) == 1:
         cutout_size = np.repeat(cutout_size, 2)
 
     if len(cutout_size) > 2:
         print("To many dimensions in cutout size, only the first two will be used") # TODO: Make this into a warning
-        
+       
     # Get cutout limits
     cutout_lims = get_cutout_limits(coordinates, cutout_size, cubeWcs)
 
     if verbose:
-        print("xmin,xmax:",cutout_lims[0])
-        print("ymin,ymax:",cutout_lims[1])
+        print("xmin,xmax:",cutout_lims[1])
+        print("ymin,ymax:",cutout_lims[0])
 
     # Make the cutout
     img_cutout, uncert_cutout, aperture = get_cutout(cutout_lims, cube[1].data)
@@ -353,10 +357,12 @@ def cube_cut(cube_file, coordinates, cutout_size, target_pixel_file=None, verbos
     if not target_pixel_file:
         # TODO: also strip off excess path from cube file
         _, flename = os.path.split(cube_file)
-        target_pixel_file = "{}_{}_{}_{}x{}_cutout.fits".format(flename.rstrip('.fits'),
-                                                                coordinates.ra.value, coordinates.dec.value,
-                                                                cutout_size[0],cutout_size[1])
-    
+        target_pixel_file = output_path + "/"
+        target_pixel_file += "{}_{}_{}_{}x{}_astrocut.fits".format(flename.rstrip('.fits').rstrip("-cube"),
+                                                                  coordinates.ra.value, coordinates.dec.value,
+                                                                  cutout_lims[0,1]-cutout_lims[0,0],
+                                                                  cutout_lims[1,1]-cutout_lims[1,0])
+        
     if verbose:
         print("Target pixel file:",target_pixel_file)
         

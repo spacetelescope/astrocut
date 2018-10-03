@@ -56,7 +56,7 @@ def make_primary_header(ffi_main_header, ffi_img_header, sector=-1):
     return header
     
 
-def make_cube(file_list, cube_file="cube.fits", verbose=True):
+def make_cube(file_list, cube_file="img-cube.fits", verbose=True):
     """
     Turns a list of fits image files into one large data-cube.
     Input images must all have the same footprint and resolution.
