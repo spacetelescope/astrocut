@@ -23,17 +23,19 @@ def get_cube_wcs(table_header,table_row):
     for header_key, header_val in table_header.items():
         if not 'TTYPE' in header_key:
             continue
-
-        colNum = int(header_key[5:])-1
-        if 'NAXIS' in header_val:
-            #print(header_key, header_val)
-            wcs_header[header_val] =  int(table_row[colNum])
+        
+        col_num = int(header_key[5:]) - 1
+        tform = table_header[header_key.replace("TTYPE","TFORM")]
+        if "A" in tform:
+            wcs_header[header_val] =  str(table_row[col_num])
+        elif "D" in tform:
+            wcs_header[header_val] =  float(table_row[col_num])
+        elif "J" in tform:
+            wcs_header[header_val] =  int(table_row[col_num])
         else:
-            wcs_header[header_val] =  table_row[colNum]
-
-    #for key in wcs_header:
-    #   print(key,wcs_header[key])
-       
+            print("Oops! (this should never happen)")
+            # TODO: raise real error? ignore? :P
+           
     return wcs.WCS(wcs_header)
 
 
@@ -48,6 +50,7 @@ def get_cutout_limits(center_coord, cutout_size, cube_wcs):
     """
 
     center_pixel = center_coord.to_pixel(cube_wcs)
+    print(center_pixel)
 
     lims = np.zeros((2,2),dtype=int)
 
@@ -63,23 +66,12 @@ def get_cutout_limits(center_coord, cutout_size, cube_wcs):
 
         lims[axis,0] = int(np.round(center_pixel[axis] - dim))
         lims[axis,1] = int(np.round(center_pixel[axis] + dim))
+
+    # Checking at least some of the cutout is on the cube
+    if ((lims[0,0] <= 0) and (lims[0,1] <=0)) or ((lims[1,0] <= 0) and (lims[1,1] <=0)):
+        raise ValueError("Cut out is not in cube footprint!") # TODO: is value error the one that makes the most sense here?
     
     return lims
-
-
-#def get_cutout_wcs(cutout_lims, cube_wcs):
-#    """
-#    Get cutout wcs object, with updated NAXIS keywords and crpix. 
-#    """
-
-#    cutout_wcs = deepcopy(cube_wcs)
-    
-#    cutout_wcs.wcs.crpix -= cutout_lims[:,0]
-    
-#    cutout_wcs._naxis = [cutout_lims[0,1]-cutout_lims[0,0],
-#                         cutout_lims[1,1]-cutout_lims[1,0]]
-
-#    return cutout_wcs
 
 
 def get_cutout_wcs(cutout_coord, cutout_lims, cube_wcs):
@@ -90,19 +82,18 @@ def get_cutout_wcs(cutout_coord, cutout_lims, cube_wcs):
     Returns as dictionary of {<kwd format string>: [value, desc]} pairs.
     TODO: Improve description
     """
-    cube_wcs_header = cube_wcs.to_header()
+    cube_wcs_header = cube_wcs.to_header(relax=True)
 
     cutout_wcs_dict = dict()
 
     ## Cutout array keywords ##
     
     cutout_wcs_dict["WCAX{}"] = [cube_wcs_header['WCSAXES'],"number of WCS axes"]
-    # TODO: make sure this is 2 (not making provisions for >2 at this point)
+    # TODO: check for 2? this must be two
 
     cutout_wcs_dict["1CTYP{}"] = [cube_wcs_header["CTYPE1"],"right ascension coordinate type"]
     cutout_wcs_dict["2CTYP{}"] = [cube_wcs_header["CTYPE2"],"declination coordinate type"]
     
-    # TODO: FILL THESE (pixel vales of COORD on cutout)
     orig_pix = cube_wcs.all_world2pix(cutout_coord.ra.deg, cutout_coord.dec.deg, 0)
     cutout_wcs_dict["1CTYP{}"] = [float(orig_pix[0]) - cutout_lims[0,0],
                                   "[pixel] reference pixel along image axis 1"]
@@ -225,58 +216,30 @@ def update_primary_header(primary_header, coordinates):
     primary_header['TICVER'] = (0,'TICVER')
 
 
-
-#def add_column_wcs(header, colnums, wcs_info):
-#    """
-#    Take WCS info in wcs_info and add it to the header as 
-#    """
-#    
-#    wcs_keywords = {'CTYPE1':'1CTYP{}',
-#                    'CTYPE2':'2CTYP{}',
-#                    'CRPIX1':'1CRPX{}',
-#                    'CRPIX2':'2CRPX{}',
-#                    'CRVAL1':'1CRVL{}',
-#                    'CRVAL2':'2CRVL{}',
-#                    'CUNIT1':'1CUNI{}',
-#                    'CUNIT2':'2CUNI{}',
-#                    'CDELT1':'1CDLT{}',
-#                    'CDELT2':'2CDLT{}',
-#                    'PC1_1':'11PC{}',
-#                    'PC1_2':'12PC{}',
-#                    'PC2_1':'21PC{}',
-#                    'PC2_2':'22PC{}'}
-#
-#
-#    for col in colnums:
-#        for kw in wcs_keywords:
-#            if kw not in wcs_info.keys():
-#                continue ## TODO: Something better than this?
-#            header[wcs_keywords[kw].format(col)] = wcs_info[kw]
-
-
 def add_column_wcs(table_header, wcs_dict):
+    """
+    TODO: Document
+    """
 
-
-    #cur_col = -1 # holds the current column number
     wcs_col = False # says if column is one that requires wcs info
     
     for kwd in table_header:
 
         # Adding header descriptions for the table keywords
-        if kwd[:-1] == "TTYPE":
+        if "TTYPE" in kwd:
             table_header.comments[kwd] = "column name"
             if table_header[kwd] == "CADENCENO":
                 table_header.comments[kwd] += ": Row counter, not true cadenceno"
-        if kwd[:-1] == "TFORM":
+        if "TFORM" in kwd:
             table_header.comments[kwd] = "column format"
-        if kwd[:-1] == "TUNIT":
+        if "TUNIT" in kwd:
             table_header.comments[kwd] = "unit"
-        if kwd[:-1] == "TDISP":
+        if "TDISP" in kwd:
             table_header.comments[kwd] = "display format"
-        if kwd[:-1] == "TDIM":
+        if "TDIM" in kwd:
             table_header.comments[kwd] = "multi-dimensional array spec"
             wcs_col = True # if column holds 2D array need to add wcs info
-        if kwd[:-1] == "TNULL":
+        if "TNULL" in kwd:
             table_header.comments[kwd] = "null value"
 
         # Adding wcs info if necessary
@@ -287,9 +250,7 @@ def add_column_wcs(table_header, wcs_dict):
                 table_header.insert(kwd,(wcs_key.format(int(kwd[-1])-1),val,com))
 
         # Removing keywords we don't want in the table header
-            
-        
-    
+        # TODO: figure out what these are (if any)
 
             
 def apply_header_inherit(hdu_list):
@@ -435,7 +396,9 @@ def cube_cut(cube_file, coordinates, cutout_size, target_pixel_file=None, output
     cubeWcs = get_cube_wcs(cube[2].header, cube[2].data[wcsInd])
 
     if not isinstance(coordinates, SkyCoord):
-        coordinates = SkyCoord.from_name(coordinates) # TODO: more checking here
+        #coordinates = SkyCoord.from_name(coordinates) # TODO: more checking here
+        coordinates = [float(x) for x in coordinates.split(' ')]
+        coordinates = SkyCoord(coordinates[0],coordinates[1],unit='deg') # TODO: fix? be better?
 
     if verbose:
         print("Cutout center coordinate:",coordinates.ra.deg,coordinates.dec.deg)

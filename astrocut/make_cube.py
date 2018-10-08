@@ -2,6 +2,7 @@ import numpy as np
 
 from astropy.io import fits
 from astropy.table import Table,Column
+from astropy.wcs import WCS
 
 from time import time
 from datetime import date
@@ -9,7 +10,8 @@ from os import path
 
 # TODO: Find a better solution to these unweildy lists
 specImgKwds = ['TSTART','TSTOP',
-               'DATE-OBS','DATE-END',
+               'DATE-OBS',
+               'DATE-END',
                'BARYCORR',
                "NAXIS", "NAXIS1", "NAXIS2",
                'CTYPE1','CTYPE2',
@@ -25,18 +27,19 @@ specImgKwds = ['TSTART','TSTOP',
                'CHECKSUM']
 
 specImgKwdTypes = [np.float32,np.float32,
-                   'S24','S24',
+                   #'S24',
+                   'S24',
                    np.float32,
-                   np.int32,np.int32,np.int32,
-                   'S12','S12',
-                   np.float32,np.float32,
-                   np.float32,np.float32,
-                   np.float32,np.float32,np.float32,np.float32,
-                   np.float32,np.float32,np.float32,
-                   np.float32,np.float32,np.float32,
-                   np.float32,np.float32,np.float32,np.float32,np.float32,
-                   np.float32,np.float32,np.float32,np.float32,np.float32,
-                   np.float32,np.float32,
+                   #np.int32,np.int32,np.int32,
+                   #'S12','S12',
+                   #np.float32,np.float32,
+                   #np.float32,np.float32,
+                   #np.float32,np.float32,np.float32,np.float32,
+                   #np.float32,np.float32,np.float32,
+                   #np.float32,np.float32,np.float32,
+                   #np.float32,np.float32,np.float32,np.float32,np.float32,
+                   #np.float32,np.float32,np.float32,np.float32,np.float32,
+                   #np.float32,np.float32,
                    np.int32,
                    'S16']
 
@@ -123,9 +126,18 @@ def make_cube(file_list, cube_file="img-cube.fits", verbose=True):
 
             # set up the img info table
             cols = []
-            for kwd,tpe in zip(specImgKwds[:-1],specImgKwdTypes[:-1]):
-                cols.append(Column(name=kwd,dtype=tpe,length=len(file_list)))
+            for kwd,val,comment in secondaryHeader.cards:
+                if type(val) == str:
+                    tpe = "S"+str(len(val))
+                elif type(val) == int:
+                    tpe = np.int32
+                else:
+                    tpe = np.float32
+                    
+                cols.append(Column(name=kwd,dtype=tpe,length=len(file_list))) # not using comment for now
+                
             cols.append(Column(name="FFI_FILE",dtype="S38",length=len(file_list)))
+            
             imgInfoTable = Table(cols)
 
         # add the image and info to the arrays
@@ -147,8 +159,7 @@ def make_cube(file_list, cube_file="img-cube.fits", verbose=True):
             print("Completed file {}".format(i))
 
     for kwd in specImgKwds:
-        secondaryHeader.remove(kwd)
-
+        secondaryHeader.remove(kwd, ignore_missing=True)
 
     # put it all in a fits file 
     primaryHdu = fits.PrimaryHDU(header=primaryHeader)
@@ -157,8 +168,15 @@ def make_cube(file_list, cube_file="img-cube.fits", verbose=True):
     # make table hdu with the img info array
     cols = []
     for kwd in imgInfoTable.columns:
-        tpe = 'F' if (imgInfoTable[kwd].dtype == np.float32) else 'A24'
+        if imgInfoTable[kwd].dtype == np.float32:
+            tpe = 'D'
+        elif imgInfoTable[kwd].dtype == np.int32:
+            tpe = 'J'
+        else:
+            tpe = "A24"
+        
         cols.append(fits.Column(name=kwd, format=tpe, array=imgInfoTable[kwd]))
+        
     tcDef = fits.ColDefs(cols)
     timeHdu = fits.BinTableHDU.from_columns(tcDef)
 
