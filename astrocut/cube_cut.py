@@ -319,16 +319,11 @@ def build_tpf(cube_fits, img_cube, uncert_cube, cutout_wcs_dict, aperture, coord
         
     # making the table HDU
     table_hdu = fits.BinTableHDU.from_columns(cols)
-
-    # Have to add the comment to the CADENCENO column Header manually
-    # (This is needed b/c the CADENCENO is not really the cadence number)
-    #table_hdu.header.comments['TTYPE3'] = "Row counter, not true cadence number"
     
     table_hdu.header['EXTNAME'] = 'PIXELS'
     table_hdu.header['INHERIT'] = True
     
     # Adding the wcs keywords to the columns and removing from the header
-    #wcs_header = cutout_wcs.to_header()
     add_column_wcs(table_hdu.header, cutout_wcs_dict) 
     #for kword in wcs_header:
     #    table_hdu.header.remove(kword, ignore_missing=True)
