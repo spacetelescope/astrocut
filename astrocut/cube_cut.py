@@ -23,12 +23,17 @@ def get_cube_wcs(table_header,table_row):
     for header_key, header_val in table_header.items():
         if not 'TTYPE' in header_key:
             continue
+
         colNum = int(header_key[5:])-1
         if 'NAXIS' in header_val:
+            #print(header_key, header_val)
             wcs_header[header_val] =  int(table_row[colNum])
         else:
             wcs_header[header_val] =  table_row[colNum]
 
+    #for key in wcs_header:
+    #   print(key,wcs_header[key])
+       
     return wcs.WCS(wcs_header)
 
 
@@ -62,20 +67,90 @@ def get_cutout_limits(center_coord, cutout_size, cube_wcs):
     return lims
 
 
-def get_cutout_wcs(cutout_lims, cube_wcs):
-    """
-    Get cutout wcs object, with updated NAXIS keywords and crpix. 
-    """
+#def get_cutout_wcs(cutout_lims, cube_wcs):
+#    """
+#    Get cutout wcs object, with updated NAXIS keywords and crpix. 
+#    """
 
-    cutout_wcs = deepcopy(cube_wcs)
+#    cutout_wcs = deepcopy(cube_wcs)
     
-    cutout_wcs.wcs.crpix -= cutout_lims[:,0]
+#    cutout_wcs.wcs.crpix -= cutout_lims[:,0]
     
-    cutout_wcs._naxis = [cutout_lims[0,1]-cutout_lims[0,0],
-                         cutout_lims[1,1]-cutout_lims[1,0]]
+#    cutout_wcs._naxis = [cutout_lims[0,1]-cutout_lims[0,0],
+#                         cutout_lims[1,1]-cutout_lims[1,0]]
 
-    return cutout_wcs
+#    return cutout_wcs
 
+
+def get_cutout_wcs(cutout_coord, cutout_lims, cube_wcs):
+    """
+    Get cutout wcs header keywords, with updated NAXIS keywords and crpix. 
+    Plus transformation back to original location on CCD.
+
+    Returns as dictionary of {<kwd format string>: [value, desc]} pairs.
+    TODO: Improve description
+    """
+    cube_wcs_header = cube_wcs.to_header()
+
+    cutout_wcs_dict = dict()
+
+    ## Cutout array keywords ##
+    
+    cutout_wcs_dict["WCAX{}"] = [cube_wcs_header['WCSAXES'],"number of WCS axes"]
+    # TODO: make sure this is 2 (not making provisions for >2 at this point)
+
+    cutout_wcs_dict["1CTYP{}"] = [cube_wcs_header["CTYPE1"],"right ascension coordinate type"]
+    cutout_wcs_dict["2CTYP{}"] = [cube_wcs_header["CTYPE2"],"declination coordinate type"]
+    
+    # TODO: FILL THESE (pixel vales of COORD on cutout)
+    orig_pix = cube_wcs.all_world2pix(cutout_coord.ra.deg, cutout_coord.dec.deg, 0)
+    cutout_wcs_dict["1CTYP{}"] = [float(orig_pix[0]) - cutout_lims[0,0],
+                                  "[pixel] reference pixel along image axis 1"]
+    cutout_wcs_dict["2CTYP{}"] = [float(orig_pix[1]) - cutout_lims[0,0],
+                                  "[pixel] reference pixel along image axis 2"]
+    
+    cutout_wcs_dict["1CRVAL{}"] = [cutout_coord.ra.deg, "[deg] right ascension at reference pixel"]
+    cutout_wcs_dict["2CRVAL{}"] = [cutout_coord.dec.deg, "[deg] declination at reference pixel"]
+    
+    cunits = cube_wcs.wcs.cunit
+    cutout_wcs_dict["1CUNI{}"] = [str(cunits[0]), "physical unit in column dimension"]
+    cutout_wcs_dict["2CUNI{}"] = [str(cunits[1]), "physical unit in row dimension"]
+
+    px_scales = wcs.utils.proj_plane_pixel_scales(cube_wcs)
+    cutout_wcs_dict["1CDLT{}"] = [px_scales[0], "[deg] pixel scale in RA dimension"]
+    cutout_wcs_dict["2CDLT{}"] = [px_scales[1], "[deg] pixel scale in DEC dimension"]
+
+    # TODO: THIS IS FILLER, HAVE TO FIGURE OUT HOW TO DO THE TRANSFORMATION FOR REAL
+    cutout_wcs_dict["11PC{}"] = [cube_wcs_header["PC1_1"],"linear transformation matrix element cos(th)"]
+    cutout_wcs_dict["12PC{}"] = [cube_wcs_header["PC1_2"],"linear transformation matrix element -sin(th)"]
+    cutout_wcs_dict["21PC{}"] = [cube_wcs_header["PC2_1"],"linear transformation matrix element sin(th)"]
+    cutout_wcs_dict["22PC{}"] = [cube_wcs_header["PC2_2"],"linear transformation matrix element cos(th)"]
+
+    ## Physical keywords ##
+    
+    cutout_wcs_dict["WCSN{}P"] = ["PHYSICAL", "table column WCS name"]
+    cutout_wcs_dict["WCAX{}P"] = [2,"table column physical WCS dimensions"]
+    
+    cutout_wcs_dict["1CTY{}P"] = ["RAWX","table column physical WCS axis 1 type, CCD col"]
+    cutout_wcs_dict["2CTY{}P"] = ["RAWY","table column physical WCS axis 2 type, CCD row"]
+    
+    cutout_wcs_dict["1CUN{}P"] = ["PIXEL","table column physical WCS axis 1 unit"]
+    cutout_wcs_dict["2CUN{}P"] = ["PIXEL","table column physical WCS axis 2 unit"]
+    
+    cutout_wcs_dict["1CRV{}P"] = [int(cube_wcs_header["CRPIX1"]) - cutout_lims[0,0],
+                                  "table column physical WCS ax 1 ref value"]
+    cutout_wcs_dict["2CRV{}P"] = [int(cube_wcs_header["CRPIX1"]) - cutout_lims[1,0],
+                                  "table column physical WCS ax 2 ref value"]
+
+    # TODO: can we calculate these? or are they fixed?
+    cutout_wcs_dict["1CDL{}P"] = [1.0,"table column physical WCS a1 step"]    
+    cutout_wcs_dict["2CDL{}P"] = [1.0,"table column physical WCS a2 step"]
+    
+    cutout_wcs_dict["1CRP{}P"] = [1,"table column physical WCS a1 reference"]
+    cutout_wcs_dict["2CRP{}P"] = [1,"table column physical WCS a2 reference"]
+
+    return cutout_wcs_dict
+    
 
 def get_cutout(cutout_lims, transposed_cube, verbose=True):
     """
@@ -151,32 +226,70 @@ def update_primary_header(primary_header, coordinates):
 
 
 
-def add_column_wcs(header, colnums, wcs_info):
-    """
-    Take WCS info in wcs_info and add it to the header as 
-    """
+#def add_column_wcs(header, colnums, wcs_info):
+#    """
+#    Take WCS info in wcs_info and add it to the header as 
+#    """
+#    
+#    wcs_keywords = {'CTYPE1':'1CTYP{}',
+#                    'CTYPE2':'2CTYP{}',
+#                    'CRPIX1':'1CRPX{}',
+#                    'CRPIX2':'2CRPX{}',
+#                    'CRVAL1':'1CRVL{}',
+#                    'CRVAL2':'2CRVL{}',
+#                    'CUNIT1':'1CUNI{}',
+#                    'CUNIT2':'2CUNI{}',
+#                    'CDELT1':'1CDLT{}',
+#                    'CDELT2':'2CDLT{}',
+#                    'PC1_1':'11PC{}',
+#                    'PC1_2':'12PC{}',
+#                    'PC2_1':'21PC{}',
+#                    'PC2_2':'22PC{}'}
+#
+#
+#    for col in colnums:
+#        for kw in wcs_keywords:
+#            if kw not in wcs_info.keys():
+#                continue ## TODO: Something better than this?
+#            header[wcs_keywords[kw].format(col)] = wcs_info[kw]
+
+
+def add_column_wcs(table_header, wcs_dict):
+
+
+    #cur_col = -1 # holds the current column number
+    wcs_col = False # says if column is one that requires wcs info
     
-    wcs_keywords = {'CTYPE1':'1CTYP{}',
-                    'CTYPE2':'2CTYP{}',
-                    'CRPIX1':'1CRPX{}',
-                    'CRPIX2':'2CRPX{}',
-                    'CRVAL1':'1CRVL{}',
-                    'CRVAL2':'2CRVL{}',
-                    'CUNIT1':'1CUNI{}',
-                    'CUNIT2':'2CUNI{}',
-                    'CDELT1':'1CDLT{}',
-                    'CDELT2':'2CDLT{}',
-                    'PC1_1':'11PC{}',
-                    'PC1_2':'12PC{}',
-                    'PC2_1':'21PC{}',
-                    'PC2_2':'22PC{}'}
+    for kwd in table_header:
 
+        # Adding header descriptions for the table keywords
+        if kwd[:-1] == "TTYPE":
+            table_header.comments[kwd] = "column name"
+            if table_header[kwd] == "CADENCENO":
+                table_header.comments[kwd] += ": Row counter, not true cadenceno"
+        if kwd[:-1] == "TFORM":
+            table_header.comments[kwd] = "column format"
+        if kwd[:-1] == "TUNIT":
+            table_header.comments[kwd] = "unit"
+        if kwd[:-1] == "TDISP":
+            table_header.comments[kwd] = "display format"
+        if kwd[:-1] == "TDIM":
+            table_header.comments[kwd] = "multi-dimensional array spec"
+            wcs_col = True # if column holds 2D array need to add wcs info
+        if kwd[:-1] == "TNULL":
+            table_header.comments[kwd] = "null value"
 
-    for col in colnums:
-        for kw in wcs_keywords:
-            if kw not in wcs_info.keys():
-                continue ## TODO: Something better than this?
-            header[wcs_keywords[kw].format(col)] = wcs_info[kw]
+        # Adding wcs info if necessary
+        if (kwd[:-1] == "TTYPE") and wcs_col:
+            wcs_col = False # reset
+            for wcs_key,(val,com) in wcs_dict.items():
+                #print((wcs_key.format(kwd[-1]),val,com))
+                table_header.insert(kwd,(wcs_key.format(int(kwd[-1])-1),val,com))
+
+        # Removing keywords we don't want in the table header
+            
+        
+    
 
             
 def apply_header_inherit(hdu_list):
@@ -193,7 +306,7 @@ def apply_header_inherit(hdu_list):
                     hdu.header[kwd] = (primary_header[kwd], primary_header.comments[kwd])
             
 
-def build_tpf(cube_fits, img_cube, uncert_cube, cutout_wcs, aperture, coordinates, verbose=True):
+def build_tpf(cube_fits, img_cube, uncert_cube, cutout_wcs_dict, aperture, coordinates, verbose=True):
     """
     Building the target pixel file.
     """
@@ -225,7 +338,7 @@ def build_tpf(cube_fits, img_cube, uncert_cube, cutout_wcs, aperture, coordinate
         print("Array shape: {}".format(empty_arr.shape))
     
     cols.append(fits.Column(name='RAW_CNTS', format=tform.replace('E','J'), unit='count', dim=dims, disp='I8',
-                            array=empty_arr)) 
+                            array=empty_arr-1, null=-1)) 
     cols.append(fits.Column(name='FLUX', format=tform, dim=dims, unit='e-/s', disp='E14.7', array=img_cube))
     cols.append(fits.Column(name='FLUX_ERR', format=tform, dim=dims, unit='e-/s', disp='E14.7', array=uncert_cube)) 
    
@@ -248,16 +361,17 @@ def build_tpf(cube_fits, img_cube, uncert_cube, cutout_wcs, aperture, coordinate
 
     # Have to add the comment to the CADENCENO column Header manually
     # (This is needed b/c the CADENCENO is not really the cadence number)
-    table_hdu.header.comments['TTYPE3'] = "Row counter, not true cadence number"
+    #table_hdu.header.comments['TTYPE3'] = "Row counter, not true cadence number"
     
     table_hdu.header['EXTNAME'] = 'PIXELS'
     table_hdu.header['INHERIT'] = True
     
     # Adding the wcs keywords to the columns and removing from the header
-    wcs_header = cutout_wcs.to_header()
-    add_column_wcs(table_hdu.header, [4,5,6,7,8], wcs_header) # TODO: can I not hard code the array?
-    for kword in wcs_header:
-        table_hdu.header.remove(kword, ignore_missing=True)
+    #wcs_header = cutout_wcs.to_header()
+    add_column_wcs(table_hdu.header, cutout_wcs_dict) 
+    #for kword in wcs_header:
+    #    table_hdu.header.remove(kword, ignore_missing=True)
+    # TODO: what kwds to remove from generic table header??
 
     # Building the aperture HDU
     aperture_hdu = fits.ImageHDU(data=aperture)
@@ -346,10 +460,10 @@ def cube_cut(cube_file, coordinates, cutout_size, target_pixel_file=None, output
     img_cutout, uncert_cutout, aperture = get_cutout(cutout_lims, cube[1].data)
 
     # Get cutout wcs info
-    cutout_wcs = get_cutout_wcs(cutout_lims, cubeWcs)
+    cutout_wcs_dict = get_cutout_wcs(coordinates, cutout_lims, cubeWcs)
     
     # Build the TPF
-    tpf_object = build_tpf(cube, img_cutout, uncert_cutout, cutout_wcs, aperture, coordinates)
+    tpf_object = build_tpf(cube, img_cutout, uncert_cutout, cutout_wcs_dict, aperture, coordinates)
 
     if verbose:
         writeTime = time()
