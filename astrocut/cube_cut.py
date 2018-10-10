@@ -10,6 +10,7 @@ from time import time
 from copy import deepcopy
 
 import os
+import warnings
 
 
 def get_cube_wcs(table_header,table_row):
@@ -344,7 +345,7 @@ def build_tpf(cube_fits, img_cube, uncert_cube, cutout_wcs_dict, aperture, coord
 
 def cube_cut(cube_file, coordinates, cutout_size, target_pixel_file=None, output_path=".", verbose=None):
     """
-    Takes a cube file (as created by ~astrocut.make_cube), 
+    Takes a cube file (as created by ``~astrocut.make_cube``), 
     and makes a cutout stak of the given size around the given coordinates.
 
     Parameters
@@ -354,7 +355,7 @@ def cube_cut(cube_file, coordinates, cutout_size, target_pixel_file=None, output
         Must be in the format returned by ~astrocut.make_cube.
     coordinates : str or `astropy.coordinates` object
         The position around which to cutout. It may be specified as a
-        string or as the appropriate `astropy.coordinates` object.
+        string ("ra dec" in degrees) or as the appropriate `~astropy.coordinates` object.
     cutout_size : int, array-like, `~astropy.units.Quantity`
         TODO: Is there a default size that makes sense?
         The size of the cutout array. If ``size``
@@ -367,7 +368,7 @@ def cube_cut(cube_file, coordinates, cutout_size, target_pixel_file=None, output
     target_pixel_file : str
         Optional. The name for the output target pixel file. 
         If no name is supplied, the file will be named: 
-        <cube_file>_<ra>_<dec>_<cutout_size>_astrocut.fits
+        <cube_file_base>_<ra>_<dec>_<cutout_size>_astrocut.fits
     output_path : str
         Optional. The path where the output file is saved. 
         The current directory is default.
@@ -378,37 +379,36 @@ def cube_cut(cube_file, coordinates, cutout_size, target_pixel_file=None, output
     -------
     response: string or None
         If successfull, returns the path to the target pixel file, 
-        if unsuccessfull returns None.
+        if unsuccessful returns None.
     """
 
     if verbose:
-        startTime = time()
+        start_time = time()
 
-    cube = fits.open(cube_file) # TODO: add checking
+    cube = fits.open(cube_file) 
 
     # Get the WCS and figure out which pixels are in the cutout
-    wcsInd = int(len(cube[2].data)/2) # using the middle file for wcs info
-    cubeWcs = get_cube_wcs(cube[2].header, cube[2].data[wcsInd])
+    wcs_ind = int(len(cube[2].data)/2) # using the middle file for wcs info
+    cube_wcs = get_cube_wcs(cube[2].header, cube[2].data[wcs_ind])
 
     if not isinstance(coordinates, SkyCoord):
-        #coordinates = SkyCoord.from_name(coordinates) # TODO: more checking here
-        coordinates = [float(x) for x in coordinates.split(' ')]
-        coordinates = SkyCoord(coordinates[0],coordinates[1],unit='deg') # TODO: fix? be better?
+        coordinates = SkyCoord(coordinates,unit='deg') 
 
     if verbose:
-        print("Cutout center coordinate:",coordinates.ra.deg,coordinates.dec.deg)
+        print("Cutout center coordinate: {},{}".format(coordinates.ra.deg,coordinates.dec.deg))
 
 
-    # making size into an array [ny, nx] TODO: MAKE SURE I AM USING THEM AS NY,NX
+    # Making size into an array [ny, nx] 
     cutout_size = np.atleast_1d(cutout_size)
     if len(cutout_size) == 1:
         cutout_size = np.repeat(cutout_size, 2)
 
     if len(cutout_size) > 2:
-        print("To many dimensions in cutout size, only the first two will be used") # TODO: Make this into a warning
+        warnings.warn("Too many dimensions in cutout size, only the first two will be used.",
+                      InputWarning)
        
     # Get cutout limits
-    cutout_lims = get_cutout_limits(coordinates, cutout_size, cubeWcs)
+    cutout_lims = get_cutout_limits(coordinates, cutout_size, cube_wcs)
 
     if verbose:
         print("xmin,xmax:",cutout_lims[1])
@@ -418,16 +418,15 @@ def cube_cut(cube_file, coordinates, cutout_size, target_pixel_file=None, output
     img_cutout, uncert_cutout, aperture = get_cutout(cutout_lims, cube[1].data)
 
     # Get cutout wcs info
-    cutout_wcs_dict = get_cutout_wcs(coordinates, cutout_lims, cubeWcs)
+    cutout_wcs_dict = get_cutout_wcs(coordinates, cutout_lims, cube_wcs)
     
     # Build the TPF
     tpf_object = build_tpf(cube, img_cutout, uncert_cutout, cutout_wcs_dict, aperture, coordinates)
 
     if verbose:
-        writeTime = time()
+        write_time = time()
 
     if not target_pixel_file:
-        # TODO: also strip off excess path from cube file
         _, flename = os.path.split(cube_file)
         target_pixel_file = output_path + "/"
         target_pixel_file += "{}_{}_{}_{}x{}_astrocut.fits".format(flename.rstrip('.fits').rstrip("-cube"),
@@ -445,8 +444,8 @@ def cube_cut(cube_file, coordinates, cutout_size, target_pixel_file=None, output
     cube.close()
 
     if verbose:
-        print("Write time: {:.2} sec".format(time()-writeTime))
-        print("Total time: {:.2} sec".format(time()-startTime))
+        print("Write time: {:.2} sec".format(time()-write_time))
+        print("Total time: {:.2} sec".format(time()-start_time))
 
     return target_pixel_file
 
