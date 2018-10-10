@@ -19,5 +19,5 @@ if sys.version_info < tuple((int(val) for val in __minimum_python_version__.spli
     raise UnsupportedPythonError("astrocut does not support Python < {}".format(__minimum_python_version__))
 
 if not _ASTROPY_SETUP_:
-    from .make_cube import MakeCube
-    from .cube_cut import cube_cut
+    from .make_cube import CubeFactory
+    from .cube_cut import CutoutFactory

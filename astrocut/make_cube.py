@@ -13,27 +13,11 @@ from datetime import date
 from os import path
 
 
-class MakeCube():
+class CubeFactory():
     """
-    Turns a list of fits image files into one large data-cube.
-    Input images must all have the same footprint and resolution.
-    The resulting datacube is transposed for quicker cutouts.
-    This function can take some time to run and requires enough 
-    memory to hold the entire cube in memory. 
-    (For full TESS sectors this is about 40 GB)
+    Makes a cube!
 
-    Parameters
-    ----------
-    file_list : array
-        The list of fits image files to cube.  
-        Assumed to have the format of a TESS FFI:
-        - A primary HDU consisting only of a primary header
-        - An image HDU containing the image
-        - A second image HDU containing the uncertainty image
-    cube_path : string
-        Optional.  The filename/path to save the output cube in. 
-    verbose : bool
-        Optional. If true intermediate information is printed. 
+    TODO: Document better.
     """
                 
     def make_primary_header(self, ffi_main_header, ffi_img_header, sector=-1):

@@ -2,7 +2,9 @@
 AstroCut Documentation
 **********************
 
-This is the documentation for AstroCut.
+AstroCut Quick Start
+
+
 
 Reference/API
 =============
