@@ -109,8 +109,8 @@ release = package.__version__
 
 # Please update these texts to match the name of your package.
 html_theme_options = {
-    'logotext1': 'package',  # white,  semi-bold
-    'logotext2': '-template',  # orange, light
+    'logotext1': 'astro',  # white,  semi-bold
+    'logotext2': 'cut',  # orange, light
     'logotext3': ':docs'   # white,  light
     }
 
@@ -120,12 +120,12 @@ html_theme_options = {
 
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
-#html_logo = ''
+html_logo = '_static/AstroCut_thumb.png'
 
 # The name of an image file (within the static path) to use as favicon of the
 # docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32
 # pixels large.
-#html_favicon = ''
+html_favicon = '_static/AstroCut_thumb.png'
 
 # If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
 # using the given strftime format.
@@ -137,6 +137,10 @@ html_title = '{0} v{1}'.format(project, release)
 
 # Output file base name for HTML help builder.
 htmlhelp_basename = project + 'doc'
+
+# Static files to copy after template files
+html_static_path = ['_static']
+html_style = 'astrocut.css'
 
 
 # -- Options for LaTeX output -------------------------------------------------

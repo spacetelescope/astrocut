@@ -58,7 +58,6 @@ class CutoutFactory():
         """
 
         center_pixel = center_coord.to_pixel(cube_wcs)
-        print(center_pixel)
 
         lims = np.zeros((2,2),dtype=int)
 
@@ -299,11 +298,6 @@ class CutoutFactory():
         tform = str(img_cube[0].size) + "E"
         dims = str(img_cube[0].shape)
         empty_arr = np.zeros(img_cube.shape)
-
-        if verbose:
-            print("TFORM: {}".format(tform))
-            print("DIMS: {}".format(dims))
-            print("Array shape: {}".format(empty_arr.shape))
     
         cols.append(fits.Column(name='RAW_CNTS', format=tform.replace('E','J'), unit='count', dim=dims, disp='I8',
                             array=empty_arr-1, null=-1)) 
