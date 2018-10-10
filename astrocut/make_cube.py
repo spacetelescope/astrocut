@@ -76,7 +76,7 @@ class MakeCube():
             - A primary HDU consisting only of a primary header
             - An image HDU containing the image
             - A second image HDU containing the uncertainty image
-        cube_path : string
+        cube_file : string
             Optional.  The filename/path to save the output cube in. 
         verbose : bool
             Optional. If true intermediate information is printed. 
@@ -185,11 +185,11 @@ class MakeCube():
         if verbose:
             writeTime = time()
     
-        hdu_list.writeto(cube_path, overwrite=True) 
+        hdu_list.writeto(cube_file, overwrite=True) 
 
         if verbose:
             endTime = time()
             print("Total time elapsed: {:.2f} sec".format(endTime - startTime))
             print("File write time: {:.2f} sec".format(endTime - writeTime))
 
-        return cube_path
+        return cube_file
