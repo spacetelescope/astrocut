@@ -30,18 +30,21 @@ sense for you to use our tesscut web service:
 Making image cubes
 ++++++++++++++++++
 
-Making an image cube is a simple operation, but comes with some important
-limitations. The main limitation is that in order to make the image cube,
-the entire cube file must be able to fit in your computer's memory.
-Depending on the number of image files being used in the cube, this can be
-quite large, for one entire sector of TESS FFI images from a single camera/
-chip combination this comes out to nearly 50 GB. The second limitation is
-that this operation can take some time to run. For the 1348 FFI images of
-the TESS ete-6 simulated sector, it takes about 12 minutes to run on a
-computer with 65 GB of memory.
+Making an image cube is a simple operation, but comes with a vert important
+limitation:
 
-By default make_cube runs in verbose mode and prints
-out it's progress, however setting verbose to false will silence all output.
+.. warning::
+   **Memory Requirements**
+
+   The entire cube file must be able to fit in your computer's memory!
+
+   For a sector of TESS FFI images from a single camera/chip combination this is ~50 GB.
+
+This operation can also take some time to run. For the 1348 FFI images of the TESS ete-6
+simulated sector, it takes about 12 minutes to run on a computer with 65 GB of memory.
+
+By default *make_cube* runs in verbose mode and prints out it's progress, however setting
+verbose to false will silence all output.
 
 
 .. code-block:: python
@@ -83,7 +86,12 @@ Making cutout target pixel files
 To make a cutout, you must already have an image cube to cut out from.
 Assuming that that step has been completed, you simply give the central
 coordinate and cutout size (in either pixels or angular `~astropy.Quanitity`)
-to the cube_cut function.
+to the *cube_cut* function.
+
+You can either specify a target pixel file name, or it will be built as:
+"<cube_file_base>_<ra>_<dec>_<cutout_size>_astrocut.fits". You can optionally
+also specify a output path, the directory in which the target pixel file will
+be saved, if unspecified it defaults to the current directory.
 
 .. code-block:: python
 
