@@ -1,3 +1,7 @@
+# Licensed under a 3-clause BSD style license - see LICENSE.rst
+
+"""This module implements the cutout functionality."""
+
 import numpy as np
 import astropy.units as u
 
@@ -16,14 +20,29 @@ import warnings
 
 class CutoutFactory():
     """
-    Class for making cutouts from cubes.
-    TODO: document better
+    Class for creating image cutouts.
+
+    This class emcompasses all of the cutout functionality.  
+    In the current version this means creating cutout target pixel files from TESS full frame image cubes.
+    Future versions will include more generalized cutout functionality.
     """
 
-    def get_cube_wcs(self, table_header,table_row):
+    def _get_cube_wcs(self, table_header,table_row):
         """
-        Takes the header and one entry from the cube table of data and returns 
+        Takes the header and one entry from the cube table of image header data and returns 
         a WCS object that encalpsulates the given WCS information.
+
+        Parameters
+        ----------
+        table_header : `~astropy.io.fits.Header`
+            The cube image header data table header.
+        table_row : `~astropy.io.fits.FITS_record`
+            One row from the cube image header data table.
+
+        Returns
+        -------
+        response : `~astropy.wcs.WCS`
+            WCS object containing the WCS information from the given cube image header data table row.
         """
     
         wcs_header = fits.header.Header()
@@ -47,14 +66,25 @@ class CutoutFactory():
         return wcs.WCS(wcs_header)
 
 
-    def get_cutout_limits(self, center_coord, cutout_size, cube_wcs):
+    def _get_cutout_limits(self, center_coord, cutout_size, cube_wcs):
         """
         Takes the center coordinates, cutout size, and the wcs from
         which the cutout is being taken and returns the x and y pixel limits
         for the cutout.
 
+        Parameters
+        ----------
+        center_coord : `~astropy.coordinates.SkyCoord`
+            The central coordinate for the cutout
         cutout_size : array
-        [nx,ny] in with ints (pixels) or astropy quantities
+            [ny,nx] in with ints (pixels) or astropy quantities
+        cube_wcs : `numpy.array`
+            The cutout pixel limits in an array of the form [[ymin,ymax],[xmin,xmax]]
+
+        Returns
+        -------
+        response : `numpy.array`
+            The cutout pixel limits in an array of the form [[ymin,ymax],[xmin,xmax]]
         """
 
         center_pixel = center_coord.to_pixel(cube_wcs)
@@ -81,13 +111,27 @@ class CutoutFactory():
         return lims
 
 
-    def get_cutout_wcs(self, cutout_coord, cutout_lims, cube_wcs):
+    def _get_cutout_wcs(self, cutout_coord, cutout_lims, cube_wcs):
         """
-        Get cutout wcs header keywords, with updated NAXIS keywords and crpix. 
-        Plus transformation back to original location on CCD.
+        Transform the cube WCS object into the cutout column WCS keywords.
+        Adds the physical keywords for transformation back from cutout to location on FFI.
+        Also performs nonliner -> linear approximation for the transformation matrix (TODO: not yet is doesn't!)
+        This is a very TESS specific function.
         
-        Returns as dictionary of {<kwd format string>: [value, desc]} pairs.
-        TODO: Improve description
+        Parameters
+        ----------
+        cutout_coord : `~astropy.coordinates.SkyCoord`
+            The central coordinate for the cutout
+        cutout_lims : `numpy.array`
+            The cutout pixel limits in an array of the form [[ymin,ymax],[xmin,xmax]]
+        cube_wcs : `numpy.array`
+            The cutout pixel limits in an array of the form [[ymin,ymax],[xmin,xmax]]
+        
+        Returns
+        -------
+        response: dict
+            Cutout wcs column header keywords as dictionary of 
+            ``{<kwd format string>: [value, desc]} pairs.``
         """
         cube_wcs_header = cube_wcs.to_header(relax=True)
 
@@ -150,12 +194,27 @@ class CutoutFactory():
         return cutout_wcs_dict
     
 
-    def get_cutout(self, cutout_lims, transposed_cube, verbose=True):
+    def _get_cutout(self, cutout_lims, transposed_cube, verbose=True):
         """
         Making a cutout from an image/uncertainty cube that has been transposed 
         to have time on the longest axis.
         
-        Returns the untransposed image cutout and uncertainty cutout.
+        Parameters
+        ----------
+        cutout_lims : `numpy.array`
+            The cutout pixel limits in an array of the form ``[[ymin,ymax],[xmin,xmax]]``
+        transposed_cube : `numpy.array`
+            Transposed image/uncertainty array.
+        verbose :  bool
+            Optional. If true intermediate information is printed. 
+
+        Returns
+        -------
+        response :  `numpy.array`, `numpy.array`, `numpy.array`
+            The untransposed image cutout array,
+            the untransposeduncertainty cutout array,
+            and the aperture array (an array the size of a single cutout 
+            that is 1 where there is image data and 0 where there isn't)
         """
 
         # These limits are not guarenteed to be within the image footprint
@@ -202,7 +261,21 @@ class CutoutFactory():
         return img_cutout, uncert_cutout, aperture
 
 
-    def update_primary_header(self, primary_header, coordinates):
+    def _update_primary_header(self, primary_header, coordinates):
+        """
+        Updates the primary header for the cutout target pixel file by filling in 
+        the object ra and dec with the central cutout coordinates and filling in
+        the rest of the TESS target pixel file keywords wil 0/empty strings
+        as we do not have access to this information.
+        This is a TESS-specific function.
+
+        Parameters
+        ----------
+        primary_header : `~astropy.io.fits.Header`
+            The primary header from the cube file that will be modified in place for the cutout.
+        coordinates : `~astropy.coordinates.SkyCoord`
+            The central coordinate for the cutout
+        """
 
         # Adding cutout specific headers
         primary_header['RA_OBJ'] = (coordinates.ra.deg,'[deg] right ascension')
@@ -223,9 +296,18 @@ class CutoutFactory():
         primary_header['TICVER'] = (0,'TICVER')
 
 
-    def add_column_wcs(self, table_header, wcs_dict):
+    def _add_column_wcs(self, table_header, wcs_dict):
         """
-        TODO: Document
+        Adds WCS information for the array columns to the cutout table header.
+
+        Parameters
+        ----------
+        table_header : `~astropy.io.fits.Header`
+            The table header for the cutout table that will be modified in place to include 
+            WCS information.
+        wcs_dict : dict
+            Dictionary of wcs keyword/value pairs to be added to each array column in the 
+            cutout table header.
         """
 
         wcs_col = False # says if column is one that requires wcs info
@@ -260,7 +342,16 @@ class CutoutFactory():
 
             
     def apply_header_inherit(self, hdu_list):
-        """Astropy fits functionality does not appy the INHERIT keyword, so we have to do it manually"""
+        """
+        The INHERIT keyword indicated that keywords from the primary header should be duplicated in 
+        the headers of all subsequent extensions.  This function performs this addition in place to 
+        the given hdu list.
+        
+        Parameters
+        ----------
+        hdu_list : `~astropy.io.fits.HDUList`
+            The hdu list to aaply the INHERIT keyword to.
+        """
     
         primary_header = hdu_list[0].header
 
@@ -273,15 +364,38 @@ class CutoutFactory():
                         hdu.header[kwd] = (primary_header[kwd], primary_header.comments[kwd])
             
 
-    def build_tpf(self, cube_fits, img_cube, uncert_cube, cutout_wcs_dict, aperture, coordinates, verbose=True):
+    def _build_tpf(self, cube_fits, img_cube, uncert_cube, cutout_wcs_dict, aperture, coordinates, verbose=True):
         """
-        Building the target pixel file.
+        Building the cutout target pixel file (TPF) and formatting it to match TESS pipeline TPFs.
+
+        Paramters
+        ---------
+        cube_fits :  
+        img_cube : `numpy.array`
+            The untransposed image cutout array
+        uncert_cube : `numpy.array`
+            The untransposed uncertainty cutout array
+        cutout_wcs_dict : dict
+            Dictionary of wcs keyword/value pairs to be added to each array 
+            column in the cutout table header.
+        aperture : `numpy.array`
+            The aperture array (an array the size of a single cutout 
+            that is 1 where there is image data and 0 where there isn't)        
+        coordinates : `~astropy.coordinates.SkyCoord`
+            The central coordinate for the cutout
+        verbose : bool
+            Optional. If true intermediate information is printed. 
+
+        Returns
+        -------
+        response :  `~astropy.io.fits.HDUList`
+            Target pixel file HDU list
         """
 
         # The primary hdu is just the main header, which is the same
         # as the one on the cube file
         primary_hdu = cube_fits[0]
-        self.update_primary_header(primary_hdu.header, coordinates)
+        self._update_primary_header(primary_hdu.header, coordinates)
 
         cols = list()
 
@@ -325,10 +439,7 @@ class CutoutFactory():
         table_hdu.header['INHERIT'] = True
     
         # Adding the wcs keywords to the columns and removing from the header
-        self.add_column_wcs(table_hdu.header, cutout_wcs_dict) 
-        #for kword in wcs_header:
-        #    table_hdu.header.remove(kword, ignore_missing=True)
-        # TODO: what kwds to remove from generic table header??
+        self._add_column_wcs(table_hdu.header, cutout_wcs_dict) 
 
         # Building the aperture HDU
         aperture_hdu = fits.ImageHDU(data=aperture)
@@ -343,32 +454,33 @@ class CutoutFactory():
 
 
 
-    def cube_cut(self, cube_file, coordinates, cutout_size, target_pixel_file=None, output_path=".", verbose=None):
+    def cube_cut(self, cube_file, coordinates, cutout_size, target_pixel_file=None, output_path=".", verbose=False):
         """
-        Takes a cube file (as created by ``~astrocut.make_cube``), 
-        and makes a cutout stak of the given size around the given coordinates.
+        Takes a cube file (as created by `~astrocut.CubeFactory`), and makes a cutout target pixel 
+        file of the given size around the given coordinates. The target pixel file is formatted like
+        a TESS pipeline target pixel file.
 
         Parameters
         ----------
         cube_file : str
             The cube file containing all the images to be cutout.  
             Must be in the format returned by ~astrocut.make_cube.
-        coordinates : str or `astropy.coordinates` object
-            The position around which to cutout. It may be specified as a
-            string ("ra dec" in degrees) or as the appropriate `~astropy.coordinates` object.
+        coordinates : str or `astropy.coordinates.SkyCoord` object
+            The position around which to cutout. 
+            It may be specified as a string ("ra dec" in degrees) 
+            or as the appropriate `~astropy.coordinates.SkyCoord` object.
         cutout_size : int, array-like, `~astropy.units.Quantity`
-            TODO: Is there a default size that makes sense?
-            The size of the cutout array. If ``size``
+            The size of the cutout array. If ``cutout_size``
             is a scalar number or a scalar `~astropy.units.Quantity`,
-            then a square cutout of ``size`` will be created.  If
-            ``size`` has two elements, they should be in ``(ny, nx)``
-            order.  Scalar numbers in ``size`` are assumed to be in
+            then a square cutout of ``cutout_size`` will be created.  If
+            ``cutout_size`` has two elements, they should be in ``(ny, nx)``
+            order.  Scalar numbers in ``cutout_size`` are assumed to be in
             units of pixels. `~astropy.units.Quantity` objects must be in pixel or
             angular units.
         target_pixel_file : str
             Optional. The name for the output target pixel file. 
             If no name is supplied, the file will be named: 
-            <cube_file_base>_<ra>_<dec>_<cutout_size>_astrocut.fits
+            ``<cube_file_base>_<ra>_<dec>_<cutout_size>_astrocut.fits``
         output_path : str
             Optional. The path where the output file is saved. 
             The current directory is default.
@@ -389,7 +501,7 @@ class CutoutFactory():
 
         # Get the WCS and figure out which pixels are in the cutout
         wcs_ind = int(len(cube[2].data)/2) # using the middle file for wcs info
-        cube_wcs = self.get_cube_wcs(cube[2].header, cube[2].data[wcs_ind])
+        cube_wcs = self._get_cube_wcs(cube[2].header, cube[2].data[wcs_ind])
 
         if not isinstance(coordinates, SkyCoord):
             coordinates = SkyCoord(coordinates,unit='deg') 
@@ -408,20 +520,20 @@ class CutoutFactory():
                           InputWarning)
        
         # Get cutout limits
-        cutout_lims = self.get_cutout_limits(coordinates, cutout_size, cube_wcs)
+        cutout_lims = self._get_cutout_limits(coordinates, cutout_size, cube_wcs)
 
         if verbose:
             print("xmin,xmax:",cutout_lims[1])
             print("ymin,ymax:",cutout_lims[0])
 
         # Make the cutout
-        img_cutout, uncert_cutout, aperture = self.get_cutout(cutout_lims, cube[1].data)
+        img_cutout, uncert_cutout, aperture = self._get_cutout(cutout_lims, cube[1].data, verbose=verbose)
 
         # Get cutout wcs info
-        cutout_wcs_dict = self.get_cutout_wcs(coordinates, cutout_lims, cube_wcs)
+        cutout_wcs_dict = self._get_cutout_wcs(coordinates, cutout_lims, cube_wcs)
     
         # Build the TPF
-        tpf_object = self.build_tpf(cube, img_cutout, uncert_cutout, cutout_wcs_dict, aperture, coordinates)
+        tpf_object = self._build_tpf(cube, img_cutout, uncert_cutout, cutout_wcs_dict, aperture, coordinates)
 
         if verbose:
             write_time = time()

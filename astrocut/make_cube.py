@@ -1,6 +1,7 @@
-"""
-Makes the cube!
-"""
+# Licensed under a 3-clause BSD style license - see LICENSE.rst
+
+"""This module implements the functionality to create image cubes for the purposes of
+creating cutout target pixel files."""
 
 import numpy as np
 
@@ -15,21 +16,32 @@ from os import path
 
 class CubeFactory():
     """
-    Makes a cube!
-
-    TODO: Document better.
+    Class for creating image cubes.
+    
+    This class emcompasses all of the cube making functionality.  
+    In the current version this means creating image cubes fits files from TESS full frame image sets.
+    Future versions will include more generalized cubing functionality.
     """
                 
-    def make_primary_header(self, ffi_main_header, ffi_img_header, sector=-1):
+    def _make_primary_header(self, ffi_main_header, ffi_img_header, sector=-1):
         """
         Given the primary and image headers from an input FFI, and the sector number, 
         build the cube's primary header.
+        This is a TESS specific function
 
         Parameters
         ----------
-        ffi_main_header
-        ffi_img_header
-        sector
+        ffi_main_header : `~astropy.io.fits.Header`
+            The primary header from a TESS FFI fits file.
+        ffi_img_header : `~astropy.io.fits.Header`
+            The seconday (image) header from a TESS FFI fits file.
+        sector : int
+            TESS mission sector number
+
+        Returns
+        -------
+        response :  `~astropy.io.fits.Header`
+            Primary header for the image cube fits file.
         """
     
         header = ffi_main_header
@@ -100,7 +112,7 @@ class CubeFactory():
 
                 # We use the primary header from the first file as the cube primary header
                 # and will add in information about the time of the final observation at the end
-                primary_header = self.make_primary_header(ffi_data[0].header, ffi_data[1].header)
+                primary_header = self._make_primary_header(ffi_data[0].header, ffi_data[1].header)
 
                 # The image specific header information will be saved in a table in the second extension
                 secondary_header = ffi_data[1].header
