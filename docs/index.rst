@@ -1,16 +1,26 @@
-Documentation
-=============
 
-This is the documentation for AstroCut.
-Cutout tools for single and multiple astronomical image fitsfiles that can
-produce both single cutout files and target pixel file cutout stacks.
+Astrocut
+========
+
+Tools for making image cutouts from sets of TESS full frame images.
+
+This package is under active development, and will ultimately grow to encompass a range of cutout activities relevant to images from many missions, however at this time it is focussed on the specific problem of creating Target Pixel File cutouts from sectors of TESS full frame images.
+
+Documentation
+-------------
 
 .. toctree::
   :maxdepth: 2
 
+  astrocut/install.rst
+
+.. toctree::
+  :maxdepth: 3
+
   astrocut/index.rst
 
-.. note:: The layout of this directory is simply a suggestion.  To follow
-          traditional practice, do *not* edit this page, but instead place
-          all documentation for the package inside ``astrocut/``.
-          You can follow this practice or choose your own layout.
+
+.. toctree::
+  :maxdepth: 1
+
+  license

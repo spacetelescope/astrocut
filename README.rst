@@ -5,8 +5,11 @@ Cutout tools for astronomical images
     :target: http://www.astropy.org
     :alt: Powered by Astropy Badge
 
-Cutout tools for single and multiple astronomical image fitsfiles that can
-produce both single cutout files and target pixel file cutout stacks.
+Tools for making image cutouts from sets of TESS full frame images.
+
+This package is under active development, and will ultimately grow to encompass a range of cutout activities relevant to images from many missions, however at this time it is focussed on the specific problem of creating Target Pixel File cutouts from sectors of TESS full frame images.
+
+Documentation is at https://astrocut.readthedocs.io.
 
 Installation
 ------------
@@ -20,15 +23,15 @@ Example Usage
 -------------
 .. code-block:: python
 
-    >>> from astrocut.make_cube import make_cube
-    >>> from astrocut.cube_cut import cube_cut
+    >>> from astrocut import CubeFactory
+    >>> from astrocut import CutoutFactory
 
     >>> # Making the data cube
     >>> filelist = ['<list of FFIs>']
-    >>> make_cube(infiles, "newCube.fits")
+    >>> CubeFactory().make_cube(infiles, "img-cube.fits")
 
     >>> # Making the cutout tpf
-    >>> cube_cut(cubeFile, "259.7 36.7", 5, verbose=True)
+    >>> CutoutFactory().cube_cut("img-cube.fits", "259.7 36.7", 5, verbose=True)
 
 
 License
