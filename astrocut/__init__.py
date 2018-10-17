@@ -21,3 +21,4 @@ if sys.version_info < tuple((int(val) for val in __minimum_python_version__.spli
 if not _ASTROPY_SETUP_:
     from .make_cube import CubeFactory
     from .cube_cut import CutoutFactory
+

@@ -4,12 +4,11 @@ channels:
     - astropy
 
 dependencies:
-    - python=3.6
+    - python>=3.6
     - astropy
-    - sphinx-astropy
     - Cython
     - matplotlib
     - numpy
-    - configparser
+    - sphinx-astropy
 #   - pip:
 #       - dependency_from_pip

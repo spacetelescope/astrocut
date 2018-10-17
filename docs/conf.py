@@ -107,7 +107,6 @@ release = package.__version__
 #html_theme = None
 
 
-# Please update these texts to match the name of your package.
 html_theme_options = {
     'logotext1': 'astro',  # white,  semi-bold
     'logotext2': 'cut',  # orange, light
