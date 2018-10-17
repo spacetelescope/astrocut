@@ -1,7 +1,9 @@
 # Licensed under a 3-clause BSD style license - see LICENSE.rst
 
-"""This module implements the functionality to create image cubes for the purposes of
-creating cutout target pixel files."""
+"""
+This module implements the functionality to create image cubes for the purposes of
+creating cutout target pixel files.
+"""
 
 import numpy as np
 
@@ -125,7 +127,7 @@ class CubeFactory():
 
                 # set up the image info table
                 cols = []
-                for kwd,val,_ in secondary_header.cards: # not using comments
+                for kwd,val,cmt in secondary_header.cards: 
                     if type(val) == str:
                         tpe = "S"+str(len(val))
                     elif type(val) == int:
@@ -133,7 +135,7 @@ class CubeFactory():
                     else:
                         tpe = np.float32
                     
-                    cols.append(Column(name=kwd,dtype=tpe,length=len(file_list))) 
+                    cols.append(Column(name=kwd,dtype=tpe,length=len(file_list), meta={"comment":cmt})) 
                 
                 cols.append(Column(name="FFI_FILE",dtype="S38",length=len(file_list)))
             
@@ -175,6 +177,12 @@ class CubeFactory():
         
         col_def = fits.ColDefs(cols)
         table_hdu = fits.BinTableHDU.from_columns(col_def)
+
+        # Adding the comments to the header
+        for kwd in img_info_table.columns:
+            if kwd in ['XTENSION', 'BITPIX', 'NAXIS','NAXIS1','NAXIS2','PCOUNT','GCOUNT','TFIELDS']:
+                continue # skipping the keyword already in use
+            table_hdu.header[kwd] = img_info_table[kwd].meta.get("comment","")
 
         hdu_list = fits.HDUList([primary_hdu,cube_hdu,table_hdu])
 
