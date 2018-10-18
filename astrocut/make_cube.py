@@ -137,7 +137,7 @@ class CubeFactory():
                     
                     cols.append(Column(name=kwd,dtype=tpe,length=len(file_list), meta={"comment":cmt})) 
                 
-                cols.append(Column(name="FFI_FILE",dtype="S38",length=len(file_list)))
+                cols.append(Column(name="FFI_FILE",dtype="S" + str(len(path.basename(fle)), length=len(file_list)))
             
                 img_info_table = Table(cols)
 
