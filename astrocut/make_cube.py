@@ -57,7 +57,7 @@ class CubeFactory():
 
         return header
     
-    def make_cube(self, file_list, cube_file="img-cube.fits", verbose=True):
+    def make_cube(self, file_list, cube_file="img-cube.fits", sector=None, verbose=True):
         """
         Turns a list of fits image files into one large data-cube.
         Input images must all have the same footprint and resolution.
@@ -76,6 +76,8 @@ class CubeFactory():
             - A second image HDU containing the uncertainty image
         cube_file : string
             Optional.  The filename/path to save the output cube in. 
+        sector : int
+            Optional.  TESS sector to add as header keyword (not present in FFI files).
         verbose : bool
             Optional. If true intermediate information is printed. 
 
@@ -114,7 +116,7 @@ class CubeFactory():
 
                 # We use the primary header from the first file as the cube primary header
                 # and will add in information about the time of the final observation at the end
-                primary_header = self._make_primary_header(ffi_data[0].header, ffi_data[1].header)
+                primary_header = self._make_primary_header(ffi_data[0].header, ffi_data[1].header, sector=sector)
 
                 # The image specific header information will be saved in a table in the second extension
                 secondary_header = ffi_data[1].header
