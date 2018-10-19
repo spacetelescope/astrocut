@@ -151,9 +151,9 @@ class CutoutFactory():
         cutout_wcs_dict["2CTYP{}"] = [cube_wcs_header["CTYPE2"],"declination coordinate type"]
         
         orig_pix = self.cube_wcs.all_world2pix(self.center_coord.ra.deg, self.center_coord.dec.deg, 0)
-        cutout_wcs_dict["1CTYP{}"] = [float(orig_pix[0]) - self.cutout_lims[0,0],
+        cutout_wcs_dict["1CRPX{}"] = [float(orig_pix[0]) - self.cutout_lims[0,0],
                                       "[pixel] reference pixel along image axis 1"]
-        cutout_wcs_dict["2CTYP{}"] = [float(orig_pix[1]) - self.cutout_lims[0,0],
+        cutout_wcs_dict["2CRPX{}"] = [float(orig_pix[1]) - self.cutout_lims[0,0],
                                       "[pixel] reference pixel along image axis 2"]
     
         cutout_wcs_dict["1CRVAL{}"] = [self.center_coord.ra.deg, "[deg] right ascension at reference pixel"]
