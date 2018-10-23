@@ -157,8 +157,8 @@ class CubeFactory():
                     img_info_table[kwd][i] = ffi_data[1].header[kwd]
 
             if fle == file_list[-1]:
-                primary_header['DATE-END'] = ffi_data[1].header['DATE-END']
-                primary_header['TSTOP'] = ffi_data[1].header.get(['TSTOP'])
+                primary_header['DATE-END'] = ffi_data[0].header['DATE-END']
+                primary_header['TSTOP'] = ffi_data[0].header.get(['TSTOP'])
                 
             # close fits file
             ffi_data.close()
