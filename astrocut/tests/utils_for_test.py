@@ -58,7 +58,7 @@ def add_keywords(hdu, extname, time_increment):
     hdu.header['B_DMAX']  =    44.62692873032506
 
 
-def create_test_ffis(img_size, num_images, basename='make_cube-test{}.fits'):
+def create_test_ffis(img_size, num_images, basename='make_cube-test{:04d}.fits'):
     """
     Create test fits files
 

@@ -168,10 +168,10 @@ class CutoutFactory():
         cutout_wcs_dict["2CDLT{}"] = [px_scales[1], "[deg] pixel scale in DEC dimension"]
 
         # TODO: THIS IS FILLER, HAVE TO FIGURE OUT HOW TO DO THE TRANSFORMATION FOR REAL
-        cutout_wcs_dict["11PC{}"] = [0,"linear transformation matrix element - unfilled"]
-        cutout_wcs_dict["12PC{}"] = [0,"linear transformation matrix element - unfilled"]
-        cutout_wcs_dict["21PC{}"] = [0,"linear transformation matrix element - unfilled"]
-        cutout_wcs_dict["22PC{}"] = [0,"linear transformation matrix element - unfilled"]
+        cutout_wcs_dict["11PC{}"] = [1,"linear transformation matrix element - unfilled"]
+        cutout_wcs_dict["12PC{}"] = [1,"linear transformation matrix element - unfilled"]
+        cutout_wcs_dict["21PC{}"] = [1,"linear transformation matrix element - unfilled"]
+        cutout_wcs_dict["22PC{}"] = [1,"linear transformation matrix element - unfilled"]
 
         ## Physical keywords ##
     
@@ -365,7 +365,7 @@ class CutoutFactory():
         # Adjusting the CRPIX/CRVAL values
         orig_pix = self.cube_wcs.all_world2pix(self.center_coord.ra.deg, self.center_coord.dec.deg, 0)
         aperture_header["CRPIX1"] = float(orig_pix[0]) - self.cutout_lims[0,0]
-        aperture_header["CRPIX2"] = float(orig_pix[1]) - self.cutout_lims[0,0]
+        aperture_header["CRPIX2"] = float(orig_pix[1]) - self.cutout_lims[1,0]
     
         aperture_header["CRVAL1"] = self.center_coord.ra.deg
         aperture_header["CRVAL2"] = self.center_coord.dec.deg

@@ -5,6 +5,8 @@ This module implements the functionality to create image cubes for the purposes 
 creating cutout target pixel files.
 """
 
+from ._astropy_init import __version__
+
 import numpy as np
 
 from astropy.io import fits
@@ -14,6 +16,7 @@ from astropy.wcs import WCS
 from time import time
 from datetime import date
 from os import path
+from copy import deepcopy
 
 
 class CubeFactory():
@@ -46,7 +49,7 @@ class CubeFactory():
             Primary header for the image cube fits file.
         """
     
-        header = ffi_main_header
+        header = deepcopy(ffi_main_header)
         header.remove('CHECKSUM', ignore_missing=True)
 
         header['ORIGIN'] = 'STScI/MAST'
@@ -54,6 +57,8 @@ class CubeFactory():
         header['SECTOR'] = (sector, "Observing sector")
         header['CAMERA'] = (ffi_img_header['CAMERA'], ffi_img_header.comments['CAMERA'])
         header['CCD'] = (ffi_img_header['CCD'], ffi_img_header.comments['CCD'])
+
+        
 
         return header
     
@@ -137,8 +142,8 @@ class CubeFactory():
                     else:
                         tpe = np.float32
                     
-                    cols.append(Column(name=kwd,dtype=tpe,length=len(file_list), meta={"comment":cmt})) 
-                
+                    cols.append(Column(name=kwd,dtype=tpe,length=len(file_list), meta={"comment":cmt}))
+                    
                 cols.append(Column(name="FFI_FILE",dtype="S" + str(len(path.basename(fle))), length=len(file_list)))
             
                 img_info_table = Table(cols)
@@ -154,7 +159,7 @@ class CubeFactory():
 
             if fle == file_list[-1]:
                 primary_header['DATE-END'] = ffi_data[1].header['DATE-END']
-
+                
             # close fits file
             ffi_data.close()
 
@@ -173,7 +178,7 @@ class CubeFactory():
             elif img_info_table[kwd].dtype == np.int32:
                 tpe = 'J'
             else:
-                tpe = "A24"
+                tpe = str(img_info_table[kwd].dtype).replace("S","A").strip("|")
         
             cols.append(fits.Column(name=kwd, format=tpe, array=img_info_table[kwd]))
         
