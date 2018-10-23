@@ -101,7 +101,7 @@ class CutoutFactory():
             The cutout pixel limits in an array of the form [[ymin,ymax],[xmin,xmax]]
         """
 
-        center_pixel = self.center_coord.to_pixel(self.cube_wcs)
+        center_pixel = self.center_coord.to_pixel(self.cube_wcs, 1)
 
         lims = np.zeros((2,2),dtype=int)
 
@@ -455,7 +455,8 @@ class CutoutFactory():
         cols.append(fits.Column(name='TIMECORR', format='E', unit='d', disp='E14.7',
                                 array=cube_fits[2].columns['BARYCORR'].array))
 
-        cols.append(fits.Column(name='CADENCENO', format='J', disp='I10', array=np.arange(1, len(img_cube) + 1)))
+        # Adding CADENCENO as zeros b/c we don't have this info
+        cols.append(fits.Column(name='CADENCENO', format='J', disp='I10', array=empty_arr[:,0,0]))
         
         # Adding the cutouts
         tform = str(img_cube[0].size) + "E"

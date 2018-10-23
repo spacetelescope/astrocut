@@ -11,7 +11,6 @@ import numpy as np
 
 from astropy.io import fits
 from astropy.table import Table,Column
-from astropy.wcs import WCS
 
 from time import time
 from datetime import date
@@ -159,6 +158,7 @@ class CubeFactory():
 
             if fle == file_list[-1]:
                 primary_header['DATE-END'] = ffi_data[1].header['DATE-END']
+                primary_header['TSTOP'] = ffi_data[1].header.get(['TSTOP'])
                 
             # close fits file
             ffi_data.close()
