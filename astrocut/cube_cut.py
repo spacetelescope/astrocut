@@ -448,6 +448,11 @@ class CutoutFactory():
 
         cols = list()
 
+        # Adding the cutouts
+        tform = str(img_cube[0].size) + "E"
+        dims = str(img_cube[0].shape)
+        empty_arr = np.zeros(img_cube.shape)
+
         # Adding the Time relates columns
         cols.append(fits.Column(name='TIME', format='D', unit='BJD - 2457000, days', disp='D14.7',
                                 array=(cube_fits[2].columns['TSTART'].array + cube_fits[2].columns['TSTOP'].array)/2))
@@ -457,14 +462,12 @@ class CutoutFactory():
 
         # Adding CADENCENO as zeros b/c we don't have this info
         cols.append(fits.Column(name='CADENCENO', format='J', disp='I10', array=empty_arr[:,0,0]))
-        
-        # Adding the cutouts
-        tform = str(img_cube[0].size) + "E"
-        dims = str(img_cube[0].shape)
-        empty_arr = np.zeros(img_cube.shape)
-    
+
+        # Adding counts (-1 b/c we don't have data)
         cols.append(fits.Column(name='RAW_CNTS', format=tform.replace('E','J'), unit='count', dim=dims, disp='I8',
-                            array=empty_arr-1, null=-1)) 
+                            array=empty_arr-1, null=-1))
+
+        # Adding flux and flux_err (data we actually have!)
         cols.append(fits.Column(name='FLUX', format=tform, dim=dims, unit='e-/s', disp='E14.7', array=img_cube))
         cols.append(fits.Column(name='FLUX_ERR', format=tform, dim=dims, unit='e-/s', disp='E14.7', array=uncert_cube)) 
    
