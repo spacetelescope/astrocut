@@ -100,7 +100,8 @@ class CutoutFactory():
         response : `numpy.array`
             The cutout pixel limits in an array of the form [[ymin,ymax],[xmin,xmax]]
         """
-
+        
+        # Note: This is returning the center pixel in 1-up
         center_pixel = self.center_coord.to_pixel(self.cube_wcs, 1)
 
         lims = np.zeros((2,2),dtype=int)
@@ -115,8 +116,8 @@ class CutoutFactory():
                 pixel_scale = u.Quantity(wcs.utils.proj_plane_pixel_scales(self.cube_wcs)[axis], self.cube_wcs.wcs.cunit[axis])
                 dim = (size / pixel_scale).decompose()/2
 
-            lims[axis,0] = int(np.round(center_pixel[axis] - dim))
-            lims[axis,1] = int(np.round(center_pixel[axis] + dim))
+            lims[axis,0] = int(np.round(center_pixel[axis] - 1 - dim))
+            lims[axis,1] = int(np.round(center_pixel[axis] - 1 + dim))
 
         # Checking at least some of the cutout is on the cube
         if ((lims[0,0] <= 0) and (lims[0,1] <=0)) or ((lims[1,0] <= 0) and (lims[1,1] <=0)):
@@ -150,7 +151,7 @@ class CutoutFactory():
         cutout_wcs_dict["1CTYP{}"] = [cube_wcs_header["CTYPE1"],"right ascension coordinate type"]
         cutout_wcs_dict["2CTYP{}"] = [cube_wcs_header["CTYPE2"],"declination coordinate type"]
         
-        orig_pix = self.cube_wcs.all_world2pix(self.center_coord.ra.deg, self.center_coord.dec.deg, 0)
+        orig_pix = self.cube_wcs.all_world2pix(self.center_coord.ra.deg, self.center_coord.dec.deg, 1)
         cutout_wcs_dict["1CRPX{}"] = [float(orig_pix[0]) - self.cutout_lims[0,0],
                                       "[pixel] reference pixel along image axis 1"]
         cutout_wcs_dict["2CRPX{}"] = [float(orig_pix[1]) - self.cutout_lims[0,0],
@@ -363,7 +364,7 @@ class CutoutFactory():
             # using table comment rather than the default ones if available
 
         # Adjusting the CRPIX/CRVAL values
-        orig_pix = self.cube_wcs.all_world2pix(self.center_coord.ra.deg, self.center_coord.dec.deg, 0)
+        orig_pix = self.cube_wcs.all_world2pix(self.center_coord.ra.deg, self.center_coord.dec.deg, 1)
         aperture_header["CRPIX1"] = float(orig_pix[0]) - self.cutout_lims[0,0]
         aperture_header["CRPIX2"] = float(orig_pix[1]) - self.cutout_lims[1,0]
     
