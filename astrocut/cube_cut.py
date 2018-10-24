@@ -282,7 +282,17 @@ class CutoutFactory():
         # Adding cutout specific headers
         primary_header['RA_OBJ'] = (self.center_coord.ra.deg,'[deg] right ascension')
         primary_header['DEC_OBJ'] = (self.center_coord.dec.deg,'[deg] declination')
-    
+
+        primary_header['TIMEREF'] = ('SOLARSYSTEM', 'barycentric correction applied to times')        
+        primary_header['TASSIGN'] = ('SPACECRAFT', 'where time is assigned')                         
+        primary_header['TIMESYS'] = ('TDB', 'time system is Barycentric Dynamical Time (TDB)')
+        primary_header['BJDREFI'] = (2457000, 'integer part of BTJD reference date')           
+        primary_header['BJDREFF'] = (0.00000000, 'fraction of the day in BTJD reference date')    
+        primary_header['TIMEUNIT'] = ('d', 'time unit for TIME, TSTART and TSTOP')
+
+        telapse = primary_header.get("TSTOP",0) - primary_header.get("TSTART",0)
+        primary_header['TELAPSE '] = (telapse, '[d] TSTOP - TSTART')
+        
         # These are all the things in the TESS pipeline tpfs about the object that we can't fill
         primary_header['OBJECT'] = ("",'string version of target id ')
         primary_header['TCID'] = (0,'unique tess target identifier')
@@ -297,6 +307,7 @@ class CutoutFactory():
         primary_header['RADIUS'] = (0.0,'[solar radii] stellar radius')
         primary_header['TICVER'] = (0,'TICVER')
 
+        
 
     def _add_column_wcs(self, table_header, wcs_dict):
         """
@@ -488,7 +499,6 @@ class CutoutFactory():
         
         # making the table HDU
         table_hdu = fits.BinTableHDU.from_columns(cols)
-    
         table_hdu.header['EXTNAME'] = 'PIXELS'
         table_hdu.header['INHERIT'] = True
     
