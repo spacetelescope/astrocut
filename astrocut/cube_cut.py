@@ -330,8 +330,6 @@ class CutoutFactory():
             # Adding header descriptions for the table keywords
             if "TTYPE" in kwd:
                 table_header.comments[kwd] = "column name"
-                if table_header[kwd] == "CADENCENO":
-                    table_header.comments[kwd] += ": Row counter, not true cadenceno"
             elif "TFORM" in kwd:
                 table_header.comments[kwd] = "column format"
             elif "TUNIT" in kwd:
