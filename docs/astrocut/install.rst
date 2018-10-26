@@ -18,14 +18,18 @@ Installing astrocut
 Using pip
 ---------
 
-Astrocut is still in beta and not yet published to PyPi,
-but you can still use pip to install it from github::
+The easiest way to install Astrocut is using pip::
 
-    pip git+https://github.com/spacetelescope/astrocut.git
+    pip install astrocut
 
 
 From source
 -----------
+
+To install the bleading edge version from github without donloading,
+run the following command::
+
+  pip git+https://github.com/spacetelescope/astrocut.git
 
 The latest development version of astrocut can be cloned from github
 using this command::
