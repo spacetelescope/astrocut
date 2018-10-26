@@ -5,8 +5,6 @@ This module implements the functionality to create image cubes for the purposes 
 creating cutout target pixel files.
 """
 
-from ._astropy_init import __version__
-
 import numpy as np
 
 from astropy.io import fits
