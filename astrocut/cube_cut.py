@@ -374,11 +374,13 @@ class CutoutFactory():
 
         # Adjusting the CRPIX/CRVAL values
         orig_pix = self.cube_wcs.all_world2pix(self.center_coord.ra.deg, self.center_coord.dec.deg, 1)
-        aperture_header["CRPIX1"] = float(orig_pix[0]) - self.cutout_lims[0,0]
-        aperture_header["CRPIX2"] = float(orig_pix[1]) - self.cutout_lims[1,0]
+        #aperture_header["CRPIX1"] = float(orig_pix[0]) - self.cutout_lims[0,0]
+        #aperture_header["CRPIX2"] = float(orig_pix[1]) - self.cutout_lims[1,0]
+        aperture_header["CRPIX1"] -= self.cutout_lims[0,0]
+        aperture_header["CRPIX2"] -= self.cutout_lims[1,0]
     
-        aperture_header["CRVAL1"] = self.center_coord.ra.deg
-        aperture_header["CRVAL2"] = self.center_coord.dec.deg
+        #aperture_header["CRVAL1"] = self.center_coord.ra.deg
+        #aperture_header["CRVAL2"] = self.center_coord.dec.deg
 
         # Adding the physical wcs keywords
         aperture_header.set("WCSNAMEP", "PHYSICAL","name of world coordinate system alternate P")
@@ -387,13 +389,13 @@ class CutoutFactory():
         aperture_header.set("CTYPE1P", "RAWX", "physical WCS axis 1 type CCD col")
         aperture_header.set("CUNIT1P", "PIXEL", "physical WCS axis 1 unit")
         aperture_header.set("CRPIX1P", 1, "reference CCD column")
-        aperture_header.set("CRVAL1P", int(cube_wcs_header["CRPIX1"]) - self.cutout_lims[0,0], "value at reference CCD column")
+        aperture_header.set("CRVAL1P", self.cutout_lims[0,0] + 1, "value at reference CCD column")
         aperture_header.set("CDELT1P", 1.0, "physical WCS axis 1 step")
                 
         aperture_header.set("CTYPE2P", "RAWY", "physical WCS axis 2 type CCD col")
         aperture_header.set("CUNIT2P", "PIXEL", "physical WCS axis 2 unit")
         aperture_header.set("CRPIX2P", 1, "reference CCD row")
-        aperture_header.set("CRVAL2P", int(cube_wcs_header["CRPIX1"]) - self.cutout_lims[1,0], "value at reference CCD row")
+        aperture_header.set("CRVAL2P", self.cutout_lims[1,0] + 1, "value at reference CCD row")
         aperture_header.set("CDELT2P", 1.0, "physical WCS axis 2 step")
 
         
