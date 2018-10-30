@@ -151,14 +151,13 @@ class CutoutFactory():
         cutout_wcs_dict["1CTYP{}"] = [cube_wcs_header["CTYPE1"],"right ascension coordinate type"]
         cutout_wcs_dict["2CTYP{}"] = [cube_wcs_header["CTYPE2"],"declination coordinate type"]
         
-        orig_pix = self.cube_wcs.all_world2pix(self.center_coord.ra.deg, self.center_coord.dec.deg, 1)
-        cutout_wcs_dict["1CRPX{}"] = [float(orig_pix[0]) - self.cutout_lims[0,0],
+        cutout_wcs_dict["1CRPX{}"] = [cube_wcs_header["CRPIX1"] - self.cutout_lims[0,0],
                                       "[pixel] reference pixel along image axis 1"]
-        cutout_wcs_dict["2CRPX{}"] = [float(orig_pix[1]) - self.cutout_lims[0,0],
+        cutout_wcs_dict["2CRPX{}"] = [cube_wcs_header["CRPIX2"] - self.cutout_lims[1,0],
                                       "[pixel] reference pixel along image axis 2"]
     
-        cutout_wcs_dict["1CRVAL{}"] = [self.center_coord.ra.deg, "[deg] right ascension at reference pixel"]
-        cutout_wcs_dict["2CRVAL{}"] = [self.center_coord.dec.deg, "[deg] declination at reference pixel"]
+        cutout_wcs_dict["1CRVL{}"] = [cube_wcs_header["CRVAL1"], "[deg] right ascension at reference pixel"]
+        cutout_wcs_dict["2CRVL{}"] = [cube_wcs_header["CRVAL2"], "[deg] declination at reference pixel"]
     
         cunits = self.cube_wcs.wcs.cunit
         cutout_wcs_dict["1CUNI{}"] = [str(cunits[0]), "physical unit in column dimension"]
@@ -185,9 +184,9 @@ class CutoutFactory():
         cutout_wcs_dict["1CUN{}P"] = ["PIXEL","table column physical WCS axis 1 unit"]
         cutout_wcs_dict["2CUN{}P"] = ["PIXEL","table column physical WCS axis 2 unit"]
     
-        cutout_wcs_dict["1CRV{}P"] = [int(cube_wcs_header["CRPIX1"]) - self.cutout_lims[0,0],
+        cutout_wcs_dict["1CRV{}P"] = [self.cutout_lims[0,0] + 1,
                                       "table column physical WCS ax 1 ref value"]
-        cutout_wcs_dict["2CRV{}P"] = [int(cube_wcs_header["CRPIX1"]) - self.cutout_lims[1,0],
+        cutout_wcs_dict["2CRV{}P"] = [self.cutout_lims[1,0] + 1,
                                       "table column physical WCS ax 2 ref value"]
 
         # TODO: can we calculate these? or are they fixed?
@@ -372,15 +371,9 @@ class CutoutFactory():
             aperture_header.set(kwd,val,cube_table_header.get(kwd,cmt))
             # using table comment rather than the default ones if available
 
-        # Adjusting the CRPIX/CRVAL values
-        orig_pix = self.cube_wcs.all_world2pix(self.center_coord.ra.deg, self.center_coord.dec.deg, 1)
-        #aperture_header["CRPIX1"] = float(orig_pix[0]) - self.cutout_lims[0,0]
-        #aperture_header["CRPIX2"] = float(orig_pix[1]) - self.cutout_lims[1,0]
+        # Adjusting the CRPIX values
         aperture_header["CRPIX1"] -= self.cutout_lims[0,0]
         aperture_header["CRPIX2"] -= self.cutout_lims[1,0]
-    
-        #aperture_header["CRVAL1"] = self.center_coord.ra.deg
-        #aperture_header["CRVAL2"] = self.center_coord.dec.deg
 
         # Adding the physical wcs keywords
         aperture_header.set("WCSNAMEP", "PHYSICAL","name of world coordinate system alternate P")
@@ -403,7 +396,7 @@ class CutoutFactory():
         
 
             
-    def apply_header_inherit(self, hdu_list):
+    def _apply_header_inherit(self, hdu_list):
         """
         The INHERIT keyword indicated that keywords from the primary header should be duplicated in 
         the headers of all subsequent extensions.  This function performs this addition in place to 
@@ -513,7 +506,7 @@ class CutoutFactory():
     
         cutout_hdu_list = fits.HDUList([primary_hdu,table_hdu, aperture_hdu])
         
-        self.apply_header_inherit(cutout_hdu_list)
+        self._apply_header_inherit(cutout_hdu_list)
 
         return cutout_hdu_list
 
