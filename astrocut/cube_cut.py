@@ -571,10 +571,14 @@ class CutoutFactory():
             print("Cutout center coordinate: {},{}".format(self.center_coord.ra.deg,self.center_coord.dec.deg))
 
 
-        # Making size into an array [ny, nx] 
-        cutout_size = np.atleast_1d(cutout_size)
-        if len(cutout_size) == 1:
-            cutout_size = np.repeat(cutout_size, 2)
+        # Making size into an array [ny, nx]
+        if np.isscalar(cutout_size):
+            size = np.repeat(size, 2)
+
+        if isinstance(cutout_size, u.Quantity):
+            size = np.atleast_1d(cutout_size)
+            if len(cutout_size) == 1:
+                size = np.repeat(cutout_size, 2)
 
         if len(cutout_size) > 2:
             warnings.warn("Too many dimensions in cutout size, only the first two will be used.",
@@ -612,7 +616,7 @@ class CutoutFactory():
             print("Target pixel file:",target_pixel_file)
         
         # Write the TPF
-        tpf_object.writeto(target_pixel_file, overwrite=True)
+        tpf_object.writeto(target_pixel_file, overwrite=True, checksum=True)
 
         # Close the cube file
         cube.close()
