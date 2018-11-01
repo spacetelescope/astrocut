@@ -581,12 +581,12 @@ class CutoutFactory():
 
         # Making size into an array [ny, nx]
         if np.isscalar(cutout_size):
-            size = np.repeat(size, 2)
+            cutout_size = np.repeat(cutout_size, 2)
 
         if isinstance(cutout_size, u.Quantity):
-            size = np.atleast_1d(cutout_size)
+            cutout_size = np.atleast_1d(cutout_size)
             if len(cutout_size) == 1:
-                size = np.repeat(cutout_size, 2)
+                cutout_size = np.repeat(cutout_size, 2)
 
         if len(cutout_size) > 2:
             warnings.warn("Too many dimensions in cutout size, only the first two will be used.",
