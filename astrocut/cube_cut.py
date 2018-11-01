@@ -117,11 +117,19 @@ class CutoutFactory():
                 dim = (size / pixel_scale).decompose()/2
 
             lims[axis,0] = int(np.round(center_pixel[axis] - 1 - dim))
-            lims[axis,1] = int(np.round(center_pixel[axis] - 1 + dim))
+            lims[axis,0] = int(np.round(center_pixel[axis] - 1 + dim))
+
+            # The case where the requested area is so small it rounds to zero
+            if lims[axis,0] == lims[axis,0]:
+                lims[axis,0] = int(np.floor(center_pixel[axis] - 1))
+                lims[axis,1] = int(np.ceil(center_pixel[axis] - 1))
 
         # Checking at least some of the cutout is on the cube
         if ((lims[0,0] <= 0) and (lims[0,1] <=0)) or ((lims[1,0] <= 0) and (lims[1,1] <=0)):
-            raise InvalidQueryError("Cutout location is not in cube footprint!") 
+            raise InvalidQueryError("Cutout location is not in cube footprint!")
+
+        
+        
     
         self.cutout_lims = lims
 
