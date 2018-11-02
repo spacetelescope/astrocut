@@ -117,10 +117,10 @@ class CutoutFactory():
                 dim = (size / pixel_scale).decompose()/2
 
             lims[axis,0] = int(np.round(center_pixel[axis] - 1 - dim))
-            lims[axis,0] = int(np.round(center_pixel[axis] - 1 + dim))
+            lims[axis,1] = int(np.round(center_pixel[axis] - 1 + dim))
 
             # The case where the requested area is so small it rounds to zero
-            if lims[axis,0] == lims[axis,0]:
+            if lims[axis,0] == lims[axis,1]:
                 lims[axis,0] = int(np.floor(center_pixel[axis] - 1))
                 lims[axis,1] = int(np.ceil(center_pixel[axis] - 1))
 
