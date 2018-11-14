@@ -617,8 +617,8 @@ class CutoutFactory():
             target_pixel_file += "{}_{}_{}_{}x{}_astrocut.fits".format(flename.rstrip('.fits').rstrip("-cube"),
                                                                        self.center_coord.ra.value,
                                                                        self.center_coord.dec.value,
-                                                                       self.cutout_lims[0,1]-self.cutout_lims[0,0],
-                                                                       self.cutout_lims[1,1]-self.cutout_lims[1,0])
+                                                                       self.cutout_lims[1,1]-self.cutout_lims[1,0],
+                                                                       self.cutout_lims[0,1]-self.cutout_lims[0,0])
         
         if verbose:
             print("Target pixel file:",target_pixel_file)
