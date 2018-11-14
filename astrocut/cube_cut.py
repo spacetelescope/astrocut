@@ -127,9 +127,9 @@ class CutoutFactory():
         # Checking at least some of the cutout is on the cube
         if ((lims[0,0] <= 0) and (lims[0,1] <=0)) or ((lims[1,0] <= 0) and (lims[1,1] <=0)):
             raise InvalidQueryError("Cutout location is not in cube footprint!")
-
         
-        
+        xmin,xmax = lims[1]
+        ymin,ymax = lims[0]
     
         self.cutout_lims = lims
 
@@ -233,25 +233,25 @@ class CutoutFactory():
         ymin,ymax = self.cutout_lims[0]
 
         # Get the image array limits
-        xmax_cube,ymax_cube,_,_ = transposed_cube.shape
+        ymax_cube,xmax_cube,_,_ = transposed_cube.shape
 
         # Adjust limits and figuring out the padding
         padding = np.zeros((3,2),dtype=int)
         if xmin < 0:
-            padding[1,0] = -xmin
+            padding[2,0] = -xmin
             xmin = 0
         if ymin < 0:
-            padding[2,0] = -ymin
+            padding[1,0] = -ymin
             ymin = 0
         if xmax > xmax_cube:
-            padding[1,1] = xmax - xmax_cube
+            padding[2,1] = xmax - xmax_cube
             xmax = xmax_cube
         if ymax > ymax_cube:
-            padding[2,1] = ymax - ymax_cube
+            padding[1,1] = ymax - ymax_cube
             ymax = ymax_cube       
         
         # Doing the cutout
-        cutout = transposed_cube[xmin:xmax,ymin:ymax,:,:]
+        cutout = transposed_cube[ymin:ymax,xmin:xmax,:,:]
     
         img_cutout = cutout[:,:,:,0].transpose((2,0,1))
         uncert_cutout = cutout[:,:,:,1].transpose((2,0,1))
@@ -463,7 +463,7 @@ class CutoutFactory():
 
         # Adding the cutouts
         tform = str(img_cube[0].size) + "E"
-        dims = str(img_cube[0].shape)
+        dims = str(img_cube[0].shape[::-1])
         empty_arr = np.zeros(img_cube.shape)
 
         # Adding the Time relates columns
