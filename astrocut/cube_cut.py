@@ -257,7 +257,7 @@ class CutoutFactory():
         uncert_cutout = cutout[:,:,:,1].transpose((2,0,1))
     
         # Making the aperture array
-        aperture = np.ones((ymax-ymin, xmax-xmin))
+        aperture = np.ones((xmax-xmin, ymax-ymin))
 
         # Adding padding to the cutouts so that it's the expected size
         if padding.any(): # only do if we need to pad
