@@ -41,10 +41,9 @@ def checkcutout(cutfile,pixcrd,world,csize,ecube,eps=1.e-7):
     dist = pinput.separation(poutput).degree
     assert dist <= eps, "{} separation in primary header {} too large".format(cutfile,dist)
         
-    cx = ecube.shape[1]
-    cy = ecube.shape[0]
+    cx = ecube.shape[0]
+    cy = ecube.shape[1]
     ntimes = ecube.shape[2]
-    print("cx: {}, cy: {}, ntimes: {}")
     tab = hdulist[1].data
     assert len(tab) == ntimes, "{} expected {} entries, found {}".format(cutfile,ntimes,len(tab))
     assert (tab['TIME']==(np.arange(ntimes)+0.5)).all(), "{} some time values are incorrect".format(cutfile)
@@ -56,27 +55,26 @@ def checkcutout(cutfile,pixcrd,world,csize,ecube,eps=1.e-7):
 
 def check1(flux,x1,x2,y1,y2,ecube,label,cutfile):
     """Test one of flux or error"""
-    cx = ecube.shape[1]
-    cy = ecube.shape[0]
+    cx = ecube.shape[0]
+    cy = ecube.shape[1]
     if x1 < 0:
-        assert np.isnan(flux[:,:,:-x1]).all(), "{} {} x1 NaN failure".format(cutfile,label)
+        assert np.isnan(flux[:,:-x1,:]).all(), "{} {} x1 NaN failure".format(cutfile,label)
     
     if y1 < 0:
-        assert np.isnan(flux[:,:-y1,:]).all(), "{} {} y1 NaN failure".format(cutfile,label)
+        assert np.isnan(flux[:,:,:-y1]).all(), "{} {} y1 NaN failure".format(cutfile,label)
         
     if x2>=cx:
-        assert np.isnan(flux[:,:,-(x2-cx+1):]).all(), "{} {} x2 NaN failure".format(cutfile,label)
+        assert np.isnan(flux[:,-(x2-cx+1):,:]).all(), "{} {} x2 NaN failure".format(cutfile,label)
         
     if y2>=cy:
-        assert np.isnan(flux[:,-(y2-cy+1):,:]).all(), "{} {} y2 NaN failure".format(cutfile,label)
+        assert np.isnan(flux[:,:,-(y2-cy+1):]).all(), "{} {} y2 NaN failure".format(cutfile,label)
         
     x1c = max(x1,0)
     y1c = max(y1,0)
     x2c = min(x2,cx-1)
     y2c = min(y2,cy-1)
-    scube = ecube[y1c:y2c,x1c:x2c,:]
-    sflux = np.moveaxis(flux[:,y1c-y1:y2c-y1,x1c-x1:x2c-x1],0,-1)
-
+    scube = ecube[x1c:x2c,y1c:y2c,:]
+    sflux = np.moveaxis(flux[:,x1c-x1:x2c-x1,y1c-y1:y2c-y1],0,-1)
     assert (scube==sflux).all(), "{} {} comparison failure".format(cutfile,label)
 
     return
