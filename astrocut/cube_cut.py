@@ -463,7 +463,7 @@ class CutoutFactory():
 
         # Adding the cutouts
         tform = str(img_cube[0].size) + "E"
-        dims = str(img_cube[0].shape)
+        dims = str(img_cube[0].shape[::-1])
         empty_arr = np.zeros(img_cube.shape)
 
         # Adding the Time relates columns
