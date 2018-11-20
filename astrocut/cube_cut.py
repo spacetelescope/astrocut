@@ -19,7 +19,6 @@ import warnings
 from .exceptions import InputWarning, TypeWarning, InvalidQueryError
 
 
-
 class CutoutFactory():
     """
     Class for creating image cutouts.
@@ -37,16 +36,51 @@ class CutoutFactory():
         self.cube_wcs = None # WCS information from the image cube
         self.cutout_lims = np.zeros((2,2),dtype=int) #  Cutout pixel limits, [[ymin,ymax],[xmin,xmax]]
         self.center_coord = None # Central skycoord
-
         
+        # Extra keywords from the FFI image headers (TESS specific)
+        self.img_kwds = {"BACKAPP": [None, "background is subtracted"],
+                         "CDPP0_5": [None, "RMS CDPP on 0.5-hr time scales"],
+                         "CDPP1_0": [None, "RMS CDPP on 1.0-hr time scales"],
+                         "CDPP2_0": [None, "RMS CDPP on 2.0-hr time scales"],
+                         "CROWDSAP": [None, "Ratio of target flux to total flux in op. ap."],
+                         "DEADAPP":[None,"deadtime applied"], 
+                         "DEADC":[None,"deadtime correction"],
+                         "EXPOSURE":[None,"[d] time on source"],
+                         "FLFRCSAP": [None, "Frac. of target flux w/in the op. aperture"],
+                         "FRAMETIM":[None,"[s] frame time [INT_TIME + READTIME]"],
+                         "FXDOFF":[None,"compression fixed offset"],
+                         "GAINA":[None,"[electrons/count] CCD output A gain"],
+                         "GAINB":[None,"[electrons/count] CCD output B gain"],
+                         "GAINC":[None,"[electrons/count] CCD output C gain"],
+                         "GAIND":[None,"[electrons/count] CCD output D gain"],
+                         "INT_TIME":[None,"[s] photon accumulation time per frame"],
+                         "LIVETIME":[None,"[d] TELAPSE multiplied by DEADC"],
+                         "MEANBLCA":[None,"[count] FSW mean black level CCD output A"],
+                         "MEANBLCB":[None,"[count] FSW mean black level CCD output B"],
+                         "MEANBLCC":[None,"[count] FSW mean black level CCD output C"],
+                         "MEANBLCD":[None,"[count] FSW mean black level CCD output D"],
+                         "NREADOUT":[None,"number of read per cadence"],
+                         "NUM_FRM":[None,"number of frames per time stamp"],
+                         "READNOIA":[None,"[electrons] read noise CCD output A"],
+                         "READNOIB":[None,"[electrons] read noise CCD output B"],
+                         "READNOIC":[None,"[electrons] read noise CCD output C"],
+                         "READNOID":[None,"[electrons] read noise CCD output D"],
+                         "READTIME":[None,"[s] readout time per frame"],
+                         "TIERRELA":[None,"[d] relative time error"],
+                         "TIMEDEL":[None,"[d] time resolution of data"],
+                         "TIMEPIXR":[None,"bin time beginning=0 middle=0.5 end=1"],
+                         "TMOFST11": [None, "(s) readout delay for camera 1 and ccd 1"],
+                         "VIGNAPP":[None,"vignetting or collimator correction applied"],
+        }
 
     
-    def _get_cube_wcs(self, table_header,table_row):
+    def _parse_table_info(self, table_header, table_row):
         """
-        Takes the header and one entry from the cube table of image header data and  builds 
-        a WCS object that encalpsulates the given WCS information.  
+        Takes the header and one entry from the cube table of image header data,
+        builds a WCS object that encalpsulates the given WCS information,
+        and collects into a dictionary the other keywords we care about.  
 
-        This object is stored in ``self.cube_wcs``.
+        The WCS is stored in ``self.cube_wcs``, and the extra keywords in ``self.img_kwds``
 
         Parameters
         ----------
@@ -54,13 +88,9 @@ class CutoutFactory():
             The cube image header data table header.
         table_row : `~astropy.io.fits.FITS_record`
             One row from the cube image header data table.
-
-        Returns
-        -------
-        response : `~astropy.wcs.WCS`
-            WCS object containing the WCS information from the given cube image header data table row.
         """
-    
+
+        # Turning the table row inot a new header object
         wcs_header = fits.header.Header()
 
         for header_key, header_val in table_header.items():
@@ -78,8 +108,13 @@ class CutoutFactory():
             else:
                 warnings.warn("Unknown data type, keyword value will be parsed as a string.",
                               TypeWarning)
-           
-        self.cube_wcs =  wcs.WCS(wcs_header)
+
+        # Setting 
+        self.cube_wcs = wcs.WCS(wcs_header, relax=True)
+
+        # Filling the img_kwds dictionary while we are here
+        for kwd in self.img_kwds:
+            self.img_kwds[kwd][0] = wcs_header.get(kwd)
 
 
     def _get_cutout_limits(self, cutout_size):
@@ -128,9 +163,6 @@ class CutoutFactory():
         if ((lims[0,0] <= 0) and (lims[0,1] <=0)) or ((lims[1,0] <= 0) and (lims[1,1] <=0)):
             raise InvalidQueryError("Cutout location is not in cube footprint!")
 
-        
-        
-    
         self.cutout_lims = lims
 
 
@@ -138,7 +170,6 @@ class CutoutFactory():
         """
         Transform the cube WCS object into the cutout column WCS keywords.
         Adds the physical keywords for transformation back from cutout to location on FFI.
-        Also performs nonliner -> linear approximation for the transformation matrix (TODO: not yet is doesn't!)
         This is a very TESS specific function.
         
         Returns
@@ -313,9 +344,9 @@ class CutoutFactory():
         primary_header['MH'] =(0.0,'[log10([M/H])] metallicity') 
         primary_header['RADIUS'] = (0.0,'[solar radii] stellar radius')
         primary_header['TICVER'] = (0,'TICVER')
+        primary_header['TICID'] = (None,'unique tess target identifier')
 
-        
-
+    
     def _add_column_wcs(self, table_header, wcs_dict):
         """
         Adds WCS information for the array columns to the cutout table header.
@@ -399,9 +430,23 @@ class CutoutFactory():
         aperture_header.set("CRVAL2P", self.cutout_lims[1,0] + 1, "value at reference CCD row")
         aperture_header.set("CDELT2P", 1.0, "physical WCS axis 2 step")
 
-        
+        # Adding extra aperture keywords (TESS specific)
+        aperture_header.set("NPIXMISS", None, "Number of op. aperture pixels not collected")
+        aperture_header.set("NPIXSAP", None, "Number of pixels in optimal aperture")
 
         
+    def _add_img_kwds(self, table_header):
+        """
+        Adding extra keywords to the table header.
+
+        Parameters
+        ----------
+        table_header : `~astropy.io.fits.Header`
+            The table header to add keywords to.  It will be modified in place.
+        """
+
+        for key in self.img_kwds:
+            table_header[key] = tuple(self.img_kwds[key])
 
             
     def _apply_header_inherit(self, hdu_list):
@@ -504,7 +549,10 @@ class CutoutFactory():
         table_hdu.header['INHERIT'] = True
     
         # Adding the wcs keywords to the columns and removing from the header
-        self._add_column_wcs(table_hdu.header, cutout_wcs_dict) 
+        self._add_column_wcs(table_hdu.header, cutout_wcs_dict)
+
+        # Adding the extra image keywords
+        self._add_img_kwds(table_hdu.header)
 
         # Building the aperture HDU
         aperture_hdu = fits.ImageHDU(data=aperture)
@@ -566,9 +614,9 @@ class CutoutFactory():
 
         cube = fits.open(cube_file) 
 
-        # Get the WCS and figure out which pixels are in the cutout
-        wcs_ind = int(len(cube[2].data)/2) # using the middle file for wcs info
-        self._get_cube_wcs(cube[2].header, cube[2].data[wcs_ind])
+        # Get the info we need from the data table
+        data_ind = int(len(cube[2].data)/2) # using the middle file for table info
+        self._parse_table_info(cube[2].header, cube[2].data[data_ind])
 
         if isinstance(coordinates, SkyCoord):
             self.center_coord = coordinates
