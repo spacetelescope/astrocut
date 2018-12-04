@@ -195,7 +195,7 @@ class CubeFactory():
         if verbose:
             writeTime = time()
     
-        hdu_list.writeto(cube_file, overwrite=True) 
+        hdu_list.writeto(cube_file, overwrite=True, checksum=True) 
 
         if verbose:
             endTime = time()
