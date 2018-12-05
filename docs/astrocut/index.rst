@@ -101,7 +101,7 @@ be saved, if unspecified it defaults to the current directory.
                 >>> my_cutter = CutoutFactory()
                 >>> cube_file = "img-cube.fits"
                 >>> 
-                >>> cutout_file = my_cutter(cube_file, "251.51 32.36", 5, verbose=True)
+                >>> cutout_file = my_cutter.cube_cut(cube_file, "251.51 32.36", 5, verbose=True)
                 Cutout center coordinate: 251.51,32.36
                 xmin,xmax: [26 31]
                 ymin,ymax: [149 154]
