@@ -14,6 +14,7 @@ from time import time
 import os
 import warnings
 
+from . import __version__
 from .exceptions import InputWarning, TypeWarning, InvalidQueryError
 
 
@@ -318,6 +319,9 @@ class CutoutFactory():
         """
 
         # Adding cutout specific headers
+        primary_header['CREATOR'] = ('astrocut', 'software used to produce this file')
+        primary_header['PROCVER'] = (__version__, 'software version')
+
         primary_header['RA_OBJ'] = (self.center_coord.ra.deg, '[deg] right ascension')
         primary_header['DEC_OBJ'] = (self.center_coord.dec.deg, '[deg] declination')
 
