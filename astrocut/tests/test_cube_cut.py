@@ -51,6 +51,9 @@ def checkcutout(cutfile,pixcrd,world,csize,ecube,eps=1.e-7):
     check1(tab['FLUX'],x1,x2,y1,y2,ecube[:,:,:,0],'FLUX',cutfile)
     check1(tab['FLUX_ERR'],x1,x2,y1,y2,ecube[:,:,:,1],'FLUX_ERR',cutfile)
     
+    # Regression test for PR #6
+    assert hdulist[2].data.dtype.type == np.int32
+
     return 
 
 def check1(flux,x1,x2,y1,y2,ecube,label,cutfile):
