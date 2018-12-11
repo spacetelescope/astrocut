@@ -47,7 +47,6 @@ By default *make_cube* runs in verbose mode and prints out it's progress, howeve
 verbose to false will silence all output.
 
 .. doctest-skip::
-.. code-block:: python
 
                 >>> from astrocut import CubeFactory
                 >>> from glob import glob
