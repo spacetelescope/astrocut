@@ -46,7 +46,7 @@ simulated sector, it takes about 12 minutes to run on a computer with 65 GB of m
 By default *make_cube* runs in verbose mode and prints out it's progress, however setting
 verbose to false will silence all output.
 
-
+.. doctest-skip::
 .. code-block:: python
 
                 >>> from astrocut import CubeFactory
@@ -54,9 +54,9 @@ verbose to false will silence all output.
                 >>> from astropy.io import fits
                 >>> 
                 >>> my_cuber = CubeFactory()
-                >>> input_files = glob("data/*ffic.fits")
+                >>> input_files = glob("data/*ffic.fits") 
                 >>> 
-                >>> cube_file = my_cuber.make_cube(input_files)
+                >>> cube_file = my_cuber.make_cube(input_files) 
                 Completed file 0
                 Completed file 1
                 Completed file 2
@@ -68,11 +68,11 @@ verbose to false will silence all output.
                 Total time elapsed: 46.42 sec
                 File write time: 8.82 sec
 
-                >>> print(cube_file)
+                >>> print(cube_file) #doctest: +SKIP
                 img-cube.fits
 
-                >>> cube_hdu = fits.open(cube_file)
-                >>> cube_hdu.info()
+                >>> cube_hdu = fits.open(cube_file) #doctest: +SKIP
+                >>> cube_hdu.info() #doctest: +SKIP
                 Filename: img-cube.fits
                 No.    Name      Ver    Type      Cards   Dimensions   Format
                 0  PRIMARY       1 PrimaryHDU      28   ()      
@@ -101,7 +101,7 @@ be saved, if unspecified it defaults to the current directory.
                 >>> my_cutter = CutoutFactory()
                 >>> cube_file = "img-cube.fits"
                 >>> 
-                >>> cutout_file = my_cutter.cube_cut(cube_file, "251.51 32.36", 5, verbose=True)
+                >>> cutout_file = my_cutter.cube_cut(cube_file, "251.51 32.36", 5, verbose=True) #doctest: +SKIP
                 Cutout center coordinate: 251.51,32.36
                 xmin,xmax: [26 31]
                 ymin,ymax: [149 154]
