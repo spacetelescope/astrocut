@@ -6,12 +6,10 @@ import numpy as np
 import astropy.units as u
 
 from astropy.io import fits
-from astropy.table import Table,Column
 from astropy.coordinates import SkyCoord
 from astropy import wcs
 
 from time import time
-from copy import deepcopy
 
 import os
 import warnings
@@ -33,9 +31,9 @@ class CutoutFactory():
         Initiazation function.
         """
 
-        self.cube_wcs = None # WCS information from the image cube
-        self.cutout_lims = np.zeros((2,2),dtype=int) #  Cutout pixel limits, [[ymin,ymax],[xmin,xmax]]
-        self.center_coord = None # Central skycoord
+        self.cube_wcs = None  # WCS information from the image cube
+        self.cutout_lims = np.zeros((2, 2), dtype=int)  # Cutout pixel limits, [[ymin,ymax],[xmin,xmax]]
+        self.center_coord = None  # Central skycoord
         
         # Extra keywords from the FFI image headers (TESS specific)
         self.img_kwds = {"BACKAPP": [None, "background is subtracted"],
@@ -43,37 +41,36 @@ class CutoutFactory():
                          "CDPP1_0": [None, "RMS CDPP on 1.0-hr time scales"],
                          "CDPP2_0": [None, "RMS CDPP on 2.0-hr time scales"],
                          "CROWDSAP": [None, "Ratio of target flux to total flux in op. ap."],
-                         "DEADAPP":[None,"deadtime applied"], 
-                         "DEADC":[None,"deadtime correction"],
-                         "EXPOSURE":[None,"[d] time on source"],
+                         "DEADAPP": [None, "deadtime applied"], 
+                         "DEADC": [None, "deadtime correction"],
+                         "EXPOSURE": [None,"[d] time on source"],
                          "FLFRCSAP": [None, "Frac. of target flux w/in the op. aperture"],
-                         "FRAMETIM":[None,"[s] frame time [INT_TIME + READTIME]"],
-                         "FXDOFF":[None,"compression fixed offset"],
-                         "GAINA":[None,"[electrons/count] CCD output A gain"],
-                         "GAINB":[None,"[electrons/count] CCD output B gain"],
-                         "GAINC":[None,"[electrons/count] CCD output C gain"],
-                         "GAIND":[None,"[electrons/count] CCD output D gain"],
-                         "INT_TIME":[None,"[s] photon accumulation time per frame"],
-                         "LIVETIME":[None,"[d] TELAPSE multiplied by DEADC"],
-                         "MEANBLCA":[None,"[count] FSW mean black level CCD output A"],
-                         "MEANBLCB":[None,"[count] FSW mean black level CCD output B"],
-                         "MEANBLCC":[None,"[count] FSW mean black level CCD output C"],
-                         "MEANBLCD":[None,"[count] FSW mean black level CCD output D"],
-                         "NREADOUT":[None,"number of read per cadence"],
-                         "NUM_FRM":[None,"number of frames per time stamp"],
-                         "READNOIA":[None,"[electrons] read noise CCD output A"],
-                         "READNOIB":[None,"[electrons] read noise CCD output B"],
-                         "READNOIC":[None,"[electrons] read noise CCD output C"],
-                         "READNOID":[None,"[electrons] read noise CCD output D"],
-                         "READTIME":[None,"[s] readout time per frame"],
-                         "TIERRELA":[None,"[d] relative time error"],
-                         "TIMEDEL":[None,"[d] time resolution of data"],
-                         "TIMEPIXR":[None,"bin time beginning=0 middle=0.5 end=1"],
+                         "FRAMETIM": [None, "[s] frame time [INT_TIME + READTIME]"],
+                         "FXDOFF": [None, "compression fixed offset"],
+                         "GAINA": [None, "[electrons/count] CCD output A gain"],
+                         "GAINB": [None, "[electrons/count] CCD output B gain"],
+                         "GAINC": [None, "[electrons/count] CCD output C gain"],
+                         "GAIND": [None, "[electrons/count] CCD output D gain"],
+                         "INT_TIME": [None, "[s] photon accumulation time per frame"],
+                         "LIVETIME": [None, "[d] TELAPSE multiplied by DEADC"],
+                         "MEANBLCA": [None, "[count] FSW mean black level CCD output A"],
+                         "MEANBLCB": [None, "[count] FSW mean black level CCD output B"],
+                         "MEANBLCC": [None, "[count] FSW mean black level CCD output C"],
+                         "MEANBLCD": [None, "[count] FSW mean black level CCD output D"],
+                         "NREADOUT": [None, "number of read per cadence"],
+                         "NUM_FRM": [None, "number of frames per time stamp"],
+                         "READNOIA": [None, "[electrons] read noise CCD output A"],
+                         "READNOIB": [None, "[electrons] read noise CCD output B"],
+                         "READNOIC": [None, "[electrons] read noise CCD output C"],
+                         "READNOID": [None, "[electrons] read noise CCD output D"],
+                         "READTIME": [None, "[s] readout time per frame"],
+                         "TIERRELA": [None, "[d] relative time error"],
+                         "TIMEDEL": [None, "[d] time resolution of data"],
+                         "TIMEPIXR": [None, "bin time beginning=0 middle=0.5 end=1"],
                          "TMOFST11": [None, "(s) readout delay for camera 1 and ccd 1"],
-                         "VIGNAPP":[None,"vignetting or collimator correction applied"],
-        }
+                         "VIGNAPP": [None, "vignetting or collimator correction applied"]}
 
-    
+        
     def _parse_table_info(self, table_header, table_row):
         """
         Takes the header and one entry from the cube table of image header data,
@@ -94,17 +91,17 @@ class CutoutFactory():
         wcs_header = fits.header.Header()
 
         for header_key, header_val in table_header.items():
-            if not 'TTYPE' in header_key:
+            if 'TTYPE' not in header_key:
                 continue
         
             col_num = int(header_key[5:]) - 1
-            tform = table_header[header_key.replace("TTYPE","TFORM")]
+            tform = table_header[header_key.replace("TTYPE", "TFORM")]
             if "A" in tform:
-                wcs_header[header_val] =  str(table_row[col_num])
+                wcs_header[header_val] = str(table_row[col_num])
             elif "D" in tform:
-                wcs_header[header_val] =  float(table_row[col_num])
+                wcs_header[header_val] = float(table_row[col_num])
             elif "J" in tform:
-                wcs_header[header_val] =  int(table_row[col_num])
+                wcs_header[header_val] = int(table_row[col_num])
             else:
                 warnings.warn("Unknown data type, keyword value will be parsed as a string.",
                               TypeWarning)
@@ -116,7 +113,7 @@ class CutoutFactory():
         for kwd in self.img_kwds:
             self.img_kwds[kwd][0] = wcs_header.get(kwd)
 
-
+            
     def _get_cutout_limits(self, cutout_size):
         """
         Takes the center coordinates, cutout size, and the wcs from
@@ -139,28 +136,29 @@ class CutoutFactory():
         # Note: This is returning the center pixel in 1-up
         center_pixel = self.center_coord.to_pixel(self.cube_wcs, 1)
 
-        lims = np.zeros((2,2),dtype=int)
+        lims = np.zeros((2, 2), dtype=int)
 
         for axis, size in enumerate(cutout_size):
         
-            if not isinstance(size, u.Quantity): # assume pixels
+            if not isinstance(size, u.Quantity):  # assume pixels
                 dim = size/2
-            elif size.unit == u.pixel: # also pixels
+            elif size.unit == u.pixel:  # also pixels
                 dim = size.value/2
             elif size.unit.physical_type == 'angle':
-                pixel_scale = u.Quantity(wcs.utils.proj_plane_pixel_scales(self.cube_wcs)[axis], self.cube_wcs.wcs.cunit[axis])
+                pixel_scale = u.Quantity(wcs.utils.proj_plane_pixel_scales(self.cube_wcs)[axis],
+                                         self.cube_wcs.wcs.cunit[axis])
                 dim = (size / pixel_scale).decompose()/2
 
-            lims[axis,0] = int(np.round(center_pixel[axis] - 1 - dim))
-            lims[axis,1] = int(np.round(center_pixel[axis] - 1 + dim))
+            lims[axis, 0] = int(np.round(center_pixel[axis] - 1 - dim))
+            lims[axis, 1] = int(np.round(center_pixel[axis] - 1 + dim))
 
             # The case where the requested area is so small it rounds to zero
-            if lims[axis,0] == lims[axis,1]:
-                lims[axis,0] = int(np.floor(center_pixel[axis] - 1))
-                lims[axis,1] = int(np.ceil(center_pixel[axis] - 1))
+            if lims[axis, 0] == lims[axis, 1]:
+                lims[axis, 0] = int(np.floor(center_pixel[axis] - 1))
+                lims[axis, 1] = int(np.ceil(center_pixel[axis] - 1))
 
         # Checking at least some of the cutout is on the cube
-        if ((lims[0,0] <= 0) and (lims[0,1] <=0)) or ((lims[1,0] <= 0) and (lims[1,1] <=0)):
+        if ((lims[0, 0] <= 0) and (lims[0, 1] <=0)) or ((lims[1, 0] <= 0) and (lims[1, 1] <= 0)):
             raise InvalidQueryError("Cutout location is not in cube footprint!")
 
         self.cutout_lims = lims
@@ -182,22 +180,23 @@ class CutoutFactory():
 
         cutout_wcs_dict = dict()
 
+        
         ## Cutout array keywords ##
-    
-        cutout_wcs_dict["WCAX{}"] = [cube_wcs_header['WCSAXES'],"number of WCS axes"]
+
+        cutout_wcs_dict["WCAX{}"] = [cube_wcs_header['WCSAXES'], "number of WCS axes"]
         # TODO: check for 2? this must be two
 
-        cutout_wcs_dict["1CTYP{}"] = [cube_wcs_header["CTYPE1"],"right ascension coordinate type"]
-        cutout_wcs_dict["2CTYP{}"] = [cube_wcs_header["CTYPE2"],"declination coordinate type"]
+        cutout_wcs_dict["1CTYP{}"] = [cube_wcs_header["CTYPE1"], "right ascension coordinate type"]
+        cutout_wcs_dict["2CTYP{}"] = [cube_wcs_header["CTYPE2"], "declination coordinate type"]
         
-        cutout_wcs_dict["1CRPX{}"] = [cube_wcs_header["CRPIX1"] - self.cutout_lims[0,0],
+        cutout_wcs_dict["1CRPX{}"] = [cube_wcs_header["CRPIX1"] - self.cutout_lims[0, 0],
                                       "[pixel] reference pixel along image axis 1"]
-        cutout_wcs_dict["2CRPX{}"] = [cube_wcs_header["CRPIX2"] - self.cutout_lims[1,0],
+        cutout_wcs_dict["2CRPX{}"] = [cube_wcs_header["CRPIX2"] - self.cutout_lims[1, 0],
                                       "[pixel] reference pixel along image axis 2"]
     
         cutout_wcs_dict["1CRVL{}"] = [cube_wcs_header["CRVAL1"], "[deg] right ascension at reference pixel"]
         cutout_wcs_dict["2CRVL{}"] = [cube_wcs_header["CRVAL2"], "[deg] declination at reference pixel"]
-    
+
         cunits = self.cube_wcs.wcs.cunit
         cutout_wcs_dict["1CUNI{}"] = [str(cunits[0]), "physical unit in column dimension"]
         cutout_wcs_dict["2CUNI{}"] = [str(cunits[1]), "physical unit in row dimension"]
@@ -207,33 +206,34 @@ class CutoutFactory():
         cutout_wcs_dict["2CDLT{}"] = [px_scales[1], "[deg] pixel scale in DEC dimension"]
 
         # TODO: THIS IS FILLER, HAVE TO FIGURE OUT HOW TO DO THE TRANSFORMATION FOR REAL
-        cutout_wcs_dict["11PC{}"] = [1,"linear transformation matrix element - unfilled"]
-        cutout_wcs_dict["12PC{}"] = [1,"linear transformation matrix element - unfilled"]
-        cutout_wcs_dict["21PC{}"] = [1,"linear transformation matrix element - unfilled"]
-        cutout_wcs_dict["22PC{}"] = [1,"linear transformation matrix element - unfilled"]
+        cutout_wcs_dict["11PC{}"] = [1, "linear transformation matrix element - unfilled"]
+        cutout_wcs_dict["12PC{}"] = [1, "linear transformation matrix element - unfilled"]
+        cutout_wcs_dict["21PC{}"] = [1, "linear transformation matrix element - unfilled"]
+        cutout_wcs_dict["22PC{}"] = [1, "linear transformation matrix element - unfilled"]
 
+        
         ## Physical keywords ##
     
         cutout_wcs_dict["WCSN{}P"] = ["PHYSICAL", "table column WCS name"]
-        cutout_wcs_dict["WCAX{}P"] = [2,"table column physical WCS dimensions"]
+        cutout_wcs_dict["WCAX{}P"] = [2, "table column physical WCS dimensions"]
     
-        cutout_wcs_dict["1CTY{}P"] = ["RAWX","table column physical WCS axis 1 type, CCD col"]
-        cutout_wcs_dict["2CTY{}P"] = ["RAWY","table column physical WCS axis 2 type, CCD row"]
+        cutout_wcs_dict["1CTY{}P"] = ["RAWX", "table column physical WCS axis 1 type, CCD col"]
+        cutout_wcs_dict["2CTY{}P"] = ["RAWY", "table column physical WCS axis 2 type, CCD row"]
     
-        cutout_wcs_dict["1CUN{}P"] = ["PIXEL","table column physical WCS axis 1 unit"]
-        cutout_wcs_dict["2CUN{}P"] = ["PIXEL","table column physical WCS axis 2 unit"]
+        cutout_wcs_dict["1CUN{}P"] = ["PIXEL", "table column physical WCS axis 1 unit"]
+        cutout_wcs_dict["2CUN{}P"] = ["PIXEL", "table column physical WCS axis 2 unit"]
     
-        cutout_wcs_dict["1CRV{}P"] = [self.cutout_lims[0,0] + 1,
+        cutout_wcs_dict["1CRV{}P"] = [self.cutout_lims[0, 0] + 1,
                                       "table column physical WCS ax 1 ref value"]
-        cutout_wcs_dict["2CRV{}P"] = [self.cutout_lims[1,0] + 1,
+        cutout_wcs_dict["2CRV{}P"] = [self.cutout_lims[1, 0] + 1,
                                       "table column physical WCS ax 2 ref value"]
 
         # TODO: can we calculate these? or are they fixed?
-        cutout_wcs_dict["1CDL{}P"] = [1.0,"table column physical WCS a1 step"]    
-        cutout_wcs_dict["2CDL{}P"] = [1.0,"table column physical WCS a2 step"]
+        cutout_wcs_dict["1CDL{}P"] = [1.0, "table column physical WCS a1 step"]    
+        cutout_wcs_dict["2CDL{}P"] = [1.0, "table column physical WCS a2 step"]
     
-        cutout_wcs_dict["1CRP{}P"] = [1,"table column physical WCS a1 reference"]
-        cutout_wcs_dict["2CRP{}P"] = [1,"table column physical WCS a2 reference"]
+        cutout_wcs_dict["1CRP{}P"] = [1, "table column physical WCS a1 reference"]
+        cutout_wcs_dict["2CRP{}P"] = [1, "table column physical WCS a2 reference"]
 
         return cutout_wcs_dict
     
@@ -260,38 +260,38 @@ class CutoutFactory():
         """
 
         # These limits are not guarenteed to be within the image footprint
-        xmin,xmax = self.cutout_lims[1]
-        ymin,ymax = self.cutout_lims[0]
+        xmin, xmax = self.cutout_lims[1]
+        ymin, ymax = self.cutout_lims[0]
 
         # Get the image array limits
-        xmax_cube,ymax_cube,_,_ = transposed_cube.shape
+        xmax_cube, ymax_cube, _, _ = transposed_cube.shape
 
         # Adjust limits and figuring out the padding
-        padding = np.zeros((3,2),dtype=int)
+        padding = np.zeros((3, 2), dtype=int)
         if xmin < 0:
-            padding[1,0] = -xmin
+            padding[1, 0] = -xmin
             xmin = 0
         if ymin < 0:
-            padding[2,0] = -ymin
+            padding[2, 0] = -ymin
             ymin = 0
         if xmax > xmax_cube:
-            padding[1,1] = xmax - xmax_cube
+            padding[1, 1] = xmax - xmax_cube
             xmax = xmax_cube
         if ymax > ymax_cube:
-            padding[2,1] = ymax - ymax_cube
+            padding[2, 1] = ymax - ymax_cube
             ymax = ymax_cube       
         
         # Doing the cutout
-        cutout = transposed_cube[xmin:xmax,ymin:ymax,:,:]
+        cutout = transposed_cube[xmin:xmax, ymin:ymax, :, :]
     
-        img_cutout = cutout[:,:,:,0].transpose((2,0,1))
-        uncert_cutout = cutout[:,:,:,1].transpose((2,0,1))
+        img_cutout = cutout[:, :, :, 0].transpose((2, 0, 1))
+        uncert_cutout = cutout[:, :, :, 1].transpose((2, 0, 1))
     
         # Making the aperture array
         aperture = np.ones((xmax-xmin, ymax-ymin))
 
         # Adding padding to the cutouts so that it's the expected size
-        if padding.any(): # only do if we need to pad
+        if padding.any():  # only do if we need to pad
             img_cutout = np.pad(img_cutout, padding, 'constant', constant_values=np.nan)
             uncert_cutout = np.pad(uncert_cutout, padding, 'constant', constant_values=np.nan)
             aperture = np.pad(aperture, padding[1:], 'constant', constant_values=0)
@@ -318,8 +318,8 @@ class CutoutFactory():
         """
 
         # Adding cutout specific headers
-        primary_header['RA_OBJ'] = (self.center_coord.ra.deg,'[deg] right ascension')
-        primary_header['DEC_OBJ'] = (self.center_coord.dec.deg,'[deg] declination')
+        primary_header['RA_OBJ'] = (self.center_coord.ra.deg, '[deg] right ascension')
+        primary_header['DEC_OBJ'] = (self.center_coord.dec.deg, '[deg] declination')
 
         primary_header['TIMEREF'] = ('SOLARSYSTEM', 'barycentric correction applied to times')        
         primary_header['TASSIGN'] = ('SPACECRAFT', 'where time is assigned')                         
@@ -332,19 +332,19 @@ class CutoutFactory():
         primary_header['TELAPSE '] = (telapse, '[d] TSTOP - TSTART')
         
         # These are all the things in the TESS pipeline tpfs about the object that we can't fill
-        primary_header['OBJECT'] = ("",'string version of target id ')
-        primary_header['TCID'] = (0,'unique tess target identifier')
-        primary_header['PXTABLE'] = (0,'pixel table id') 
-        primary_header['PMRA'] = (0.0,'[mas/yr] RA proper motion') 
-        primary_header['PMDEC'] = (0.0,'[mas/yr] Dec proper motion') 
-        primary_header['PMTOTAL'] = (0.0,'[mas/yr] total proper motion') 
-        primary_header['TESSMAG'] = (0.0,'[mag] TESS magnitude') 
-        primary_header['TEFF'] = (0.0,'[K] Effective temperature') 
-        primary_header['LOGG'] = (0.0,'[cm/s2] log10 surface gravity') 
-        primary_header['MH'] =(0.0,'[log10([M/H])] metallicity') 
-        primary_header['RADIUS'] = (0.0,'[solar radii] stellar radius')
-        primary_header['TICVER'] = (0,'TICVER')
-        primary_header['TICID'] = (None,'unique tess target identifier')
+        primary_header['OBJECT'] = ("", 'string version of target id ')
+        primary_header['TCID'] = (0, 'unique tess target identifier')
+        primary_header['PXTABLE'] = (0, 'pixel table id') 
+        primary_header['PMRA'] = (0.0, '[mas/yr] RA proper motion') 
+        primary_header['PMDEC'] = (0.0, '[mas/yr] Dec proper motion') 
+        primary_header['PMTOTAL'] = (0.0, '[mas/yr] total proper motion') 
+        primary_header['TESSMAG'] = (0.0, '[mag] TESS magnitude') 
+        primary_header['TEFF'] = (0.0, '[K] Effective temperature') 
+        primary_header['LOGG'] = (0.0, '[cm/s2] log10 surface gravity') 
+        primary_header['MH'] =(0.0, '[log10([M/H])] metallicity') 
+        primary_header['RADIUS'] = (0.0, '[solar radii] stellar radius')
+        primary_header['TICVER'] = (0, 'TICVER')
+        primary_header['TICID'] = (None, 'unique tess target identifier')
 
     
     def _add_column_wcs(self, table_header, wcs_dict):
@@ -361,7 +361,7 @@ class CutoutFactory():
             cutout table header.
         """
 
-        wcs_col = False # says if column is one that requires wcs info
+        wcs_col = False  # says if column is one that requires wcs info
     
         for kwd in table_header:
 
@@ -376,20 +376,17 @@ class CutoutFactory():
                 table_header.comments[kwd] = "display format"
             elif "TDIM" in kwd:
                 table_header.comments[kwd] = "multi-dimensional array spec"
-                wcs_col = True # if column holds 2D array need to add wcs info
+                wcs_col = True  # if column holds 2D array need to add wcs info
             elif "TNULL" in kwd:
                 table_header.comments[kwd] = "null value"
 
             # Adding wcs info if necessary
             if (kwd[:-1] == "TTYPE") and wcs_col:
-                wcs_col = False # reset
-                for wcs_key,(val,com) in wcs_dict.items():
-                    table_header.insert(kwd,(wcs_key.format(int(kwd[-1])-1),val,com))
+                wcs_col = False  # reset
+                for wcs_key, (val, com) in wcs_dict.items():
+                    table_header.insert(kwd, (wcs_key.format(int(kwd[-1])-1), val, com))
 
-            # Removing keywords we don't want in the table header
-            # TODO: figure out what these are (if any)
 
-            
     def _add_aperture_wcs(self, aperture_header, cube_table_header):
         """
         Adds the full cube WCS information with adjustments for the cutout 
@@ -407,27 +404,27 @@ class CutoutFactory():
 
         # Adding the wcs keywords
         for kwd,val,cmt in cube_wcs_header.cards: 
-            aperture_header.set(kwd,val,cube_table_header.get(kwd,cmt))
+            aperture_header.set(kwd, val, cube_table_header.get(kwd,cmt))
             # using table comment rather than the default ones if available
 
         # Adjusting the CRPIX values
-        aperture_header["CRPIX1"] -= self.cutout_lims[0,0]
-        aperture_header["CRPIX2"] -= self.cutout_lims[1,0]
+        aperture_header["CRPIX1"] -= self.cutout_lims[0, 0]
+        aperture_header["CRPIX2"] -= self.cutout_lims[1, 0]
 
         # Adding the physical wcs keywords
-        aperture_header.set("WCSNAMEP", "PHYSICAL","name of world coordinate system alternate P")
+        aperture_header.set("WCSNAMEP", "PHYSICAL", "name of world coordinate system alternate P")
         aperture_header.set("WCSAXESP", 2, "number of WCS physical axes")
     
         aperture_header.set("CTYPE1P", "RAWX", "physical WCS axis 1 type CCD col")
         aperture_header.set("CUNIT1P", "PIXEL", "physical WCS axis 1 unit")
         aperture_header.set("CRPIX1P", 1, "reference CCD column")
-        aperture_header.set("CRVAL1P", self.cutout_lims[0,0] + 1, "value at reference CCD column")
+        aperture_header.set("CRVAL1P", self.cutout_lims[0, 0] + 1, "value at reference CCD column")
         aperture_header.set("CDELT1P", 1.0, "physical WCS axis 1 step")
                 
         aperture_header.set("CTYPE2P", "RAWY", "physical WCS axis 2 type CCD col")
         aperture_header.set("CUNIT2P", "PIXEL", "physical WCS axis 2 unit")
         aperture_header.set("CRPIX2P", 1, "reference CCD row")
-        aperture_header.set("CRVAL2P", self.cutout_lims[1,0] + 1, "value at reference CCD row")
+        aperture_header.set("CRVAL2P", self.cutout_lims[1, 0] + 1, "value at reference CCD row")
         aperture_header.set("CDELT2P", 1.0, "physical WCS axis 2 step")
 
         # Adding extra aperture keywords (TESS specific)
@@ -463,7 +460,7 @@ class CutoutFactory():
     
         primary_header = hdu_list[0].header
 
-        reserved_kwds = ["COMMENT","SIMPLE","BITPIX", "EXTEND", "NEXTEND"]
+        reserved_kwds = ["COMMENT", "SIMPLE", "BITPIX", "EXTEND", "NEXTEND"]
 
         for hdu in hdu_list[1:]:
             if hdu.header.get("INHERIT", False):
@@ -519,29 +516,32 @@ class CutoutFactory():
                                 array=cube_fits[2].columns['BARYCORR'].array))
 
         # Adding CADENCENO as zeros b/c we don't have this info
-        cols.append(fits.Column(name='CADENCENO', format='J', disp='I10', array=empty_arr[:,0,0]))
+        cols.append(fits.Column(name='CADENCENO', format='J', disp='I10', array=empty_arr[:, 0, 0]))
 
         # Adding counts (-1 b/c we don't have data)
-        cols.append(fits.Column(name='RAW_CNTS', format=tform.replace('E','J'), unit='count', dim=dims, disp='I8',
-                            array=empty_arr-1, null=-1))
+        cols.append(fits.Column(name='RAW_CNTS', format=tform.replace('E', 'J'), unit='count', dim=dims, disp='I8',
+                                array=empty_arr-1, null=-1))
 
         # Adding flux and flux_err (data we actually have!)
         cols.append(fits.Column(name='FLUX', format=tform, dim=dims, unit='e-/s', disp='E14.7', array=img_cube))
         cols.append(fits.Column(name='FLUX_ERR', format=tform, dim=dims, unit='e-/s', disp='E14.7', array=uncert_cube)) 
    
         # Adding the background info (zeros b.c we don't have this info)
-        cols.append(fits.Column(name='FLUX_BKG', format=tform, dim=dims, unit='e-/s', disp='E14.7',array=empty_arr))
-        cols.append(fits.Column(name='FLUX_BKG_ERR', format=tform, dim=dims, unit='e-/s', disp='E14.7',array=empty_arr))
+        cols.append(fits.Column(name='FLUX_BKG', format=tform, dim=dims, unit='e-/s', disp='E14.7', array=empty_arr))
+        cols.append(fits.Column(name='FLUX_BKG_ERR', format=tform, dim=dims,
+                                unit='e-/s', disp='E14.7', array=empty_arr))
 
         # Adding the quality flags
-        cols.append(fits.Column(name='QUALITY', format='J', disp='B16.16', array=cube_fits[2].columns['DQUALITY'].array))
+        cols.append(fits.Column(name='QUALITY', format='J', disp='B16.16',
+                                array=cube_fits[2].columns['DQUALITY'].array))
 
         # Adding the position correction info (zeros b.c we don't have this info)
-        cols.append(fits.Column(name='POS_CORR1', format='E', unit='pixel', disp='E14.7',array=empty_arr[:,0,0]))
-        cols.append(fits.Column(name='POS_CORR2', format='E', unit='pixel', disp='E14.7',array=empty_arr[:,0,0]))
+        cols.append(fits.Column(name='POS_CORR1', format='E', unit='pixel', disp='E14.7',array=empty_arr[:, 0, 0]))
+        cols.append(fits.Column(name='POS_CORR2', format='E', unit='pixel', disp='E14.7',array=empty_arr[:, 0, 0]))
 
         # Adding the FFI_FILE column (not in the pipeline tpfs)
-        cols.append(fits.Column(name='FFI_FILE', format='38A', unit='pixel',array=cube_fits[2].columns['FFI_FILE'].array))
+        cols.append(fits.Column(name='FFI_FILE', format='38A', unit='pixel',
+                                array=cube_fits[2].columns['FFI_FILE'].array))
         
         # making the table HDU
         table_hdu = fits.BinTableHDU.from_columns(cols)
@@ -560,7 +560,7 @@ class CutoutFactory():
         self._add_aperture_wcs(aperture_hdu.header, cube_fits[2].header)
         aperture_hdu.header['INHERIT'] = True
     
-        cutout_hdu_list = fits.HDUList([primary_hdu,table_hdu, aperture_hdu])
+        cutout_hdu_list = fits.HDUList([primary_hdu, table_hdu, aperture_hdu])
         
         self._apply_header_inherit(cutout_hdu_list)
 
@@ -615,16 +615,16 @@ class CutoutFactory():
         cube = fits.open(cube_file) 
 
         # Get the info we need from the data table
-        data_ind = int(len(cube[2].data)/2) # using the middle file for table info
+        data_ind = int(len(cube[2].data)/2)  # using the middle file for table info
         self._parse_table_info(cube[2].header, cube[2].data[data_ind])
 
         if isinstance(coordinates, SkyCoord):
             self.center_coord = coordinates
         else:
-            self.center_coord = SkyCoord(coordinates,unit='deg')
+            self.center_coord = SkyCoord(coordinates, unit='deg')
 
         if verbose:
-            print("Cutout center coordinate: {},{}".format(self.center_coord.ra.deg,self.center_coord.dec.deg))
+            print("Cutout center coordinate: {},{}".format(self.center_coord.ra.deg, self.center_coord.dec.deg))
 
 
         # Making size into an array [ny, nx]
@@ -665,11 +665,11 @@ class CutoutFactory():
             target_pixel_file += "{}_{}_{}_{}x{}_astrocut.fits".format(flename.rstrip('.fits').rstrip("-cube"),
                                                                        self.center_coord.ra.value,
                                                                        self.center_coord.dec.value,
-                                                                       self.cutout_lims[0,1]-self.cutout_lims[0,0],
-                                                                       self.cutout_lims[1,1]-self.cutout_lims[1,0])
+                                                                       self.cutout_lims[0, 1]-self.cutout_lims[0, 0],
+                                                                       self.cutout_lims[1, 1]-self.cutout_lims[1, 0])
         
         if verbose:
-            print("Target pixel file:",target_pixel_file)
+            print("Target pixel file: {}".format(target_pixel_file))
         
         # Write the TPF
         tpf_object.writeto(target_pixel_file, overwrite=True, checksum=True)
