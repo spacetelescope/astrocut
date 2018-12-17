@@ -28,7 +28,7 @@ sense for you to use our tesscut web service:
 `mast.stsci.edu/tesscut <https://mast.stsci.edu/tesscut/>`_
  
 Making image cubes
-++++++++++++++++++
+^^^^^^^^^^^^^^^^^^
 
 Making an image cube is a simple operation, but comes with a vert important
 limitation:
@@ -67,11 +67,11 @@ verbose to false will silence all output.
                 Total time elapsed: 46.42 sec
                 File write time: 8.82 sec
 
-                >>> print(cube_file) #doctest: +SKIP
+                >>> print(cube_file)
                 img-cube.fits
 
                 >>> cube_hdu = fits.open(cube_file) #doctest: +SKIP
-                >>> cube_hdu.info() #doctest: +SKIP
+                >>> cube_hdu.info()
                 Filename: img-cube.fits
                 No.    Name      Ver    Type      Cards   Dimensions   Format
                 0  PRIMARY       1 PrimaryHDU      28   ()      
@@ -80,7 +80,7 @@ verbose to false will silence all output.
 
 
 Making cutout target pixel files
-++++++++++++++++++++++++++++++++
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 To make a cutout, you must already have an image cube to cut out from.
 Assuming that that step has been completed, you simply give the central
@@ -92,7 +92,7 @@ You can either specify a target pixel file name, or it will be built as:
 also specify a output path, the directory in which the target pixel file will
 be saved, if unspecified it defaults to the current directory.
 
-.. code-block:: python
+.. doctest-skip::
 
                 >>> from astrocut import CutoutFactory
                 >>> from astropy.io import fits
@@ -100,7 +100,7 @@ be saved, if unspecified it defaults to the current directory.
                 >>> my_cutter = CutoutFactory()
                 >>> cube_file = "img-cube.fits"
                 >>> 
-                >>> cutout_file = my_cutter.cube_cut(cube_file, "251.51 32.36", 5, verbose=True) #doctest: +SKIP
+                >>> cutout_file = my_cutter.cube_cut(cube_file, "251.51 32.36", 5, verbose=True)
                 Cutout center coordinate: 251.51,32.36
                 xmin,xmax: [26 31]
                 ymin,ymax: [149 154]
@@ -117,6 +117,7 @@ be saved, if unspecified it defaults to the current directory.
                 0  PRIMARY       1 PrimaryHDU      42   ()      
                 1  PIXELS        1 BinTableHDU    222   144R x 12C   [D, E, J, 25J, 25E, 25E, 25E, 25E, J, E, E, 38A]   
                 2  APERTURE      1 ImageHDU        45   (5, 5)   float64  
+
 
 
 .. automodapi:: astrocut
