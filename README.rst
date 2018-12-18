@@ -1,15 +1,26 @@
 Cutout tools for astronomical images
 ------------------------------------
 
-.. image:: http://img.shields.io/badge/powered%20by-AstroPy-orange.svg?style=flat
+.. image:: http://img.shields.io/badge/powered%20by-AstroPy-orange.svg
     :target: http://www.astropy.org
     :alt: Powered by Astropy Badge
+    
+.. image:: https://badge.fury.io/py/astrocut.svg
+    :target: https://badge.fury.io/py/astrocut 
 
 Tools for making image cutouts from sets of TESS full frame images.
 
 This package is under active development, and will ultimately grow to encompass a range of cutout activities relevant to images from many missions, however at this time it is focussed on the specific problem of creating Target Pixel File cutouts from sectors of TESS full frame images.
 
 Documentation is at https://astrocut.readthedocs.io.
+
+Project Status
+--------------
+.. image:: https://travis-ci.org/spacetelescope/astrocut.svg?branch=master
+    :target: https://travis-ci.org/spacetelescope/astrocut
+    
+.. image:: https://coveralls.io/repos/github/spacetelescope/astrocut/badge.svg?branch=master
+    :target: https://coveralls.io/github/spacetelescope/astrocut?branch=master
 
 Installation
 ------------
