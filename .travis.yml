@@ -58,7 +58,7 @@ env:
         # If you want to ignore certain flake8 errors, you can list them
         # in FLAKE8_OPT, for example:
         # - FLAKE8_OPT='--ignore=E501'
-        - FLAKE8_OPT='--ignore=W291,W293,W391,E303,E266 --max-line-length=120 --exclude=astrocut/conftest.py'
+        - FLAKE8_OPT=''
 
     matrix:
         # Make sure that egg_info works without dependencies
