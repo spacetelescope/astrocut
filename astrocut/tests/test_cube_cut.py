@@ -114,7 +114,7 @@ def test_cube_cutout(tmpdir):
     csize[-1] = img_sz+5
     for i, v in enumerate(world_coords):
         coord = SkyCoord(v[0], v[1], frame='icrs', unit='deg')
-        cut = CutoutFactory().cube_cut(cube_file, coord, csize[i], target_pixel_file=cutlist[i], verbose=False)
+        CutoutFactory().cube_cut(cube_file, coord, csize[i], target_pixel_file=cutlist[i], verbose=False)
 
     # expected values for cube
     ecube = np.zeros((img_sz, img_sz, num_im, 2))

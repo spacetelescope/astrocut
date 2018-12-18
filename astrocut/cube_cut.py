@@ -43,7 +43,7 @@ class CutoutFactory():
                          "CROWDSAP": [None, "Ratio of target flux to total flux in op. ap."],
                          "DEADAPP": [None, "deadtime applied"], 
                          "DEADC": [None, "deadtime correction"],
-                         "EXPOSURE": [None,"[d] time on source"],
+                         "EXPOSURE": [None, "[d] time on source"],
                          "FLFRCSAP": [None, "Frac. of target flux w/in the op. aperture"],
                          "FRAMETIM": [None, "[s] frame time [INT_TIME + READTIME]"],
                          "FXDOFF": [None, "compression fixed offset"],
@@ -141,13 +141,13 @@ class CutoutFactory():
         for axis, size in enumerate(cutout_size):
         
             if not isinstance(size, u.Quantity):  # assume pixels
-                dim = size/2
+                dim = size / 2
             elif size.unit == u.pixel:  # also pixels
-                dim = size.value/2
+                dim = size.value / 2
             elif size.unit.physical_type == 'angle':
                 pixel_scale = u.Quantity(wcs.utils.proj_plane_pixel_scales(self.cube_wcs)[axis],
                                          self.cube_wcs.wcs.cunit[axis])
-                dim = (size / pixel_scale).decompose()/2
+                dim = (size / pixel_scale).decompose() / 2
 
             lims[axis, 0] = int(np.round(center_pixel[axis] - 1 - dim))
             lims[axis, 1] = int(np.round(center_pixel[axis] - 1 + dim))
@@ -158,7 +158,7 @@ class CutoutFactory():
                 lims[axis, 1] = int(np.ceil(center_pixel[axis] - 1))
 
         # Checking at least some of the cutout is on the cube
-        if ((lims[0, 0] <= 0) and (lims[0, 1] <=0)) or ((lims[1, 0] <= 0) and (lims[1, 1] <= 0)):
+        if ((lims[0, 0] <= 0) and (lims[0, 1] <= 0)) or ((lims[1, 0] <= 0) and (lims[1, 1] <= 0)):
             raise InvalidQueryError("Cutout location is not in cube footprint!")
 
         self.cutout_lims = lims
@@ -328,7 +328,7 @@ class CutoutFactory():
         primary_header['BJDREFF'] = (0.00000000, 'fraction of the day in BTJD reference date')    
         primary_header['TIMEUNIT'] = ('d', 'time unit for TIME, TSTART and TSTOP')
 
-        telapse = primary_header.get("TSTOP",0) - primary_header.get("TSTART",0)
+        telapse = primary_header.get("TSTOP", 0) - primary_header.get("TSTART", 0)
         primary_header['TELAPSE '] = (telapse, '[d] TSTOP - TSTART')
         
         # These are all the things in the TESS pipeline tpfs about the object that we can't fill
@@ -341,7 +341,7 @@ class CutoutFactory():
         primary_header['TESSMAG'] = (0.0, '[mag] TESS magnitude') 
         primary_header['TEFF'] = (0.0, '[K] Effective temperature') 
         primary_header['LOGG'] = (0.0, '[cm/s2] log10 surface gravity') 
-        primary_header['MH'] =(0.0, '[log10([M/H])] metallicity') 
+        primary_header['MH'] = (0.0, '[log10([M/H])] metallicity') 
         primary_header['RADIUS'] = (0.0, '[solar radii] stellar radius')
         primary_header['TICVER'] = (0, 'TICVER')
         primary_header['TICID'] = (None, 'unique tess target identifier')
@@ -403,7 +403,7 @@ class CutoutFactory():
         cube_wcs_header = self.cube_wcs.to_header(relax=True)
 
         # Adding the wcs keywords
-        for kwd,val,cmt in cube_wcs_header.cards: 
+        for kwd, val, cmt in cube_wcs_header.cards: 
             aperture_header.set(kwd, val, cube_table_header.get(kwd,cmt))
             # using table comment rather than the default ones if available
 
@@ -536,8 +536,8 @@ class CutoutFactory():
                                 array=cube_fits[2].columns['DQUALITY'].array))
 
         # Adding the position correction info (zeros b.c we don't have this info)
-        cols.append(fits.Column(name='POS_CORR1', format='E', unit='pixel', disp='E14.7',array=empty_arr[:, 0, 0]))
-        cols.append(fits.Column(name='POS_CORR2', format='E', unit='pixel', disp='E14.7',array=empty_arr[:, 0, 0]))
+        cols.append(fits.Column(name='POS_CORR1', format='E', unit='pixel', disp='E14.7', array=empty_arr[:, 0, 0]))
+        cols.append(fits.Column(name='POS_CORR2', format='E', unit='pixel', disp='E14.7', array=empty_arr[:, 0, 0]))
 
         # Adding the FFI_FILE column (not in the pipeline tpfs)
         cols.append(fits.Column(name='FFI_FILE', format='38A', unit='pixel',
