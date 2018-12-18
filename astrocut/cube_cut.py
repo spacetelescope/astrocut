@@ -404,7 +404,7 @@ class CutoutFactory():
 
         # Adding the wcs keywords
         for kwd, val, cmt in cube_wcs_header.cards: 
-            aperture_header.set(kwd, val, cube_table_header.get(kwd,cmt))
+            aperture_header.set(kwd, val, cube_table_header.get(kwd, cmt))
             # using table comment rather than the default ones if available
 
         # Adjusting the CRPIX values
