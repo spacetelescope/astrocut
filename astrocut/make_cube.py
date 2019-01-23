@@ -151,7 +151,7 @@ class CubeFactory():
                 if kwd == "FFI_FILE":
                     img_info_table[kwd][i] = path.basename(fle)
                 else:
-                    img_info_table[kwd][i] = ffi_data[1].header[kwd]
+                    img_info_table[kwd][i] = ffi_data[1].header.get([kwd])
 
             if i == (len(file_list) - 1):
                 primary_header['DATE-END'] = ffi_data[0].header['DATE-END']
@@ -192,7 +192,9 @@ class CubeFactory():
 
         if verbose:
             writeTime = time()
-    
+
+        # TODO: check for path in cube and make sure directory exists
+        #       and create it if it doesn't
         hdu_list.writeto(cube_file, overwrite=True) 
 
         if verbose:
