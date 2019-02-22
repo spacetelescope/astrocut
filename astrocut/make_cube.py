@@ -132,7 +132,7 @@ class CubeFactory():
                 cols = []
                 for kwd, val, cmt in secondary_header.cards: 
                     if type(val) == str:
-                        tpe = "S" + str(len(val))
+                        tpe = "S" + str(len(val)) # TODO: Maybe switch to U?
                     elif type(val) == int:
                         tpe = np.int32
                     else:
@@ -151,7 +151,12 @@ class CubeFactory():
                 if kwd == "FFI_FILE":
                     img_info_table[kwd][i] = path.basename(fle)
                 else:
-                    img_info_table[kwd][i] = ffi_data[1].header.get(kwd)
+                    nulval = None
+                    if img_info_table[kwd].dtype == int:
+                        nulval = 0
+                    elif img_info_table[kwd].dtype.char == "S": # hacky way to check if it's a string
+                        nulval = ""
+                    img_info_table[kwd][i] = ffi_data[1].header.get(kwd, nulval)
 
             if i == (len(file_list) - 1):
                 primary_header['DATE-END'] = ffi_data[0].header['DATE-END']
