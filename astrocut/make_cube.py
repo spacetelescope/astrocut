@@ -152,7 +152,7 @@ class CubeFactory():
                     img_info_table[kwd][i] = path.basename(fle)
                 else:
                     nulval = None
-                    if img_info_table[kwd].dtype == int:
+                    if img_info_table[kwd].dtype.name == "int32":
                         nulval = 0
                     elif img_info_table[kwd].dtype.char == "S": # hacky way to check if it's a string
                         nulval = ""
