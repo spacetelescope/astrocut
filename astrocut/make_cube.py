@@ -132,7 +132,7 @@ class CubeFactory():
                 cols = []
                 for kwd, val, cmt in secondary_header.cards: 
                     if type(val) == str:
-                        tpe = "S" + str(len(val)) # TODO: Maybe switch to U?
+                        tpe = "S" + str(len(val))  # TODO: Maybe switch to U?
                     elif type(val) == int:
                         tpe = np.int32
                     else:
@@ -154,7 +154,7 @@ class CubeFactory():
                     nulval = None
                     if img_info_table[kwd].dtype.name == "int32":
                         nulval = 0
-                    elif img_info_table[kwd].dtype.char == "S": # hacky way to check if it's a string
+                    elif img_info_table[kwd].dtype.char == "S":  # hacky way to check if it's a string
                         nulval = ""
                     img_info_table[kwd][i] = ffi_data[1].header.get(kwd, nulval)
 
