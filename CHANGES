@@ -1,3 +1,12 @@
+0.3 (unreleased)
+----------------
+
+- Formatting update. [#5]
+- Making the sperture extension use integers. [#6]
+- Setting the creator keyword to astrocute. [#7]
+- Adding automated testing. [#8]
+- Uniform formatting on target pixel file names. [#10]
+
 0.2 (2018-12-05)
 ----------------
 
