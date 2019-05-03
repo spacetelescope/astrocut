@@ -665,12 +665,13 @@ class CutoutFactory():
 
         if not target_pixel_file:
             _, flename = os.path.split(cube_file)
-            target_pixel_file = output_path + "/"
-            target_pixel_file += "{}_{:7f}_{:7f}_{}x{}_astrocut.fits".format(flename.rstrip('.fits').rstrip("-cube"),
-                                                                             self.center_coord.ra.value,
-                                                                             self.center_coord.dec.value,
-                                                                             self.cutout_lims[0, 1]-self.cutout_lims[0, 0],
-                                                                             self.cutout_lims[1, 1]-self.cutout_lims[1, 0])
+            tpf_name = "{}_{:7f}_{:7f}_{}x{}_astrocut.fits".format(flename.rstrip('.fits').rstrip("-cube"),
+                                                                   self.center_coord.ra.value,
+                                                                   self.center_coord.dec.value,
+                                                                   self.cutout_lims[0,1]-self.cutout_lims[0,0],
+                                                                   self.cutout_lims[1,1]-self.cutout_lims[1,0])
+            target_pixel_file = os.path.join(output_path, tpf_name)
+            
         
         if verbose:
             print("Target pixel file: {}".format(target_pixel_file))
