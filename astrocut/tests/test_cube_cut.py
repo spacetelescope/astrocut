@@ -3,6 +3,7 @@ import numpy as np
 from astropy.io import fits
 from astropy import wcs
 from astropy.coordinates import SkyCoord
+import astropy.units as u
 
 from .utils_for_test import create_test_ffis
 from ..make_cube import CubeFactory
@@ -131,4 +132,75 @@ def test_cube_cutout(tmpdir):
     for i, cutfile in enumerate(cutlist):
         checkcutout(cutfile, pixcrd[i], world_coords[i], csize[i], ecube)
            
+    
+        
+def test_cutout_individual_functions(tmpdir):
+
+    # Making the test cube
+    cube_maker = CubeFactory()
+    
+    img_sz = 10
+    num_im = 100
+    
+    ffi_files = create_test_ffis(img_sz, num_im)
+    cube_file = cube_maker.make_cube(ffi_files, "make_cube-test-cube", verbose=False)
+
+    # Opening the cube file
+    cube = fits.open(cube_file)
+    myfactory = CutoutFactory()
+
+    ###########################
+    # Test  _parse_table_info #
+    ###########################
+    data_ind = int(len(cube[2].data)/2)  # using the middle file for table info
+    myfactory._parse_table_info(cube[2].header, cube[2].data[data_ind])
+    
+    assert isinstance(myfactory.cube_wcs, wcs.WCS)
+    ra, dec = myfactory.cube_wcs.wcs.crval
+    assert round(ra, 4) == 250.3497
+    assert round(dec, 4) == 2.2809
+
+    
+    ############################
+    # Test  _get_cutout_limits #
+    ############################
+    coordinates = SkyCoord(249.5, 2.5, frame='icrs', unit='deg')
+    myfactory.center_coord = coordinates
+    
+    cutout_size = [5,3]
+    myfactory._get_cutout_limits(cutout_size)
+    xmin,xmax = myfactory.cutout_lims[0]
+    ymin,ymax = myfactory.cutout_lims[1]
+    
+    assert (xmax-xmin) == cutout_size[0]
+    assert (ymax-ymin) == cutout_size[1]
+
+    cutout_size = [5*u.pixel, 7*u.pixel]
+    myfactory._get_cutout_limits(cutout_size)
+    xmin,xmax = myfactory.cutout_lims[0]
+    ymin,ymax = myfactory.cutout_lims[1]
+    
+    assert (xmax-xmin) == cutout_size[0].value
+    assert (ymax-ymin) == cutout_size[1].value
+
+    cutout_size = [3*u.arcmin,5*u.arcmin]
+    myfactory._get_cutout_limits(cutout_size)
+    xmin,xmax = myfactory.cutout_lims[0]
+    ymin,ymax = myfactory.cutout_lims[1]
+    
+    assert (xmax-xmin) == 9
+    assert (ymax-ymin) == 15
+
+    cutout_size = [1*u.arcsec,5*u.arcsec]
+    myfactory._get_cutout_limits(cutout_size)
+    xmin,xmax = myfactory.cutout_lims[0]
+    ymin,ymax = myfactory.cutout_lims[1]
+    
+    assert (xmax-xmin) == 1
+    assert (ymax-ymin) == 1
+
+    
+
+
+    
     
