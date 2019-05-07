@@ -1,7 +1,7 @@
 0.4 (unreleased)
 ----------------
 
-- No changes yet
+- Adding more unit tests and coveralls setup [#11]
 
 
 0.3 (2019-05-03)
