@@ -134,7 +134,7 @@ def test_cube_cutout(tmpdir):
            
     
         
-def test_cutout_individual_functions(tmpdir):
+def test_cutout_extras(tmpdir):
 
     # Making the test cube
     cube_maker = CubeFactory()
@@ -145,62 +145,98 @@ def test_cutout_individual_functions(tmpdir):
     ffi_files = create_test_ffis(img_sz, num_im)
     cube_file = cube_maker.make_cube(ffi_files, "make_cube-test-cube", verbose=False)
 
-    # Opening the cube file
-    cube = fits.open(cube_file)
+    # Making the cutout
     myfactory = CutoutFactory()
+    coord = SkyCoord(256.88, 6.38, frame='icrs', unit='deg')
 
     ###########################
     # Test  _parse_table_info #
     ###########################
-    data_ind = int(len(cube[2].data)/2)  # using the middle file for table info
-    myfactory._parse_table_info(cube[2].header, cube[2].data[data_ind])
-    
+    cutout_size = [5, 3]
+    out_file = myfactory.cube_cut(cube_file, coord, cutout_size, verbose=False)
+    assert "256.880000_6.380000_5x3_astrocut.fits" in out_file
+
     assert isinstance(myfactory.cube_wcs, wcs.WCS)
     ra, dec = myfactory.cube_wcs.wcs.crval
     assert round(ra, 4) == 250.3497
     assert round(dec, 4) == 2.2809
 
-    
     ############################
     # Test  _get_cutout_limits #
     ############################
-    coordinates = SkyCoord(249.5, 2.5, frame='icrs', unit='deg')
-    myfactory.center_coord = coordinates
-    
-    cutout_size = [5,3]
-    myfactory._get_cutout_limits(cutout_size)
-    xmin,xmax = myfactory.cutout_lims[0]
-    ymin,ymax = myfactory.cutout_lims[1]
+    xmin, xmax = myfactory.cutout_lims[0]
+    ymin, ymax = myfactory.cutout_lims[1]
     
     assert (xmax-xmin) == cutout_size[0]
     assert (ymax-ymin) == cutout_size[1]
 
     cutout_size = [5*u.pixel, 7*u.pixel]
-    myfactory._get_cutout_limits(cutout_size)
-    xmin,xmax = myfactory.cutout_lims[0]
-    ymin,ymax = myfactory.cutout_lims[1]
+    out_file = myfactory.cube_cut(cube_file, coord, cutout_size, verbose=False)
+    assert "256.880000_6.380000_5x7_astrocut.fits" in out_file
+    
+    xmin, xmax = myfactory.cutout_lims[0]
+    ymin, ymax = myfactory.cutout_lims[1]
     
     assert (xmax-xmin) == cutout_size[0].value
     assert (ymax-ymin) == cutout_size[1].value
 
-    cutout_size = [3*u.arcmin,5*u.arcmin]
-    myfactory._get_cutout_limits(cutout_size)
-    xmin,xmax = myfactory.cutout_lims[0]
-    ymin,ymax = myfactory.cutout_lims[1]
+    cutout_size = [3*u.arcmin, 5*u.arcmin]
+    out_file = myfactory.cube_cut(cube_file, coord, cutout_size, verbose=False)
+    assert "256.880000_6.380000_8x15_astrocut.fits" in out_file
     
-    assert (xmax-xmin) == 9
+    xmin, xmax = myfactory.cutout_lims[0]
+    ymin, ymax = myfactory.cutout_lims[1]
+    
+    assert (xmax-xmin) == 8
     assert (ymax-ymin) == 15
 
-    cutout_size = [1*u.arcsec,5*u.arcsec]
-    myfactory._get_cutout_limits(cutout_size)
-    xmin,xmax = myfactory.cutout_lims[0]
-    ymin,ymax = myfactory.cutout_lims[1]
+    cutout_size = [1*u.arcsec, 5*u.arcsec]
+    out_file = myfactory.cube_cut(cube_file, coord, cutout_size, verbose=False)
+    assert "256.880000_6.380000_1x1_astrocut.fits" in out_file
+    
+    xmin, xmax = myfactory.cutout_lims[0]
+    ymin, ymax = myfactory.cutout_lims[1]
     
     assert (xmax-xmin) == 1
     assert (ymax-ymin) == 1
 
-    
+    #########################
+    # Test  _get_cutout_wcs #
+    #########################
+    cutout_size = [5, 3]
+    out_file = myfactory.cube_cut(cube_file, coord, cutout_size, verbose=False)
 
+    cutout_wcs_dict = myfactory._get_cutout_wcs()
 
+    assert cutout_wcs_dict["1CTYP{}"][0] == 'RA---TAN-SIP'
+    assert cutout_wcs_dict["1CRPX{}"][0] == 1043
+    assert round(cutout_wcs_dict["1CRVL{}"][0], 4) == 250.3497
+
+    ###########################
+    # Test  target pixel file #
+    ###########################
+
+    # Testing the cutout content is in test_cube_cutout
+    # this tests that the format of the tpf is what it should be
+    tpf = fits.open(out_file)
+
+    assert tpf[0].header["ORIGIN"] == 'STScI/MAST'
+
+    tpf_table = tpf[1].data
+    assert len(tpf_table.columns) == 12
+    assert "TIME" in tpf_table.columns.names
+    assert "FLUX" in tpf_table.columns.names
+    assert "FLUX_ERR" in tpf_table.columns.names
+    assert "FFI_FILE" in tpf_table.columns.names
+
+    cutout_img = tpf_table[0]['FLUX']
+    assert cutout_img.shape == (3, 5)
+    assert cutout_img.dtype.name =='float32'
+
+    aperture = tpf[2].data
+    assert aperture.shape == (3, 5)
+    assert aperture.dtype.name =='int32'
+
+    tpf.close()
     
     
