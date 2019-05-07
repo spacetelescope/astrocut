@@ -28,11 +28,39 @@ Developer Documentation
 
 Installation
 ^^^^^^^^^^^^
+
 .. code-block:: bash
 
     $ git clone https://github.com/spacetelescope/astrocut.git
     $ cd astrocut
     $ python setup.py install
+    
+For active developement intall in develop mode
+
+.. code-block:: bash
+
+    $ python setup.py develop
+    
+Testing
+^^^^^^^
+Tests can be found in ``astrocut/tests/``.
+
+.. code-block:: bash
+
+    $ python setup.py test
+    
+Documentation
+^^^^^^^^^^^^^
+
+Documentation files are found in ``docs/``.
+
+To build the documentation:
+
+.. code-block:: bash
+
+    $ python setup.py build_docs
+    
+The built docs will be in ``docs/_build/html/``, to view them go to ``file:///path/to/astrocut/repo/docs/_build/html/index.html`` in the browser of your choice.
     
 
 Release Protocol
