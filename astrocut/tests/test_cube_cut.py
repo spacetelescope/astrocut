@@ -147,7 +147,7 @@ def test_cutout_extras(tmpdir):
 
     # Making the cutout
     myfactory = CutoutFactory()
-    coord = SkyCoord(256.88, 6.38, frame='icrs', unit='deg')
+    coord = "256.88 6.38"
 
     ###########################
     # Test  _parse_table_info #
@@ -160,6 +160,10 @@ def test_cutout_extras(tmpdir):
     ra, dec = myfactory.cube_wcs.wcs.crval
     assert round(ra, 4) == 250.3497
     assert round(dec, 4) == 2.2809
+
+    # checking on the center coordinate too
+    coord = SkyCoord(256.88, 6.38, frame='icrs', unit='deg')
+    assert myfactory.center_coord.separation(coord) == 0
 
     ############################
     # Test  _get_cutout_limits #
@@ -231,11 +235,11 @@ def test_cutout_extras(tmpdir):
 
     cutout_img = tpf_table[0]['FLUX']
     assert cutout_img.shape == (3, 5)
-    assert cutout_img.dtype.name =='float32'
+    assert cutout_img.dtype.name == 'float32'
 
     aperture = tpf[2].data
     assert aperture.shape == (3, 5)
-    assert aperture.dtype.name =='int32'
+    assert aperture.dtype.name == 'int32'
 
     tpf.close()
     
