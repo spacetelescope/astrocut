@@ -101,10 +101,10 @@ class CubeFactory():
         for i, ffi in enumerate(file_list):
             ffi_data = fits.open(ffi)
             
-            start_times[i] = ffi_data[1].header.get("TSTART") # TODO: optionally pass this in?
+            start_times[i] = ffi_data[1].header.get("TSTART")  # TODO: optionally pass this in?
             
-            if good_header_ind is None: # Only check this if we don't already have it
-                if ffi_data[1].header.get("CTYPE1"): # Checking for WCS info
+            if good_header_ind is None:  # Only check this if we don't already have it
+                if ffi_data[1].header.get("CTYPE1"):  # Checking for WCS info
                     good_header_ind = i
             
             ffi_data.close()
