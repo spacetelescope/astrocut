@@ -93,56 +93,79 @@ class CubeFactory():
             startTime = time()
 
         # Getting the time sorted indices for the files
+        # and a good header to build the table colums (needs to have WCS keywords)
         file_list = np.array(file_list)
         start_times = np.zeros(len(file_list))
+        good_header_ind = None
     
         for i, ffi in enumerate(file_list):
-            start_times[i] = fits.getval(ffi, 'TSTART', 1)  # TODO: optionally pass this in?
+            ffi_data = fits.open(ffi)
+            
+            start_times[i] = ffi_data[1].header.get("TSTART") # TODO: optionally pass this in?
+            
+            if good_header_ind is None: # Only check this if we don't already have it
+                if ffi_data[1].header.get("CTYPE1"): # Checking for WCS info
+                    good_header_ind = i
+            
+            ffi_data.close()
+                
+            
             
         sorted_indices = np.argsort(start_times)      
     
-        # these will be the arrays and headers
+        # These will be the arrays and headers
         img_cube = None
         img_info_table = None
         primary_header = None
-        secondary_header = None
+
+        # Setting up the image info table
+        fle = file_list[good_header_ind]
+        
+        if verbose:
+            print("Using {} to initialize the image header table.".format(path.basename(fle)))
+            
+        ffi_data = fits.open(fle)
+
+        # The image specific header information will be saved in a table in the second extension
+        secondary_header = ffi_data[1].header
+
+        # set up the image info table
+        cols = []
+        for kwd, val, cmt in secondary_header.cards: 
+            if type(val) == str:
+                tpe = "S" + str(len(val))  # TODO: Maybe switch to U?
+            elif type(val) == int:
+                tpe = np.int32
+            else:
+                tpe = np.float32
+                    
+            cols.append(Column(name=kwd, dtype=tpe, length=len(file_list), meta={"comment": cmt}))
+                    
+        cols.append(Column(name="FFI_FILE", dtype="S" + str(len(path.basename(fle))), length=len(file_list)))
+            
+        img_info_table = Table(cols)
+
+        ffi_data.close()
+        
 
         # Loop through files
         for i, fle in enumerate(file_list[sorted_indices]):
         
             ffi_data = fits.open(fle)
 
-            # if the arrays/headers aren't initialized do it now
+            # if the arrays/header aren't initialized do it now
             if img_cube is None:
 
                 # We use the primary header from the first file as the cube primary header
                 # and will add in information about the time of the final observation at the end
                 primary_header = self._make_primary_header(ffi_data[0].header, ffi_data[1].header, sector=sector)
 
-                # The image specific header information will be saved in a table in the second extension
-                secondary_header = ffi_data[1].header
-            
                 ffi_img = ffi_data[1].data
 
                 # set up the cube array
                 img_cube = np.full((ffi_img.shape[0], ffi_img.shape[1], len(file_list), 2),
                                    np.nan, dtype=np.float32)
 
-                # set up the image info table
-                cols = []
-                for kwd, val, cmt in secondary_header.cards: 
-                    if type(val) == str:
-                        tpe = "S" + str(len(val))  # TODO: Maybe switch to U?
-                    elif type(val) == int:
-                        tpe = np.int32
-                    else:
-                        tpe = np.float32
-                    
-                    cols.append(Column(name=kwd, dtype=tpe, length=len(file_list), meta={"comment": cmt}))
-                    
-                cols.append(Column(name="FFI_FILE", dtype="S" + str(len(path.basename(fle))), length=len(file_list)))
-            
-                img_info_table = Table(cols)
 
             # add the image and info to the arrays
             img_cube[:, :, i, 0] = ffi_data[1].data
