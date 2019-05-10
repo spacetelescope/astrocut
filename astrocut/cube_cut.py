@@ -114,7 +114,7 @@ class CutoutFactory():
             
             wcs_val = table_row[col_num]
             if (not isinstance(wcs_val, str)) and (np.isnan(wcs_val)):
-                continue # Just skip nans
+                continue  # Just skip nans
             
             if "A" in tform:
                 wcs_header[header_val] = str(table_row[col_num])
@@ -156,7 +156,7 @@ class CutoutFactory():
         # Note: This is returning the center pixel in 1-up
         try:
             center_pixel = self.center_coord.to_pixel(self.cube_wcs, 1)
-        except wcs.NoConvergence: # If wcs can't converge, center coordinate is far from the footprint
+        except wcs.NoConvergence:  # If wcs can't converge, center coordinate is far from the footprint
             raise InvalidQueryError("Cutout location is not in cube footprint!")
 
         lims = np.zeros((2, 2), dtype=int)
