@@ -113,7 +113,7 @@ class CutoutFactory():
             tform = table_header[header_key.replace("TTYPE", "TFORM")]
             
             wcs_val = table_row[col_num]
-            if (not wcs_val.isinstance(str)) and (np.isnan(wcs_val)):
+            if (not isinstance(wcs_val, str)) and (np.isnan(wcs_val)):
                 continue # Just skip nans
             
             if "A" in tform:
