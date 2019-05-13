@@ -72,7 +72,7 @@ class CutoutFactory():
                          "VIGNAPP": [None, "vignetting or collimator correction applied"]}
 
         
-    def _parse_table_info(self, table_header, table_row):
+    def _parse_table_info(self, table_header, table_data, verbose=False):
         """
         Takes the header and one entry from the cube table of image header data,
         builds a WCS object that encalpsulates the given WCS information,
@@ -88,7 +88,23 @@ class CutoutFactory():
             One row from the cube image header data table.
         """
 
-        # Turning the table row inot a new header object
+        data_ind = int(len(table_data)/2)  # using the middle file for table info
+        table_row = None
+
+        # Making sure we have a row with wcs info
+        while table_row is None:
+            table_row = table_data[data_ind]
+            ra_col = int([x for x in table_header.cards if x[1] == "CTYPE1"][0][0].replace("TTYPE", "")) - 1
+            if "RA" not in table_row[ra_col]:
+                table_row is None
+                data_ind += 1
+                if data_ind == len(table_data):
+                    raise wcs.NoWcsKeywordsFoundError("No FFI rows contain valid WCS keywords.")
+
+        if verbose:
+            print("Using WCS from row {} out of {}".format(data_ind, len(table_data)))
+
+        # Turning the table row into a new header object
         wcs_header = fits.header.Header()
 
         for header_key, header_val in table_header.items():
@@ -97,6 +113,11 @@ class CutoutFactory():
         
             col_num = int(header_key[5:]) - 1
             tform = table_header[header_key.replace("TTYPE", "TFORM")]
+            
+            wcs_val = table_row[col_num]
+            if (not isinstance(wcs_val, str)) and (np.isnan(wcs_val)):
+                continue  # Just skip nans
+            
             if "A" in tform:
                 wcs_header[header_val] = str(table_row[col_num])
             elif "D" in tform:
@@ -135,7 +156,10 @@ class CutoutFactory():
         """
         
         # Note: This is returning the center pixel in 1-up
-        center_pixel = self.center_coord.to_pixel(self.cube_wcs, 1)
+        try:
+            center_pixel = self.center_coord.to_pixel(self.cube_wcs, 1)
+        except wcs.NoConvergence:  # If wcs can't converge, center coordinate is far from the footprint
+            raise InvalidQueryError("Cutout location is not in cube footprint!")
 
         lims = np.zeros((2, 2), dtype=int)
 
@@ -619,8 +643,7 @@ class CutoutFactory():
         cube = fits.open(cube_file) 
 
         # Get the info we need from the data table
-        data_ind = int(len(cube[2].data)/2)  # using the middle file for table info
-        self._parse_table_info(cube[2].header, cube[2].data[data_ind])
+        self._parse_table_info(cube[2].header, cube[2].data, verbose)
 
         if isinstance(coordinates, SkyCoord):
             self.center_coord = coordinates
