@@ -844,6 +844,10 @@ class CutoutFactory():
         #cutout_wcs_dict = self._get_cutout_wcs()
         cutout_wcs_full = self._get_full_cutout_wcs(cube[2].header)
         max_dist,sigma = self._fit_cutout_wcs(cutout_wcs_full, img_cutout.shape[1:])
+        if verbose:
+            print("Maximum distance between approximate and true location: {}".format(max_dist))
+            print("Error in approximate WCS (sigma): {}".format(sigma))
+        
         # TODO: put the max_dist, sigma somewhere
         cutout_wcs_dict = self._get_cutout_wcs_dict()
     
