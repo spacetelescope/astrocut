@@ -197,7 +197,7 @@ class CutoutFactory():
         self.cutout_lims = lims
 
 
-    def _fit_cutout_wcs(self, cutout_wcs, cutout_shape):
+    def _fit_cutout_wcs(self, cutout_wcs, cutout_shape, verbose=False):
         """
         Given a full (including SIP coefficients) wcs for the cutout, 
         calculate the best fit linear wcs, and a measure of the goodness-of-fit.
@@ -847,7 +847,7 @@ class CutoutFactory():
         # Get cutout wcs info
         #cutout_wcs_dict = self._get_cutout_wcs()
         cutout_wcs_full = self._get_full_cutout_wcs(cube[2].header)
-        max_dist,sigma = self._fit_cutout_wcs(cutout_wcs_full, img_cutout.shape[1:])
+        max_dist,sigma = self._fit_cutout_wcs(cutout_wcs_full, img_cutout.shape[1:], verbose=verbose)
         if verbose:
             print("Maximum distance between approximate and true location: {}".format(max_dist))
             print("Error in approximate WCS (sigma): {}".format(sigma))
