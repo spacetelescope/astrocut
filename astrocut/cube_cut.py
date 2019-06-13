@@ -227,18 +227,22 @@ class CutoutFactory():
         self.cutout_wcs = linear_wcs
 
         # Checking the fit
-        #world_pix_nosip = SkyCoord(cutout_wcs.wcs_pix2world(pix_inds,1), unit='deg')
+        world_pix_nosip = SkyCoord(cutout_wcs.wcs_pix2world(pix_inds,1), unit='deg')
         world_pix_new = SkyCoord(linear_wcs.all_pix2world(pix_inds,1), unit='deg')
     
         dists = world_pix.separation(world_pix_new)
-        #dists_nosip = world_pix.separation(world_pix_nosip)
+        dists_nosip = world_pix.separation(world_pix_nosip)
     
         sigma = np.sqrt(sum(dists.value**2))
-        #nosip_sigma = np.sqrt(sum(dists_nosip.value**2))
+        nosip_sigma = np.sqrt(sum(dists_nosip.value**2))
 
         # TODO: If just wacking off the SIP coefficients is better than the fit, just do that
-        #if nosip_sigma < sigma:
-        #    pass
+        if nosip_sigma < sigma:
+            if verbose:
+                print("Falling back to original WCS.")
+            self.cutout_wcs = cutout_wcs
+            dists = dists_nosip
+            sigma = nosip_sigma
 
         return (dists.max(), sigma)
     
