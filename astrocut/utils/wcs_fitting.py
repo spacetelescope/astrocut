@@ -1,3 +1,19 @@
+#################################################################################
+#
+# Licensed under a 3-clause BSD style license
+#           - see https://github.com/astropy/astropy/blob/master/LICENSE.rst
+#
+# wcs fitting functionality
+#          by Clare Shanahan (shannnnnyyy @github)
+#
+# Will be added to Astropy (PR: https://github.com/astropy/astropy/pull/7884)
+#
+# Astropy version is used preferenetially, this is supplied prior to the
+# addition of this code to Astropy, and for users using older versions of Astropy
+#
+#################################################################################
+
+
 import numpy as np
 
 from astropy import units as u
@@ -12,7 +28,10 @@ def _linear_transformation_fit(params, lon, lat, x, y, w_obj):
     w_obj.wcs.pc = ((pc[0],pc[1]),(pc[2],pc[3]))
     w_obj.wcs.crpix = crpix
     lon2, lat2 = w_obj.wcs_pix2world(x,y,1)
+    
     resids = np.concatenate((lon-lon2, lat-lat2))
+    resids[resids > 180] = 360 - resids[resids > 180]
+    resids[resids < -180] = 360	+ resids[resids < -180]
 
     return resids
 

@@ -222,27 +222,28 @@ class CutoutFactory():
         world_pix = SkyCoord(cutout_wcs.all_pix2world(pix_inds, 1), unit='deg')
 
         # Getting the fit WCS
-        linear_wcs = fit_wcs_from_points(pix_inds[:,0], pix_inds[:,1], world_pix, mode='wcs', proj_point="center")
+        linear_wcs = fit_wcs_from_points(pix_inds[:,0], pix_inds[:,1], world_pix, mode='wcs',
+                                         proj_point=[self.center_coord.data.lon.value,self.center_coord.data.lat.value])
 
         self.cutout_wcs = linear_wcs
 
         # Checking the fit
-        world_pix_nosip = SkyCoord(cutout_wcs.wcs_pix2world(pix_inds,1), unit='deg')
+        #world_pix_nosip = SkyCoord(cutout_wcs.wcs_pix2world(pix_inds,1), unit='deg')
         world_pix_new = SkyCoord(linear_wcs.all_pix2world(pix_inds,1), unit='deg')
     
         dists = world_pix.separation(world_pix_new)
-        dists_nosip = world_pix.separation(world_pix_nosip)
+        #dists_nosip = world_pix.separation(world_pix_nosip)
     
         sigma = np.sqrt(sum(dists.value**2))
-        nosip_sigma = np.sqrt(sum(dists_nosip.value**2))
+        #nosip_sigma = np.sqrt(sum(dists_nosip.value**2))
 
         # TODO: If just wacking off the SIP coefficients is better than the fit, just do that
-        if nosip_sigma < sigma:
-            if verbose:
-                print("Falling back to original WCS.")
-            self.cutout_wcs = cutout_wcs
-            dists = dists_nosip
-            sigma = nosip_sigma
+        #if nosip_sigma < sigma:
+        #    if verbose:
+        #        print("Falling back to original WCS.")
+        #    self.cutout_wcs = cutout_wcs
+        #    dists = dists_nosip
+        #    sigma = nosip_sigma
 
         return (dists.max(), sigma)
     
