@@ -145,6 +145,9 @@ class CutoutFactory():
         # Filling the img_kwds dictionary while we are here
         for kwd in self.img_kwds:
             self.img_kwds[kwd][0] = wcs_header.get(kwd)
+        # Adding the info about which FFI we got the 
+        self.img_kwds["WCS_FFI"] = [table_data[data_ind]["FFI_FILE"],
+                                    "FFI filname used in cutout WCS calculation."]
 
             
     def _get_cutout_limits(self, cutout_size):
@@ -200,52 +203,21 @@ class CutoutFactory():
         self.cutout_lims = lims
 
 
-    def _fit_cutout_wcs(self, cutout_wcs, cutout_shape):
+    def _get_full_cutout_wcs(self, cube_table_header):
         """
-        Given a full (including SIP coefficients) wcs for the cutout, 
-        calculate the best fit linear wcs, and a measure of the goodness-of-fit.
-        
-        The new WCS is stored in ``self.cutout_wcs``.
-        Goodness-of-fit measures are returned and stored in ``self.cutout_wcs_fit``.
+        Starting with the full FFI WCS and adjusting it for the cutout WCS.
+        Adjusts CRPIX values and adds physical WCS keywords.
 
         Parameters
         ----------
-        cutout_wcs : 
-            The full (including SIP coefficients) cutout WCS object 
-        cutout_shape : tuple
-            The shape of the cutout in the form (width, height).
+        cube_table_header :  `~astropy.io.fits.Header`
+           The FFI cube header for the data table extension. This allows the cutout WCS information
+           to more closely match the mission TPF format.
 
-        Returns
-        -------
-        response : tuple
-            Goodness-of-fit statistics. (max dist, sigma)
-        """
-
-        # Getting matched pixel, world coordinate pairs
-        pix_inds = np.array(list(product(list(range(cutout_shape[1])),list(range(cutout_shape[0])))))
-        world_pix = SkyCoord(cutout_wcs.all_pix2world(pix_inds, 1), unit='deg')
-
-        # Getting the fit WCS
-        linear_wcs = fit_wcs_from_points(pix_inds[:,0], pix_inds[:,1], world_pix, mode='wcs',
-                                         proj_point=[self.center_coord.data.lon.value,self.center_coord.data.lat.value])
-
-        self.cutout_wcs = linear_wcs
-
-        # Checking the fit
-        world_pix_new = SkyCoord(linear_wcs.all_pix2world(pix_inds,1), unit='deg')
-    
-        dists = world_pix.separation(world_pix_new)
-        sigma = np.sqrt(sum(dists.value**2))
-
-        self.cutout_wcs_fit['WCS_MSEP'][0] = dists.max().to('deg').value
-        self.cutout_wcs_fit['WCS_SIG'][0] = sigma
-
-        return (dists.max(), sigma)
-    
-
-    def _get_full_cutout_wcs(self, cube_table_header):
-        """
-        TODO: Document
+        Resturns
+        --------
+        response :  `~astropy.wcs.WCS`
+            The cutout WCS object including SIP distortions.
         """
         
         wcs_header = self.cube_wcs.to_header(relax=True)
@@ -278,6 +250,49 @@ class CutoutFactory():
         return wcs.WCS(wcs_header)
 
     
+    def _fit_cutout_wcs(self, cutout_wcs, cutout_shape):
+        """
+        Given a full (including SIP coefficients) wcs for the cutout, 
+        calculate the best fit linear wcs, and a measure of the goodness-of-fit.
+        
+        The new WCS is stored in ``self.cutout_wcs``.
+        Goodness-of-fit measures are returned and stored in ``self.cutout_wcs_fit``.
+
+        Parameters
+        ----------
+        cutout_wcs :  `~astropy.wcs.WCS`
+            The full (including SIP coefficients) cutout WCS object 
+        cutout_shape : tuple
+            The shape of the cutout in the form (width, height).
+
+        Returns
+        -------
+        response : tuple
+            Goodness-of-fit statistics. (max dist, sigma)
+        """
+
+        # Getting matched pixel, world coordinate pairs
+        pix_inds = np.array(list(product(list(range(cutout_shape[1])),list(range(cutout_shape[0])))))
+        world_pix = SkyCoord(cutout_wcs.all_pix2world(pix_inds, 1), unit='deg')
+
+        # Getting the fit WCS
+        linear_wcs = fit_wcs_from_points(pix_inds[:,0], pix_inds[:,1], world_pix, mode='wcs',
+                                         proj_point=[self.center_coord.data.lon.value,self.center_coord.data.lat.value])
+
+        self.cutout_wcs = linear_wcs
+
+        # Checking the fit
+        world_pix_new = SkyCoord(linear_wcs.all_pix2world(pix_inds,1), unit='deg')
+    
+        dists = world_pix.separation(world_pix_new).to('deg')
+        sigma = np.sqrt(sum(dists.value**2))
+
+        self.cutout_wcs_fit['WCS_MSEP'][0] = dists.max().value
+        self.cutout_wcs_fit['WCS_SIG'][0] = sigma
+
+        return (dists.max(), sigma)
+    
+  
     def _get_cutout_wcs_dict(self):
         """
         Transform the cutout WCS object into the cutout column WCS keywords.

@@ -119,6 +119,15 @@ be saved, if unspecified it defaults to the current directory.
                 2  APERTURE      1 ImageHDU        45   (5, 5)   float64  
 
 
+A note about the cutout WCS object
+""""""""""""""""""""""""""""""""""
+
+TESS FFIs are large and therefore are described by WCS objects that have many non-linear terms. Astrocut creates a new simpler (linear) WCS object from the matched set of cutout pixel coordinates and sky coordinates (from the FFI WCS). This linear WCS object will generally work very well, however at larger cutout sizes (100-200 pixels per side and above) the linear WCS fit will start to be noticeably incorrect at the edges of the cutout.  Three header keywords have been added to the PIXELS extension to give additional information about the cutout WCS:
+
+* **WCS_FFI:** The name of the FFI file used to build the original WCS from which the cutout and cutout WCS were calculated.
+* **WCS_MSEP:** The maximum separation in degrees between the cutout's linear WCS and the FFI's full WCS.
+* **WCS_SIG:** The error in the cutout's linear WCS, calculated as sqrt((dist(Po_ij, Pl_ij)^2) where dist(Po_ij, Pl_ij) is the angular distance in degrees between the sky position of of pixel i,j in the original full WCS and the new linear WCS.
+
 
 .. automodapi:: astrocut
     :skip: test
