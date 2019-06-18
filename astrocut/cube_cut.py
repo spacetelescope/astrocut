@@ -768,6 +768,10 @@ class CutoutFactory():
         
         if verbose:
             print("Target pixel file: {}".format(target_pixel_file))
+
+        # Make sure the output directory exists
+        if not os.path.exists(output_path):
+            os.makedirs(output_path)
         
         # Write the TPF
         tpf_object.writeto(target_pixel_file, overwrite=True, checksum=True)
