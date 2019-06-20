@@ -104,7 +104,7 @@ class CubeFactory():
             start_times[i] = ffi_data[1].header.get("TSTART")  # TODO: optionally pass this in?
             
             if good_header_ind is None:  # Only check this if we don't already have it
-                if ffi_data[1].header.get("CTYPE1"):  # Checking for WCS info
+                if ffi_data[1].header.get("WCSAXES", 0) == 2:  # Checking for WCS info
                     good_header_ind = i
             
             ffi_data.close()

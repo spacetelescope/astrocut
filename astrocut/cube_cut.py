@@ -105,8 +105,8 @@ class CutoutFactory():
         # Making sure we have a row with wcs info
         while table_row is None:
             table_row = table_data[data_ind]
-            ra_col = int([x for x in table_header.cards if x[1] == "CTYPE1"][0][0].replace("TTYPE", "")) - 1
-            if "RA" not in table_row[ra_col]:
+            ra_col = int([x for x in table_header.cards if x[1] == "WCSAXES"][0][0].replace("TTYPE", "")) - 1
+            if table_row[ra_col] == 2:
                 table_row is None
                 data_ind += 1
                 if data_ind == len(table_data):
@@ -147,7 +147,7 @@ class CutoutFactory():
             self.img_kwds[kwd][0] = wcs_header.get(kwd)
         # Adding the info about which FFI we got the 
         self.img_kwds["WCS_FFI"] = [table_data[data_ind]["FFI_FILE"],
-                                    "FFI filname used in cutout WCS calculation."]
+                                    "FFI used for cutout WCS"]
 
             
     def _get_cutout_limits(self, cutout_size):
