@@ -6,13 +6,13 @@ creating cutout target pixel files.
 """
 
 import numpy as np
+import os
 
 from astropy.io import fits
 from astropy.table import Table, Column
 
 from time import time
 from datetime import date
-from os import path
 from copy import deepcopy
 
 
@@ -104,7 +104,7 @@ class CubeFactory():
             start_times[i] = ffi_data[1].header.get("TSTART")  # TODO: optionally pass this in?
             
             if good_header_ind is None:  # Only check this if we don't already have it
-                if ffi_data[1].header.get("CTYPE1"):  # Checking for WCS info
+                if ffi_data[1].header.get("WCSAXES", 0) == 2:  # Checking for WCS info
                     good_header_ind = i
             
             ffi_data.close()
@@ -122,7 +122,7 @@ class CubeFactory():
         fle = file_list[good_header_ind]
         
         if verbose:
-            print("Using {} to initialize the image header table.".format(path.basename(fle)))
+            print("Using {} to initialize the image header table.".format(os.path.basename(fle)))
             
         ffi_data = fits.open(fle)
 
@@ -141,7 +141,7 @@ class CubeFactory():
                     
             cols.append(Column(name=kwd, dtype=tpe, length=len(file_list), meta={"comment": cmt}))
                     
-        cols.append(Column(name="FFI_FILE", dtype="S" + str(len(path.basename(fle))), length=len(file_list)))
+        cols.append(Column(name="FFI_FILE", dtype="S" + str(len(os.path.basename(fle))), length=len(file_list)))
             
         img_info_table = Table(cols)
 
@@ -172,7 +172,7 @@ class CubeFactory():
             img_cube[:, :, i, 1] = ffi_data[2].data
             for kwd in img_info_table.columns:
                 if kwd == "FFI_FILE":
-                    img_info_table[kwd][i] = path.basename(fle)
+                    img_info_table[kwd][i] = os.path.basename(fle)
                 else:
                     nulval = None
                     if img_info_table[kwd].dtype.name == "int32":
@@ -221,8 +221,11 @@ class CubeFactory():
         if verbose:
             writeTime = time()
 
-        # TODO: check for path in cube and make sure directory exists
-        #       and create it if it doesn't
+        # Making sure the output directory exists
+        direc, _ = os.path.split(cube_file)
+        if direc and not os.path.exists(direc):
+            os.makedirs(direc)
+            
         hdu_list.writeto(cube_file, overwrite=True) 
 
         if verbose:

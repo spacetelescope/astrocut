@@ -204,21 +204,31 @@ def test_cutout_extras(tmpdir):
     assert (xmax-xmin) == 1
     assert (ymax-ymin) == 1
 
-    #########################
-    # Test  _get_cutout_wcs #
-    #########################
+    #############################
+    # Test _get_full_cutout_wcs #
+    #############################
     cutout_size = [5, 3]
     out_file = myfactory.cube_cut(cube_file, coord, cutout_size, verbose=False)
 
-    cutout_wcs_dict = myfactory._get_cutout_wcs()
+    cutout_wcs_full = myfactory._get_full_cutout_wcs(fits.getheader(cube_file, 2))
+    assert (cutout_wcs_full.wcs.crpix == [1045 - myfactory.cutout_lims[0, 0],
+                                          1001 - myfactory.cutout_lims[1, 0]]).all()    
 
-    assert cutout_wcs_dict["1CTYP{}"][0] == 'RA---TAN-SIP'
-    assert cutout_wcs_dict["1CRPX{}"][0] == 1043
-    assert round(cutout_wcs_dict["1CRVL{}"][0], 4) == 250.3497
+    ########################
+    # Test _fit_cutout_wcs #
+    ########################
+    max_dist, sigma = myfactory._fit_cutout_wcs(cutout_wcs_full, (3, 5))
+    assert round(max_dist.deg, 7) == 7e-07
+    assert round(sigma, 7) == 1.4e-06
 
-    ###########################
-    # Test  target pixel file #
-    ###########################
+    cry, crx = myfactory.cutout_wcs.wcs.crpix
+    assert round(cry) == 4
+    assert round(crx) == 2
+    
+
+    ##########################
+    # Test target pixel file #
+    ##########################
 
     # Testing the cutout content is in test_cube_cutout
     # this tests that the format of the tpf is what it should be

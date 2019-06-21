@@ -3,6 +3,7 @@
 
 - Adding more unit tests and coveralls setup [#11]
 - Adding workaround for FFIs with bad WCS info [#12]
+- Adding linear WCS approximation for cutouts [#14]
 
 
 0.3 (2019-05-03)
