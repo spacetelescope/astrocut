@@ -13,7 +13,7 @@ from itertools import product
 
 try:
     from astropy.wcs.utils import fit_wcs_from_points
-except: # astropy version does not have the function
+except ImportError:  # astropy version does not have the function
     from .utils.wcs_fitting import fit_wcs_from_points
 
 from time import time
@@ -40,7 +40,7 @@ class CutoutFactory():
         """
 
         self.cube_wcs = None  # WCS information from the image cube
-        self.cutout_wcs = None # WCS information (linear) for the cutout
+        self.cutout_wcs = None  # WCS information (linear) for the cutout
         self.cutout_wcs_fit = {'WCS_MSEP': [None, "[deg] Max offset between cutout WCS and FFI WCS"],
                                'WCS_SIG': [None, "[deg] Error measurement of cutout WCS fit"]}
         
@@ -272,17 +272,17 @@ class CutoutFactory():
         """
 
         # Getting matched pixel, world coordinate pairs
-        pix_inds = np.array(list(product(list(range(cutout_shape[1])),list(range(cutout_shape[0])))))
+        pix_inds = np.array(list(product(list(range(cutout_shape[1])), list(range(cutout_shape[0])))))
         world_pix = SkyCoord(cutout_wcs.all_pix2world(pix_inds, 1), unit='deg')
 
         # Getting the fit WCS
-        linear_wcs = fit_wcs_from_points(pix_inds[:,0], pix_inds[:,1], world_pix, mode='wcs',
-                                         proj_point=[self.center_coord.data.lon.value,self.center_coord.data.lat.value])
+        linear_wcs = fit_wcs_from_points(pix_inds[:, 0], pix_inds[:, 1], world_pix, mode='wcs',
+                                         proj_point=[self.center_coord.data.lon.value, self.center_coord.data.lat.value])
 
         self.cutout_wcs = linear_wcs
 
         # Checking the fit
-        world_pix_new = SkyCoord(linear_wcs.all_pix2world(pix_inds,1), unit='deg')
+        world_pix_new = SkyCoord(linear_wcs.all_pix2world(pix_inds, 1), unit='deg')
     
         dists = world_pix.separation(world_pix_new).to('deg')
         sigma = np.sqrt(sum(dists.value**2))

@@ -13,14 +13,14 @@
 #
 #################################################################################
 
+# flake8: noqa
 
 import numpy as np
 
 from astropy import units as u
 from astropy.wcs.utils import celestial_frame_to_wcs
 
-
-def _linear_transformation_fit(params, lon, lat, x, y, w_obj):
+def _linear_transformation_fit(params, lon, lat, x, y, w_obj):  # pragma: no cover
     """ Objective function for fitting linear terms."""
     pc = params[0:4]
     crpix = params[4:6]
@@ -37,7 +37,7 @@ def _linear_transformation_fit(params, lon, lat, x, y, w_obj):
 
 
 def _sip_fit(params, lon, lat, u, v, w_obj, a_order, b_order, a_coeff_names,
-             b_coeff_names):
+             b_coeff_names):  # pragma: no cover
         """ Objective function for fitting SIP."""
         from astropy.modeling.models import SIP # here instead of top to avoid circular import
 
@@ -64,7 +64,7 @@ def _sip_fit(params, lon, lat, u, v, w_obj, a_order, b_order, a_coeff_names,
         return resids
 
 
-def fit_wcs_from_points(xp, yp, coords, mode, projection='TAN', proj_point=None, order=None, inwcs=None):
+def fit_wcs_from_points(xp, yp, coords, mode, projection='TAN', proj_point=None, order=None, inwcs=None):  # pragma: no cover
     """Given a set of matched x,y pixel positions and celestial coordinates, solves for
     WCS parameters and returns a WCS with these best fit values and other keywords based
     on projection type, frame, and units.
