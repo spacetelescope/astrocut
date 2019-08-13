@@ -125,13 +125,23 @@ def _get_cutout_wcs(img_wcs, cutout_lims):
 #### FUNCTIONS FOR UTILS ####
 
 
-def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, verbose=False):
+def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, drop_after=None, verbose=False):
     """
     Does the actual cutting out.
     """
+
+    # Pulling out the header
+    max_ind = len(img_hdu.header)
+    if drop_after is not None:
+        try:
+            max_ind = img_hdu.header.index(drop_after)
+        except ValueError:
+            warnings.warn("Last desired keyword not found in image header, using the entire header.")
     
-    img_wcs = wcs.WCS(img_hdu.header)
-    img_wcs.sip = None # Necessary for CANDELS bc extra sip coeffs hanging around
+    hdu_header = fits.Header(img_hdu.header[:max_ind], copy=True)
+    
+    img_wcs = wcs.WCS(hdu_header)
+    #img_wcs.sip = None # Necessary for CANDELS bc extra sip coeffs hanging around
     
     img_data = img_hdu.data
 
@@ -175,21 +185,19 @@ def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, verbose=False
     # Getting the cutout wcs
     cutout_wcs = _get_cutout_wcs(img_wcs, cutout_lims)
 
-    # Building the HDU
-    hdu_header = fits.Header(img_hdu.header, copy=True)
+    # Updating the header with the new wcs infor
     hdu_header.update(cutout_wcs.to_header(relax=True)) # relax arg is for sip distortions if they exist
     # TODO: change filename -> original_file or something
     # Add/change any other keywords as needed
 
-    
     hdu = fits.ImageHDU(header=hdu_header, data=img_cutout)
 
     return hdu
     
 
 
-def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, single_outfile=True,
-             cutout_files=None, output_path='.', verbose=False):
+def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_after=None,
+             single_outfile=True, cutout_files=None, output_path='.', verbose=False):
     """
     Takes one or more fits files with the same WCS/pointing (in future will support resampling),
     makes the same cutout in each file and returns the result in a single fitsfile with one cutout
@@ -223,10 +231,10 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, single_ou
     for in_fle in input_files:
         hdulist = fits.open(in_fle)
         cutout_hdus.append( _hducut(hdulist[0], coordinates, cutout_size,
-                                    correct_wcs=correct_wcs, verbose=verbose))
+                                    correct_wcs=correct_wcs, drop_after=drop_after, verbose=verbose))
         hdulist.close()
 
-    # Setting up the Promary HDU
+    # Setting up the Primary HDU
     primary_hdu = fits.PrimaryHDU()
     # TODO: add some info about origin etc
 
