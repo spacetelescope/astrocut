@@ -298,23 +298,57 @@ def _save_multiple(cutout_hdus, output_dir, filenames, center_coord):
 def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_after=None,
              single_outfile=True, cutout_prefix="cutout", output_dir='.', verbose=False):
     """
-    Takes one or more fits files with the same WCS/pointing (in future will support resampling),
-    makes the same cutout in each file and returns the result in a single fitsfile with one cutout
-    per extension (in future will support outputting multiple files).
+    Takes one or more fits files with the same WCS/pointing, makes the same cutout in each file,
+    and returns the result either in a single fitsfile with one cutout per extension or in 
+    individual fits files.
+
+    Note: No checking is done on either the WCS pointing or pixel scale. If images don't line up
+          the cutouts will also not line up.
 
     Parameters
     ----------
-    input_files, coordinates, cutout_size, correct_wcs=False, drop_after=None,
-             single_outfile=True, cutout_prefix="cutout", output_dir='.', verbose=False
+    input_files : list
+        List of fits image files to cutout from. The image is assumed to be in the first extension.
+    coordinates : str or `~astropy.coordinates.SkyCoord` object
+        The position around which to cutout. It may be specified as a string ("ra dec" in degrees) 
+        or as the appropriate `~astropy.coordinates.SkyCoord` object.
+    cutout_size : int, array-like, `~astropy.units.Quantity`
+        The size of the cutout array. If ``cutout_size`` is a scalar number or a scalar 
+        `~astropy.units.Quantity`, then a square cutout of ``cutout_size`` will be created.  
+        If ``cutout_size`` has two elements, they should be in ``(ny, nx)`` order.  Scalar numbers 
+        in ``cutout_size`` are assumed to be in units of pixels. `~astropy.units.Quantity` objects 
+        must be in pixel or angular units.
+    correct_wcs : bool
+        Default False. If true a new WCS will be created for the cutout that is tangent projected
+        and does not include distortions.
+    drop_after : str or None
+        Default None. When creating the header for the cutout (and crucially, before 
+        building the WCS object) drop all header keywords starting with the one given.  This is
+        useful particularly for drizzle files that contain a multitude of extranious keywords
+        and sometimes leftover WCS keywords that astropy will try to parse even thought they should be
+        ignored.
+    single_outfile : bool 
+        Default True. If true return all cutouts in a single fits file with one cutout per extension,
+        if False return cutouts in individual fits files. If returing a single file the filename will 
+        have the form: <cutout_prefix>_<ra>_<dec>_<size x>_<size y>.fits. If returning multiple files
+        each will be named: <original filemame base>_<ra>_<dec>_<size x>_<size y>.fits.
+    cutout_prefix : str 
+        Default value "cutout". Only used if single_outfile is True. A prefix to prepend to the cutout 
+        filename. 
+    output_dir : str
+        Defaul value '.'. The directory to save the cutout file(s) to.
+    verbose : bool
+        Default False. If true intermediate information is printed.
 
     Returns
     -------
     response : str or list
-
+        If single_outfile is True returns the single output filename. Otherwise returns a list of all 
+        the output files.
     """
 
     if verbose:
-            start_time = time()
+        start_time = time()
             
     # Making sure we have an array of images
     if type(input_files) == str:
