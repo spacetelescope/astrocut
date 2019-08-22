@@ -53,7 +53,7 @@ def _get_cutout_limits(img_wcs, center_coord, cutout_size):
     except wcs.NoConvergence:  # If wcs can't converge, center coordinate is far from the footprint
         raise InvalidQueryError("Cutout location is not in image footprint!")
 
-    print(f"Center pixel: {center_pixel}")
+    #print(f"Center pixel: {center_pixel}")
     
     lims = np.zeros((2, 2), dtype=int)
 
@@ -74,7 +74,7 @@ def _get_cutout_limits(img_wcs, center_coord, cutout_size):
         # The case where the requested area is so small it rounds to zero
         if lims[axis, 0] == lims[axis, 1]:
             lims[axis, 0] = int(np.floor(center_pixel[axis] - 1))
-            lims[axis, 1] = int(np.ceil(center_pixel[axis] - 1))
+            lims[axis, 1] = lims[axis, 0] + 1 #int(np.ceil(center_pixel[axis] - 1))
 
     return lims
 
@@ -198,13 +198,13 @@ def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, drop_after=No
         padding[1, 0] = -xmin
         xmin = 0
     if ymin < 0:
-        padding[2, 0] = -ymin
+        padding[0, 0] = -ymin
         ymin = 0
     if xmax > xmax_img:
         padding[1, 1] = xmax - xmax_img
         xmax = xmax_img
     if ymax > ymax_img:
-        padding[2, 1] = ymax - ymax_img
+        padding[0, 1] = ymax - ymax_img
         ymax = ymax_img  
         
     img_cutout = img_hdu.data[ymin:ymax, xmin:xmax]
@@ -415,7 +415,7 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
         for fle in input_files:
             cutout = cutout_hdu_dict[fle]
             if cutout.header.get("EMPTY"):
-                warning.warn("Cutout of {} contains to data and will not be written.".format(fle))
+                warnings.warn("Cutout of {} contains to data and will not be written.".format(fle))
                 continue
 
             cutout_hdus.append(cutout)

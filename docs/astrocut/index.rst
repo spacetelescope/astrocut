@@ -152,8 +152,7 @@ that all input image are aligned and have the same pixel scale, no checking is d
                 >>> center_coord = SkyCoord("150.0945 2.38681", unit='deg')
                 >>> cutout_size = [200,300]
                 >>> 
-                >>> cutout_file = astrocut.fits_cut(candels_fles, center_coord, cutout_size,
-                ...                                 drop_after="", single_outfile=True)
+                >>> cutout_file = fits_cut(input_files, center_coord, cutout_size, drop_after="", single_outfile=True)
                 >>> print(cutout_file)
                 cutout_150.094500_2.386810_200x300_astrocut.fits
 
