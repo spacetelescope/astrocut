@@ -35,7 +35,7 @@ def test_get_cutout_limits():
 
     lims = cutouts._get_cutout_limits(test_img_wcs, center_coord, cutout_size)
     assert (lims[0, 1] - lims[0, 0]) == (lims[1, 1] - lims[1, 0])
-    assert (lims == np.array([[ 4, 14], [ 9, 19]])).all()
+    assert (lims == np.array([[4, 14], [9, 19]])).all()
 
     cutout_size = [10, 5]
     lims = cutouts._get_cutout_limits(test_img_wcs, center_coord, cutout_size)
@@ -119,7 +119,7 @@ def test_fits_cut(tmpdir):
     assert len(cutout_hdulist) == len(test_images) + 1  # num imgs + primary header
 
     cut1 = cutout_hdulist[1].data
-    assert cut1.shape == (cutout_size,cutout_size)
+    assert cut1.shape == (cutout_size, cutout_size)
     assert cutout_hdulist[1].data.shape == cutout_hdulist[2].data.shape
     assert cutout_hdulist[2].data.shape == cutout_hdulist[3].data.shape
     assert cutout_hdulist[3].data.shape == cutout_hdulist[4].data.shape
@@ -147,7 +147,7 @@ def test_fits_cut(tmpdir):
     assert cut1.shape == (cutout_size, cutout_size)
     
     cut_wcs = wcs.WCS(cutout_hdulist[0].header)
-    sra,sdec = cut_wcs.all_pix2world(cutout_size/2, cutout_size/2,0)
+    sra, sdec = cut_wcs.all_pix2world(cutout_size/2, cutout_size/2, 0)
     assert round(float(sra), 4) == round(center_coord.ra.deg, 4)
     assert round(float(sdec), 4) == round(center_coord.dec.deg, 4)
 
