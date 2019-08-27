@@ -2,6 +2,7 @@ import numpy as np
 
 from astropy.io import fits    
 
+
 def add_keywords(hdu, extname, time_increment, primary=False):
     """
     Add a bunch of required keywords (mostly fake values).
@@ -109,13 +110,14 @@ def add_wcs_nosip_keywords(hdu, img_size):
                        ('CRVAL1', 150.1163213, '[deg] Coordinate value at reference point'),
                        ('CRVAL2', 2.200973097, '[deg] Coordinate value at reference point')])
 
+    
 def add_dummy_keywords(hdu):
     """
     Adding a number of dummy keywords, basically so the drop_after argument to fits_cut can be tested.
     """
     hdu.header.extend([('Dummy1', "Dummy1", 'Dummy1'),
                        ('Dummy2', 2, 'Dummy2'),
-                       ('Dummy3', "", 'Dummy3')],strip=False)
+                       ('Dummy3', "", 'Dummy3')], strip=False)
     
 
 def create_test_imgs(img_size, num_images, dummy_keywords=True, basename='img_{:04d}.fits'):

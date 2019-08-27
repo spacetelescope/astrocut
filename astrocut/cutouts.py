@@ -17,10 +17,7 @@ import os
 import warnings
 
 from . import __version__
-from .exceptions import InputWarning, TypeWarning, InvalidQueryError, InvalidInputError
-
-
-
+from .exceptions import InputWarning, InvalidQueryError, InvalidInputError
 
 #### FUNCTIONS FOR UTILS ####
 def _get_cutout_limits(img_wcs, center_coord, cutout_size):
@@ -53,7 +50,7 @@ def _get_cutout_limits(img_wcs, center_coord, cutout_size):
     except wcs.NoConvergence:  # If wcs can't converge, center coordinate is far from the footprint
         raise InvalidQueryError("Cutout location is not in image footprint!")
 
-    #print(f"Center pixel: {center_pixel}")
+    # print("Center pixel: {center_pixel}".format(center_pixel))
     
     lims = np.zeros((2, 2), dtype=int)
 
@@ -74,7 +71,7 @@ def _get_cutout_limits(img_wcs, center_coord, cutout_size):
         # The case where the requested area is so small it rounds to zero
         if lims[axis, 0] == lims[axis, 1]:
             lims[axis, 0] = int(np.floor(center_pixel[axis] - 1))
-            lims[axis, 1] = lims[axis, 0] + 1 #int(np.ceil(center_pixel[axis] - 1))
+            lims[axis, 1] = lims[axis, 0] + 1
 
     return lims
 
@@ -173,7 +170,7 @@ def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, drop_after=No
     img_data = img_hdu.data
 
     if verbose:
-        print(f"Original image shape: {img_data.shape}")
+        print("Original image shape: {}".format(img_data.shape))
 
     # Get cutout limits
     cutout_lims = _get_cutout_limits(img_wcs, center_coord, cutout_size)
@@ -223,18 +220,19 @@ def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, drop_after=No
         print(cutout_wcs.__repr__())
 
     # Updating the header with the new wcs info
-    hdu_header.update(cutout_wcs.to_header(relax=True)) # relax arg is for sip distortions if they exist
+    hdu_header.update(cutout_wcs.to_header(relax=True))  # relax arg is for sip distortions if they exist
 
     # Naming the extension
     hdu_header["EXTNAME"] = "CUTOUT"
 
     # Moving the filename, if present, into the ORIG_FLE keyword
-    hdu_header["ORIG_FLE"] = (hdu_header.get("FILENAME"),"Original image filename.")
+    hdu_header["ORIG_FLE"] = (hdu_header.get("FILENAME"), "Original image filename.")
     hdu_header.remove("FILENAME", ignore_missing=True)
 
     hdu = fits.ImageHDU(header=hdu_header, data=img_cutout)
 
     return hdu
+
 
 def _save_single(cutout_hdus, output_path, center_coord):
     """
@@ -252,9 +250,9 @@ def _save_single(cutout_hdus, output_path, center_coord):
 
     # Setting up the Primary HDU
     primary_hdu = fits.PrimaryHDU()
-    primary_hdu.header.extend([("ORIGIN",'STScI/MAST',"institution responsible for creating this file"),
+    primary_hdu.header.extend([("ORIGIN", 'STScI/MAST', "institution responsible for creating this file"),
                                ("DATE", str(date.today()), "file creation date"),
-                               ('PROCVER',__version__, 'software version'),
+                               ('PROCVER', __version__, 'software version'),
                                ('RA_OBJ', center_coord.ra.deg, '[deg] right ascension'),
                                ('DEC_OBJ', center_coord.dec.deg, '[deg] declination')])
 
@@ -282,17 +280,17 @@ def _save_multiple(cutout_hdus, output_dir, filenames, center_coord):
         raise InvalidInputError("The number of filenames must match the number of cutouts.")
 
     # Adding aditional keywords
-    for i,cutout in enumerate(cutout_hdus):
+    for i, cutout in enumerate(cutout_hdus):
         # Turning our hdu into a primary hdu
         hdu = fits.PrimaryHDU(header=cutout.header, data=cutout.data)
-        hdu.header.extend([("ORIGIN",'STScI/MAST',"institution responsible for creating this file"),
+        hdu.header.extend([("ORIGIN", 'STScI/MAST', "institution responsible for creating this file"),
                            ("DATE", str(date.today()), "file creation date"),
-                           ('PROCVER',__version__, 'software version'),
+                           ('PROCVER', __version__, 'software version'),
                            ('RA_OBJ', center_coord.ra.deg, '[deg] right ascension'),
                            ('DEC_OBJ', center_coord.dec.deg, '[deg] declination')])
 
         cutout_hdulist = fits.HDUList([hdu])
-        cutout_hdulist.writeto(os.path.join(output_dir,filenames[i]), overwrite=True, checksum=True)    
+        cutout_hdulist.writeto(os.path.join(output_dir, filenames[i]), overwrite=True, checksum=True)    
 
         
 def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_after=None,
@@ -375,7 +373,7 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
     num_empty = 0
     for in_fle in input_files:
         if verbose:
-            print(f"\n{in_fle}")
+            print("\n{}".format(in_fle))
         hdulist = fits.open(in_fle)
         cutout = _hducut(hdulist[0], coordinates, cutout_size,
                          correct_wcs=correct_wcs, drop_after=drop_after, verbose=verbose)
@@ -386,7 +384,7 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
             cutout.header["EMPTY"] = (True, "Indicates no data in cutout image.")
             num_empty += 1
             
-        cutout_hdu_dict[in_fle] =  cutout
+        cutout_hdu_dict[in_fle] = cutout
 
     # If no cutouts contain data, raise exception
     if num_empty == len(input_files):
@@ -402,8 +400,8 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
         cutout_file = "{}_{:7f}_{:7f}_{}x{}_astrocut.fits".format(cutout_prefix,
                                                                   coordinates.ra.value,
                                                                   coordinates.dec.value,
-                                                                  cutout_size[0], # TODO: make cutout size
-                                                                  cutout_size[1]) # look nicer
+                                                                  cutout_size[0],  # TODO: make cutout size
+                                                                  cutout_size[1])  # look nicer
         
         cutout_hdus = [cutout_hdu_dict[fle] for fle in input_files]
 

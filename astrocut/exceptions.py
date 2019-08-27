@@ -13,12 +13,14 @@ class InvalidQueryError(Exception):
     """
     pass
 
+
 class InvalidInputError(Exception):
     """
     Exception to be issued when user input is incorrect in a 
     way that prevents the function from running.
     """
     pass
+
 
 class InputWarning(AstropyWarning):
     """
