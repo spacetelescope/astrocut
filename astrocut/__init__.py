@@ -24,3 +24,4 @@ if sys.version_info < tuple((int(val) for val in __minimum_python_version__.spli
 if not _ASTROPY_SETUP_:  # noqa
     from .make_cube import CubeFactory  # noqa
     from .cube_cut import CutoutFactory  # noqa
+    from .cutouts import fits_cut  # noqa

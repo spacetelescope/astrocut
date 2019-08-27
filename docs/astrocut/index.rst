@@ -8,18 +8,22 @@ Introduction
 Astrocut contains tools for creating image cutouts from sets images with
 shared footprints. This package is under active development, and will
 ultimately grow to encompass a range of cutout activities relevant to
-images from many missions, however at this time it is focused on the
-specific problem of creating image cutouts from sectors of TESS full
-frame images (FFIs).
+images from many missions. Currently there are two modes of interaction:
 
-There are two parts to this package, the `~astrocut.CubeFactory` class
-allows you to create a large image cube from a list of FFI files.
+    - Solving the specific problem of creating image cutouts from sectors of TESS full
+      frame images (FFIs) ( `~astrocut.CubeFactory` and `~astrocut.CutoutFactory`)
+    - More generalized cutouts from sets of images with the same WCS/pixel scale
+      (`~astrocut.fits_cut`)
+
+
+TESS Full-Frame Image Cutouts
+-----------------------------
+
+There are two parts of the package involved in this task, the `~astrocut.CubeFactory`
+class allows you to create a large image cube from a list of FFI files.
 This is what allows the cutout operation to be performed efficiently.
 The `~astrocut.CutoutFactory` class performs the actual cutout and builds
 a target pixel file (TPF) that is compatible with TESS pipeline TPFs.
-
-Getting Started
----------------
 
 The basic workflow is to first create an image cube from individual FFI files
 (this is one-time work), and then make individual cutout TPFs from this
@@ -128,7 +132,42 @@ TESS FFIs are large and therefore are described by WCS objects that have many no
 * **WCS_MSEP:** The maximum separation in degrees between the cutout's linear WCS and the FFI's full WCS.
 * **WCS_SIG:** The error in the cutout's linear WCS, calculated as sqrt((dist(Po_ij, Pl_ij)^2) where dist(Po_ij, Pl_ij) is the angular distance in degrees between the sky position of of pixel i,j in the original full WCS and the new linear WCS.
 
+General fits image cutouts (beta!)
+----------------------------------
 
+This function is a general purpose fits cutout tool.  It takes one or more fits files
+and performs the same cutout in each, returning the result either in a single fits file
+or as one fits file per cutout. It is important to remember that while the expectation is
+that all input image are aligned and have the same pixel scale, no checking is done.
+
+.. code-block:: python
+
+                >>> from astrocut import fits_cut
+                >>> from astropy.io import fits
+                >>> from astropy.coordinates import SkyCoord
+                >>> 
+                >>> input_files = ["https://archive.stsci.edu/pub/hlsp/candels/cosmos/cos-tot/v1.0/hlsp_candels_hst_acs_cos-tot-sect23_f606w_v1.0_drz.fits",
+                ...                "https://archive.stsci.edu/pub/hlsp/candels/cosmos/cos-tot/v1.0/hlsp_candels_hst_acs_cos-tot-sect23_f814w_v1.0_drz.fits"]
+
+                >>> center_coord = SkyCoord("150.0945 2.38681", unit='deg')
+                >>> cutout_size = [200,300]
+                >>> 
+                >>> cutout_file = fits_cut(input_files, center_coord, cutout_size, drop_after="", single_outfile=True)
+                >>> print(cutout_file)
+                cutout_150.094500_2.386810_200x300_astrocut.fits
+
+                >>> cutout_hdulist = fits.open(cutout_file)
+                >>> cutout_hdulist.info()
+                Filename: cutout_150.094500_2.386810_200x300_astrocut.fits
+                No.    Name      Ver    Type      Cards   Dimensions   Format
+                  0  PRIMARY       1 PrimaryHDU      11   ()      
+                  1  CUTOUT        1 ImageHDU        44   (200, 300)   float32   
+                  2  CUTOUT        1 ImageHDU        44   (200, 300)   float32    
+
+
+\* This is the newest functionality and as such should be considered to be in beta. It has been tested primarily on Hubble deep field drizzled images. We welcome issues and pull-requests to make it more widely functional.
+
+  
 .. automodapi:: astrocut
     :skip: test
     :skip: UnsupportedPythonError

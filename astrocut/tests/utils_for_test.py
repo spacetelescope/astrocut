@@ -1,11 +1,11 @@
 import numpy as np
 
-from astropy.io import fits
+from astropy.io import fits    
 
 
 def add_keywords(hdu, extname, time_increment, primary=False):
     """
-    Add a bunch of required keywords (mostly fake values)
+    Add a bunch of required keywords (mostly fake values).
     """
     
     hdu.header['extname'] = 'CAMERA.CCD 1.1 cal'
@@ -62,8 +62,7 @@ def create_test_ffis(img_size, num_images, basename='make_cube-test{:04d}.fits')
     Create test fits files
 
     Write negative values for data array and positive values for error array,
-    with unique values for all the pixels. The header keywords are just
-    populated to make things run but are not tested.
+    with unique values for all the pixels. 
     """
 
     img = np.arange(img_size*img_size, dtype=np.float32).reshape((img_size, img_size))
@@ -75,8 +74,7 @@ def create_test_ffis(img_size, num_images, basename='make_cube-test{:04d}.fits')
 
         primary_hdu = fits.PrimaryHDU()
         add_keywords(primary_hdu, "PRIMARY", i, primary=True)
-        
-        
+           
         hdu = fits.ImageHDU(-img)
         add_keywords(hdu, 'CAMERA.CCD 1.1 cal', i)
         
@@ -84,6 +82,66 @@ def create_test_ffis(img_size, num_images, basename='make_cube-test{:04d}.fits')
         add_keywords(ehdu, 'CAMERA.CCD 1.1 uncert', i)
         
         hdulist = fits.HDUList([primary_hdu, hdu, ehdu])
+        hdulist.writeto(file_list[-1], overwrite=True, checksum=True)
+        
+        img = img + img_size*img_size
+
+    return file_list
+
+
+def add_wcs_nosip_keywords(hdu, img_size):
+    """
+    Adds example wcs keywords without sip distortions to the given header.
+
+    Center coordinate is: 150.1163213, 2.200973097
+    """
+
+    hdu.header.extend([('WCSAXES', 2, 'Number of coordinate axes'),
+                       ('CRPIX1', img_size/2, 'Pixel coordinate of reference point'),
+                       ('CRPIX2', img_size/2, 'Pixel coordinate of reference point'),
+                       ('PC1_1', -1.666667e-05, 'Coordinate transformation matrix element'),
+                       ('PC2_2', 1.666667e-05, 'Coordinate transformation matrix element'),
+                       ('CDELT1', 1.0, '[deg] Coordinate increment at reference point'),
+                       ('CDELT2', 1.0, '[deg] Coordinate increment at reference point'),
+                       ('CUNIT1', 'deg', 'Units of coordinate increment and value'),
+                       ('CUNIT2', 'deg', 'Units of coordinate increment and value'),
+                       ('CTYPE1', 'RA---TAN', 'Right ascension, gnomonic projection'),
+                       ('CTYPE2', 'DEC--TAN', 'Declination, gnomonic projection'),
+                       ('CRVAL1', 150.1163213, '[deg] Coordinate value at reference point'),
+                       ('CRVAL2', 2.200973097, '[deg] Coordinate value at reference point')])
+
+    
+def add_dummy_keywords(hdu):
+    """
+    Adding a number of dummy keywords, basically so the drop_after argument to fits_cut can be tested.
+    """
+    hdu.header.extend([('Dummy1', "Dummy1", 'Dummy1'),
+                       ('Dummy2', 2, 'Dummy2'),
+                       ('Dummy3', "", 'Dummy3')], strip=False)
+    
+
+def create_test_imgs(img_size, num_images, dummy_keywords=True, basename='img_{:04d}.fits'):
+    """
+    Create test fits image files, single extension.
+
+    Write unique values for all the pixels. 
+    The header keywords are populated with a simple WCS for testing.
+    """
+
+    img = np.arange(img_size*img_size, dtype=np.float32).reshape((img_size, img_size))
+    file_list = []
+    
+    for i in range(num_images):
+        
+        file_list.append(basename.format(i))
+
+        primary_hdu = fits.PrimaryHDU(data=img)
+        add_wcs_nosip_keywords(primary_hdu, img_size)
+
+        if dummy_keywords:
+            add_dummy_keywords(primary_hdu)
+        
+        hdulist = fits.HDUList([primary_hdu])
         hdulist.writeto(file_list[-1], overwrite=True, checksum=True)
         
         img = img + img_size*img_size

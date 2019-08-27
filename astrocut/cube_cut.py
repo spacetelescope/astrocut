@@ -277,7 +277,8 @@ class CutoutFactory():
 
         # Getting the fit WCS
         linear_wcs = fit_wcs_from_points(pix_inds[:, 0], pix_inds[:, 1], world_pix, mode='wcs',
-                                         proj_point=[self.center_coord.data.lon.value, self.center_coord.data.lat.value])
+                                         proj_point=[self.center_coord.data.lon.value,
+                                                     self.center_coord.data.lat.value])
 
         self.cutout_wcs = linear_wcs
 
