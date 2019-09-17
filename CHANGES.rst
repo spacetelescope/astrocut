@@ -1,6 +1,7 @@
 0.5 (unreleased)
 ----------------
 - Adding fits_cut function [#17]
+- Doc update (explain time column) [#19]
 
 0.4 (2019-06-21)
 ----------------

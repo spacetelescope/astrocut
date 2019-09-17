@@ -122,7 +122,8 @@ be saved, if unspecified it defaults to the current directory.
                 1  PIXELS        1 BinTableHDU    222   144R x 12C   [D, E, J, 25J, 25E, 25E, 25E, 25E, J, E, E, 38A]   
                 2  APERTURE      1 ImageHDU        45   (5, 5)   float64  
 
-
+**Note:** The 'TIME' column of the cutout table is formed by taking the average of the TSTART, TSTOP values from the corresponding FFI for each row.
+   
 A note about the cutout WCS object
 """"""""""""""""""""""""""""""""""
 
