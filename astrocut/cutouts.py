@@ -9,6 +9,10 @@ import astropy.units as u
 from astropy.io import fits
 from astropy.coordinates import SkyCoord
 from astropy import wcs
+from astropy.visualization import (SqrtStretch, LogStretch, AsinhStretch, SinhStretch, LinearStretch,
+                                   MinMaxInterval, ManualInterval, AsymmetricPercentileInterval)
+
+from PIL import Image
 
 from time import time
 from datetime import date
@@ -217,8 +221,8 @@ def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, drop_after=No
     # Getting the cutout wcs
     cutout_wcs = _get_cutout_wcs(img_wcs, cutout_lims)
 
-    if verbose:
-        print(cutout_wcs.__repr__())
+    #if verbose:
+    #    print(cutout_wcs.__repr__())
 
     # Updating the header with the new wcs info
     hdu_header.update(cutout_wcs.to_header(relax=True))  # relax arg is for sip distortions if they exist
@@ -235,7 +239,7 @@ def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, drop_after=No
     return hdu
 
 
-def _save_single(cutout_hdus, output_path, center_coord):
+def _save_single_fits(cutout_hdus, output_path, center_coord):
     """
     Save a list of cutout hdus to a single fits file.
 
@@ -261,7 +265,7 @@ def _save_single(cutout_hdus, output_path, center_coord):
     cutout_hdulist.writeto(output_path, overwrite=True, checksum=True)
 
 
-def _save_multiple(cutout_hdus, output_dir, filenames, center_coord):
+def _save_multiple_fits(cutout_hdus, output_paths, center_coord):
     """
     Save a list of cutout hdus to individual fits files.
 
@@ -269,15 +273,13 @@ def _save_multiple(cutout_hdus, output_dir, filenames, center_coord):
     ----------
     cutout_hdus : list
         List of `~astropy.io.fits.hdu.image.ImageHDU` objects to be written to a single fits file.
-    output_dir : str
-        The path to the directory where the fits files will be written.
-    filenames : list
-        The filename associated with the cutout hdus.
+    output_paths : list
+        The cutout filepaths associated with the cutout hdus.
     center_coord : `~astropy.coordinates.sky_coordinate.SkyCoord`
         The center coordinate of the image cutouts.
     """
 
-    if len(filenames) != len(cutout_hdus):
+    if len(output_paths) != len(cutout_hdus):
         raise InvalidInputError("The number of filenames must match the number of cutouts.")
 
     # Adding aditional keywords
@@ -291,7 +293,30 @@ def _save_multiple(cutout_hdus, output_dir, filenames, center_coord):
                            ('DEC_OBJ', center_coord.dec.deg, '[deg] declination')])
 
         cutout_hdulist = fits.HDUList([hdu])
-        cutout_hdulist.writeto(os.path.join(output_dir, filenames[i]), overwrite=True, checksum=True)    
+        cutout_hdulist.writeto(output_paths[i], overwrite=True, checksum=True)
+
+
+def _save_jpg():
+    pass
+    
+def _parse_size_input(cutout_size):
+
+    # Making size into an array [ny, nx]
+    if np.isscalar(cutout_size):
+        cutout_size = np.repeat(cutout_size, 2)
+
+    if isinstance(cutout_size, u.Quantity):
+        cutout_size = np.atleast_1d(cutout_size)
+        if len(cutout_size) == 1:
+            cutout_size = np.repeat(cutout_size, 2)
+
+    if len(cutout_size) > 2:
+        warnings.warn("Too many dimensions in cutout size, only the first two will be used.",
+                      InputWarning)
+        cutout_size = cutout_size[:2]
+
+    return cutout_size
+
 
         
 def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_after=None,
@@ -342,8 +367,8 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
     Returns
     -------
     response : str or list
-        If single_outfile is True returns the single output filename. Otherwise returns a list of all 
-        the output files.
+        If single_outfile is True returns the single output filepath. Otherwise returns a list of all 
+        the output filepaths.
     """
 
     if verbose:
@@ -351,7 +376,7 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
             
     # Making sure we have an array of images
     if type(input_files) == str:
-        input_files == [input_files]
+        input_files = [input_files]
 
     if not isinstance(coordinates, SkyCoord):
         coordinates = SkyCoord(coordinates, unit='deg')
@@ -398,19 +423,20 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
     # Setting up the output file(s) and writing them
     if single_outfile:
 
-        cutout_file = "{}_{:7f}_{:7f}_{}x{}_astrocut.fits".format(cutout_prefix,
+        cutout_path = "{}_{:7f}_{:7f}_{}x{}_astrocut.fits".format(cutout_prefix,
                                                                   coordinates.ra.value,
                                                                   coordinates.dec.value,
                                                                   cutout_size[0],  # TODO: make cutout size
                                                                   cutout_size[1])  # look nicer
+        cutout_path = os.path.join(output_dir, cutout_path)
         
         cutout_hdus = [cutout_hdu_dict[fle] for fle in input_files]
 
-        _save_single(cutout_hdus, os.path.join(output_dir, cutout_file), coordinates)
+        _save_single_fits(cutout_hdus, cutout_path, coordinates)
 
     else:
         cutout_hdus = []
-        cutout_file = []
+        cutout_path = []
         for fle in input_files:
             cutout = cutout_hdu_dict[fle]
             if cutout.header.get("EMPTY"):
@@ -419,17 +445,219 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
 
             cutout_hdus.append(cutout)
 
-            cutout_file.append("{}_{:7f}_{:7f}_{}x{}_astrocut.fits".format(fle.rstrip('.fits'),
-                                                                           coordinates.ra.value,
-                                                                           coordinates.dec.value,
-                                                                           cutout.header["NAXIS1"],
-                                                                           cutout.header["NAXIS2"]))
+            filename = "{}_{:7f}_{:7f}_{}x{}_astrocut.fits".format(os.path.basename(fle).rstrip('.fits'),
+                                                                   coordinates.ra.value,
+                                                                   coordinates.dec.value,
+                                                                   cutout.header["NAXIS1"],
+                                                                   cutout.header["NAXIS2"])
+            cutout_path.append(os.path.join(output_dir, filename))
                 
-        _save_multiple(cutout_hdus, output_dir, cutout_file, coordinates)
+        _save_multiple_fits(cutout_hdus, cutout_path, coordinates)
 
         
     if verbose:
-        print("Cutout fits file(s): {}".format(cutout_file))
+        print("Cutout fits file(s): {}".format(cutout_path))
         print("Total time: {:.2} sec".format(time()-start_time))
 
-    return cutout_file
+    return cutout_path
+
+
+def normalize_img(img_arr, stretch='asinh', minmax_percent=None, minmax_cut=None, invert=False):
+    """
+    Apply given stretch and scaling to the image array.
+    """
+
+    # Check for a valid stretch
+    if not stretch.lower() in ('asinh', 'sinh', 'sqrt', 'log', 'linear'):
+        raise InvalidQueryError("Stretch {} is not supported!".format(stretch))
+
+    # Check the scaling
+    if (minmax_percent is not None) and (minmax_cut is not None):
+        warnings.warn("Both scale and max_min are set, max_min will be ignored.",
+                      InputWarning)
+
+    # Setting up the transform with the scaling
+    if minmax_percent:
+        transform = AsymmetricPercentileInterval(*minmax_percent)
+    elif minmax_val:
+        transform = ManualInterval(*minmax_cut)
+    else: # Default, scale the entire image range to [0,1]
+        transform = MinMaxInterval()
+        
+    # Adding the stretch to the transform
+    if stretch == 'asinh':
+        transform += AsinhStretch()
+    elif stretch == 'sinh':
+        transform += SinhStretch()
+    elif stretch == 'sqrt':
+        transform += SqrtStretch()
+    elif stretch == 'log':
+        transform += LogStretch()
+    elif stretch == 'linear':
+        transform += LinearStretch()
+   
+    # Performing the transform and then putting it into the integer range 0-255
+    norm_img = transform(img_arr)
+    norm_img = np.multiply(255, norm_img, out=norm_img)
+    norm_img = norm_img.astype(np.uint8)
+
+    # Applying invert if requested
+    if invert:
+        norm_img = 255 - norm_img
+
+    return norm_img
+        
+
+def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_percent=None,
+            minmax_cut=None, invert=False, img_format='jpg', colorize=False,
+            cutout_prefix="cutout", output_dir='.', drop_after=None, verbose=False):
+    """
+    Takes one or more fits files with the same WCS/pointing, makes the same cutout in each file,
+    and returns the result either as a single color image or in individual image files.
+
+    Note: No checking is done on either the WCS pointing or pixel scale. If images don't line up
+          the cutouts will also not line up.
+
+    Parameters
+    ----------
+    input_files : list
+        List of fits image files to cutout from. The image is assumed to be in the first extension.
+    coordinates : str or `~astropy.coordinates.SkyCoord` object
+        The position around which to cutout. It may be specified as a string ("ra dec" in degrees) 
+        or as the appropriate `~astropy.coordinates.SkyCoord` object.
+    cutout_size : int, array-like, `~astropy.units.Quantity`
+        The size of the cutout array. If ``cutout_size`` is a scalar number or a scalar 
+        `~astropy.units.Quantity`, then a square cutout of ``cutout_size`` will be created.  
+        If ``cutout_size`` has two elements, they should be in ``(ny, nx)`` order.  Scalar numbers 
+        in ``cutout_size`` are assumed to be in units of pixels. `~astropy.units.Quantity` objects 
+        must be in pixel or angular units.
+    TODO: DOCUMENT the other arguments
+    cutout_prefix : str 
+        Default value "cutout". Only used when producing a color image. A prefix to prepend to the 
+        cutout filename. 
+    output_dir : str
+        Defaul value '.'. The directory to save the cutout file(s) to.
+    verbose : bool
+        Default False. If true intermediate information is printed.
+
+    Returns
+    -------
+    response : str or list
+        If single_outfile is True returns the single output filepath. Otherwise returns a list of all 
+        the output filepaths.
+    """
+
+
+    if verbose:
+        start_time = time()
+            
+    # Making sure we have an array of images
+    if type(input_files) == str:
+        input_files = [input_files]
+    
+    # Doing image checks for color images
+    if colorize:
+        if len(input_files) < 3:
+            raise InvalidQueryError("Color cutouts require 3 imput files (RGB).")
+        if len(input_files) > 3:
+            warnings.warn("Too many inputs for a color cutout, only the first three will be used.",
+                          InputWarning)
+            input_files = input_files[:3]
+            
+    if not isinstance(coordinates, SkyCoord):
+        coordinates = SkyCoord(coordinates, unit='deg')
+
+    # Turning the cutout size into a 2 member array
+    cutout_size = _parse_size_input(cutout_size)
+
+    # Applying the default scaling
+    if (minmax_percent is None) and (minmax_cut is None):
+        minmax_percent=[0.5,99.5]
+        
+    # Making the cutouts
+    cutout_hdu_dict = {}
+    for in_fle in input_files:
+        if verbose:
+            print("\n{}".format(in_fle))
+        hdulist = fits.open(in_fle)
+        cutout = _hducut(hdulist[0], coordinates, cutout_size, correct_wcs=False, drop_after=drop_after, verbose=verbose)
+        hdulist.close()
+
+        # We just want the data array
+        cutout = cutout.data
+        
+        # Applying the appropriate normalization parameters
+        # TODO: what happens if this routine gets all nans?
+        normalized_cutout = normalize_img(cutout, stretch, minmax_percent, minmax_cut, invert)
+        
+        # Check that there is data in the cutout image
+        if not (cutout == 0).all():
+            cutout_hdu_dict[in_fle] = normalized_cutout
+
+    # If no cutouts contain data, raise exception
+    if not cutout_hdu_dict:
+        raise InvalidQueryError("Cutout contains to data! (Check image footprint.)")
+
+    # Make sure the output directory exists
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+        
+    # Setting up the output file(s) and writing them
+    if colorize:
+
+        cutout_path = "{}_{:7f}_{:7f}_{}x{}_astrocut.{}".format(cutout_prefix,
+                                                                coordinates.ra.value,
+                                                                coordinates.dec.value,
+                                                                cutout_size[0],  # TODO: make cutout size
+                                                                cutout_size[1],
+                                                                img_format.lower())  # look nicer
+        cutout_path = os.path.join(output_dir, cutout_path)
+
+        # TODO: This is not elegant or efficient, make it better
+        red = cutout_hdu_dict.get(input_files[0])
+        green = cutout_hdu_dict.get(input_files[1])
+        blue = cutout_hdu_dict.get(input_files[2])
+
+        cshape = ()
+        for cutout in [red, green,blue]:
+            if cutout is not None:
+                cshape = cutout.shape
+                break
+
+        if red is None:
+            red = np.zeros(cshape)
+        if green is None:
+            green = np.zeros(cshape)
+        if blue is None:
+            blue = np.zeros(cshape)
+
+        Image.fromarray(np.dstack([red,green,blue]).astype(np.uint8)).save(cutout_path)
+          
+    else:
+ 
+        cutout_path = []
+        for fle in input_files:
+            cutout = cutout_hdu_dict.get(fle)
+            if cutout is None:
+                warnings.warn("Cutout of {} contains to data and will not be written.".format(fle))
+                continue
+
+            file_path = "{}_{:7f}_{:7f}_{}x{}_astrocut.{}".format(os.path.basename(fle).rstrip('.fits'),
+                                                                  coordinates.ra.value,
+                                                                  coordinates.dec.value,
+                                                                  cutout_size[0],  # TODO: make cutout size
+                                                                  cutout_size[1],
+                                                                  img_format.lower())
+            file_path = os.path.join(output_dir, file_path)
+            cutout_path.append(file_path)
+            
+            Image.fromarray(cutout).save(file_path)
+        
+    if verbose:
+        print("Cutout fits file(s): {}".format(cutout_path))
+        print("Total time: {:.2} sec".format(time()-start_time))
+
+    return cutout_path
+    
+    
+    
