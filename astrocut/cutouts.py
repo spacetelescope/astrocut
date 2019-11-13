@@ -295,9 +295,6 @@ def _save_multiple_fits(cutout_hdus, output_paths, center_coord):
         cutout_hdulist = fits.HDUList([hdu])
         cutout_hdulist.writeto(output_paths[i], overwrite=True, checksum=True)
 
-
-def _save_jpg():
-    pass
     
 def _parse_size_input(cutout_size):
 
@@ -469,7 +466,7 @@ def normalize_img(img_arr, stretch='asinh', minmax_percent=None, minmax_cut=None
 
     # Check for a valid stretch
     if not stretch.lower() in ('asinh', 'sinh', 'sqrt', 'log', 'linear'):
-        raise InvalidQueryError("Stretch {} is not supported!".format(stretch))
+        raise InvalidInputError("Stretch {} is not supported!".format(stretch))
 
     # Check the scaling
     if (minmax_percent is not None) and (minmax_cut is not None):
@@ -479,7 +476,7 @@ def normalize_img(img_arr, stretch='asinh', minmax_percent=None, minmax_cut=None
     # Setting up the transform with the scaling
     if minmax_percent:
         transform = AsymmetricPercentileInterval(*minmax_percent)
-    elif minmax_val:
+    elif minmax_cut:
         transform = ManualInterval(*minmax_cut)
     else: # Default, scale the entire image range to [0,1]
         transform = MinMaxInterval()
@@ -558,7 +555,7 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
     # Doing image checks for color images
     if colorize:
         if len(input_files) < 3:
-            raise InvalidQueryError("Color cutouts require 3 imput files (RGB).")
+            raise InvalidInputError("Color cutouts require 3 imput files (RGB).")
         if len(input_files) > 3:
             warnings.warn("Too many inputs for a color cutout, only the first three will be used.",
                           InputWarning)
