@@ -297,6 +297,23 @@ def _save_multiple_fits(cutout_hdus, output_paths, center_coord):
 
     
 def _parse_size_input(cutout_size):
+    """
+    Makes the given cutout size into a length 2 array.
+
+    Parameters
+    ----------
+    cutout_size : int, array-like, `~astropy.units.Quantity`
+        The size of the cutout array. If ``cutout_size`` is a scalar number or a scalar 
+        `~astropy.units.Quantity`, then a square cutout of ``cutout_size`` will be created.  
+        If ``cutout_size`` has two elements, they should be in ``(ny, nx)`` order.  Scalar numbers 
+        in ``cutout_size`` are assumed to be in units of pixels. `~astropy.units.Quantity` objects 
+        must be in pixel or angular units.
+
+    Returns
+    -------
+    response : array
+        Length two cutout size array, in the form [ny, nx].
+    """
 
     # Making size into an array [ny, nx]
     if np.isscalar(cutout_size):
@@ -324,7 +341,7 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
     individual fits files.
 
     Note: No checking is done on either the WCS pointing or pixel scale. If images don't line up
-          the cutouts will also not line up.
+    the cutouts will also not line up.
 
     Parameters
     ----------
@@ -378,18 +395,8 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
     if not isinstance(coordinates, SkyCoord):
         coordinates = SkyCoord(coordinates, unit='deg')
 
-    # Making size into an array [ny, nx]
-    if np.isscalar(cutout_size):
-        cutout_size = np.repeat(cutout_size, 2)
-
-    if isinstance(cutout_size, u.Quantity):
-        cutout_size = np.atleast_1d(cutout_size)
-        if len(cutout_size) == 1:
-            cutout_size = np.repeat(cutout_size, 2)
-
-    if len(cutout_size) > 2:
-        warnings.warn("Too many dimensions in cutout size, only the first two will be used.",
-                      InputWarning)
+    # Turning the cutout size into a 2 member array
+    cutout_size = _parse_size_input(cutout_size)
 
     # Making the cutouts
     cutout_hdu_dict = {}
@@ -461,7 +468,32 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
 
 def normalize_img(img_arr, stretch='asinh', minmax_percent=None, minmax_cut=None, invert=False):
     """
-    Apply given stretch and scaling to the image array.
+    Apply given stretch and scaling to an image array.
+
+    Parameters
+    ----------
+    img_arr : array
+        The input image array.
+    stretch : str
+        Optional, default 'asinh'. The stretch to apply to the image array.
+        Valid values are: asinh, sinh, sqrt, log, linear
+    minmax_percent : array
+        Optional. Interval based on a keeping a specified fraction of pixels (can be asymmetric) 
+        when scaling the image. The format is [lower percentile, upper percentile], where pixel
+        values below the lower percentile and above the upper percentile are clipped.
+        Only one of minmax_percent and minmax_cut shoul be specified.
+    minmax_cut : array
+        Optional. Interval based on user-specified pixel values when scaling the image.
+        The format is [min value, max value], where pixel values below the min value and above
+        the max value are clipped.
+        Only one of minmax_percent and minmax_cut shoul be specified.
+    invert : bool
+        Optional, default False.  If True the image is inverted (light pixels become dark and vice versa).
+
+    Returns
+    -------
+    response : array
+        The normalized image array, in the form in an integer arrays with values in the range 0-255.
     """
 
     # Check for a valid stretch
@@ -513,7 +545,7 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
     and returns the result either as a single color image or in individual image files.
 
     Note: No checking is done on either the WCS pointing or pixel scale. If images don't line up
-          the cutouts will also not line up.
+    the cutouts will also not line up.
 
     Parameters
     ----------
@@ -528,7 +560,26 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
         If ``cutout_size`` has two elements, they should be in ``(ny, nx)`` order.  Scalar numbers 
         in ``cutout_size`` are assumed to be in units of pixels. `~astropy.units.Quantity` objects 
         must be in pixel or angular units.
-    TODO: DOCUMENT the other arguments
+    stretch : str
+        Optional, default 'asinh'. The stretch to apply to the image array.
+        Valid values are: asinh, sinh, sqrt, log, linear
+    minmax_percent : array
+        Optional, default [0.5,99.5]. Interval based on a keeping a specified fraction of pixels 
+        (can be asymmetric) when scaling the image. The format is [lower percentile, upper percentile], 
+        where pixel values below the lower percentile and above the upper percentile are clipped.
+        Only one of minmax_percent and minmax_cut shoul be specified.
+    minmax_cut : array
+        Optional. Interval based on user-specified pixel values when scaling the image.
+        The format is [min value, max value], where pixel values below the min value and above
+        the max value are clipped.
+        Only one of minmax_percent and minmax_cut shoul be specified.
+    invert : bool
+        Optional, default False.  If True the image is inverted (light pixels become dark and vice versa).
+    img_format : str
+        Optional, default 'jpg'. The output image file type. Valid values are "jpg" and "png".
+    colorize : bool
+        Optional, default False.  If True a single color image is produced as output, and it is expected
+        that three files are given as input.
     cutout_prefix : str 
         Default value "cutout". Only used when producing a color image. A prefix to prepend to the 
         cutout filename. 
@@ -540,7 +591,7 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
     Returns
     -------
     response : str or list
-        If single_outfile is True returns the single output filepath. Otherwise returns a list of all 
+        If colorize is True returns the single output filepath. Otherwise returns a list of all 
         the output filepaths.
     """
 
