@@ -159,7 +159,7 @@ aligned and have the same pixel scale, no checking is done.
                 
                 >>> cutout_file = fits_cut(input_files, center_coord, cutout_size, drop_after="", single_outfile=True)  
                 >>> print(cutout_file)  
-                cutout_150.094500_2.386810_200x300_astrocut.fits
+                ./cutout_150.094500_2.386810_200x300_astrocut.fits
 
                 >>> cutout_hdulist = fits.open(cutout_file)  
                 >>> cutout_hdulist.info()  

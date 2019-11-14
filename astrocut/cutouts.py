@@ -221,9 +221,6 @@ def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, drop_after=No
     # Getting the cutout wcs
     cutout_wcs = _get_cutout_wcs(img_wcs, cutout_lims)
 
-    #if verbose:
-    #    print(cutout_wcs.__repr__())
-
     # Updating the header with the new wcs info
     hdu_header.update(cutout_wcs.to_header(relax=True))  # relax arg is for sip distortions if they exist
 
@@ -510,7 +507,7 @@ def normalize_img(img_arr, stretch='asinh', minmax_percent=None, minmax_cut=None
         transform = AsymmetricPercentileInterval(*minmax_percent)
     elif minmax_cut:
         transform = ManualInterval(*minmax_cut)
-    else: # Default, scale the entire image range to [0,1]
+    else:  # Default, scale the entire image range to [0,1]
         transform = MinMaxInterval()
         
     # Adding the stretch to the transform
@@ -620,7 +617,7 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
 
     # Applying the default scaling
     if (minmax_percent is None) and (minmax_cut is None):
-        minmax_percent=[0.5,99.5]
+        minmax_percent = [0.5, 99.5]
         
     # Making the cutouts
     cutout_hdu_dict = {}
@@ -628,14 +625,14 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
         if verbose:
             print("\n{}".format(in_fle))
         hdulist = fits.open(in_fle)
-        cutout = _hducut(hdulist[0], coordinates, cutout_size, correct_wcs=False, drop_after=drop_after, verbose=verbose)
+        cutout = _hducut(hdulist[0], coordinates, cutout_size,
+                         correct_wcs=False, drop_after=drop_after, verbose=verbose)
         hdulist.close()
 
         # We just want the data array
         cutout = cutout.data
         
         # Applying the appropriate normalization parameters
-        # TODO: what happens if this routine gets all nans?
         normalized_cutout = normalize_img(cutout, stretch, minmax_percent, minmax_cut, invert)
         
         # Check that there is data in the cutout image
@@ -667,7 +664,7 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
         blue = cutout_hdu_dict.get(input_files[2])
 
         cshape = ()
-        for cutout in [red, green,blue]:
+        for cutout in [red, green, blue]:
             if cutout is not None:
                 cshape = cutout.shape
                 break
@@ -679,7 +676,7 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
         if blue is None:
             blue = np.zeros(cshape)
 
-        Image.fromarray(np.dstack([red,green,blue]).astype(np.uint8)).save(cutout_path)
+        Image.fromarray(np.dstack([red, green, blue]).astype(np.uint8)).save(cutout_path)
           
     else:
  
