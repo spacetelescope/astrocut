@@ -262,7 +262,7 @@ def test_img_cut(tmpdir):
     norm_img = cutouts.normalize_img(raw_img, stretch='asinh', minmax_percent=[0.7, 99.3])
     with pytest.warns(InputWarning):
         img_files = cutouts.img_cut(test_images[0], center_coord, cutout_size,
-                                     minmax_percent=[0.7, 99.3], minmax_cut=[5, 2000], img_format='png')
+                                    minmax_percent=[0.7, 99.3], minmax_cut=[5, 2000], img_format='png')
     assert (img_arr == norm_img).all()
 
     # Color image
