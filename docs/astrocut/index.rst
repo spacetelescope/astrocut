@@ -163,7 +163,7 @@ aligned and have the same pixel scale, no checking is done.
 
                 >>> cutout_hdulist = fits.open(cutout_file)  
                 >>> cutout_hdulist.info()  
-                Filename: cutout_150.094500_2.386810_200x300_astrocut.fits
+                Filename: ./cutout_150.094500_2.386810_200x300_astrocut.fits
                 No.    Name      Ver    Type      Cards   Dimensions   Format
                   0  PRIMARY       1 PrimaryHDU      11   ()      
                   1  CUTOUT        1 ImageHDU        44   (200, 300)   float32   
@@ -191,7 +191,7 @@ aligned and have the same pixel scale, no checking is done.
                 >>> print(png_files[0])  
                 ./hlsp_candels_hst_acs_cos-tot-sect23_f606w_v1.0_drz_150.094500_2.386810_200x300_astrocut.png
 
-                >>> Image.open(png_files[1])
+                >>> Image.open(png_files[1]) #doctest: +SKIP
                 
 .. image:: imgs/png_ex_cutout.png
 
@@ -215,7 +215,7 @@ treated as the R, G, and B channels respectively.
                 >>> print(color_image)  
                 ./cutout_189.515220_62.286522_200x300_astrocut.jpg
                 
-                >>> Image.open(color_image)
+                >>> Image.open(color_image) #doctest: +SKIP
                 
 .. image:: imgs/color_ex_cutout.png
            
