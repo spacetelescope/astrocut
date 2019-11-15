@@ -47,7 +47,7 @@ limitation:
 This operation can also take some time to run. For the 1348 FFI images of the TESS ete-6
 simulated sector, it takes about 12 minutes to run on a computer with 65 GB of memory.
 
-By default ``make_cube`` runs in verbose mode and prints out it's progress, however setting
+By default ``make_cube`` runs in verbose mode and prints out its progress, however setting
 verbose to false will silence all output.
 
 .. code-block:: python

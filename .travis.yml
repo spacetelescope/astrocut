@@ -100,11 +100,11 @@ matrix:
         # time.
 
         - os: linux
-          env: PYTHON_VERSION=3.5 NUMPY_VERSION=1.12 ASTROPY_VERSION=3.0
+          env: PYTHON_VERSION=3.5 NUMPY_VERSION=1.13 ASTROPY_VERSION=3.0
         - os: linux
-          env: PYTHON_VERSION=3.6 NUMPY_VERSION=1.13
+          env: PYTHON_VERSION=3.6 NUMPY_VERSION=1.15
         - os: linux
-          env: NUMPY_VERSION=1.14
+          env: NUMPY_VERSION=1.16
 
         # Try numpy pre-release
         - os: linux
