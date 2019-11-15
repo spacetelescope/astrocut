@@ -2,6 +2,7 @@
 ----------------
 - Adding fits_cut function [#17]
 - Doc update (explain time column) [#19]
+- Adding img_cut and normalize_img [#21]
 
 0.4 (2019-06-21)
 ----------------

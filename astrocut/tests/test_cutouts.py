@@ -1,12 +1,17 @@
+import pytest
+
 import numpy as np
 
 from astropy.io import fits
 from astropy import wcs
 from astropy.coordinates import SkyCoord
-import astropy.units as u
+from astropy import units as u
+
+from PIL import Image
 
 from .utils_for_test import create_test_imgs
 from .. import cutouts
+from ..exceptions import InputWarning, InvalidInputError
 
 
 def test_get_cutout_limits():
@@ -153,6 +158,14 @@ def test_fits_cut(tmpdir):
 
     cutout_hdulist.close()
 
+    # Specify the output directory
+    cutout_files = cutouts.fits_cut(test_images, center_coord, cutout_size,
+                                    output_dir="cutout_files", single_outfile=False)
+
+    assert isinstance(cutout_files, list)
+    assert len(cutout_files) == len(test_images)
+    assert "cutout_files" in cutout_files[0] 
+    
     # Do an off the edge test
     center_coord = SkyCoord("150.1163213 2.2005731", unit='deg')
     cutout_file = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=True)
@@ -193,3 +206,78 @@ def test_fits_cut(tmpdir):
     cutout_files = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=False)
     assert isinstance(cutout_files, list)
     assert len(cutout_files) == len(test_images) - 2
+
+
+def test_img_cut(tmpdir):
+
+    test_images = create_test_imgs(50, 6)
+    center_coord = SkyCoord("150.1163213 2.200973097", unit='deg')
+    cutout_size = 10
+
+    # Basic jpg image
+    jpg_files = cutouts.img_cut(test_images, center_coord, cutout_size)
+    
+    assert len(jpg_files) == len(test_images)
+    with open(jpg_files[0], 'rb') as IMGFLE:
+        assert IMGFLE.read(3) == b'\xFF\xD8\xFF'  # JPG
+
+    # Png (single input file, not as list)
+    img_files = cutouts.img_cut(test_images[0], center_coord, cutout_size, img_format='png')
+    with open(img_files[0], 'rb') as IMGFLE:
+        assert IMGFLE.read(8) == b'\x89\x50\x4E\x47\x0D\x0A\x1A\x0A'  # PNG
+
+    # Testing the different scaling parameters
+    raw_hdu = fits.open(test_images[0])[0]
+    raw_img = cutouts._hducut(raw_hdu, center_coord, cutouts._parse_size_input(cutout_size)).data
+
+    norm_img = cutouts.normalize_img(raw_img, stretch='sinh', minmax_percent=[0.5, 99.5])
+    img_files = cutouts.img_cut(test_images[0], center_coord, cutout_size,
+                                stretch='sinh', img_format='png')
+    img_arr = np.array(Image.open(img_files[0]))
+    assert (img_arr == norm_img).all()
+
+    norm_img = cutouts.normalize_img(raw_img, stretch='sqrt', minmax_percent=[5, 95])
+    img_files = cutouts.img_cut(test_images[0], center_coord, cutout_size,
+                                stretch='sqrt', minmax_percent=[5, 95], img_format='png')
+    img_arr = np.array(Image.open(img_files[0]))
+    assert (img_arr == norm_img).all()
+
+    norm_img = cutouts.normalize_img(raw_img, stretch='log', minmax_cut=[5, 2000])
+    img_files = cutouts.img_cut(test_images[0], center_coord, cutout_size,
+                                stretch='log', minmax_cut=[5, 2000], img_format='png')
+    img_arr = np.array(Image.open(img_files[0]))
+    assert (img_arr == norm_img).all()
+
+    norm_img = cutouts.normalize_img(raw_img, stretch='linear', minmax_percent=[0.5, 99.5])
+    img_files = cutouts.img_cut(test_images[0], center_coord, cutout_size,
+                                stretch='linear', img_format='png')
+    img_arr = np.array(Image.open(img_files[0]))
+    assert (img_arr == norm_img).all()
+
+    # Bad stretch
+    with pytest.raises(InvalidInputError):
+        cutouts.img_cut(test_images[0], center_coord, cutout_size, stretch='lin')
+
+    # Giving both minmax percent and cut
+    norm_img = cutouts.normalize_img(raw_img, stretch='asinh', minmax_percent=[0.7, 99.3])
+    with pytest.warns(InputWarning):
+        img_files = cutouts.img_cut(test_images[0], center_coord, cutout_size,
+                                    minmax_percent=[0.7, 99.3], minmax_cut=[5, 2000], img_format='png')
+    assert (img_arr == norm_img).all()
+
+    # Color image
+    color_jpg = cutouts.img_cut(test_images[:3], center_coord, cutout_size, colorize=True)
+    img = Image.open(color_jpg)
+    assert img.mode == 'RGB'
+
+    # Too few input images
+    with pytest.raises(InvalidInputError):
+        cutouts.img_cut(test_images[0], center_coord, cutout_size, colorize=True)
+
+    # Too many input images
+    with pytest.warns(InputWarning):
+        color_jpg = cutouts.img_cut(test_images, center_coord, cutout_size, colorize=True)
+    img = Image.open(color_jpg)
+    assert img.mode == 'RGB'
+
+    

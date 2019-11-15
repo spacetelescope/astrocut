@@ -47,7 +47,7 @@ limitation:
 This operation can also take some time to run. For the 1348 FFI images of the TESS ete-6
 simulated sector, it takes about 12 minutes to run on a computer with 65 GB of memory.
 
-By default *make_cube* runs in verbose mode and prints out it's progress, however setting
+By default ``make_cube`` runs in verbose mode and prints out its progress, however setting
 verbose to false will silence all output.
 
 .. code-block:: python
@@ -133,38 +133,93 @@ TESS FFIs are large and therefore are described by WCS objects that have many no
 * **WCS_MSEP:** The maximum separation in degrees between the cutout's linear WCS and the FFI's full WCS.
 * **WCS_SIG:** The error in the cutout's linear WCS, calculated as sqrt((dist(Po_ij, Pl_ij)^2) where dist(Po_ij, Pl_ij) is the angular distance in degrees between the sky position of of pixel i,j in the original full WCS and the new linear WCS.
 
-General fits image cutouts (beta!)
-----------------------------------
+General fits image cutouts (beta!)\*
+-------------------------------------
 
-This function is a general purpose fits cutout tool.  It takes one or more fits files
-and performs the same cutout in each, returning the result either in a single fits file
-or as one fits file per cutout. It is important to remember that while the expectation is
-that all input image are aligned and have the same pixel scale, no checking is done.
+These functions provide general purpose fits cutout functionality, returning the results either
+as fits cutout files, or as images (jpg or png).
+An image normalization (`~astrocut.normalize_img`) function is also available.
+
+The function `~astrocut.fits_cut` takes one or more fits files and performs the same cutout in each,
+returning the result either in a single fits file or as one fits file per cutout.
+It is important to remember that while the expectation is that all input image are
+aligned and have the same pixel scale, no checking is done.
 
 .. code-block:: python
 
                 >>> from astrocut import fits_cut
                 >>> from astropy.io import fits
                 >>> from astropy.coordinates import SkyCoord
-                >>> 
+                
                 >>> input_files = ["https://archive.stsci.edu/pub/hlsp/candels/cosmos/cos-tot/v1.0/hlsp_candels_hst_acs_cos-tot-sect23_f606w_v1.0_drz.fits",
                 ...                "https://archive.stsci.edu/pub/hlsp/candels/cosmos/cos-tot/v1.0/hlsp_candels_hst_acs_cos-tot-sect23_f814w_v1.0_drz.fits"]
 
                 >>> center_coord = SkyCoord("150.0945 2.38681", unit='deg')
                 >>> cutout_size = [200,300]
-                >>> 
-                >>> cutout_file = fits_cut(input_files, center_coord, cutout_size, drop_after="", single_outfile=True)
-                >>> print(cutout_file)
-                cutout_150.094500_2.386810_200x300_astrocut.fits
+                
+                >>> cutout_file = fits_cut(input_files, center_coord, cutout_size, drop_after="", single_outfile=True)  
+                >>> print(cutout_file)  
+                ./cutout_150.094500_2.386810_200x300_astrocut.fits
 
-                >>> cutout_hdulist = fits.open(cutout_file)
-                >>> cutout_hdulist.info()
-                Filename: cutout_150.094500_2.386810_200x300_astrocut.fits
+                >>> cutout_hdulist = fits.open(cutout_file)  
+                >>> cutout_hdulist.info()  
+                Filename: ./cutout_150.094500_2.386810_200x300_astrocut.fits
                 No.    Name      Ver    Type      Cards   Dimensions   Format
                   0  PRIMARY       1 PrimaryHDU      11   ()      
                   1  CUTOUT        1 ImageHDU        44   (200, 300)   float32   
                   2  CUTOUT        1 ImageHDU        44   (200, 300)   float32    
 
+
+The function `~astrocut.img_cut` takes one or more fits files and performs the same cutout in each,
+returning the result either an image (jpg or png) per cutout, or a single color image.
+It is important to remember that while the expectation is that all input images are
+aligned and have the same pixel scale, no checking is done.
+
+.. code-block:: python
+
+                >>> from astrocut import img_cut
+                >>> from astropy.coordinates import SkyCoord
+                >>> from PIL import Image
+                
+                >>> input_files = ["https://archive.stsci.edu/pub/hlsp/candels/cosmos/cos-tot/v1.0/hlsp_candels_hst_acs_cos-tot-sect23_f606w_v1.0_drz.fits",
+                ...                "https://archive.stsci.edu/pub/hlsp/candels/cosmos/cos-tot/v1.0/hlsp_candels_hst_acs_cos-tot-sect23_f814w_v1.0_drz.fits"]
+
+                >>> center_coord = SkyCoord("150.0945 2.38681", unit='deg')
+                >>> cutout_size = [200,300]
+                
+                >>> png_files = img_cut(input_files, center_coord, cutout_size, img_format='png', drop_after="")  
+                >>> print(png_files[0])  
+                ./hlsp_candels_hst_acs_cos-tot-sect23_f606w_v1.0_drz_150.094500_2.386810_200x300_astrocut.png
+
+                >>> Image.open(png_files[1]) #doctest: +SKIP
+                
+.. image:: imgs/png_ex_cutout.png
+
+Color images can also be produced using `~astrocut.img_cut` given three input files, which will be
+treated as the R, G, and B channels respectively.
+
+.. code-block:: python
+
+                >>> from astrocut import img_cut
+                >>> from astropy.coordinates import SkyCoord
+                >>> from PIL import Image
+                
+                >>> input_files = ["https://archive.stsci.edu/pub/hlsp/goods/v2/h_nz_sect14_v2.0_drz_img.fits",
+                ...                "https://archive.stsci.edu/pub/hlsp/goods/v2/h_ni_sect14_v2.0_drz_img.fits",
+                ...                "https://archive.stsci.edu/pub/hlsp/goods/v2/h_nv_sect14_v2.0_drz_img.fits"]
+                
+                >>> center_coord = SkyCoord("189.51522 62.2865221", unit='deg')
+                >>> cutout_size = [200,300]
+                
+                >>> color_image = img_cut(input_files, center_coord, cutout_size, colorize=True)
+                >>> print(color_image)  
+                ./cutout_189.515220_62.286522_200x300_astrocut.jpg
+                
+                >>> Image.open(color_image) #doctest: +SKIP
+                
+.. image:: imgs/color_ex_cutout.png
+           
+|
 
 \* This is the newest functionality and as such should be considered to be in beta. It has been tested primarily on Hubble deep field drizzled images. We welcome issues and pull-requests to make it more widely functional.
 

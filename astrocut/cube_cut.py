@@ -11,10 +11,10 @@ from astropy import wcs
 
 from itertools import product
 
-try:
-    from astropy.wcs.utils import fit_wcs_from_points
-except ImportError:  # astropy version does not have the function
-    from .utils.wcs_fitting import fit_wcs_from_points
+# Note: This is a local version of an astropy function available as of
+# astropy 4.0, however the astropy call signature is different, so the
+# local code must be changed before astropy  can used if available.
+from .utils.wcs_fitting import fit_wcs_from_points
 
 from time import time
 
