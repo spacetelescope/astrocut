@@ -159,11 +159,11 @@ aligned and have the same pixel scale, no checking is done.
                 
                 >>> cutout_file = fits_cut(input_files, center_coord, cutout_size, drop_after="", single_outfile=True)  
                 >>> print(cutout_file)  
-                ./cutout_150.094500_2.386810_200x300_astrocut.fits
+                ./cutout_150.094500_2.386810_200-x-300_astrocut.fits
 
                 >>> cutout_hdulist = fits.open(cutout_file)  
                 >>> cutout_hdulist.info()  
-                Filename: ./cutout_150.094500_2.386810_200x300_astrocut.fits
+                Filename: ./cutout_150.094500_2.386810_200-x-300_astrocut.fits
                 No.    Name      Ver    Type      Cards   Dimensions   Format
                   0  PRIMARY       1 PrimaryHDU      11   ()      
                   1  CUTOUT        1 ImageHDU        44   (200, 300)   float32   
@@ -189,7 +189,7 @@ aligned and have the same pixel scale, no checking is done.
                 
                 >>> png_files = img_cut(input_files, center_coord, cutout_size, img_format='png', drop_after="")  
                 >>> print(png_files[0])  
-                ./hlsp_candels_hst_acs_cos-tot-sect23_f606w_v1.0_drz_150.094500_2.386810_200x300_astrocut.png
+                ./hlsp_candels_hst_acs_cos-tot-sect23_f606w_v1.0_drz_150.094500_2.386810_200-x-300_astrocut.png
 
                 >>> Image.open(png_files[1]) #doctest: +SKIP
                 
@@ -213,7 +213,7 @@ treated as the R, G, and B channels respectively.
                 
                 >>> color_image = img_cut(input_files, center_coord, cutout_size, colorize=True)
                 >>> print(color_image)  
-                ./cutout_189.515220_62.286522_200x300_astrocut.jpg
+                ./cutout_189.515220_62.286522_200-x-300_astrocut.jpg
                 
                 >>> Image.open(color_image) #doctest: +SKIP
                 
