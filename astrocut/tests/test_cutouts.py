@@ -242,9 +242,9 @@ def test_img_cut(tmpdir):
     img_arr = np.array(Image.open(img_files[0]))
     assert (img_arr == norm_img).all()
 
-    norm_img = cutouts.normalize_img(raw_img, stretch='log', minmax_cut=[5, 2000])
+    norm_img = cutouts.normalize_img(raw_img, stretch='log', minmax_value=[5, 2000])
     img_files = cutouts.img_cut(test_images[0], center_coord, cutout_size,
-                                stretch='log', minmax_cut=[5, 2000], img_format='png')
+                                stretch='log', minmax_value=[5, 2000], img_format='png')
     img_arr = np.array(Image.open(img_files[0]))
     assert (img_arr == norm_img).all()
 
@@ -262,7 +262,7 @@ def test_img_cut(tmpdir):
     norm_img = cutouts.normalize_img(raw_img, stretch='asinh', minmax_percent=[0.7, 99.3])
     with pytest.warns(InputWarning):
         img_files = cutouts.img_cut(test_images[0], center_coord, cutout_size,
-                                    minmax_percent=[0.7, 99.3], minmax_cut=[5, 2000], img_format='png')
+                                    minmax_percent=[0.7, 99.3], minmax_value=[5, 2000], img_format='png')
     assert (img_arr == norm_img).all()
 
     # Color image

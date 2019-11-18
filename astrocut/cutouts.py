@@ -424,11 +424,11 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
     # Setting up the output file(s) and writing them
     if single_outfile:
 
-        cutout_path = "{}_{:7f}_{:7f}_{}x{}_astrocut.fits".format(cutout_prefix,
+        cutout_path = "{}_{:7f}_{:7f}_{}-x-{}_astrocut.fits".format(cutout_prefix,
                                                                   coordinates.ra.value,
                                                                   coordinates.dec.value,
-                                                                  cutout_size[0],  # TODO: make cutout size
-                                                                  cutout_size[1])  # look nicer
+                                                                  str(cutout_size[0]).replace(' ',''), 
+                                                                  str(cutout_size[1]).replace(' ',''))
         cutout_path = os.path.join(output_dir, cutout_path)
         
         cutout_hdus = [cutout_hdu_dict[fle] for fle in input_files]
@@ -446,11 +446,11 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
 
             cutout_hdus.append(cutout)
 
-            filename = "{}_{:7f}_{:7f}_{}x{}_astrocut.fits".format(os.path.basename(fle).rstrip('.fits'),
-                                                                   coordinates.ra.value,
-                                                                   coordinates.dec.value,
-                                                                   cutout.header["NAXIS1"],
-                                                                   cutout.header["NAXIS2"])
+            filename = "{}_{:7f}_{:7f}_{}-x-{}_astrocut.fits".format(os.path.basename(fle).rstrip('.fits'),
+                                                                     coordinates.ra.value,
+                                                                     coordinates.dec.value,
+                                                                     str(cutout_size[0]).replace(' ',''), 
+                                                                     str(cutout_size[1]).replace(' ',''))
             cutout_path.append(os.path.join(output_dir, filename))
                 
         _save_multiple_fits(cutout_hdus, cutout_path, coordinates)
@@ -463,7 +463,7 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
     return cutout_path
 
 
-def normalize_img(img_arr, stretch='asinh', minmax_percent=None, minmax_cut=None, invert=False):
+def normalize_img(img_arr, stretch='asinh', minmax_percent=None, minmax_value=None, invert=False):
     """
     Apply given stretch and scaling to an image array.
 
@@ -478,12 +478,12 @@ def normalize_img(img_arr, stretch='asinh', minmax_percent=None, minmax_cut=None
         Optional. Interval based on a keeping a specified fraction of pixels (can be asymmetric) 
         when scaling the image. The format is [lower percentile, upper percentile], where pixel
         values below the lower percentile and above the upper percentile are clipped.
-        Only one of minmax_percent and minmax_cut shoul be specified.
-    minmax_cut : array
+        Only one of minmax_percent and minmax_value shoul be specified.
+    minmax_value : array
         Optional. Interval based on user-specified pixel values when scaling the image.
         The format is [min value, max value], where pixel values below the min value and above
         the max value are clipped.
-        Only one of minmax_percent and minmax_cut shoul be specified.
+        Only one of minmax_percent and minmax_value should be specified.
     invert : bool
         Optional, default False.  If True the image is inverted (light pixels become dark and vice versa).
 
@@ -498,15 +498,15 @@ def normalize_img(img_arr, stretch='asinh', minmax_percent=None, minmax_cut=None
         raise InvalidInputError("Stretch {} is not supported!".format(stretch))
 
     # Check the scaling
-    if (minmax_percent is not None) and (minmax_cut is not None):
+    if (minmax_percent is not None) and (minmax_value is not None):
         warnings.warn("Both scale and max_min are set, max_min will be ignored.",
                       InputWarning)
 
     # Setting up the transform with the scaling
     if minmax_percent:
         transform = AsymmetricPercentileInterval(*minmax_percent)
-    elif minmax_cut:
-        transform = ManualInterval(*minmax_cut)
+    elif minmax_value:
+        transform = ManualInterval(*minmax_value)
     else:  # Default, scale the entire image range to [0,1]
         transform = MinMaxInterval()
         
@@ -535,7 +535,7 @@ def normalize_img(img_arr, stretch='asinh', minmax_percent=None, minmax_cut=None
         
 
 def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_percent=None,
-            minmax_cut=None, invert=False, img_format='jpg', colorize=False,
+            minmax_value=None, invert=False, img_format='jpg', colorize=False,
             cutout_prefix="cutout", output_dir='.', drop_after=None, verbose=False):
     """
     Takes one or more fits files with the same WCS/pointing, makes the same cutout in each file,
@@ -564,12 +564,12 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
         Optional, default [0.5,99.5]. Interval based on a keeping a specified fraction of pixels 
         (can be asymmetric) when scaling the image. The format is [lower percentile, upper percentile], 
         where pixel values below the lower percentile and above the upper percentile are clipped.
-        Only one of minmax_percent and minmax_cut shoul be specified.
-    minmax_cut : array
+        Only one of minmax_percent and minmax_value should be specified.
+    minmax_value : array
         Optional. Interval based on user-specified pixel values when scaling the image.
         The format is [min value, max value], where pixel values below the min value and above
         the max value are clipped.
-        Only one of minmax_percent and minmax_cut shoul be specified.
+        Only one of minmax_percent and minmax_value should be specified.
     invert : bool
         Optional, default False.  If True the image is inverted (light pixels become dark and vice versa).
     img_format : str
@@ -616,7 +616,7 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
     cutout_size = _parse_size_input(cutout_size)
 
     # Applying the default scaling
-    if (minmax_percent is None) and (minmax_cut is None):
+    if (minmax_percent is None) and (minmax_value is None):
         minmax_percent = [0.5, 99.5]
         
     # Making the cutouts
@@ -633,7 +633,7 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
         cutout = cutout.data
         
         # Applying the appropriate normalization parameters
-        normalized_cutout = normalize_img(cutout, stretch, minmax_percent, minmax_cut, invert)
+        normalized_cutout = normalize_img(cutout, stretch, minmax_percent, minmax_value, invert)
         
         # Check that there is data in the cutout image
         if not (cutout == 0).all():
@@ -650,11 +650,11 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
     # Setting up the output file(s) and writing them
     if colorize:
 
-        cutout_path = "{}_{:7f}_{:7f}_{}x{}_astrocut.{}".format(cutout_prefix,
+        cutout_path = "{}_{:7f}_{:7f}_{}-x-{}_astrocut.{}".format(cutout_prefix,
                                                                 coordinates.ra.value,
                                                                 coordinates.dec.value,
-                                                                cutout_size[0],  # TODO: make cutout size
-                                                                cutout_size[1],
+                                                                str(cutout_size[0]).replace(' ',''), 
+                                                                str(cutout_size[1]).replace(' ',''),
                                                                 img_format.lower())  # look nicer
         cutout_path = os.path.join(output_dir, cutout_path)
 
@@ -687,11 +687,11 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
                 warnings.warn("Cutout of {} contains to data and will not be written.".format(fle))
                 continue
 
-            file_path = "{}_{:7f}_{:7f}_{}x{}_astrocut.{}".format(os.path.basename(fle).rstrip('.fits'),
+            file_path = "{}_{:7f}_{:7f}_{}-x-{}_astrocut.{}".format(os.path.basename(fle).rstrip('.fits'),
                                                                   coordinates.ra.value,
                                                                   coordinates.dec.value,
-                                                                  cutout_size[0],  # TODO: make cutout size
-                                                                  cutout_size[1],
+                                                                  str(cutout_size[0]).replace(' ',''), 
+                                                                  str(cutout_size[1]).replace(' ',''),
                                                                   img_format.lower())
             file_path = os.path.join(output_dir, file_path)
             cutout_path.append(file_path)
