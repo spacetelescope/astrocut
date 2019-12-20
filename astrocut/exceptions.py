@@ -35,3 +35,10 @@ class TypeWarning(AstropyWarning):
     Warnings to do with data types.
     """
     pass
+
+
+class DataWarning(AstropyWarning):
+    """
+    Warnings to do with data content.
+    """
+    pass

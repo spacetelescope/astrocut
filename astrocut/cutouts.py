@@ -21,7 +21,7 @@ import os
 import warnings
 
 from . import __version__
-from .exceptions import InputWarning, InvalidQueryError, InvalidInputError
+from .exceptions import InputWarning, DataWarning, InvalidQueryError, InvalidInputError
 
 
 #### FUNCTIONS FOR UTILS ####
@@ -168,7 +168,8 @@ def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, drop_after=No
         try:
             max_ind = img_hdu.header.index(drop_after)
         except ValueError:
-            warnings.warn("Last desired keyword not found in image header, using the entire header.")
+            warnings.warn("Last desired keyword not found in image header, using the entire header.",
+                          DataWarning)
     
     hdu_header = fits.Header(img_hdu.header[:max_ind], copy=True)
     img_wcs = wcs.WCS(hdu_header)
@@ -402,8 +403,14 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
         if verbose:
             print("\n{}".format(in_fle))
         hdulist = fits.open(in_fle)
-        cutout = _hducut(hdulist[0], coordinates, cutout_size,
-                         correct_wcs=correct_wcs, drop_after=drop_after, verbose=verbose)
+
+        try:
+            cutout = _hducut(hdulist[0], coordinates, cutout_size,
+                             correct_wcs=correct_wcs, drop_after=drop_after, verbose=verbose)
+        except OSError as err:
+            warnings.warn("Error {} encountered when performing cutout on {}.\nFile will be skipped".format(err, im_fle),
+                          DataWarning)
+            
         hdulist.close()
         
         # Check that there is data in the cutout image
@@ -441,7 +448,8 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
         for fle in input_files:
             cutout = cutout_hdu_dict[fle]
             if cutout.header.get("EMPTY"):
-                warnings.warn("Cutout of {} contains to data and will not be written.".format(fle))
+                warnings.warn("Cutout of {} contains to data and will not be written.".format(fle),
+                              DataWarning)
                 continue
 
             cutout_hdus.append(cutout)
@@ -684,7 +692,8 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
         for fle in input_files:
             cutout = cutout_hdu_dict.get(fle)
             if cutout is None:
-                warnings.warn("Cutout of {} contains to data and will not be written.".format(fle))
+                warnings.warn("Cutout of {} contains to data and will not be written.".format(fle),
+                              DataWarning)
                 continue
 
             file_path = "{}_{:7f}_{:7f}_{}-x-{}_astrocut.{}".format(os.path.basename(fle).rstrip('.fits'),
