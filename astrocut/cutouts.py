@@ -422,7 +422,7 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
 
     # If no cutouts contain data, raise exception
     if num_empty == len(input_files):
-        raise InvalidQueryError("Cutout contains to data! (Check image footprint.)")
+        raise InvalidQueryError("Cutout contains no data! (Check image footprint.)")
 
     # Make sure the output directory exists
     if not os.path.exists(output_dir):
