@@ -408,7 +408,7 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
             cutout = _hducut(hdulist[0], coordinates, cutout_size,
                              correct_wcs=correct_wcs, drop_after=drop_after, verbose=verbose)
         except OSError as err:
-            warnings.warn("Error {} encountered when performing cutout on {}.\nFile will be skipped".format(err, im_fle),
+            warnings.warn("Error {} encountered when performing cutout on {}.\nFile will be skipped".format(err, in_fle),
                           DataWarning)
             
         hdulist.close()
