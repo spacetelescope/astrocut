@@ -408,7 +408,7 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
             cutout = _hducut(hdulist[0], coordinates, cutout_size,
                              correct_wcs=correct_wcs, drop_after=drop_after, verbose=verbose)
         except OSError as err:
-            warnings.warn("Error {} encountered when performing cutout on {}.\nFile will be skipped".format(err, in_fle),
+            warnings.warn("Error {} encountered when performing cutout on {}, skipping...".format(err, in_fle),
                           DataWarning)
             
         hdulist.close()
@@ -432,10 +432,10 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
     if single_outfile:
 
         cutout_path = "{}_{:7f}_{:7f}_{}-x-{}_astrocut.fits".format(cutout_prefix,
-                                                                  coordinates.ra.value,
-                                                                  coordinates.dec.value,
-                                                                  str(cutout_size[0]).replace(' ',''), 
-                                                                  str(cutout_size[1]).replace(' ',''))
+                                                                    coordinates.ra.value,
+                                                                    coordinates.dec.value,
+                                                                    str(cutout_size[0]).replace(' ', ''), 
+                                                                    str(cutout_size[1]).replace(' ', ''))
         cutout_path = os.path.join(output_dir, cutout_path)
         
         cutout_hdus = [cutout_hdu_dict[fle] for fle in input_files]
@@ -457,8 +457,8 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
             filename = "{}_{:7f}_{:7f}_{}-x-{}_astrocut.fits".format(os.path.basename(fle).rstrip('.fits'),
                                                                      coordinates.ra.value,
                                                                      coordinates.dec.value,
-                                                                     str(cutout_size[0]).replace(' ',''), 
-                                                                     str(cutout_size[1]).replace(' ',''))
+                                                                     str(cutout_size[0]).replace(' ', ''), 
+                                                                     str(cutout_size[1]).replace(' ', ''))
             cutout_path.append(os.path.join(output_dir, filename))
                 
         _save_multiple_fits(cutout_hdus, cutout_path, coordinates)
@@ -659,11 +659,11 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
     if colorize:
 
         cutout_path = "{}_{:7f}_{:7f}_{}-x-{}_astrocut.{}".format(cutout_prefix,
-                                                                coordinates.ra.value,
-                                                                coordinates.dec.value,
-                                                                str(cutout_size[0]).replace(' ',''), 
-                                                                str(cutout_size[1]).replace(' ',''),
-                                                                img_format.lower())  # look nicer
+                                                                  coordinates.ra.value,
+                                                                  coordinates.dec.value,
+                                                                  str(cutout_size[0]).replace(' ', ''), 
+                                                                  str(cutout_size[1]).replace(' ', ''),
+                                                                  img_format.lower()) 
         cutout_path = os.path.join(output_dir, cutout_path)
 
         # TODO: This is not elegant or efficient, make it better
@@ -697,11 +697,11 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
                 continue
 
             file_path = "{}_{:7f}_{:7f}_{}-x-{}_astrocut.{}".format(os.path.basename(fle).rstrip('.fits'),
-                                                                  coordinates.ra.value,
-                                                                  coordinates.dec.value,
-                                                                  str(cutout_size[0]).replace(' ',''), 
-                                                                  str(cutout_size[1]).replace(' ',''),
-                                                                  img_format.lower())
+                                                                    coordinates.ra.value,
+                                                                    coordinates.dec.value,
+                                                                    str(cutout_size[0]).replace(' ', ''), 
+                                                                    str(cutout_size[1]).replace(' ', ''),
+                                                                    img_format.lower())
             file_path = os.path.join(output_dir, file_path)
             cutout_path.append(file_path)
             
