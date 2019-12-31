@@ -402,16 +402,14 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
     for in_fle in input_files:
         if verbose:
             print("\n{}".format(in_fle))
-        hdulist = fits.open(in_fle)
-
-        try:
-            cutout = _hducut(hdulist[0], coordinates, cutout_size,
+        
+        with fits.open(in_fle) as hdulist:
+            try:
+                cutout = _hducut(hdulist[0], coordinates, cutout_size,
                              correct_wcs=correct_wcs, drop_after=drop_after, verbose=verbose)
-        except OSError as err:
-            warnings.warn("Error {} encountered when performing cutout on {}, skipping...".format(err, in_fle),
-                          DataWarning)
-            
-        hdulist.close()
+            except OSError as err:
+                warnings.warn("Error {} encountered when performing cutout on {}, skipping...".format(err, in_fle),
+                              DataWarning)
         
         # Check that there is data in the cutout image
         if (cutout.data == 0).all() or (np.isnan(cutout.data)).all():
