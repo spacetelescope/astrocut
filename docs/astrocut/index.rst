@@ -162,7 +162,7 @@ aligned and have the same pixel scale, no checking is done.
                 ./cutout_150.094500_2.386810_200-x-300_astrocut.fits
 
                 >>> cutout_hdulist = fits.open(cutout_file)  
-                >>> cutout_hdulist.info()
+                >>> cutout_hdulist.info() #doctest: +SKIP
                 Filename: ./cutout_150.094500_2.386810_200-x-300_astrocut.fits
                 No.    Name      Ver    Type      Cards   Dimensions   Format
                   0  PRIMARY       1 PrimaryHDU      11   ()      
