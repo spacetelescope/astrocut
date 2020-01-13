@@ -4,6 +4,7 @@
 - Doc update (explain time column) [#19]
 - Adding img_cut and normalize_img [#21]
 - Improve cutout filenames, change minmax_cut to minmax_value [#24]
+- Add error handling when reading data raises an exception [#28]
 
 0.4 (2019-06-21)
 ----------------

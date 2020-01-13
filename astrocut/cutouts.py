@@ -21,7 +21,7 @@ import os
 import warnings
 
 from . import __version__
-from .exceptions import InputWarning, InvalidQueryError, InvalidInputError
+from .exceptions import InputWarning, DataWarning, InvalidQueryError, InvalidInputError
 
 
 #### FUNCTIONS FOR UTILS ####
@@ -168,7 +168,8 @@ def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, drop_after=No
         try:
             max_ind = img_hdu.header.index(drop_after)
         except ValueError:
-            warnings.warn("Last desired keyword not found in image header, using the entire header.")
+            warnings.warn("Last desired keyword not found in image header, using the entire header.",
+                          DataWarning)
     
     hdu_header = fits.Header(img_hdu.header[:max_ind], copy=True)
     img_wcs = wcs.WCS(hdu_header)
@@ -401,10 +402,14 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
     for in_fle in input_files:
         if verbose:
             print("\n{}".format(in_fle))
-        hdulist = fits.open(in_fle)
-        cutout = _hducut(hdulist[0], coordinates, cutout_size,
-                         correct_wcs=correct_wcs, drop_after=drop_after, verbose=verbose)
-        hdulist.close()
+        
+        with fits.open(in_fle) as hdulist:
+            try:
+                cutout = _hducut(hdulist[0], coordinates, cutout_size,
+                                 correct_wcs=correct_wcs, drop_after=drop_after, verbose=verbose)
+            except OSError as err:
+                warnings.warn("Error {} encountered when performing cutout on {}, skipping...".format(err, in_fle),
+                              DataWarning)
         
         # Check that there is data in the cutout image
         if (cutout.data == 0).all() or (np.isnan(cutout.data)).all():
@@ -415,7 +420,7 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
 
     # If no cutouts contain data, raise exception
     if num_empty == len(input_files):
-        raise InvalidQueryError("Cutout contains to data! (Check image footprint.)")
+        raise InvalidQueryError("Cutout contains no data! (Check image footprint.)")
 
     # Make sure the output directory exists
     if not os.path.exists(output_dir):
@@ -425,10 +430,10 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
     if single_outfile:
 
         cutout_path = "{}_{:7f}_{:7f}_{}-x-{}_astrocut.fits".format(cutout_prefix,
-                                                                  coordinates.ra.value,
-                                                                  coordinates.dec.value,
-                                                                  str(cutout_size[0]).replace(' ',''), 
-                                                                  str(cutout_size[1]).replace(' ',''))
+                                                                    coordinates.ra.value,
+                                                                    coordinates.dec.value,
+                                                                    str(cutout_size[0]).replace(' ', ''), 
+                                                                    str(cutout_size[1]).replace(' ', ''))
         cutout_path = os.path.join(output_dir, cutout_path)
         
         cutout_hdus = [cutout_hdu_dict[fle] for fle in input_files]
@@ -441,7 +446,8 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
         for fle in input_files:
             cutout = cutout_hdu_dict[fle]
             if cutout.header.get("EMPTY"):
-                warnings.warn("Cutout of {} contains to data and will not be written.".format(fle))
+                warnings.warn("Cutout of {} contains to data and will not be written.".format(fle),
+                              DataWarning)
                 continue
 
             cutout_hdus.append(cutout)
@@ -449,8 +455,8 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
             filename = "{}_{:7f}_{:7f}_{}-x-{}_astrocut.fits".format(os.path.basename(fle).rstrip('.fits'),
                                                                      coordinates.ra.value,
                                                                      coordinates.dec.value,
-                                                                     str(cutout_size[0]).replace(' ',''), 
-                                                                     str(cutout_size[1]).replace(' ',''))
+                                                                     str(cutout_size[0]).replace(' ', ''), 
+                                                                     str(cutout_size[1]).replace(' ', ''))
             cutout_path.append(os.path.join(output_dir, filename))
                 
         _save_multiple_fits(cutout_hdus, cutout_path, coordinates)
@@ -651,11 +657,11 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
     if colorize:
 
         cutout_path = "{}_{:7f}_{:7f}_{}-x-{}_astrocut.{}".format(cutout_prefix,
-                                                                coordinates.ra.value,
-                                                                coordinates.dec.value,
-                                                                str(cutout_size[0]).replace(' ',''), 
-                                                                str(cutout_size[1]).replace(' ',''),
-                                                                img_format.lower())  # look nicer
+                                                                  coordinates.ra.value,
+                                                                  coordinates.dec.value,
+                                                                  str(cutout_size[0]).replace(' ', ''), 
+                                                                  str(cutout_size[1]).replace(' ', ''),
+                                                                  img_format.lower()) 
         cutout_path = os.path.join(output_dir, cutout_path)
 
         # TODO: This is not elegant or efficient, make it better
@@ -684,15 +690,16 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
         for fle in input_files:
             cutout = cutout_hdu_dict.get(fle)
             if cutout is None:
-                warnings.warn("Cutout of {} contains to data and will not be written.".format(fle))
+                warnings.warn("Cutout of {} contains to data and will not be written.".format(fle),
+                              DataWarning)
                 continue
 
             file_path = "{}_{:7f}_{:7f}_{}-x-{}_astrocut.{}".format(os.path.basename(fle).rstrip('.fits'),
-                                                                  coordinates.ra.value,
-                                                                  coordinates.dec.value,
-                                                                  str(cutout_size[0]).replace(' ',''), 
-                                                                  str(cutout_size[1]).replace(' ',''),
-                                                                  img_format.lower())
+                                                                    coordinates.ra.value,
+                                                                    coordinates.dec.value,
+                                                                    str(cutout_size[0]).replace(' ', ''), 
+                                                                    str(cutout_size[1]).replace(' ', ''),
+                                                                    img_format.lower())
             file_path = os.path.join(output_dir, file_path)
             cutout_path.append(file_path)
             

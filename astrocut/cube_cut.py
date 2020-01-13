@@ -158,8 +158,6 @@ class CutoutFactory():
 
         Parameters
         ----------
-        center_coord : `~astropy.coordinates.SkyCoord`
-            The central coordinate for the cutout
         cutout_size : array
             [ny,nx] in with ints (pixels) or astropy quantities
 
@@ -705,80 +703,80 @@ class CutoutFactory():
         if verbose:
             start_time = time()
 
-        cube = fits.open(cube_file) 
+        with fits.open(cube_file) as cube:
 
-        # Get the info we need from the data table
-        self._parse_table_info(cube[2].header, cube[2].data, verbose)
+            # Get the info we need from the data table
+            self._parse_table_info(cube[2].header, cube[2].data, verbose)
 
-        if isinstance(coordinates, SkyCoord):
-            self.center_coord = coordinates
-        else:
-            self.center_coord = SkyCoord(coordinates, unit='deg')
+            if isinstance(coordinates, SkyCoord):
+                self.center_coord = coordinates
+            else:
+                self.center_coord = SkyCoord(coordinates, unit='deg')
 
-        if verbose:
-            print("Cutout center coordinate: {},{}".format(self.center_coord.ra.deg, self.center_coord.dec.deg))
+            if verbose:
+                print("Cutout center coordinate: {},{}".format(self.center_coord.ra.deg,
+                                                               self.center_coord.dec.deg))
 
-
-        # Making size into an array [ny, nx]
-        if np.isscalar(cutout_size):
-            cutout_size = np.repeat(cutout_size, 2)
-
-        if isinstance(cutout_size, u.Quantity):
-            cutout_size = np.atleast_1d(cutout_size)
-            if len(cutout_size) == 1:
+            # Making size into an array [ny, nx]
+            if np.isscalar(cutout_size):
                 cutout_size = np.repeat(cutout_size, 2)
 
-        if len(cutout_size) > 2:
-            warnings.warn("Too many dimensions in cutout size, only the first two will be used.",
-                          InputWarning)
-       
-        # Get cutout limits
-        self._get_cutout_limits(cutout_size)
+            if isinstance(cutout_size, u.Quantity):
+                cutout_size = np.atleast_1d(cutout_size)
+                if len(cutout_size) == 1:
+                    cutout_size = np.repeat(cutout_size, 2)
 
-        if verbose:
-            print("xmin,xmax: {}".format(self.cutout_lims[1]))
-            print("ymin,ymax: {}".format(self.cutout_lims[0]))
+            if len(cutout_size) > 2:
+                warnings.warn("Too many dimensions in cutout size, only the first two will be used.",
+                              InputWarning)
+                
+            # Get cutout limits
+            self._get_cutout_limits(cutout_size)
 
-        # Make the cutout
-        img_cutout, uncert_cutout, aperture = self._get_cutout(cube[1].data, verbose=verbose)
+            if verbose:
+                print("xmin,xmax: {}".format(self.cutout_lims[1]))
+                print("ymin,ymax: {}".format(self.cutout_lims[0]))
 
-        # Get cutout wcs info
-        cutout_wcs_full = self._get_full_cutout_wcs(cube[2].header)
-        max_dist, sigma = self._fit_cutout_wcs(cutout_wcs_full, img_cutout.shape[1:])
-        if verbose:
-            print("Maximum distance between approximate and true location: {}".format(max_dist))
-            print("Error in approximate WCS (sigma): {}".format(sigma))
-        
-        cutout_wcs_dict = self._get_cutout_wcs_dict()
+            # Make the cutout
+            img_cutout, uncert_cutout, aperture = self._get_cutout(cube[1].data, verbose=verbose)
+
+            # Get cutout wcs info
+            cutout_wcs_full = self._get_full_cutout_wcs(cube[2].header)
+            max_dist, sigma = self._fit_cutout_wcs(cutout_wcs_full, img_cutout.shape[1:])
+            if verbose:
+                print("Maximum distance between approximate and true location: {}".format(max_dist))
+                print("Error in approximate WCS (sigma): {}".format(sigma))
+                
+            cutout_wcs_dict = self._get_cutout_wcs_dict()
     
-        # Build the TPF
-        tpf_object = self._build_tpf(cube, img_cutout, uncert_cutout, cutout_wcs_dict, aperture)
+            # Build the TPF
+            tpf_object = self._build_tpf(cube, img_cutout, uncert_cutout, cutout_wcs_dict, aperture)
 
-        if verbose:
-            write_time = time()
+            if verbose:
+                write_time = time()
 
-        if not target_pixel_file:
-            _, flename = os.path.split(cube_file)
-            tpf_name = "{}_{:7f}_{:7f}_{}x{}_astrocut.fits".format(flename.rstrip('.fits').rstrip("-cube"),
-                                                                   self.center_coord.ra.value,
-                                                                   self.center_coord.dec.value,
-                                                                   self.cutout_lims[0, 1]-self.cutout_lims[0, 0],
-                                                                   self.cutout_lims[1, 1]-self.cutout_lims[1, 0])
-            target_pixel_file = os.path.join(output_path, tpf_name)
+            if not target_pixel_file:
+                _, flename = os.path.split(cube_file)
+
+                width = self.cutout_lims[0, 1]-self.cutout_lims[0, 0]
+                height = self.cutout_lims[1, 1]-self.cutout_lims[1, 0]
+                target_pixel_file = "{}_{:7f}_{:7f}_{}x{}_astrocut.fits".format(flename.rstrip('.fits').rstrip("-cube"),
+                                                                                self.center_coord.ra.value,
+                                                                                self.center_coord.dec.value,
+                                                                                width,
+                                                                                height)
+            target_pixel_file = os.path.join(output_path, target_pixel_file)
             
         
-        if verbose:
-            print("Target pixel file: {}".format(target_pixel_file))
+            if verbose:
+                print("Target pixel file: {}".format(target_pixel_file))
 
-        # Make sure the output directory exists
-        if not os.path.exists(output_path):
-            os.makedirs(output_path)
+            # Make sure the output directory exists
+            if not os.path.exists(output_path):
+                os.makedirs(output_path)
         
-        # Write the TPF
-        tpf_object.writeto(target_pixel_file, overwrite=True, checksum=True)
-
-        # Close the cube file
-        cube.close()
+            # Write the TPF
+            tpf_object.writeto(target_pixel_file, overwrite=True, checksum=True)
 
         if verbose:
             print("Write time: {:.2} sec".format(time()-write_time))
