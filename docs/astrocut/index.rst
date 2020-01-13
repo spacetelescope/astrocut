@@ -163,11 +163,11 @@ aligned and have the same pixel scale, no checking is done.
 
                 >>> cutout_hdulist = fits.open(cutout_file)  
                 >>> cutout_hdulist.info()  
-                Filename: ./cutout_150.094500_2.386810_200-x-300_astrocut.fits
                 No.    Name      Ver    Type      Cards   Dimensions   Format
                   0  PRIMARY       1 PrimaryHDU      11   ()      
                   1  CUTOUT        1 ImageHDU        44   (200, 300)   float32   
-                  2  CUTOUT        1 ImageHDU        44   (200, 300)   float32    
+                  2  CUTOUT        1 ImageHDU        44   (200, 300)   float32   
+
 
 
 The function `~astrocut.img_cut` takes one or more fits files and performs the same cutout in each,
