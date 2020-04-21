@@ -7,6 +7,11 @@ Cutout tools for astronomical images
     
 .. image:: https://badge.fury.io/py/astrocut.svg
     :target: https://badge.fury.io/py/astrocut 
+    :alt: PyPi Status
+    
+.. image:: https://readthedocs.org/projects/astrocut/badge/?version=latest
+    :target: https://astrocut.readthedocs.io/en/latest/?badge=latest
+    :alt: Documentation Status
 
 Tools for making image cutouts from sets of TESS full frame images.
 
@@ -18,9 +23,11 @@ Project Status
 --------------
 .. image:: https://travis-ci.org/spacetelescope/astrocut.svg?branch=master
     :target: https://travis-ci.org/spacetelescope/astrocut
+    :alt: Travis CI status
     
 .. image:: https://coveralls.io/repos/github/spacetelescope/astrocut/badge.svg?branch=master
     :target: https://coveralls.io/github/spacetelescope/astrocut?branch=master
+    :alt: Coveralls status
 
 
 Developer Documentation
