@@ -1,6 +1,6 @@
 0.6 (unreleased)
 ----------------
-- No changes yet
+- Update wcs fitting to match Astropy (and use Astropy when available) [#29]
 
 
 0.5 (2020-01-13)

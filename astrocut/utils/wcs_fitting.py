@@ -20,7 +20,7 @@ import numpy as np
 from astropy import units as u
 from astropy.wcs.utils import celestial_frame_to_wcs
 
-def _linear_wcs_fit(params, lon, lat, x, y, w_obj):
+def _linear_wcs_fit(params, lon, lat, x, y, w_obj):  # pragma: no cover
     """
     Objective function for fitting linear terms.
 
@@ -49,7 +49,7 @@ def _linear_wcs_fit(params, lon, lat, x, y, w_obj):
     return resids
 
 
-def _sip_fit(params, lon, lat, u, v, w_obj, order, coeff_names):
+def _sip_fit(params, lon, lat, u, v, w_obj, order, coeff_names):  # pragma: no cover
 
     """ Objective function for fitting SIP.
      Parameters
@@ -101,7 +101,7 @@ def _sip_fit(params, lon, lat, u, v, w_obj, order, coeff_names):
 
 
 def fit_wcs_from_points(xy, world_coords, proj_point='center',
-                        projection='TAN', sip_degree=None):
+                        projection='TAN', sip_degree=None):  # pragma: no cover
     """
     Given two matching sets of coordinates on detector and sky,
     compute the WCS.
