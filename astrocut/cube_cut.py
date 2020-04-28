@@ -272,7 +272,14 @@ class CutoutFactory():
         """
 
         # Getting matched pixel, world coordinate pairs
-        pix_inds = np.array(list(product(list(range(cutout_shape[1])), list(range(cutout_shape[0])))))
+        # We don't want more than ~100 pairs, and we want them spread evenly through the iamge
+
+        x, y = cutout_shape
+        i = 1
+        while (x/i)*(y/i) > 100:
+            i += 1
+            
+        pix_inds = np.array(list(product(list(range(0,x,i)), list(range(0,y,i)))))
         world_pix = SkyCoord(cutout_wcs.all_pix2world(pix_inds, 0), unit='deg')
 
         # Getting the fit WCS
@@ -280,9 +287,11 @@ class CutoutFactory():
 
         self.cutout_wcs = linear_wcs
 
-        # Checking the fit
+        # Checking the fit (we want to use all of the pixels for this)
+        pix_inds = np.array(list(product(list(range(cutout_shape[1])), list(range(cutout_shape[0])))))
+        world_pix = SkyCoord(cutout_wcs.all_pix2world(pix_inds, 0), unit='deg')
         world_pix_new = SkyCoord(linear_wcs.all_pix2world(pix_inds, 0), unit='deg')
-    
+
         dists = world_pix.separation(world_pix_new).to('deg')
         sigma = np.sqrt(sum(dists.value**2))
 
