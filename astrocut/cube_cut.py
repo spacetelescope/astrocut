@@ -274,7 +274,7 @@ class CutoutFactory():
         # Getting matched pixel, world coordinate pairs
         # We don't want more than ~100 pairs, and we want them spread evenly through the iamge
 
-        x, y = cutout_shape
+        y, x = cutout_shape
         i = 1
         while (x/i)*(y/i) > 100:
             i += 1
