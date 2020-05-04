@@ -272,7 +272,18 @@ class CutoutFactory():
         """
 
         # Getting matched pixel, world coordinate pairs
-        # We don't want more than ~100 pairs, and we want them spread evenly through the iamge
+        # We will choose no more than 100 pixels spread evenly throughout the image
+        # To do this we the appropriate "step size" between pixel coordinates
+        # (i.e. we take every ith pixel in each row/column)
+        # For example in a 5x7 cutout with i = 2 we get:
+        #
+        # xoxoxox
+        # ooooooo
+        # xoxoxox
+        # ooooooo
+        # xoxoxox
+        #
+        # Where x denotes the indexes that will be used in the fit.
 
         y, x = cutout_shape
         i = 1
@@ -283,7 +294,7 @@ class CutoutFactory():
         world_pix = SkyCoord(cutout_wcs.all_pix2world(pix_inds, 0), unit='deg')
 
         # Getting the fit WCS
-        linear_wcs = fit_wcs_from_points([pix_inds[:, 0], pix_inds[:, 1]], world_pix, proj_point=self.center_coord)
+        linear_wcs = fit_wcs_from_points([pix_inds[:, 0], pix_inds[:, 1]], world_pix, proj_point='center')
 
         self.cutout_wcs = linear_wcs
 
