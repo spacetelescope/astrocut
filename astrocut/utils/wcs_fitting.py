@@ -166,8 +166,8 @@ def fit_wcs_from_points(xy, world_coords, proj_point='center',
     from astropy.wcs import Sip
     from scipy.optimize import least_squares
 
+    xp, yp = xy
     try:
-        xp, yp = xy
         lon, lat = world_coords.data.lon.deg, world_coords.data.lat.deg
     except AttributeError:
         unit_sph =  world_coords.unit_spherical
@@ -207,7 +207,7 @@ def fit_wcs_from_points(xy, world_coords, proj_point='center',
         raise ValueError("sip_degree must be None, or integer.")
 
     # set pixel_shape to span of input points
-    wcs.pixel_shape = (xp.max()-xp.min(), yp.max()-yp.min())
+    wcs.pixel_shape = (xp.max()+1-xp.min(), yp.max()+1-yp.min())
 
     # determine CRVAL from input
     close = lambda l, p: p[np.argmin(np.abs(l))]
@@ -229,8 +229,15 @@ def fit_wcs_from_points(xy, world_coords, proj_point='center',
     # use (1, 0, 0, 1) as initial guess, in case input wcs was passed in
     # and cd terms are way off.
     p0 = np.concatenate([wcs.wcs.cd.flatten(), wcs.wcs.crpix.flatten()])
+    
+    xpmin, xpmax, ypmin, ypmax = xp.min(), xp.max(), yp.min(), yp.max()
+    if xpmin==xpmax: xpmin, xpmax = xpmin-0.5, xpmax+0.5
+    if ypmin==ypmax: ypmin, ypmax = ypmin-0.5, ypmax+0.5
+    
     fit = least_squares(_linear_wcs_fit, p0,
-                        args=(lon, lat, xp, yp, wcs))
+                        args=(lon, lat, xp, yp, wcs),
+                        bounds=[[-np.inf,-np.inf,-np.inf,-np.inf, xpmin, ypmin],
+                                [ np.inf, np.inf, np.inf, np.inf, xpmax, ypmax]])
     wcs.wcs.crpix = np.array(fit.x[4:6])
     wcs.wcs.cd = np.array(fit.x[0:4].reshape((2, 2)))
 

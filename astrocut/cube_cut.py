@@ -13,7 +13,7 @@ from itertools import product
 
 # Note: Use the astropy function if available
 import astropy
-if astropy.utils.minversion(astropy,"4.0.1"):
+if astropy.utils.minversion(astropy,"4.0.2"):
     from astropy.wcs.utils import fit_wcs_from_points
 else:
     from .utils.wcs_fitting import fit_wcs_from_points
@@ -273,24 +273,32 @@ class CutoutFactory():
 
         # Getting matched pixel, world coordinate pairs
         # We will choose no more than 100 pixels spread evenly throughout the image
+        # Centered on the center pixel.
         # To do this we the appropriate "step size" between pixel coordinates
-        # (i.e. we take every ith pixel in each row/column)
+        # (i.e. we take every ith pixel in each row/column) [TODOOOOOO]
         # For example in a 5x7 cutout with i = 2 we get:
         #
-        # xoxoxox
+        # xxoxoxx
         # ooooooo
-        # xoxoxox
+        # xxoxoxx
         # ooooooo
-        # xoxoxox
+        # xxoxoxx
         #
         # Where x denotes the indexes that will be used in the fit.
-
         y, x = cutout_shape
         i = 1
         while (x/i)*(y/i) > 100:
             i += 1
             
-        pix_inds = np.array(list(product(list(range(0,x,i)), list(range(0,y,i)))))
+        xvals = list(reversed(range(x//2, -1, -i)))[:-1] + list(range(x//2, x, i))
+        if xvals[-1] != x-1: xvals += [x-1]
+        if xvals[0] != 0: xvals = [0] + xvals
+        
+        yvals = list(reversed(range(y//2, -1, -i)))[:-1] + list(range(y//2, y, i))
+        if yvals[-1] != y-1: yvals += [y-1]
+        if yvals[0] != 0: yvals = [0] + yvals
+        
+        pix_inds = np.array(list(product(xvals,yvals)))
         world_pix = SkyCoord(cutout_wcs.all_pix2world(pix_inds, 0), unit='deg')
 
         # Getting the fit WCS
