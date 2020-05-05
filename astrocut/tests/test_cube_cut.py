@@ -218,8 +218,8 @@ def test_cutout_extras(tmpdir):
     # Test _fit_cutout_wcs #
     ########################
     max_dist, sigma = myfactory._fit_cutout_wcs(cutout_wcs_full, (3, 5))
-    assert round(max_dist.deg, 6) == 1e-06
-    assert round(sigma, 6) == 5e-06
+    assert max_dist.deg < 1e-05
+    assert sigma < 1e-05
 
     cry, crx = myfactory.cutout_wcs.wcs.crpix
     assert round(cry) == 3
