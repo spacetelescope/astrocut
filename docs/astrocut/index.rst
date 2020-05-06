@@ -157,11 +157,11 @@ aligned and have the same pixel scale, no checking is done.
                 >>> center_coord = SkyCoord("150.0945 2.38681", unit='deg')
                 >>> cutout_size = [200,300]
                 
-                >>> cutout_file = fits_cut(input_files, center_coord, cutout_size, drop_after="", single_outfile=True)  
-                >>> print(cutout_file)  
+                >>> cutout_file = fits_cut(input_files, center_coord, cutout_size, drop_after="", single_outfile=True)  #doctest: +SKIP
+                >>> print(cutout_file)    #doctest: +SKIP
                 ./cutout_150.094500_2.386810_200-x-300_astrocut.fits
 
-                >>> cutout_hdulist = fits.open(cutout_file)  
+                >>> cutout_hdulist = fits.open(cutout_file)  #doctest: +SKIP
                 >>> cutout_hdulist.info() #doctest: +SKIP
                 Filename: ./cutout_150.094500_2.386810_200-x-300_astrocut.fits
                 No.    Name      Ver    Type      Cards   Dimensions   Format
@@ -188,8 +188,8 @@ aligned and have the same pixel scale, no checking is done.
                 >>> center_coord = SkyCoord("150.0945 2.38681", unit='deg')
                 >>> cutout_size = [200,300]
                 
-                >>> png_files = img_cut(input_files, center_coord, cutout_size, img_format='png', drop_after="")  
-                >>> print(png_files[0])  
+                >>> png_files = img_cut(input_files, center_coord, cutout_size, img_format='png', drop_after="")    #doctest: +SKIP
+                >>> print(png_files[0])    #doctest: +SKIP
                 ./hlsp_candels_hst_acs_cos-tot-sect23_f606w_v1.0_drz_150.094500_2.386810_200-x-300_astrocut.png
 
                 >>> Image.open(png_files[1]) #doctest: +SKIP
@@ -212,8 +212,8 @@ treated as the R, G, and B channels respectively.
                 >>> center_coord = SkyCoord("189.51522 62.2865221", unit='deg')
                 >>> cutout_size = [200,300]
                 
-                >>> color_image = img_cut(input_files, center_coord, cutout_size, colorize=True)
-                >>> print(color_image)  
+                >>> color_image = img_cut(input_files, center_coord, cutout_size, colorize=True)   #doctest: +SKIP
+                >>> print(color_image)    #doctest: +SKIP
                 ./cutout_189.515220_62.286522_200-x-300_astrocut.jpg
                 
                 >>> Image.open(color_image) #doctest: +SKIP
