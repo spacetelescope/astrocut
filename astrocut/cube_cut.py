@@ -15,15 +15,15 @@ from astropy.io import fits
 from astropy.coordinates import SkyCoord
 from astropy import wcs
 
+from . import __version__ 
+from .exceptions import InputWarning, TypeWarning, InvalidQueryError
+
 # Note: Use the astropy function if available
 import astropy
 if astropy.utils.minversion(astropy, "4.0.2"):
     from astropy.wcs.utils import fit_wcs_from_points
 else:
     from .utils.wcs_fitting import fit_wcs_from_points
-
-from . import __version__
-from .exceptions import InputWarning, TypeWarning, InvalidQueryError
 
 
 class CutoutFactory():
@@ -301,7 +301,7 @@ class CutoutFactory():
         if yvals[0] != 0:
             yvals = [0] + yvals
         
-        pix_inds = np.array(list(product(xvals,yvals)))
+        pix_inds = np.array(list(product(xvals, yvals)))
         world_pix = SkyCoord(cutout_wcs.all_pix2world(pix_inds, 0), unit='deg')
 
         # Getting the fit WCS
