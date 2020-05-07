@@ -2,6 +2,7 @@
 ----------------
 - Update wcs fitting to match Astropy (and use Astropy when available) [#29]
 - Limit the number of pixels used for WCS fitting to 100 [#30]
+- Deprecate drop_after and handle inconsistant wcs keywords automatically [#31]
 
 
 0.5 (2020-01-13)

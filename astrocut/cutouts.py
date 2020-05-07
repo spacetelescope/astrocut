@@ -129,25 +129,29 @@ def remove_sip_coefficients(hdu_header):
     """
     Remove standard sip coefficient keywords for a fits header.
 
-    Everything is wrapped in try catches because we don't care is a keyword is not actually there.
+    Parameters
+    ----------
+    hdu_header : ~astropy.io.fits.Header
+        The header from which SIP keywords will be removed.  This is done in place.
     """
 
-    for lets in product(["A","B"], ["","P"]):
+    # Everything is wrapped in try catches because if a keyword is missing we just move on.
+    for lets in product(["A", "B"], ["", "P"]):
         lets = ''.join(lets)
         
         try:
-            del hdu_header[f"{lets}_ORDER"]
+            del hdu_header["{}_ORDER".format(lets)]
         except KeyError:
             pass
 
         try:
-            del hdu_header[f"{lets}_DMAX"]
+            del hdu_header["{}_DMAX".format(lets)]
         except KeyError:
             pass
         
-        for i,j in product([0,1,2,3],[0,1,2,3]):
+        for i, j in product([0, 1, 2, 3], [0, 1, 2, 3]):
             try:
-                del hdu_header[f"{lets}_{i}_{j}"]
+                del hdu_header["{}_{}_{}".format(lets, i, j)]
             except KeyError:
                 pass
 
@@ -208,7 +212,7 @@ def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, verbose=False
             img_wcs.sip = None
             no_sip = True
             
-        else: # Message(s) we didn't prepare for we want to go ahead and display
+        else:  # Message(s) we didn't prepare for we want to go ahead and display
             for log_rec in log_list:
                 log.log(log_rec.levelno, log_rec.msg, extra={"origin": log_rec.name})
 
@@ -376,7 +380,7 @@ def _parse_size_input(cutout_size):
     return cutout_size
 
 
-@deprecated_renamed_argument('drop_after', None, '0.5')        
+@deprecated_renamed_argument('drop_after', None, '0.6')        
 def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_after=None, 
              single_outfile=True, cutout_prefix="cutout", output_dir='.', verbose=False):
     """
@@ -579,7 +583,8 @@ def normalize_img(img_arr, stretch='asinh', minmax_percent=None, minmax_value=No
         norm_img = 255 - norm_img
 
     return norm_img
-        
+
+
 @deprecated_renamed_argument('drop_after', None, '0.5')
 def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_percent=None,
             minmax_value=None, invert=False, img_format='jpg', colorize=False,
