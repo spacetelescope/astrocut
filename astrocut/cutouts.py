@@ -15,7 +15,7 @@ from astropy import units as u
 from astropy.io import fits
 from astropy.coordinates import SkyCoord
 from astropy import wcs
-from astropy.utils.decorators import deprecated_renamed_argument
+from astropy.utils.exceptions import AstropyDeprecationWarning
 from astropy.visualization import (SqrtStretch, LogStretch, AsinhStretch, SinhStretch, LinearStretch,
                                    MinMaxInterval, ManualInterval, AsymmetricPercentileInterval)
 
@@ -379,8 +379,7 @@ def _parse_size_input(cutout_size):
 
     return cutout_size
 
-
-@deprecated_renamed_argument('drop_after', None, '0.6')        
+       
 def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_after=None, 
              single_outfile=True, cutout_prefix="cutout", output_dir='.', verbose=False):
     """
@@ -427,6 +426,11 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
         the output filepaths.
     """
 
+    # Dealing with deprecation
+    if drop_after is not None:
+        warnings.warn("Argument 'drop_after' is deprecated and will be ignored",
+                      AstropyDeprecationWarning)
+    
     if verbose:
         start_time = time()
             
@@ -585,7 +589,6 @@ def normalize_img(img_arr, stretch='asinh', minmax_percent=None, minmax_value=No
     return norm_img
 
 
-@deprecated_renamed_argument('drop_after', None, '0.5')
 def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_percent=None,
             minmax_value=None, invert=False, img_format='jpg', colorize=False,
             cutout_prefix="cutout", output_dir='.', drop_after=None, verbose=False):
@@ -644,7 +647,11 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
         the output filepaths.
     """
 
-
+    # Dealing with deprecation
+    if drop_after is not None:
+        warnings.warn("Argument 'drop_after' is deprecated and will be ignored",
+                      AstropyDeprecationWarning)
+        
     if verbose:
         start_time = time()
             
