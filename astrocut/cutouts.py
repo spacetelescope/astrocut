@@ -2,23 +2,24 @@
 
 """This module implements cutout functionality similar to fitscut."""
 
-
+import os
+import warnings
 import numpy as np
-import astropy.units as u
 
+from time import time
+from datetime import date
+from itertools import product
+
+from astropy import log
+from astropy import units as u
 from astropy.io import fits
 from astropy.coordinates import SkyCoord
 from astropy import wcs
+from astropy.utils.exceptions import AstropyDeprecationWarning
 from astropy.visualization import (SqrtStretch, LogStretch, AsinhStretch, SinhStretch, LinearStretch,
                                    MinMaxInterval, ManualInterval, AsymmetricPercentileInterval)
 
 from PIL import Image
-
-from time import time
-from datetime import date
-
-import os
-import warnings
 
 from . import __version__
 from .exceptions import InputWarning, DataWarning, InvalidQueryError, InvalidInputError
@@ -54,8 +55,6 @@ def _get_cutout_limits(img_wcs, center_coord, cutout_size):
         center_pixel = center_coord.to_pixel(img_wcs, 1)
     except wcs.NoConvergence:  # If wcs can't converge, center coordinate is far from the footprint
         raise InvalidQueryError("Cutout location is not in image footprint!")
-
-    # print("Center pixel: {center_pixel}".format(center_pixel))
     
     lims = np.zeros((2, 2), dtype=int)
 
@@ -125,10 +124,35 @@ def _get_cutout_wcs(img_wcs, cutout_lims):
     return wcs.WCS(wcs_header)
         
 
+def remove_sip_coefficients(hdu_header):
+    """
+    Remove standard sip coefficient keywords for a fits header.
+
+    Parameters
+    ----------
+    hdu_header : ~astropy.io.fits.Header
+        The header from which SIP keywords will be removed.  This is done in place.
+    """
+
+    for lets in product(["A", "B"], ["", "P"]):
+        lets = ''.join(lets)
+
+        key = "{}_ORDER".format(lets)
+        if key in hdu_header.keys():
+            del hdu_header["{}_ORDER".format(lets)]
+
+        key = "{}_DMAX".format(lets)
+        if key in hdu_header.keys():
+            del hdu_header["{}_DMAX".format(lets)]
+        
+        for i, j in product([0, 1, 2, 3], [0, 1, 2, 3]):
+            key = "{}_{}_{}".format(lets, i, j)
+            if key in hdu_header.keys():
+                del hdu_header["{}_{}_{}".format(lets, i, j)]
+
 #### FUNCTIONS FOR UTILS ####
 
-
-def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, drop_after=None, verbose=False):
+def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, verbose=False):
     """
     Takes an ImageHDU (image and associated metatdata in the fits format), as well as a center 
     coordinate and size and make a cutout of that image, which is returned as another ImageHDU,
@@ -146,13 +170,7 @@ def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, drop_after=No
         or `~astropy.Quantity` values, either pixels or angular quantities.
     correct_wcs : bool
         Default False. If true a new WCS will be created for the cutout that is tangent projected
-        and does not include distortions.
-    drop_after : str or None
-        Default None. When creating the header for the cutout (and crucially, before 
-        building the WCS object) drop all header keywords starting with the one given.  This is
-        useful particularly for drizzle files that contain a multitude of extranious keywords
-        and sometimes leftover WCS keywords that astropy will try to parse even thought they should be
-        ignored.
+        and does not include distortions.  
     verbose : bool
         Default False. If true intermediate information is printed.
 
@@ -161,18 +179,39 @@ def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, drop_after=No
     response : `~astropy.io.fits.hdu.image.ImageHDU` 
         The cutout image and associated metadata.
     """
-
-    # Pulling out the header
-    max_ind = len(img_hdu.header)
-    if drop_after is not None:
-        try:
-            max_ind = img_hdu.header.index(drop_after)
-        except ValueError:
-            warnings.warn("Last desired keyword not found in image header, using the entire header.",
-                          DataWarning)
     
-    hdu_header = fits.Header(img_hdu.header[:max_ind], copy=True)
-    img_wcs = wcs.WCS(hdu_header)
+    hdu_header = fits.Header(img_hdu.header, copy=True)
+
+    # We are going to reroute the logging to a string stream temporarily so we can
+    # intercept any message from astropy, chiefly the "Inconsistent SIP distortion information"
+    # INFO message which will indicate that we need to remove existing SIP keywords
+    # from a WCS whose CTYPE does not include SIP. In this we are taking the CTYPE to be
+    # correct and adjusting the header keywords to match.
+    hdlrs = log.handlers
+    log.handlers = []
+    with log.log_to_list() as log_list:        
+        img_wcs = wcs.WCS(hdu_header, relax=True)
+
+    for hd in hdlrs:
+        log.addHandler(hd)
+
+    no_sip = False
+    if (len(log_list) > 0):
+        if ("Inconsistent SIP distortion information" in log_list[0].msg):
+            # Delete standard sip keywords
+            remove_sip_coefficients(hdu_header)
+        
+            # load wcs ignoring any nonstandard keywords
+            img_wcs = wcs.WCS(hdu_header, relax=False)
+
+            # As an extra precaution make sure the img wcs has no sip coeefficients
+            img_wcs.sip = None
+            no_sip = True
+            
+        else:  # Message(s) we didn't prepare for we want to go ahead and display
+            for log_rec in log_list:
+                log.log(log_rec.levelno, log_rec.msg, extra={"origin": log_rec.name})
+
     img_data = img_hdu.data
 
     if verbose:
@@ -223,7 +262,10 @@ def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, drop_after=No
     cutout_wcs = _get_cutout_wcs(img_wcs, cutout_lims)
 
     # Updating the header with the new wcs info
-    hdu_header.update(cutout_wcs.to_header(relax=True))  # relax arg is for sip distortions if they exist
+    if no_sip:
+        hdu_header.update(cutout_wcs.to_header(relax=False))
+    else:
+        hdu_header.update(cutout_wcs.to_header(relax=True))  # relax arg is for sip distortions if they exist
 
     # Naming the extension
     hdu_header["EXTNAME"] = "CUTOUT"
@@ -260,7 +302,11 @@ def _save_single_fits(cutout_hdus, output_path, center_coord):
                                ('DEC_OBJ', center_coord.dec.deg, '[deg] declination')])
 
     cutout_hdulist = fits.HDUList([primary_hdu] + cutout_hdus)
-    cutout_hdulist.writeto(output_path, overwrite=True, checksum=True)
+
+    # Writing out the hdu often causes a warning as the ORIG_FLE card description is truncated
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore") 
+        cutout_hdulist.writeto(output_path, overwrite=True, checksum=True)
 
 
 def _save_multiple_fits(cutout_hdus, output_paths, center_coord):
@@ -329,9 +375,8 @@ def _parse_size_input(cutout_size):
 
     return cutout_size
 
-
-        
-def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_after=None,
+       
+def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_after=None, 
              single_outfile=True, cutout_prefix="cutout", output_dir='.', verbose=False):
     """
     Takes one or more fits files with the same WCS/pointing, makes the same cutout in each file,
@@ -357,12 +402,6 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
     correct_wcs : bool
         Default False. If true a new WCS will be created for the cutout that is tangent projected
         and does not include distortions.
-    drop_after : str or None
-        Default None. When creating the header for the cutout (and crucially, before 
-        building the WCS object) drop all header keywords starting with the one given.  This is
-        useful particularly for drizzle files that contain a multitude of extranious keywords
-        and sometimes leftover WCS keywords that astropy will try to parse even thought they should be
-        ignored.
     single_outfile : bool 
         Default True. If true return all cutouts in a single fits file with one cutout per extension,
         if False return cutouts in individual fits files. If returing a single file the filename will 
@@ -383,6 +422,11 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
         the output filepaths.
     """
 
+    # Dealing with deprecation
+    if drop_after is not None:
+        warnings.warn("Argument 'drop_after' is deprecated and will be ignored",
+                      AstropyDeprecationWarning)
+    
     if verbose:
         start_time = time()
             
@@ -402,11 +446,12 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
     for in_fle in input_files:
         if verbose:
             print("\n{}".format(in_fle))
-        
+
+        warnings.filterwarnings("ignore", category=wcs.FITSFixedWarning)
         with fits.open(in_fle) as hdulist:
             try:
                 cutout = _hducut(hdulist[0], coordinates, cutout_size,
-                                 correct_wcs=correct_wcs, drop_after=drop_after, verbose=verbose)
+                                 correct_wcs=correct_wcs, verbose=verbose)
             except OSError as err:
                 warnings.warn("Error {} encountered when performing cutout on {}, skipping...".format(err, in_fle),
                               DataWarning)
@@ -538,7 +583,7 @@ def normalize_img(img_arr, stretch='asinh', minmax_percent=None, minmax_value=No
         norm_img = 255 - norm_img
 
     return norm_img
-        
+
 
 def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_percent=None,
             minmax_value=None, invert=False, img_format='jpg', colorize=False,
@@ -598,7 +643,11 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
         the output filepaths.
     """
 
-
+    # Dealing with deprecation
+    if drop_after is not None:
+        warnings.warn("Argument 'drop_after' is deprecated and will be ignored",
+                      AstropyDeprecationWarning)
+        
     if verbose:
         start_time = time()
             
@@ -632,7 +681,7 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
             print("\n{}".format(in_fle))
         hdulist = fits.open(in_fle)
         cutout = _hducut(hdulist[0], coordinates, cutout_size,
-                         correct_wcs=False, drop_after=drop_after, verbose=verbose)
+                         correct_wcs=False, verbose=verbose)
         hdulist.close()
 
         # We just want the data array
