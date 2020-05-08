@@ -124,7 +124,6 @@ def _get_cutout_wcs(img_wcs, cutout_lims):
     return wcs.WCS(wcs_header)
         
 
-#### FUNCTIONS FOR UTILS ####
 def remove_sip_coefficients(hdu_header):
     """
     Remove standard sip coefficient keywords for a fits header.
@@ -135,26 +134,23 @@ def remove_sip_coefficients(hdu_header):
         The header from which SIP keywords will be removed.  This is done in place.
     """
 
-    # Everything is wrapped in try catches because if a keyword is missing we just move on.
     for lets in product(["A", "B"], ["", "P"]):
         lets = ''.join(lets)
-        
-        try:
-            del hdu_header["{}_ORDER".format(lets)]
-        except KeyError:
-            pass
 
-        try:
+        key = "{}_ORDER".format(lets)
+        if key in hdu_header.keys():
+            del hdu_header["{}_ORDER".format(lets)]
+
+        key = "{}_DMAX".format(lets)
+        if key in hdu_header.keys():
             del hdu_header["{}_DMAX".format(lets)]
-        except KeyError:
-            pass
         
         for i, j in product([0, 1, 2, 3], [0, 1, 2, 3]):
-            try:
+            key = "{}_{}_{}".format(lets, i, j)
+            if key in hdu_header.keys():
                 del hdu_header["{}_{}_{}".format(lets, i, j)]
-            except KeyError:
-                pass
 
+#### FUNCTIONS FOR UTILS ####
 
 def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, verbose=False):
     """
@@ -191,13 +187,13 @@ def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, verbose=False
     # INFO message which will indicate that we need to remove existing SIP keywords
     # from a WCS whose CTYPE does not include SIP. In this we are taking the CTYPE to be
     # correct and adjusting the header keywords to match.
-    with log.log_to_list() as log_list:
-        hdlr = log.handlers[0]  
-        log.removeHandler(log.handlers[0])
-        
+    hdlrs = log.handlers
+    log.handlers = []
+    with log.log_to_list() as log_list:        
         img_wcs = wcs.WCS(hdu_header, relax=True)
-        
-        log.addHandler(hdlr)
+
+    for hd in hdlrs:
+        log.addHandler(hd)
 
     no_sip = False
     if (len(log_list) > 0):
