@@ -261,7 +261,7 @@ def test_normalize_img():
 
     # Bad stretch
     with pytest.raises(InvalidInputError):
-        img_arr = np.array([[1,0 ], [.25, .75]])
+        img_arr = np.array([[1, 0], [.25, .75]])
         cutouts.normalize_img(img_arr, stretch='lin')
 
     # Giving both minmax percent and cut
