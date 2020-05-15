@@ -208,6 +208,70 @@ def test_fits_cut(tmpdir):
     assert len(cutout_files) == len(test_images) - 2
 
 
+def test_normalize_img():
+
+    # basic linear stretch
+    img_arr = np.array([[1,0],[.25,.75]])
+    assert ((img_arr*255).astype(int) == cutouts.normalize_img(img_arr, stretch='linear')).all()
+
+    # linear stretch where input image must be scaled 
+    img_arr = np.array([[10,5],[2.5,7.5]])
+    norm_img = ((img_arr - img_arr.min())/(img_arr.max()-img_arr.min())*255).astype(int)
+    assert (norm_img == cutouts.normalize_img(img_arr, stretch='linear')).all()
+
+    # min_max val
+    minval,maxval = 0,1
+    img_arr = np.array([[1,0],[-1,2]])
+    norm_img = cutouts.normalize_img(img_arr, stretch='linear', minmax_value=[minval,maxval])
+    img_arr[img_arr<minval] = minval
+    img_arr[img_arr>maxval] = maxval
+    assert ((img_arr*255).astype(int) == norm_img).all()
+
+    minval,maxval = 0,1
+    img_arr = np.array([[1,0],[.1,.2]])
+    norm_img = cutouts.normalize_img(img_arr, stretch='linear', minmax_value=[minval,maxval])
+    img_arr[img_arr<minval] = minval
+    img_arr[img_arr>maxval] = maxval
+    ((img_arr*255).astype(int) == norm_img).all()
+
+    # min_max percent
+    img_arr = np.array([[1,0],[0.1,0.9],[.25,.75]])
+    norm_img = cutouts.normalize_img(img_arr, stretch='linear', minmax_percent=[25,75])
+    assert (norm_img == [[255,0],[0,255],[39,215]]).all()
+
+    # asinh
+    img_arr = np.array([[1,0],[.25,.75]])
+    norm_img = cutouts.normalize_img(img_arr)
+    assert ((np.arcsinh(img_arr*10)/np.arcsinh(10)*255).astype(int) == norm_img).all()
+
+    # sinh
+    img_arr = np.array([[1,0],[.25,.75]])
+    norm_img = cutouts.normalize_img(img_arr, stretch='sinh')
+    assert ((np.sinh(img_arr*3)/np.sinh(3)*255).astype(int) == norm_img).all()
+
+    # sqrt
+    img_arr = np.array([[1,0],[.25,.75]])
+    norm_img = cutouts.normalize_img(img_arr, stretch='sqrt')
+    assert ((np.sqrt(img_arr)*255).astype(int) == norm_img).all()
+
+    # log
+    img_arr = np.array([[1,0],[.25,.75]])
+    norm_img = cutouts.normalize_img(img_arr, stretch='log')
+    assert ((np.log(img_arr*1000+1)/np.log(1000)*255).astype(int) == norm_img).all()
+
+    # Bad stretch
+    with pytest.raises(InvalidInputError):
+        img_arr = np.array([[1,0],[.25,.75]])
+        cutouts.normalize_img(img_arr, stretch='lin')
+
+    # Giving both minmax percent and cut
+    img_arr = np.array([[1,0],[.25,.75]])
+    norm_img = cutouts.normalize_img(img_arr, stretch='asinh', minmax_percent=[0.7, 99.3])
+    with pytest.warns(InputWarning):
+        test_img = cutouts.normalize_img(img_arr, stretch='asinh', minmax_value=[5, 2000], minmax_percent=[0.7, 99.3])
+    assert (test_img == norm_img).all()
+
+
 def test_img_cut(tmpdir):
 
     test_images = create_test_imgs(50, 6)
@@ -225,45 +289,6 @@ def test_img_cut(tmpdir):
     img_files = cutouts.img_cut(test_images[0], center_coord, cutout_size, img_format='png')
     with open(img_files[0], 'rb') as IMGFLE:
         assert IMGFLE.read(8) == b'\x89\x50\x4E\x47\x0D\x0A\x1A\x0A'  # PNG
-
-    # Testing the different scaling parameters
-    raw_hdu = fits.open(test_images[0])[0]
-    raw_img = cutouts._hducut(raw_hdu, center_coord, cutouts._parse_size_input(cutout_size)).data
-
-    norm_img = cutouts.normalize_img(raw_img, stretch='sinh', minmax_percent=[0.5, 99.5])
-    img_files = cutouts.img_cut(test_images[0], center_coord, cutout_size,
-                                stretch='sinh', img_format='png')
-    img_arr = np.array(Image.open(img_files[0]))
-    assert (img_arr == norm_img).all()
-
-    norm_img = cutouts.normalize_img(raw_img, stretch='sqrt', minmax_percent=[5, 95])
-    img_files = cutouts.img_cut(test_images[0], center_coord, cutout_size,
-                                stretch='sqrt', minmax_percent=[5, 95], img_format='png')
-    img_arr = np.array(Image.open(img_files[0]))
-    assert (img_arr == norm_img).all()
-
-    norm_img = cutouts.normalize_img(raw_img, stretch='log', minmax_value=[5, 2000])
-    img_files = cutouts.img_cut(test_images[0], center_coord, cutout_size,
-                                stretch='log', minmax_value=[5, 2000], img_format='png')
-    img_arr = np.array(Image.open(img_files[0]))
-    assert (img_arr == norm_img).all()
-
-    norm_img = cutouts.normalize_img(raw_img, stretch='linear', minmax_percent=[0.5, 99.5])
-    img_files = cutouts.img_cut(test_images[0], center_coord, cutout_size,
-                                stretch='linear', img_format='png')
-    img_arr = np.array(Image.open(img_files[0]))
-    assert (img_arr == norm_img).all()
-
-    # Bad stretch
-    with pytest.raises(InvalidInputError):
-        cutouts.img_cut(test_images[0], center_coord, cutout_size, stretch='lin')
-
-    # Giving both minmax percent and cut
-    norm_img = cutouts.normalize_img(raw_img, stretch='asinh', minmax_percent=[0.7, 99.3])
-    with pytest.warns(InputWarning):
-        img_files = cutouts.img_cut(test_images[0], center_coord, cutout_size,
-                                    minmax_percent=[0.7, 99.3], minmax_value=[5, 2000], img_format='png')
-    assert (img_arr == norm_img).all()
 
     # Color image
     color_jpg = cutouts.img_cut(test_images[:3], center_coord, cutout_size, colorize=True)
