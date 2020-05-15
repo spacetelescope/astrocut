@@ -149,8 +149,8 @@ def remove_sip_coefficients(hdu_header):
             key = "{}_{}_{}".format(lets, i, j)
             if key in hdu_header.keys():
                 del hdu_header["{}_{}_{}".format(lets, i, j)]
-
 #### FUNCTIONS FOR UTILS ####
+
 
 def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, verbose=False):
     """
@@ -559,7 +559,7 @@ def normalize_img(img_arr, stretch='asinh', minmax_percent=None, minmax_value=No
     else:
         raise InvalidInputError("Stretch {} is not supported!".format(stretch))
 
-     # Adding the scaling to the transform
+    # Adding the scaling to the transform
     if minmax_percent is not None:
         transform += AsymmetricPercentileInterval(*minmax_percent)
         
