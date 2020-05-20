@@ -448,7 +448,7 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
             print("\n{}".format(in_fle))
 
         warnings.filterwarnings("ignore", category=wcs.FITSFixedWarning)
-        with fits.open(in_fle) as hdulist:
+        with fits.open(in_fle, mode='denywrite', memmap=True) as hdulist:
             try:
                 cutout = _hducut(hdulist[0], coordinates, cutout_size,
                                  correct_wcs=correct_wcs, verbose=verbose)
@@ -677,7 +677,7 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
     for in_fle in input_files:
         if verbose:
             print("\n{}".format(in_fle))
-        hdulist = fits.open(in_fle)
+        hdulist = fits.open(in_fle, mode='denywrite', memmap=True)
         cutout = _hducut(hdulist[0], coordinates, cutout_size,
                          correct_wcs=False, verbose=verbose)
         hdulist.close()
