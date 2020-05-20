@@ -735,7 +735,7 @@ class CutoutFactory():
             start_time = time()
 
         warnings.filterwarnings("ignore", category=wcs.FITSFixedWarning)
-        with fits.open(cube_file) as cube:
+        with fits.open(cube_file, mode='denywrite', memmap=True) as cube:
 
             # Get the info we need from the data table
             self._parse_table_info(cube[2].header, cube[2].data, verbose)

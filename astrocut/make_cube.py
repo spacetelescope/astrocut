@@ -99,7 +99,7 @@ class CubeFactory():
         good_header_ind = None
     
         for i, ffi in enumerate(file_list):
-            ffi_data = fits.open(ffi)
+            ffi_data = fits.open(ffi, mode='denywrite', memmap=True)
             
             start_times[i] = ffi_data[1].header.get("TSTART")  # TODO: optionally pass this in?
             
@@ -124,7 +124,7 @@ class CubeFactory():
         if verbose:
             print("Using {} to initialize the image header table.".format(os.path.basename(fle)))
             
-        ffi_data = fits.open(fle)
+        ffi_data = fits.open(fle, mode='denywrite', memmap=True)
 
         # The image specific header information will be saved in a table in the second extension
         secondary_header = ffi_data[1].header
@@ -151,7 +151,7 @@ class CubeFactory():
         # Loop through files
         for i, fle in enumerate(file_list[sorted_indices]):
         
-            ffi_data = fits.open(fle)
+            ffi_data = fits.open(fle, mode='denywrite', memmap=True)
 
             # if the arrays/header aren't initialized do it now
             if img_cube is None:
