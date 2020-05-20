@@ -1,4 +1,4 @@
-0.6 (unreleased)
+0.6 (2020-05-20)
 ----------------
 - Update wcs fitting to match Astropy (and use Astropy when available) [#29]
 - Limit the number of pixels used for WCS fitting to 100 [#30]
