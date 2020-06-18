@@ -320,7 +320,45 @@ def _parse_size_input(cutout_size):
 
     return cutout_size
 
-       
+
+def _parse_extensions(infile_exts, infile_name, user_exts):
+    """
+    Given a list of image extensions available in the file with infile_name, cross-match with
+    user input extensions to figure out which extensions to use for cutout.
+
+    Parameters
+    ----------
+    infile_exts : array
+    infile_name : str
+    user_exts : int, list of ints, None, or 'all'
+        Optional, default None. Default is to cutout the first extension that has image data.
+        The user can also supply one or more extensions to cutout from (integers), or "all".
+
+    Returns
+    -------
+    response : array
+        List of extensions to be cutout.
+    """
+ 
+    if len(infile_exts) == 0:
+        warnings.warn(f"No image extensions with data found in {infile_name}, skipping...",
+                      DataWarning)
+        return []
+            
+    if user_exts is None:
+        cutout_exts = infile_exts[:1]  # Take the first image extension
+    elif user_exts == 'all':
+        cutout_exts = infile_exts  # Take all the extensions
+    else:  # User input extentions
+        cutout_exts = [x for x in infile_exts if x in user_exts]
+        if len(cutout_exts) < len(user_exts):
+            warnings.warn((f"Not all requested extensions in {infile_name} are image extensions or have data, extension(s)"
+                           f" {','.join([x for x in user_exts if x not in cutout_exts])} will be skipped."),
+                          DataWarning)
+
+    return cutout_exts
+
+                    
 def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension=None, 
              single_outfile=True, cutout_prefix="cutout", output_dir='.', verbose=False):
     """
@@ -398,21 +436,9 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
         warnings.filterwarnings("ignore", category=wcs.FITSFixedWarning)
         with fits.open(in_fle, mode='denywrite', memmap=True) as hdulist:
 
-            # Sorting out which extensions to cutout
-            cutout_inds = np.where([x.is_image and (x.data is not None)  for x in hdulist])[0]
-            if len(cutout_inds) == 0:
-                warnings.warn(f"No image extensions with data found in {in_fle}, skipping...",
-                              DataWarning)
-                continue  # Nothing to cutout move onto the next file
-            
-            if extension is None:
-                cutout_inds = cutout_inds[:1]  # Take the first image extension
-            elif extension != 'all':  # User supplied extensions
-                cutout_inds = [x for x in extension if x in cutout_inds]
-                if len(cutout_inds) < len(extension):
-                    warnings.warn((f"Not all requested extensions in {in_fle} are image extensions or have data, extension(s)"
-                                   " {','.join([x for x in extension if x not in cutout_inds])} will be skipped."),
-                                  DataWarning)
+            # Sorting out which extension(s) to cutout
+            all_inds = np.where([x.is_image and (x.data is not None)  for x in hdulist])[0]
+            cutout_inds = _parse_extensions(all_inds, in_fle, extension)
 
             num_cutouts += len(cutout_inds)
             for ind in cutout_inds:            
@@ -467,13 +493,13 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
                               DataWarning)
                 continue
 
-            cutout_path = "{}_{:7f}_{:7f}_{}-x-{}_astrocut.fits".format(os.path.basename(fle).rstrip('.fits'),
-                                                                        coordinates.ra.value,
-                                                                        coordinates.dec.value,
-                                                                        str(cutout_size[0]).replace(' ', ''), 
-                                                                        str(cutout_size[1]).replace(' ', ''))
+            filename = "{}_{:7f}_{:7f}_{}-x-{}_astrocut.fits".format(os.path.basename(fle).rstrip('.fits'),
+                                                                     coordinates.ra.value,
+                                                                     coordinates.dec.value,
+                                                                     str(cutout_size[0]).replace(' ', ''), 
+                                                                     str(cutout_size[1]).replace(' ', ''))
             cutout_path = os.path.join(output_dir, filename)
-            _save_fits(cutout_list, file_path, coordinates)
+            _save_fits(cutout_list, cutout_path, coordinates)
             
             if verbose:
                 print(cutout_path)
@@ -555,7 +581,7 @@ def normalize_img(img_arr, stretch='asinh', minmax_percent=None, minmax_value=No
 
 def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_percent=None,
             minmax_value=None, invert=False, img_format='jpg', colorize=False,
-            cutout_prefix="cutout", output_dir='.', drop_after=None, verbose=False):
+            cutout_prefix="cutout", output_dir='.', extension=None, verbose=False):
     """
     Takes one or more fits files with the same WCS/pointing, makes the same cutout in each file,
     and returns the result either as a single color image or in individual image files.
@@ -601,6 +627,9 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
         cutout filename. 
     output_dir : str
         Defaul value '.'. The directory to save the cutout file(s) to.
+    extension : int, list of ints, None, or 'all'
+        Optional, default None. Default is to cutout the first extension that has image data.
+        The user can also supply one or more extensions to cutout from (integers), or "all".
     verbose : bool
         Default False. If true intermediate information is printed.
 
@@ -610,11 +639,6 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
         If colorize is True returns the single output filepath. Otherwise returns a list of all 
         the output filepaths.
     """
-
-    # Dealing with deprecation
-    if drop_after is not None:
-        warnings.warn("Argument 'drop_after' is deprecated and will be ignored",
-                      AstropyDeprecationWarning)
         
     if verbose:
         start_time = time()
@@ -622,15 +646,6 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
     # Making sure we have an array of images
     if type(input_files) == str:
         input_files = [input_files]
-    
-    # Doing image checks for color images
-    if colorize:
-        if len(input_files) < 3:
-            raise InvalidInputError("Color cutouts require 3 imput files (RGB).")
-        if len(input_files) > 3:
-            warnings.warn("Too many inputs for a color cutout, only the first three will be used.",
-                          InputWarning)
-            input_files = input_files[:3]
             
     if not isinstance(coordinates, SkyCoord):
         coordinates = SkyCoord(coordinates, unit='deg')
@@ -647,20 +662,32 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
     for in_fle in input_files:
         if verbose:
             print("\n{}".format(in_fle))
-        hdulist = fits.open(in_fle, mode='denywrite', memmap=True)
-        cutout = _hducut(hdulist[0], coordinates, cutout_size,
-                         correct_wcs=False, verbose=verbose)
-        hdulist.close()
 
-        # We just want the data array
-        cutout = cutout.data
+
+        warnings.filterwarnings("ignore", category=wcs.FITSFixedWarning)
+        with fits.open(in_fle, mode='denywrite', memmap=True) as hdulist:
+
+            # Sorting out which extension(s) to cutout
+            all_inds = np.where([x.is_image and (x.data is not None)  for x in hdulist])[0]
+            cutout_inds = _parse_extensions(all_inds, in_fle, extension)
+
+            for ind in cutout_inds:   
+                try:
+                    cutout = _hducut(hdulist[ind], coordinates, cutout_size, correct_wcs=False, verbose=verbose)
+
+                    # We just want the data array
+                    cutout = cutout.data
         
-        # Applying the appropriate normalization parameters
-        normalized_cutout = normalize_img(cutout, stretch, minmax_percent, minmax_value, invert)
+                    # Applying the appropriate normalization parameters
+                    normalized_cutout = normalize_img(cutout, stretch, minmax_percent, minmax_value, invert)
         
-        # Check that there is data in the cutout image
-        if not (cutout == 0).all():
-            cutout_hdu_dict[in_fle] = normalized_cutout
+                    # Check that there is data in the cutout image
+                    if not (cutout == 0).all():
+                        cutout_hdu_dict[in_fle] = cutout_hdu_dict.get(in_fle, []) + [normalized_cutout]
+                    
+                except OSError as err:
+                    warnings.warn("Error {} encountered when performing cutout on {}, skipping...".format(err, in_fle),
+                                  DataWarning)
 
     # If no cutouts contain data, raise exception
     if not cutout_hdu_dict:
@@ -673,6 +700,17 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
     # Setting up the output file(s) and writing them
     if colorize:
 
+        cutouts = [x for fle in input_files for x in cutout_hdu_dict[fle] if cutout_hdu_dict.get(fle)]
+        
+        # Doing checks correct number of cutouts
+        if len(cutouts) < 3:
+            raise InvalidInputError("Color cutouts require 3 input images (RGB).")
+        if len(cutouts) > 3:
+            warnings.warn("Too many inputs for a color cutout, only the first three will be used.",
+                          InputWarning)
+            cutouts = input_files[:3]
+
+            
         cutout_path = "{}_{:7f}_{:7f}_{}-x-{}_astrocut.{}".format(cutout_prefix,
                                                                   coordinates.ra.value,
                                                                   coordinates.dec.value,
@@ -680,47 +718,27 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
                                                                   str(cutout_size[1]).replace(' ', ''),
                                                                   img_format.lower()) 
         cutout_path = os.path.join(output_dir, cutout_path)
-
-        # TODO: This is not elegant or efficient, make it better
-        red = cutout_hdu_dict.get(input_files[0])
-        green = cutout_hdu_dict.get(input_files[1])
-        blue = cutout_hdu_dict.get(input_files[2])
-
-        cshape = ()
-        for cutout in [red, green, blue]:
-            if cutout is not None:
-                cshape = cutout.shape
-                break
-
-        if red is None:
-            red = np.zeros(cshape)
-        if green is None:
-            green = np.zeros(cshape)
-        if blue is None:
-            blue = np.zeros(cshape)
-
-        Image.fromarray(np.dstack([red, green, blue]).astype(np.uint8)).save(cutout_path)
+        Image.fromarray(np.dstack([cutouts[0], cutouts[1], cutouts[2]]).astype(np.uint8)).save(cutout_path)
           
     else:
  
         cutout_path = []
         for fle in input_files:
-            cutout = cutout_hdu_dict.get(fle)
-            if cutout is None:
-                warnings.warn("Cutout of {} contains to data and will not be written.".format(fle),
-                              DataWarning)
-                continue
 
-            file_path = "{}_{:7f}_{:7f}_{}-x-{}_astrocut.{}".format(os.path.basename(fle).rstrip('.fits'),
-                                                                    coordinates.ra.value,
-                                                                    coordinates.dec.value,
-                                                                    str(cutout_size[0]).replace(' ', ''), 
-                                                                    str(cutout_size[1]).replace(' ', ''),
-                                                                    img_format.lower())
-            file_path = os.path.join(output_dir, file_path)
-            cutout_path.append(file_path)
+            for i,cutout  in enumerate(cutout_hdu_dict.get(fle)):
+
+
+                file_path = "{}_{:7f}_{:7f}_{}-x-{}_astrocut_{}.{}".format(os.path.basename(fle).rstrip('.fits'),
+                                                                           coordinates.ra.value,
+                                                                           coordinates.dec.value,
+                                                                           str(cutout_size[0]).replace(' ', ''), 
+                                                                           str(cutout_size[1]).replace(' ', ''),
+                                                                           i,
+                                                                           img_format.lower())
+                file_path = os.path.join(output_dir, file_path)
+                cutout_path.append(file_path)
             
-            Image.fromarray(cutout).save(file_path)
+                Image.fromarray(cutout).save(file_path)
         
     if verbose:
         print("Cutout fits file(s): {}".format(cutout_path))
