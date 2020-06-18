@@ -251,20 +251,23 @@ def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, verbose=False
     return hdu
 
 
-def _save_single_fits(cutout_hdus, output_path, center_coord):
+def _save_fits(cutout_hdus, output_path, center_coord):
     """
-    Save a list of cutout hdus to a single fits file.
+    Save one or more cutout hdus to a single fits file.
 
     Parameters
     ----------
-    cutout_hdus : list
-        List of `~astropy.io.fits.hdu.image.ImageHDU` objects to be written to a single fits file.
+    cutout_hdus : list or `~astropy.io.fits.hdu.image.ImageHDU`
+        The `~astropy.io.fits.hdu.image.ImageHDU` object(s) to be written to the fits file.
     output_path : str
         The full path to the output fits file.
     center_coord : `~astropy.coordinates.sky_coordinate.SkyCoord`
         The center coordinate of the image cutouts.
     """
 
+    if isinstance(cutout_hdus, fits.hdu.image.ImageHDU):
+        cutout_hdus = [cutout_hdus]
+    
     # Setting up the Primary HDU
     primary_hdu = fits.PrimaryHDU()
     primary_hdu.header.extend([("ORIGIN", 'STScI/MAST', "institution responsible for creating this file"),
@@ -279,37 +282,7 @@ def _save_single_fits(cutout_hdus, output_path, center_coord):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore") 
         cutout_hdulist.writeto(output_path, overwrite=True, checksum=True)
-
-
-def _save_multiple_fits(cutout_hdus, output_paths, center_coord):
-    """
-    Save a list of cutout hdus to individual fits files.
-
-    Parameters
-    ----------
-    cutout_hdus : list
-        List of `~astropy.io.fits.hdu.image.ImageHDU` objects to be written to a single fits file.
-    output_paths : list
-        The cutout filepaths associated with the cutout hdus.
-    center_coord : `~astropy.coordinates.sky_coordinate.SkyCoord`
-        The center coordinate of the image cutouts.
-    """
-
-    if len(output_paths) != len(cutout_hdus):
-        raise InvalidInputError("The number of filenames must match the number of cutouts.")
-
-    # Adding aditional keywords
-    for i, cutout in enumerate(cutout_hdus):
-        # Turning our hdu into a primary hdu
-        hdu = fits.PrimaryHDU(header=cutout.header, data=cutout.data)
-        hdu.header.extend([("ORIGIN", 'STScI/MAST', "institution responsible for creating this file"),
-                           ("DATE", str(date.today()), "file creation date"),
-                           ('PROCVER', __version__, 'software version'),
-                           ('RA_OBJ', center_coord.ra.deg, '[deg] right ascension'),
-                           ('DEC_OBJ', center_coord.dec.deg, '[deg] declination')])
-
-        cutout_hdulist = fits.HDUList([hdu])
-        cutout_hdulist.writeto(output_paths[i], overwrite=True, checksum=True)
+        
 
     
 def _parse_size_input(cutout_size):
@@ -348,7 +321,7 @@ def _parse_size_input(cutout_size):
     return cutout_size
 
        
-def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_after=None, 
+def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension=None, 
              single_outfile=True, cutout_prefix="cutout", output_dir='.', verbose=False):
     """
     Takes one or more fits files with the same WCS/pointing, makes the same cutout in each file,
@@ -374,6 +347,9 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
     correct_wcs : bool
         Default False. If true a new WCS will be created for the cutout that is tangent projected
         and does not include distortions.
+    extension : int, list of ints, None, or 'all'
+        Optional, default None. Default is to cutout the first extension that has image data.
+        The user can also supply one or more extensions to cutout from (integers), or "all".
     single_outfile : bool 
         Default True. If true return all cutouts in a single fits file with one cutout per extension,
         if False return cutouts in individual fits files. If returing a single file the filename will 
@@ -393,11 +369,6 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
         If single_outfile is True returns the single output filepath. Otherwise returns a list of all 
         the output filepaths.
     """
-
-    # Dealing with deprecation
-    if drop_after is not None:
-        warnings.warn("Argument 'drop_after' is deprecated and will be ignored",
-                      AstropyDeprecationWarning)
     
     if verbose:
         start_time = time()
@@ -405,6 +376,10 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
     # Making sure we have an array of images
     if type(input_files) == str:
         input_files = [input_files]
+
+    # If a single extension is given, make it a list
+    if isinstance(extension, int):
+        extension = [extension]
 
     if not isinstance(coordinates, SkyCoord):
         coordinates = SkyCoord(coordinates, unit='deg')
@@ -415,28 +390,51 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
     # Making the cutouts
     cutout_hdu_dict = {}
     num_empty = 0
+    num_cutouts = 0
     for in_fle in input_files:
         if verbose:
             print("\n{}".format(in_fle))
 
         warnings.filterwarnings("ignore", category=wcs.FITSFixedWarning)
         with fits.open(in_fle, mode='denywrite', memmap=True) as hdulist:
-            try:
-                cutout = _hducut(hdulist[0], coordinates, cutout_size,
-                                 correct_wcs=correct_wcs, verbose=verbose)
-            except OSError as err:
-                warnings.warn("Error {} encountered when performing cutout on {}, skipping...".format(err, in_fle),
+
+            # Sorting out which extensions to cutout
+            cutout_inds = np.where([x.is_image and (x.data is not None)  for x in hdulist])[0]
+            if len(cutout_inds) == 0:
+                warnings.warn(f"No image extensions with data found in {in_fle}, skipping...",
                               DataWarning)
-        
-        # Check that there is data in the cutout image
-        if (cutout.data == 0).all() or (np.isnan(cutout.data)).all():
-            cutout.header["EMPTY"] = (True, "Indicates no data in cutout image.")
-            num_empty += 1
+                continue  # Nothing to cutout move onto the next file
             
-        cutout_hdu_dict[in_fle] = cutout
+            if extension is None:
+                cutout_inds = cutout_inds[:1]  # Take the first image extension
+            elif extension != 'all':  # User supplied extensions
+                cutout_inds = [x for x in extension if x in cutout_inds]
+                if len(cutout_inds) < len(extension):
+                    warnings.warn((f"Not all requested extensions in {in_fle} are image extensions or have data, extension(s)"
+                                   " {','.join([x for x in extension if x not in cutout_inds])} will be skipped."),
+                                  DataWarning)
+
+            num_cutouts += len(cutout_inds)
+            for ind in cutout_inds:            
+                try:
+                    cutout = _hducut(hdulist[ind], coordinates, cutout_size,
+                                 correct_wcs=correct_wcs, verbose=verbose)
+
+                    # Check that there is data in the cutout image
+                    if (cutout.data == 0).all() or (np.isnan(cutout.data)).all():
+                        cutout.header["EMPTY"] = (True, "Indicates no data in cutout image.")
+                        num_empty += 1
+
+                    cutout.header["ORIG_EXT"] = (ind, "Extension in original file.")
+                    cutout_hdu_dict[in_fle] = cutout_hdu_dict.get(in_fle, []) + [cutout]
+                    
+                except OSError as err:
+                    warnings.warn(f"Error {err} encountered when performing cutout on {in_fle}, extension {ind}, skipping...",
+                                  DataWarning)
+                    num_empty += 1
 
     # If no cutouts contain data, raise exception
-    if num_empty == len(input_files):
+    if num_empty == num_cutouts:
         raise InvalidQueryError("Cutout contains no data! (Check image footprint.)")
 
     # Make sure the output directory exists
@@ -452,33 +450,35 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
                                                                     str(cutout_size[0]).replace(' ', ''), 
                                                                     str(cutout_size[1]).replace(' ', ''))
         cutout_path = os.path.join(output_dir, cutout_path)
-        cutout_hdus = [cutout_hdu_dict[fle] for fle in input_files]
-        _save_single_fits(cutout_hdus, cutout_path, coordinates)
+        cutout_hdus = [x for fle in cutout_hdu_dict for x in cutout_hdu_dict[fle]]
+        _save_fits(cutout_hdus, cutout_path, coordinates)
 
-    else:
-        cutout_hdus = []
-        cutout_path = []
+        if verbose:
+            print("Cutout fits file: {}".format(cutout_path))
+
+    else:  # one output file per input file
+        if verbose:
+            print("Cutout fits files:")
+            
         for fle in input_files:
-            cutout = cutout_hdu_dict[fle]
-            if cutout.header.get("EMPTY"):
-                warnings.warn("Cutout of {} contains to data and will not be written.".format(fle),
+            cutout_list = cutout_hdu_dict[fle]
+            if np.array([x.header.get("EMPTY") for x in cutout_list]).all():
+                warnings.warn(f"Cutout of {fle} contains no data and will not be written.",
                               DataWarning)
                 continue
 
-            cutout_hdus.append(cutout)
-
-            filename = "{}_{:7f}_{:7f}_{}-x-{}_astrocut.fits".format(os.path.basename(fle).rstrip('.fits'),
-                                                                     coordinates.ra.value,
-                                                                     coordinates.dec.value,
-                                                                     str(cutout_size[0]).replace(' ', ''), 
-                                                                     str(cutout_size[1]).replace(' ', ''))
-            cutout_path.append(os.path.join(output_dir, filename))
-                
-        _save_multiple_fits(cutout_hdus, cutout_path, coordinates)
-
+            cutout_path = "{}_{:7f}_{:7f}_{}-x-{}_astrocut.fits".format(os.path.basename(fle).rstrip('.fits'),
+                                                                        coordinates.ra.value,
+                                                                        coordinates.dec.value,
+                                                                        str(cutout_size[0]).replace(' ', ''), 
+                                                                        str(cutout_size[1]).replace(' ', ''))
+            cutout_path = os.path.join(output_dir, filename)
+            _save_fits(cutout_list, file_path, coordinates)
+            
+            if verbose:
+                print(cutout_path)
         
     if verbose:
-        print("Cutout fits file(s): {}".format(cutout_path))
         print("Total time: {:.2} sec".format(time()-start_time))
 
     return cutout_path
