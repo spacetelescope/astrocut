@@ -8,7 +8,7 @@ def add_keywords(hdu, extname, time_increment, primary=False):
     Add a bunch of required keywords (mostly fake values).
     """
     
-    hdu.header['extname'] = 'CAMERA.CCD 1.1 cal'
+    hdu.header['extname'] = extname
     hdu.header['camera'] = 1
     hdu.header['ccd'] = 1
     hdu.header['tstart'] = float(time_increment)
