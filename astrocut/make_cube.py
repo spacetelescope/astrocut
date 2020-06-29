@@ -81,7 +81,7 @@ class CubeFactory():
         # without using too much memory
         cube_size = np.prod(image_shape) * len(self.file_list) * 2 * 4 # in bytes (float32)
         slice_size = image_shape[1] * len(self.file_list) * 2 * 4 # in bytes (float32)
-        self.block_size = int((self.max_memory * 10e9)//slice_size)
+        self.block_size = int((self.max_memory * 1e9)//slice_size)
         self.num_blocks = int(image_shape[0]/self.block_size + 1)
         self.cube_shape = (image_shape[0], image_shape[1], len(self.file_list), 2)
 
@@ -287,7 +287,7 @@ class CubeFactory():
         
         if verbose:
             print("Using {} to initialize the image header table.".format(os.path.basename(self.template_file)))
-            # print info about number of blocks and block length
+            print(f"Cube will be made in {self.num_blocks} blocks of {self.block_size} rows each.")
 
         # Set up the table to old the individual image heades
         self._build_info_table()
