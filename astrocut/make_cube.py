@@ -7,6 +7,8 @@ creating cutout target pixel files.
 
 import numpy as np
 import os
+import time as pt
+import psutil
 
 from astropy.io import fits
 from astropy.table import Table, Column
@@ -205,11 +207,13 @@ class CubeFactory():
                                 nulval = ""
                             self.info_table[kwd][i] = ffi_data[1].header.get(kwd, nulval)
             
-            if verbose:
-                print("Completed file {}".format(i))
+            #if verbose:
+            #    print("Completed file {}".format(i))
 
         # Flush the filled block to disk
-        cube_hdu.flush()
+        #cube_hdu.flush()
+        mm = fits.util._get_array_mmap(cube_hdu[1].data)
+        mm.flush()
 
         
     def _write_info_table(self):
@@ -296,6 +300,8 @@ class CubeFactory():
         # Write the empty file, ready for the cube to be added
         self._build_cube_file(cube_file)
 
+        psutil.virtual_memory()
+
         # Fill the image cube
         with fits.open(self.cube_file, mode='update', memmap=True) as cube_hdu:
             for i in range(self.num_blocks):
@@ -309,6 +315,11 @@ class CubeFactory():
   
                 if verbose:
                     print(f"Completed block {i+1} of {self.num_blocks}")
+
+                pt.sleep(1)
+
+                memstats = psutil.virtual_memory()
+                print(f"{psutil.cpu_percent()}%cpu, {memstats.percent}%memory, {memstats.used/1e9}GB mem used")
 
 
         # Add the info table to the cube file
