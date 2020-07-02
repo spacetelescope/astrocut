@@ -187,6 +187,8 @@ class CubeFactory():
 
          # Loop through files
         for i, fle in enumerate(self.file_list):
+
+            st = pt.time()
         
             with fits.open(fle, mode='denywrite', memmap=True) as ffi_data:
 
@@ -207,8 +209,8 @@ class CubeFactory():
                                 nulval = ""
                             self.info_table[kwd][i] = ffi_data[1].header.get(kwd, nulval)
             
-            #if verbose:
-            #    print("Completed file {}".format(i))
+            if verbose:
+                print(f"Completed file {i} in {pt.time()-st:.3} sec.")
 
         # Flush the filled block to disk
         #cube_hdu.flush()
@@ -316,7 +318,7 @@ class CubeFactory():
                 if verbose:
                     print(f"Completed block {i+1} of {self.num_blocks}")
 
-                pt.sleep(1)
+                #pt.sleep(1)
 
                 memstats = psutil.virtual_memory()
                 print(f"{psutil.cpu_percent()}%cpu, {memstats.percent}%memory, {memstats.used/1e9}GB mem used")
