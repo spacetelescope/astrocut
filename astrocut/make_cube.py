@@ -186,20 +186,18 @@ class CubeFactory():
         """
 
         # Initializing the sub-cube
-        nrows = self.block_size if (end_row is not None) else (self.cube_shape[0]-start_row)
-        sub_cube = np.zeros((nrows, *self.cube_shape[1:]))
+        nrows = (self.cube_shape[0] - start_row) if (end_row is None) else (end_row - start_row)
+        sub_cube = np.zeros((nrows, *self.cube_shape[1:]), dtype=np.float32)
         
          # Loop through files
         for i, fle in enumerate(self.file_list):
 
-            st = pt.time()
+            if verbose:
+                st = pt.time()
 
             with fits.open(fle, mode='denywrite', memmap=True) as ffi_data:
 
-                # add the image and info to the arrays
-                #cube_hdu[1].data[start_row:end_row, :, i, 0]  = ffi_data[1].data[start_row:end_row, :]
-                #cube_hdu[1].data[start_row:end_row, :, i, 1]  = ffi_data[2].data[start_row:end_row, :]
-
+                # add the image and info to the sube_cube array
                 sub_cube[:, :, i, 0] = ffi_data[1].data[start_row:end_row, :]
                 sub_cube[:, :, i, 1] = ffi_data[2].data[start_row:end_row, :]
 
@@ -227,11 +225,6 @@ class CubeFactory():
         cube_hdu.flush()
 
         del sub_cube
-        
-        # Flush the filled block to disk
-        #cube_hdu.flush()
-        #mm = fits.util._get_array_mmap(cube_hdu[1].data)
-        #mm.flush()
 
         
     def _write_info_table(self):
@@ -325,16 +318,16 @@ class CubeFactory():
             for i in range(self.num_blocks):
                 start_row = i * self.block_size
                 end_row = start_row + self.block_size
-                if end_row >= len(self.file_list):
+                if end_row >= self.cube_shape[0]:
                     end_row = None
 
                 fill_info_table = True if (i == 0) else False
                 self._write_block(cube_hdu, start_row, end_row, fill_info_table, verbose)
-  
+                  
                 if verbose:
                     print(f"Completed block {i+1} of {self.num_blocks}")
 
-                #pt.sleep(1)
+                pt.sleep(1)
 
                 memstats = psutil.virtual_memory()
                 print(f"{psutil.cpu_percent()}%cpu, {memstats.percent}%memory, {memstats.used/1e9}GB mem used")
