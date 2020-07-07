@@ -189,7 +189,7 @@ class CubeFactory():
         nrows = (self.cube_shape[0] - start_row) if (end_row is None) else (end_row - start_row)
         sub_cube = np.zeros((nrows, *self.cube_shape[1:]), dtype=np.float32)
         
-         # Loop through files
+        # Loop through files
         for i, fle in enumerate(self.file_list):
 
             if verbose:
@@ -197,7 +197,7 @@ class CubeFactory():
 
             with fits.open(fle, mode='denywrite', memmap=True) as ffi_data:
 
-                # add the image and info to the sube_cube array
+                # add the image and info to the arrays
                 sub_cube[:, :, i, 0] = ffi_data[1].data[start_row:end_row, :]
                 sub_cube[:, :, i, 1] = ffi_data[2].data[start_row:end_row, :]
 
@@ -221,7 +221,7 @@ class CubeFactory():
                 print(f"Completed file {i} in {pt.time()-st:.3} sec.")
 
         # Fill block and flush to disk
-        cube_hdu[1].data[start_row:end_row, :, :, :]
+        cube_hdu[1].data[start_row:end_row, :, :, :] = sub_cube
         cube_hdu.flush()
 
         del sub_cube
