@@ -185,16 +185,26 @@ class CubeFactory():
         cube_hdu is am hdulist object opened in update mode
         """
 
+        # Initializing the sub-cube
+        nrows = self.block_size if (end_row is not None) else (self.cube_shape[0]-start_row)
+        sub_cube = np.zeros((nrows, *self.cube_shape[1:]))
+        
          # Loop through files
         for i, fle in enumerate(self.file_list):
 
             st = pt.time()
-        
+
             with fits.open(fle, mode='denywrite', memmap=True) as ffi_data:
 
                 # add the image and info to the arrays
-                cube_hdu[1].data[start_row:end_row, :, i, 0]  = ffi_data[1].data[start_row:end_row, :]
-                cube_hdu[1].data[start_row:end_row, :, i, 1]  = ffi_data[2].data[start_row:end_row, :]
+                #cube_hdu[1].data[start_row:end_row, :, i, 0]  = ffi_data[1].data[start_row:end_row, :]
+                #cube_hdu[1].data[start_row:end_row, :, i, 1]  = ffi_data[2].data[start_row:end_row, :]
+
+                sub_cube[:, :, i, 0] = ffi_data[1].data[start_row:end_row, :]
+                sub_cube[:, :, i, 1] = ffi_data[2].data[start_row:end_row, :]
+
+                del ffi_data[1].data
+                del ffi_data[2].data
                 
                 if fill_info_table: # Also save the header info in the info table
 
@@ -212,10 +222,16 @@ class CubeFactory():
             if verbose:
                 print(f"Completed file {i} in {pt.time()-st:.3} sec.")
 
+        # Fill block and flush to disk
+        cube_hdu[1].data[start_row:end_row, :, :, :]
+        cube_hdu.flush()
+
+        del sub_cube
+        
         # Flush the filled block to disk
         #cube_hdu.flush()
-        mm = fits.util._get_array_mmap(cube_hdu[1].data)
-        mm.flush()
+        #mm = fits.util._get_array_mmap(cube_hdu[1].data)
+        #mm.flush()
 
         
     def _write_info_table(self):
