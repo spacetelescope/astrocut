@@ -7,8 +7,6 @@ creating cutout target pixel files.
 
 import numpy as np
 import os
-import time as pt
-import psutil
 
 from astropy.io import fits
 from astropy.table import Table, Column
@@ -16,7 +14,10 @@ from astropy.table import Table, Column
 from time import time
 from datetime import date
 from copy import deepcopy
+from sys import version_info
 
+if version_info >= (3,8):
+    from mmap import MADV_SEQUENTIAL
 
 class CubeFactory():
     """
@@ -83,8 +84,11 @@ class CubeFactory():
         # without using too much memory
         cube_size = np.prod(image_shape) * len(self.file_list) * 2 * 4 # in bytes (float32)
         slice_size = image_shape[1] * len(self.file_list) * 2 * 4 # in bytes (float32)
-        self.block_size = int((self.max_memory * 1e9)//slice_size)
-        self.num_blocks = int(image_shape[0]/self.block_size + 1)
+        max_block_size = int((self.max_memory * 1e9)//slice_size)
+        
+        #self.block_size = int((self.max_memory * 1e9)//slice_size)
+        self.num_blocks = int(image_shape[0]/max_block_size + 1)
+        self.block_size = int(image_shape[0]/self.num_blocks + 1)
         self.cube_shape = (image_shape[0], image_shape[1], len(self.file_list), 2)
 
         # Making the primary header
@@ -169,7 +173,7 @@ class CubeFactory():
 
         # Expanding the file to fit the full data cube
         # fits requires all blocks to be a multiple of 2880
-        cubesize_in_bytes = int((np.prod(self.cube_shape) * 4 / 2880) + 1) * 2880
+        cubesize_in_bytes = ((np.prod(self.cube_shape) * 4 + 2880 - 1) // 2880) * 2880
         filelen = os.path.getsize(cube_file)
         with open(cube_file, 'r+b') as CUBE:
             CUBE.seek(filelen + cubesize_in_bytes - 1)
@@ -193,7 +197,7 @@ class CubeFactory():
         for i, fle in enumerate(self.file_list):
 
             if verbose:
-                st = pt.time()
+                st = time()
 
             with fits.open(fle, mode='denywrite', memmap=True) as ffi_data:
 
@@ -218,11 +222,13 @@ class CubeFactory():
                             self.info_table[kwd][i] = ffi_data[1].header.get(kwd, nulval)
             
             if verbose:
-                print(f"Completed file {i} in {pt.time()-st:.3} sec.")
+                print(f"Completed file {i} in {time()-st:.3} sec.")
 
         # Fill block and flush to disk
         cube_hdu[1].data[start_row:end_row, :, :, :] = sub_cube
-        cube_hdu.flush()
+
+        if version_info <= (3,8):
+            cube_hdu.flush()
 
         del sub_cube
 
@@ -311,10 +317,14 @@ class CubeFactory():
         # Write the empty file, ready for the cube to be added
         self._build_cube_file(cube_file)
 
-        psutil.virtual_memory()
-
         # Fill the image cube
         with fits.open(self.cube_file, mode='update', memmap=True) as cube_hdu:
+
+            if version_info >= (3,8):
+                print("Using the memmap sequential thingy")
+                mm = fits.util._get_array_mmap(cube_hdu[1].data)
+                mm.madvise(MADV_SEQUENTIAL)
+
             for i in range(self.num_blocks):
                 start_row = i * self.block_size
                 end_row = start_row + self.block_size
@@ -327,16 +337,9 @@ class CubeFactory():
                 if verbose:
                     print(f"Completed block {i+1} of {self.num_blocks}")
 
-                pt.sleep(1)
-
-                memstats = psutil.virtual_memory()
-                print(f"{psutil.cpu_percent()}%cpu, {memstats.percent}%memory, {memstats.used/1e9}GB mem used")
-
-
         # Add the info table to the cube file
         self._write_info_table()
         if verbose:
-            endTime = time()
-            print("Total time elapsed: {:.2f} sec".format(endTime - startTime))
+            print(f"Total time elapsed: {(time() - startTime)/60:.2f} min")
 
         return self.cube_file
