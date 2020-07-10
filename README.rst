@@ -40,32 +40,47 @@ Installation
 
     $ git clone https://github.com/spacetelescope/astrocut.git
     $ cd astrocut
-    $ python setup.py install
+    $ pip install .
     
 For active developement intall in develop mode
 
 .. code-block:: bash
 
-    $ python setup.py develop
+    $ pip install -e .
     
 Testing
 ^^^^^^^
+Testing is now run with `tox <https://tox.readthedocs.io>`_ (``pip install tox``).
 Tests can be found in ``astrocut/tests/``.
 
 .. code-block:: bash
 
-    $ python setup.py test
+    $ tox -e test
+
+ Tests can also be run directly with pytest:
+
+ .. code-block:: bash
+
+    $ pip install -e .[test]
+    $ pytest
     
 Documentation
 ^^^^^^^^^^^^^
-
 Documentation files are found in ``docs/``.
 
-To build the documentation:
+We now build the documentation with `tox <https://tox.readthedocs.io>`_ (``pip install tox``):
 
 .. code-block:: bash
 
-    $ python setup.py build_docs
+    $ tox -e build_docs
+
+You can also build the documentation with Sphinx directly using::
+
+.. code-block:: bash
+                
+    $ pip install -e .[docs]
+    $ cd docs
+    $ make html
     
 The built docs will be in ``docs/_build/html/``, to view them go to ``file:///path/to/astrocut/repo/docs/_build/html/index.html`` in the browser of your choice.
     
@@ -73,7 +88,7 @@ The built docs will be in ``docs/_build/html/``, to view them go to ``file:///pa
 Release Protocol
 ^^^^^^^^^^^^^^^^
 
-Follow the `Astropy template release instructions <https://docs.astropy.org/en/stable/development/astropy-package-template.html>`_.
+Follow the `Astropy template release instructions <https://docs.astropy.org/en/latest/development/astropy-package-template.html>`_.
 
 Contributing
 ------------
