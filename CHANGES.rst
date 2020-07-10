@@ -1,7 +1,7 @@
 0.7 (unreleased)
 ----------------
 
-- Removed astropy helpers [#34]
+- Nothing yet
 
 
 0.6 (2020-05-20)
