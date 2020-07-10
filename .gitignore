@@ -16,6 +16,7 @@ htmlcov
 .coverage
 MANIFEST
 .ipynb_checkpoints
+pip-wheel-metadata/
 
 # Sphinx
 docs/api
@@ -55,6 +56,7 @@ distribute-*.tar.gz
 .project
 .pydevproject
 .settings
+.tmp/
 
 # Mac OSX
 .DS_Store
