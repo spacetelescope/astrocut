@@ -155,11 +155,11 @@ script:
 after_success:
     # if either coveralls or codecov is used, uncomment the if and fi statements
     # and the appropriate two lines inside the if statement
-     - if [[ $TOXENV == *-cov ]]; then
+    # - if [[ $TOXENV == *-cov ]]; then
     #    # If coveralls.io is set up for this package, uncomment the two lines below.
-        pip install coveralls;
-        coveralls;
+    #    pip install coveralls;
+    #    coveralls;
     #    # If codecov is set up for this package, uncomment the two lines below
     #    pip install codecov;
     #    codecov;
-     fi
+    # fi
