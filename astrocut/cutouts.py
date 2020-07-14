@@ -480,9 +480,7 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, drop_afte
                                                                     str(cutout_size[0]).replace(' ', ''), 
                                                                     str(cutout_size[1]).replace(' ', ''))
         cutout_path = os.path.join(output_dir, cutout_path)
-        
         cutout_hdus = [cutout_hdu_dict[fle] for fle in input_files]
-
         _save_single_fits(cutout_hdus, cutout_path, coordinates)
 
     else:

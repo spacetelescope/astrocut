@@ -1,7 +1,7 @@
 0.7 (unreleased)
 ----------------
 
-- No changes yet
+- Nothing yet
 
 
 0.6 (2020-05-20)

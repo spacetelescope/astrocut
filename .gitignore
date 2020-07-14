@@ -16,6 +16,7 @@ htmlcov
 .coverage
 MANIFEST
 .ipynb_checkpoints
+pip-wheel-metadata/
 
 # Sphinx
 docs/api
@@ -36,6 +37,7 @@ docs/_build
 # Packages/installer info
 *.egg
 *.egg-info
+*.eggs/
 dist
 build
 eggs
@@ -55,6 +57,7 @@ distribute-*.tar.gz
 .project
 .pydevproject
 .settings
+.tmp/
 
 # Mac OSX
 .DS_Store
