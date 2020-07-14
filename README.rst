@@ -25,9 +25,12 @@ Project Status
     :target: https://travis-ci.org/spacetelescope/astrocut
     :alt: Travis CI status
     
-.. image:: https://coveralls.io/repos/github/spacetelescope/astrocut/badge.svg?branch=master
-    :target: https://coveralls.io/github/spacetelescope/astrocut?branch=master
-    :alt: Coveralls status
+.. image:: https://codecov.io/gh/spacetelescope/astrocut/branch/master/graph/badge.svg
+  :target: https://codecov.io/gh/spacetelescope/astrocut
+  :alt: Codecov coverage status
+
+
+
 
 
 Developer Documentation
