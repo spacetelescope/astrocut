@@ -154,6 +154,6 @@ script:
 
 after_success:
     - if [[ $TOXENV == *-cov ]]; then
-        pip install coveralls;
-        coveralls;
+        pip install codecov;
+        codecov;
       fi
