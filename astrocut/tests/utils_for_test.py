@@ -1,5 +1,5 @@
 import numpy as np
-
+from os import path
 from astropy.io import fits    
 
 
@@ -57,7 +57,7 @@ def add_keywords(hdu, extname, time_increment, primary=False):
         hdu.header['B_DMAX'] = 44.62692873032506
 
 
-def create_test_ffis(img_size, num_images, basename='make_cube-test{:04d}.fits'):
+def create_test_ffis(img_size, num_images, dir_name=".", basename='make_cube-test{:04d}.fits'):
     """
     Create test fits files
 
@@ -67,7 +67,8 @@ def create_test_ffis(img_size, num_images, basename='make_cube-test{:04d}.fits')
 
     img = np.arange(img_size*img_size, dtype=np.float32).reshape((img_size, img_size))
     file_list = []
-    
+
+    basename = path.join(dir_name, basename)
     for i in range(num_images):
         
         file_list.append(basename.format(i))
@@ -120,7 +121,7 @@ def add_dummy_keywords(hdu):
                        ('Dummy3', "", 'Dummy3')], strip=False)
     
 
-def create_test_imgs(img_size, num_images, dummy_keywords=True, basename='img_{:04d}.fits'):
+def create_test_imgs(img_size, num_images, dummy_keywords=True, dir_name=".", basename='img_{:04d}.fits'):
     """
     Create test fits image files, single extension.
 
@@ -130,7 +131,8 @@ def create_test_imgs(img_size, num_images, dummy_keywords=True, basename='img_{:
 
     img = np.arange(img_size*img_size, dtype=np.float32).reshape((img_size, img_size))
     file_list = []
-    
+
+    basename = path.join(dir_name, basename)
     for i in range(num_images):
         
         file_list.append(basename.format(i))
