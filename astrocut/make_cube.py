@@ -321,7 +321,6 @@ class CubeFactory():
         with fits.open(self.cube_file, mode='update', memmap=True) as cube_hdu:
 
             if version_info >= (3,8):
-                print("Using the memmap sequential thingy")
                 mm = fits.util._get_array_mmap(cube_hdu[1].data)
                 mm.madvise(MADV_SEQUENTIAL)
 
