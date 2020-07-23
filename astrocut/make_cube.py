@@ -16,8 +16,9 @@ from datetime import date
 from copy import deepcopy
 from sys import version_info
 
-if version_info >= (3,8):
+if version_info >= (3, 8):
     from mmap import MADV_SEQUENTIAL
+
 
 class CubeFactory():
     """
@@ -31,15 +32,15 @@ class CubeFactory():
     def __init__(self, max_memory=50):
         """ Setting up the class members """
 
-        self.max_memory = max_memory # in GB
-        self.block_size = None # Number of rows
+        self.max_memory = max_memory  # in GB
+        self.block_size = None  # Number of rows
         self.num_blocks = None
         self.cube_shape = None
         
-        self.time_keyword = 'TSTART' # TESS-specific
-        self.last_file_keywords = ['DATE-END', 'TSTOP'] # TESS-specific (assumed to be in extension 0)
-        self.image_header_keywords = ['CAMERA', 'CCD'] # TESS-specific
-        self.template_requirements = {"WCSAXES": 2} # TESS-specific (assumed to be in extension 1)
+        self.time_keyword = 'TSTART'  # TESS-specific
+        self.last_file_keywords = ['DATE-END', 'TSTOP']  # TESS-specific (assumed to be in extension 0)
+        self.image_header_keywords = ['CAMERA', 'CCD']  # TESS-specific
+        self.template_requirements = {"WCSAXES": 2}  # TESS-specific (assumed to be in extension 1)
 
         self.file_list = None
         self.template_file = None
@@ -69,7 +70,7 @@ class CubeFactory():
             if self.template_file is None:  # Only check this if we don't already have it
 
                 is_template = True
-                for key,value in self.template_requirements.items():
+                for key, value in self.template_requirements.items():
                     if ffi_data[1].header.get(key) != value:  # Checking for a good image header
                         is_template = False
                         
@@ -82,11 +83,9 @@ class CubeFactory():
 
         # Working out the block size and number of blocks needed for writing the cube
         # without using too much memory
-        cube_size = np.prod(image_shape) * len(self.file_list) * 2 * 4 # in bytes (float32)
-        slice_size = image_shape[1] * len(self.file_list) * 2 * 4 # in bytes (float32)
+        slice_size = image_shape[1] * len(self.file_list) * 2 * 4  # in bytes (float32)
         max_block_size = int((self.max_memory * 1e9)//slice_size)
         
-        #self.block_size = int((self.max_memory * 1e9)//slice_size)
         self.num_blocks = int(image_shape[0]/max_block_size + 1)
         self.block_size = int(image_shape[0]/self.num_blocks + 1)
         self.cube_shape = (image_shape[0], image_shape[1], len(self.file_list), 2)
@@ -168,8 +167,8 @@ class CubeFactory():
         header = hdu.header
         header["NAXIS4"], header["NAXIS3"], header["NAXIS2"], header["NAXIS1"] = self.cube_shape
 
-        with open(cube_file,'ab') as CUBE:
-            CUBE.write(bytearray(header.tostring(),encoding="utf-8"))
+        with open(cube_file, 'ab') as CUBE:
+            CUBE.write(bytearray(header.tostring(), encoding="utf-8"))
 
         # Expanding the file to fit the full data cube
         # fits requires all blocks to be a multiple of 2880
@@ -208,7 +207,7 @@ class CubeFactory():
                 del ffi_data[1].data
                 del ffi_data[2].data
                 
-                if fill_info_table: # Also save the header info in the info table
+                if fill_info_table:  # Also save the header info in the info table
 
                     for kwd in self.info_table.columns:
                         if kwd == "FFI_FILE":
@@ -227,7 +226,7 @@ class CubeFactory():
         # Fill block and flush to disk
         cube_hdu[1].data[start_row:end_row, :, :, :] = sub_cube
 
-        if version_info <= (3,8):
+        if version_info <= (3, 8):
             cube_hdu.flush()
 
         del sub_cube
@@ -299,7 +298,7 @@ class CubeFactory():
         if verbose:
             startTime = time()
 
-        self.max_memory=max_memory
+        self.max_memory = max_memory
             
         # Set up the basic cube parameters
         sector = (sector, "Observing sector")
@@ -320,7 +319,7 @@ class CubeFactory():
         # Fill the image cube
         with fits.open(self.cube_file, mode='update', memmap=True) as cube_hdu:
 
-            if version_info >= (3,8):
+            if version_info >= (3, 8):
                 mm = fits.util._get_array_mmap(cube_hdu[1].data)
                 mm.madvise(MADV_SEQUENTIAL)
 

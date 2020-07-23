@@ -77,7 +77,7 @@ def test_iteration(tmpdir, capsys):
     cube_1 = hdu_1[1].data
 
     hdu_2 = fits.open(cube_file_2)
-    cube_2 = hdu_1[1].data
+    cube_2 = hdu_2[1].data
 
     assert cube_1.shape == cube_2.shape, "Mismatch between cube shape for 1 vs 2 iterations"
     assert np.alltrue(cube_1 == cube_2), "Cubes made in 1 vs 2 iterations do not match"

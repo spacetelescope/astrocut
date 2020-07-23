@@ -12,6 +12,7 @@ from ..make_cube import CubeFactory
 from ..cube_cut import CutoutFactory
 from ..exceptions import TypeWarning, InvalidQueryError, InputWarning
 
+
 def checkcutout(cutfile, pixcrd, world, csize, ecube, eps=1.e-7):
     """Check FITS cutout for correctness
     
@@ -299,12 +300,12 @@ def test_exceptions(tmpdir):
     # Testing various off the cube inputs
     myfactory.center_coord = SkyCoord("50.91092264 6.40588255", unit='deg')
     with pytest.raises(Exception, match='Cutout location is not in cube footprint!') as e:
-        myfactory._get_cutout_limits(np.array([5,5]))
+        myfactory._get_cutout_limits(np.array([5, 5]))
         assert e.type is InvalidQueryError
          
     myfactory.center_coord = SkyCoord("257.91092264 6.40588255", unit='deg')
     with pytest.raises(Exception, match='Cutout location is not in cube footprint!') as e:
-        myfactory._get_cutout_limits(np.array([5,5]))
+        myfactory._get_cutout_limits(np.array([5, 5]))
         assert e.type is InvalidQueryError
 
 
@@ -322,7 +323,7 @@ def test_exceptions(tmpdir):
     assert sigma < 0.03
 
     myfactory.center_coord = SkyCoord("256.38994124 4.88986771", unit='deg')
-    myfactory._get_cutout_limits(np.array([5,500]))
+    myfactory._get_cutout_limits(np.array([5, 500]))
 
     hdu = fits.open(cube_file)
     cutout_wcs = myfactory._get_full_cutout_wcs(hdu[2].header)
@@ -346,7 +347,7 @@ def test_inputs(tmpdir, capsys):
     Testing with different user input types/combos. And verbose.
     """
 
-     # Making the test cube
+    # Making the test cube
     cube_maker = CubeFactory()
     
     img_sz = 10
