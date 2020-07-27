@@ -289,8 +289,8 @@ def test_exceptions(tmpdir):
     # Testing when nans are present or unknown data types
     myfactory._parse_table_info(cube_table)
     wcs_orig = myfactory.cube_wcs
-    cube_table.columns["GCOUNT"].format = fits.column._ColumnFormat("D")
-    cube_table["GCOUNT"] = np.nan
+    #cube_table.columns["GCOUNT"].format = fits.column._ColumnFormat("D")
+    cube_table["BARYCORR"] = np.nan
     cube_table.columns["PCOUNT"].format = fits.column._ColumnFormat("E")
     with pytest.warns(TypeWarning):
         myfactory._parse_table_info(cube_table)
