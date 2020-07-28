@@ -120,17 +120,8 @@ class CutoutFactory():
             wcs_val = table_row[col.name]
             if (not isinstance(wcs_val, str)) and (np.isnan(wcs_val)):
                 continue  # Just skip nans
-
-            if "A" in col.format:
-                wcs_header[col.name] = str(wcs_val)
-            elif "D" in col.format:
-                wcs_header[col.name] = float(wcs_val)
-            elif "J" in col.format:
-                wcs_header[col.name] = int(wcs_val)
-            else:
-                warnings.warn("Unknown data type, keyword value will be parsed as a string.",
-                              TypeWarning)
-                wcs_header[col.name] = str(wcs_val)
+)
+            wcs_header[col.name] = wcs_val
 
         # Setting the cube wcs
         self.cube_wcs = wcs.WCS(wcs_header, relax=True)

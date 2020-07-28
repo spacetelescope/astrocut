@@ -38,7 +38,7 @@ class CubeFactory():
         self.cube_shape = None
         
         self.time_keyword = 'TSTART'  # TESS-specific
-        self.last_file_keywords = ['DATE-END', 'TSTOP']  # TESS-specific (assumed to be in extension 0)
+        self.last_file_keywords = ['DATE-END', 'TSTOP']  # TESS-specific (assumed to be in extension 1)
         self.image_header_keywords = ['CAMERA', 'CCD']  # TESS-specific
         self.template_requirements = {"WCSAXES": 2}  # TESS-specific (assumed to be in extension 1)
 
@@ -110,7 +110,7 @@ class CubeFactory():
         # Adding the keywords from the last file
         with fits.open(self.file_list[-1], mode='denywrite', memmap=True) as last_file:
             for kwd in self.last_file_keywords:
-                header[kwd] = (last_file[0].header[kwd], last_file[0].header.comments[kwd])
+                header[kwd] = (last_file[1].header[kwd], last_file[1].header.comments[kwd])
 
         header["EXTNAME"] = "PRIMARY"
 
@@ -136,7 +136,7 @@ class CubeFactory():
                 elif type(val) == int:
                     tpe = np.int32
                 else:
-                    tpe = np.float32
+                    tpe = np.float64
                     
                 cols.append(Column(name=kwd, dtype=tpe, length=len(self.file_list), meta={"comment": cmt}))
                     
@@ -240,7 +240,7 @@ class CubeFactory():
         # Make table hdu 
         cols = []
         for kwd in self.info_table.columns:
-            if self.info_table[kwd].dtype == np.float32:
+            if self.info_table[kwd].dtype == np.float64:
                 tpe = 'D'
             elif self.info_table[kwd].dtype == np.int32:
                 tpe = 'J'
