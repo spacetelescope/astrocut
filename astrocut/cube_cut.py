@@ -120,9 +120,9 @@ class CutoutFactory():
             wcs_val = table_row[col.name]
             if (not isinstance(wcs_val, str)) and (np.isnan(wcs_val)):
                 continue  # Just skip nans
-)
-            wcs_header[col.name] = wcs_val
 
+            wcs_header[col.name] = wcs_val
+            
         # Setting the cube wcs
         self.cube_wcs = wcs.WCS(wcs_header, relax=True)
 
