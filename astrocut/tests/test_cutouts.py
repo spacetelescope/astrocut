@@ -2,6 +2,7 @@ import pytest
 
 import numpy as np
 from os import path
+from re import findall
 
 from astropy.io import fits
 from astropy import wcs
@@ -330,6 +331,9 @@ def test_normalize_img():
     img_arr = np.array([[1, 0], [.25, .75]])
     assert ((img_arr*255).astype(int) == cutouts.normalize_img(img_arr, stretch='linear')).all()
 
+    # invert
+    assert (255-(img_arr*255).astype(int) == cutouts.normalize_img(img_arr, stretch='linear', invert=True)).all()
+
     # linear stretch where input image must be scaled 
     img_arr = np.array([[10, 5], [2.5, 7.5]])
     norm_img = ((img_arr - img_arr.min())/(img_arr.max()-img_arr.min())*255).astype(int)
@@ -388,7 +392,8 @@ def test_normalize_img():
     assert (test_img == norm_img).all()
 
 
-def test_img_cut(tmpdir):
+
+def test_img_cut(tmpdir, capsys):
 
     test_images = create_test_imgs(50, 6, dir_name=tmpdir)
     center_coord = SkyCoord("150.1163213 2.200973097", unit='deg')
@@ -402,9 +407,12 @@ def test_img_cut(tmpdir):
         assert IMGFLE.read(3) == b'\xFF\xD8\xFF'  # JPG
 
     # Png (single input file, not as list)
-    img_files = cutouts.img_cut(test_images[0], center_coord, cutout_size, img_format='png', output_dir=tmpdir)
+    with pytest.warns(AstropyDeprecationWarning):
+        img_files = cutouts.img_cut(test_images[0], center_coord, cutout_size, img_format='png',
+                                    output_dir=tmpdir, drop_after="")
     with open(img_files[0], 'rb') as IMGFLE:
         assert IMGFLE.read(8) == b'\x89\x50\x4E\x47\x0D\x0A\x1A\x0A'  # PNG
+    assert len(img_files) == 1
 
     # Color image
     color_jpg = cutouts.img_cut(test_images[:3], center_coord, cutout_size, colorize=True, output_dir=tmpdir)
@@ -421,4 +429,25 @@ def test_img_cut(tmpdir):
     img = Image.open(color_jpg)
     assert img.mode == 'RGB'
 
+    # string coordinates and verbose
+    center_coord = "150.1163213 2.200973097"
+    jpg_files = cutouts.img_cut(test_images, center_coord, cutout_size,
+                                output_dir=path.join(tmpdir, "image_path"), verbose=True)
+    captured = capsys.readouterr()
+    assert len(findall("Original image shape", captured.out)) == 6
+    assert "Cutout fits file(s)" in captured.out
+    assert "Total time" in captured.out
+
+    # test color image where one of the images is all zeros
+    hdu = fits.open(test_images[0], mode='update')
+    hdu[0].data[:, :] = 0
+    hdu.flush()
+    hdu.close()
+
+    color_png = cutouts.img_cut(test_images[:3], center_coord, cutout_size, colorize=True,
+                                img_format='png', output_dir=tmpdir)
+    img = Image.open(color_png)
+    assert img.mode == 'RGB'
+    assert (np.asarray(img)[:, :, 0] == 0).all()
+    
     

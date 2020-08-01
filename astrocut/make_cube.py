@@ -14,9 +14,9 @@ from astropy.table import Table, Column
 from time import time
 from datetime import date
 from copy import deepcopy
-from sys import version_info
+from sys import version_info, platform
 
-if version_info >= (3, 8):
+if (version_info >= (3, 8)) and (platform != "win32"):
     from mmap import MADV_SEQUENTIAL
 
 
@@ -226,7 +226,7 @@ class CubeFactory():
         # Fill block and flush to disk
         cube_hdu[1].data[start_row:end_row, :, :, :] = sub_cube
 
-        if version_info <= (3, 8):
+        if (version_info <= (3, 8)) or (platform == "win32"):
             cube_hdu.flush()
 
         del sub_cube
@@ -319,7 +319,7 @@ class CubeFactory():
         # Fill the image cube
         with fits.open(self.cube_file, mode='update', memmap=True) as cube_hdu:
 
-            if version_info >= (3, 8):
+            if (version_info >= (3, 8)) and (platform != "win32"):
                 mm = fits.util._get_array_mmap(cube_hdu[1].data)
                 mm.madvise(MADV_SEQUENTIAL)
 
