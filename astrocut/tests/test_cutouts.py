@@ -1,11 +1,13 @@
 import pytest
 
 import numpy as np
+from os import path
 
 from astropy.io import fits
 from astropy import wcs
 from astropy.coordinates import SkyCoord
 from astropy import units as u
+from astropy.utils.exceptions import AstropyDeprecationWarning
 
 from PIL import Image
 
@@ -109,15 +111,66 @@ def test_get_cutout_wcs():
     assert (cutout_wcs.wcs.crval == [100, 20]).all()
     assert (cutout_wcs.wcs.crpix == [-3, 6]).all() 
 
-    
-def test_fits_cut(tmpdir):
 
-    test_images = create_test_imgs(50, 6)
+def test_remove_sip_coefficients():
+
+    test_img_wcs_kwds = fits.Header(cards=[('NAXIS', 2, 'number of array dimensions'),
+                                           ('NAXIS1', 20, ''),
+                                           ('NAXIS2', 30, ''),
+                                           ('CTYPE1', 'RA---TAN', 'Right ascension, gnomonic projection'),
+                                           ('CTYPE2', 'DEC--TAN', 'Declination, gnomonic projection'),
+                                           ('CRVAL1', 100, '[deg] Coordinate value at reference point'),
+                                           ('CRVAL2', 20, '[deg] Coordinate value at reference point'),
+                                           ('CRPIX1', 10, 'Pixel coordinate of reference point'),
+                                           ('CRPIX2', 15, 'Pixel coordinate of reference point'),
+                                           ('CDELT1', 1.0, '[deg] Coordinate increment at reference point'),
+                                           ('CDELT2', 1.0, '[deg] Coordinate increment at reference point'),
+                                           ('WCSAXES', 2, 'Number of coordinate axes'),
+                                           ('PC1_1', 1, 'Coordinate transformation matrix element'),
+                                           ('PC2_2', 1, 'Coordinate transformation matrix element'),
+                                           ('CUNIT1', 'deg', 'Units of coordinate increment and value'),
+                                           ('CUNIT2', 'deg', 'Units of coordinate increment and value')])
+
+    # no sip coefficients to remove
+    num_kwds = len(test_img_wcs_kwds)
+    cutouts.remove_sip_coefficients(test_img_wcs_kwds)
+    assert num_kwds == len(test_img_wcs_kwds)
+
+    # add sip coefficients
+    test_img_wcs_kwds['A_ORDER'] = 2
+    test_img_wcs_kwds['B_ORDER'] = 2
+    test_img_wcs_kwds['A_2_0'] = 2.024511892340E-05
+    test_img_wcs_kwds['A_0_2'] = 3.317603337918E-06
+    test_img_wcs_kwds['A_1_1'] = 1.73456334971071E-5
+    test_img_wcs_kwds['B_2_0'] = 3.331330003472E-06
+    test_img_wcs_kwds['B_0_2'] = 2.042474824825892E-5
+    test_img_wcs_kwds['B_1_1'] = 1.714767108041439E-5
+    test_img_wcs_kwds['AP_ORDER'] = 2
+    test_img_wcs_kwds['BP_ORDER'] = 2
+    test_img_wcs_kwds['AP_1_0'] = 9.047002963896363E-4
+    test_img_wcs_kwds['AP_0_1'] = 6.276607155847164E-4
+    test_img_wcs_kwds['AP_2_0'] = -2.023482905861E-05
+    test_img_wcs_kwds['AP_0_2'] = -3.332285841011E-06
+    test_img_wcs_kwds['AP_1_1'] = -1.731636633824E-05
+    test_img_wcs_kwds['BP_1_0'] = 6.279608820532116E-4
+    test_img_wcs_kwds['BP_0_1'] = 9.112228860848081E-4
+    test_img_wcs_kwds['BP_2_0'] = -3.343918167224E-06
+    test_img_wcs_kwds['BP_0_2'] = -2.041598249021E-05
+    test_img_wcs_kwds['BP_1_1'] = -1.711876336719E-05
+    test_img_wcs_kwds['A_DMAX'] = 44.72893589844534
+    test_img_wcs_kwds['B_DMAX'] = 44.62692873032506
+    cutouts.remove_sip_coefficients(test_img_wcs_kwds)
+    assert num_kwds == len(test_img_wcs_kwds)
+
+    
+def test_fits_cut(tmpdir, capsys):
+
+    test_images = create_test_imgs(50, 6, dir_name=tmpdir)
 
     # Single file
     center_coord = SkyCoord("150.1163213 2.200973097", unit='deg')
     cutout_size = 10
-    cutout_file = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=True)
+    cutout_file = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=True, output_dir=tmpdir)
     assert isinstance(cutout_file, str)
     
     cutout_hdulist = fits.open(cutout_file)
@@ -139,8 +192,9 @@ def test_fits_cut(tmpdir):
     cutout_hdulist.close()
 
     # Multiple files
-    cutout_files = cutouts.fits_cut(test_images, center_coord, cutout_size,
-                                    drop_after="Dummy1", single_outfile=False)
+    with pytest.warns(AstropyDeprecationWarning):
+        cutout_files = cutouts.fits_cut(test_images, center_coord, cutout_size,
+                                        drop_after="Dummy1", single_outfile=False, output_dir=tmpdir)
 
     assert isinstance(cutout_files, list)
     assert len(cutout_files) == len(test_images)
@@ -158,9 +212,9 @@ def test_fits_cut(tmpdir):
 
     cutout_hdulist.close()
 
-    # Specify the output directory
+    # Output directory that has to be made
     cutout_files = cutouts.fits_cut(test_images, center_coord, cutout_size,
-                                    output_dir="cutout_files", single_outfile=False)
+                                    output_dir=path.join(tmpdir, "cutout_files"), single_outfile=False)
 
     assert isinstance(cutout_files, list)
     assert len(cutout_files) == len(test_images)
@@ -168,7 +222,7 @@ def test_fits_cut(tmpdir):
     
     # Do an off the edge test
     center_coord = SkyCoord("150.1163213 2.2005731", unit='deg')
-    cutout_file = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=True)
+    cutout_file = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=True, output_dir=tmpdir)
     assert isinstance(cutout_file, str)
     
     cutout_hdulist = fits.open(cutout_file)
@@ -180,18 +234,30 @@ def test_fits_cut(tmpdir):
 
     cutout_hdulist.close()
 
+    # Test when the requested cutout is not on the image
+    center_coord = SkyCoord("140.1163213 2.2005731", unit='deg')
+    with pytest.raises(Exception, match='Cutout location is not in image footprint!') as e:
+        cutout_file = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=True)
+        assert e.type is InvalidQueryError
+
+    center_coord = SkyCoord("15.1163213 2.2005731", unit='deg')
+    with pytest.raises(Exception, match='Cutout location is not in image footprint!') as e:
+        cutout_file = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=True)
+        assert e.type is InvalidQueryError
+    
+
     # Test when cutout is in some images not others
 
     # Putting zeros into 2 images
-    for i in range(2):
-        hdu = fits.open(test_images[i], mode="update")
+    for img in test_images[:2]:
+        hdu = fits.open(img, mode="update")
         hdu[0].data[:20, :] = 0
         hdu.flush()
         hdu.close()
         
         
     center_coord = SkyCoord("150.1163213 2.2007", unit='deg')
-    cutout_file = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=True)
+    cutout_file = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=True, output_dir=tmpdir)
     
     cutout_hdulist = fits.open(cutout_file)
     assert len(cutout_hdulist) == len(test_images) + 1  # num imgs + primary header
@@ -203,9 +269,59 @@ def test_fits_cut(tmpdir):
     assert ~(cutout_hdulist[6].data == 0).any()
 
     
-    cutout_files = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=False)
+    cutout_files = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=False, output_dir=tmpdir)
     assert isinstance(cutout_files, list)
     assert len(cutout_files) == len(test_images) - 2
+
+    # Test when cutout is in no images
+    for img in test_images[2:]:
+        hdu = fits.open(img, mode="update")
+        hdu[0].data[:20, :] = 0
+        hdu.flush()
+        hdu.close()
+
+    with pytest.raises(Exception) as e:
+        cutout_file = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=True, output_dir=tmpdir)
+        assert e.type is InvalidQueryError
+        assert "Cutout contains no data! (Check image footprint.)" in str(e.value)
+
+    # test single image and also conflicting sip keywords
+    test_image = create_test_imgs(50, 6, dir_name=tmpdir, bad_sip_keywords=True)[0]
+
+    center_coord = SkyCoord("150.1163213 2.2007", unit='deg')
+    cutout_size = [10, 15]
+    cutout_file = cutouts.fits_cut(test_image, center_coord, cutout_size, output_dir=tmpdir)
+    assert isinstance(cutout_file, str)
+    assert "10-x-15" in cutout_file
+    cutout_hdulist = fits.open(cutout_file)
+    assert cutout_hdulist[1].data.shape == (15, 10)
+
+    center_coord = SkyCoord("150.1159 2.2006", unit='deg')
+    cutout_size = [10, 15]*u.pixel
+    cutout_file = cutouts.fits_cut(test_image, center_coord, cutout_size, output_dir=tmpdir)
+    assert isinstance(cutout_file, str)
+    assert "10.0pix-x-15.0pix" in cutout_file
+    cutout_hdulist = fits.open(cutout_file)
+    assert cutout_hdulist[1].data.shape == (15, 10)
+
+    cutout_size = [1, 2]*u.arcsec
+    cutout_file = cutouts.fits_cut(test_image, center_coord, cutout_size, output_dir=tmpdir, verbose=True)
+    assert isinstance(cutout_file, str)
+    assert "1.0arcsec-x-2.0arcsec" in cutout_file
+    cutout_hdulist = fits.open(cutout_file)
+    assert cutout_hdulist[1].data.shape == (33, 17)
+    captured = capsys.readouterr()
+    assert "Original image shape: (50, 50)" in captured.out
+    assert "Image cutout shape: (33, 17)" in captured.out
+    assert "Total time:" in captured.out
+
+    center_coord = "150.1159 2.2006"
+    cutout_size = [10, 15, 20]
+    with pytest.warns(InputWarning):
+        cutout_file = cutouts.fits_cut(test_image, center_coord, cutout_size, output_dir=tmpdir)
+    assert isinstance(cutout_file, str)
+    assert "10-x-15" in cutout_file
+    assert "x-20" not in cutout_file
 
 
 def test_normalize_img():
@@ -274,34 +390,34 @@ def test_normalize_img():
 
 def test_img_cut(tmpdir):
 
-    test_images = create_test_imgs(50, 6)
+    test_images = create_test_imgs(50, 6, dir_name=tmpdir)
     center_coord = SkyCoord("150.1163213 2.200973097", unit='deg')
     cutout_size = 10
 
     # Basic jpg image
-    jpg_files = cutouts.img_cut(test_images, center_coord, cutout_size)
+    jpg_files = cutouts.img_cut(test_images, center_coord, cutout_size, output_dir=tmpdir)
     
     assert len(jpg_files) == len(test_images)
     with open(jpg_files[0], 'rb') as IMGFLE:
         assert IMGFLE.read(3) == b'\xFF\xD8\xFF'  # JPG
 
     # Png (single input file, not as list)
-    img_files = cutouts.img_cut(test_images[0], center_coord, cutout_size, img_format='png')
+    img_files = cutouts.img_cut(test_images[0], center_coord, cutout_size, img_format='png', output_dir=tmpdir)
     with open(img_files[0], 'rb') as IMGFLE:
         assert IMGFLE.read(8) == b'\x89\x50\x4E\x47\x0D\x0A\x1A\x0A'  # PNG
 
     # Color image
-    color_jpg = cutouts.img_cut(test_images[:3], center_coord, cutout_size, colorize=True)
+    color_jpg = cutouts.img_cut(test_images[:3], center_coord, cutout_size, colorize=True, output_dir=tmpdir)
     img = Image.open(color_jpg)
     assert img.mode == 'RGB'
 
     # Too few input images
     with pytest.raises(InvalidInputError):
-        cutouts.img_cut(test_images[0], center_coord, cutout_size, colorize=True)
+        cutouts.img_cut(test_images[0], center_coord, cutout_size, colorize=True, output_dir=tmpdir)
 
     # Too many input images
     with pytest.warns(InputWarning):
-        color_jpg = cutouts.img_cut(test_images, center_coord, cutout_size, colorize=True)
+        color_jpg = cutouts.img_cut(test_images, center_coord, cutout_size, colorize=True, output_dir=tmpdir)
     img = Image.open(color_jpg)
     assert img.mode == 'RGB'
 

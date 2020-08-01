@@ -286,13 +286,11 @@ def test_exceptions(tmpdir):
         assert e.type is wcs.NoWcsKeywordsFoundError
     cube_table["WCSAXES"] = 2
 
-    # Testing when nans are present or unknown data types
+    # Testing when nans are present 
     myfactory._parse_table_info(cube_table)
     wcs_orig = myfactory.cube_wcs
     cube_table["BARYCORR"] = np.nan
-    cube_table.columns["PCOUNT"].format = fits.column._ColumnFormat("E")
-    with pytest.warns(TypeWarning):
-        myfactory._parse_table_info(cube_table)
+    myfactory._parse_table_info(cube_table)
     assert wcs_orig.to_header_string() == myfactory.cube_wcs.to_header_string()
 
     hdu.close()
