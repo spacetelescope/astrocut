@@ -1,7 +1,7 @@
 0.7 (unreleased)
 ----------------
 
-- Nothing yet
+- Add iterative cubing and user selected max memory [#35]
 
 
 0.6 (2020-05-20)
