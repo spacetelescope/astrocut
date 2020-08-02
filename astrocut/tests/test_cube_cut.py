@@ -10,7 +10,7 @@ import astropy.units as u
 from .utils_for_test import create_test_ffis
 from ..make_cube import CubeFactory
 from ..cube_cut import CutoutFactory
-from ..exceptions import TypeWarning, InvalidQueryError, InputWarning
+from ..exceptions import InvalidQueryError, InputWarning
 
 
 def checkcutout(cutfile, pixcrd, world, csize, ecube, eps=1.e-7):

@@ -14,7 +14,7 @@ from PIL import Image
 
 from .utils_for_test import create_test_imgs
 from .. import cutouts
-from ..exceptions import InputWarning, InvalidInputError
+from ..exceptions import InputWarning, InvalidInputError, InvalidQueryError
 
 
 def test_get_cutout_limits():
@@ -287,7 +287,7 @@ def test_fits_cut(tmpdir, capsys):
         assert "Cutout contains no data! (Check image footprint.)" in str(e.value)
 
     # test single image and also conflicting sip keywords
-    test_image = create_test_imgs(50, 6, dir_name=tmpdir, bad_sip_keywords=True)[0]
+    test_image = create_test_imgs(50, 1, dir_name=tmpdir, basename="img_badsip_{:04d}.fits", bad_sip_keywords=True)[0]
 
     center_coord = SkyCoord("150.1163213 2.2007", unit='deg')
     cutout_size = [10, 15]

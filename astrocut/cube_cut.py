@@ -16,7 +16,7 @@ from astropy.coordinates import SkyCoord
 from astropy import wcs
 
 from . import __version__ 
-from .exceptions import InputWarning, TypeWarning, InvalidQueryError
+from .exceptions import InputWarning, InvalidQueryError
 
 # Note: Use the astropy function if available
 import astropy
