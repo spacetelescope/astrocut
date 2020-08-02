@@ -1,5 +1,5 @@
 import numpy as np
-
+from os import path
 from astropy.io import fits    
 
 
@@ -23,8 +23,8 @@ def add_keywords(hdu, extname, time_increment, primary=False):
         hdu.header['RADESYS'] = 'ICRS    '
         hdu.header['EQUINOX'] = 2000.0
         hdu.header['WCSAXES'] = 2
-        hdu.header['CTYPE1'] = 'RA---TAN-SIP'
-        hdu.header['CTYPE2'] = 'DEC--TAN-SIP'
+        hdu.header['CTYPE1'] = ('RA---TAN-SIP', "Gnomonic projection + SIP distortions")
+        hdu.header['CTYPE2'] = ('DEC--TAN-SIP', "Gnomonic projection + SIP distortions")
         hdu.header['CRVAL1'] = 250.3497414839765200
         hdu.header['CRVAL2'] = 2.2809255996090630
         hdu.header['CRPIX1'] = 1045.0
@@ -57,7 +57,7 @@ def add_keywords(hdu, extname, time_increment, primary=False):
         hdu.header['B_DMAX'] = 44.62692873032506
 
 
-def create_test_ffis(img_size, num_images, basename='make_cube-test{:04d}.fits'):
+def create_test_ffis(img_size, num_images, dir_name=".", basename='make_cube-test{:04d}.fits'):
     """
     Create test fits files
 
@@ -67,7 +67,8 @@ def create_test_ffis(img_size, num_images, basename='make_cube-test{:04d}.fits')
 
     img = np.arange(img_size*img_size, dtype=np.float32).reshape((img_size, img_size))
     file_list = []
-    
+
+    basename = path.join(dir_name, basename)
     for i in range(num_images):
         
         file_list.append(basename.format(i))
@@ -111,16 +112,35 @@ def add_wcs_nosip_keywords(hdu, img_size):
                        ('CRVAL2', 2.200973097, '[deg] Coordinate value at reference point')])
 
     
-def add_dummy_keywords(hdu):
+def add_bad_sip_keywords(hdu):
     """
     Adding a number of dummy keywords, basically so the drop_after argument to fits_cut can be tested.
     """
-    hdu.header.extend([('Dummy1', "Dummy1", 'Dummy1'),
-                       ('Dummy2', 2, 'Dummy2'),
-                       ('Dummy3', "", 'Dummy3')], strip=False)
+    hdu.header['A_ORDER'] = 2
+    hdu.header['B_ORDER'] = 2
+    hdu.header['A_2_0'] = 2.024511892340E-05
+    hdu.header['A_0_2'] = 3.317603337918E-06
+    hdu.header['A_1_1'] = 1.73456334971071E-5
+    hdu.header['B_2_0'] = 3.331330003472E-06
+    hdu.header['B_0_2'] = 2.042474824825892E-5
+    hdu.header['B_1_1'] = 1.714767108041439E-5
+    hdu.header['AP_ORDER'] = 2
+    hdu.header['BP_ORDER'] = 2
+    hdu.header['AP_1_0'] = 9.047002963896363E-4
+    hdu.header['AP_0_1'] = 6.276607155847164E-4
+    hdu.header['AP_2_0'] = -2.023482905861E-05
+    hdu.header['AP_0_2'] = -3.332285841011E-06
+    hdu.header['AP_1_1'] = -1.731636633824E-05
+    hdu.header['BP_1_0'] = 6.279608820532116E-4
+    hdu.header['BP_0_1'] = 9.112228860848081E-4
+    hdu.header['BP_2_0'] = -3.343918167224E-06
+    hdu.header['BP_0_2'] = -2.041598249021E-05
+    hdu.header['BP_1_1'] = -1.711876336719E-05
+    hdu.header['A_DMAX'] = 44.72893589844534
+    hdu.header['B_DMAX'] = 44.62692873032506
     
 
-def create_test_imgs(img_size, num_images, dummy_keywords=True, basename='img_{:04d}.fits'):
+def create_test_imgs(img_size, num_images, bad_sip_keywords=False, dir_name=".", basename='img_{:04d}.fits'):
     """
     Create test fits image files, single extension.
 
@@ -130,7 +150,8 @@ def create_test_imgs(img_size, num_images, dummy_keywords=True, basename='img_{:
 
     img = np.arange(img_size*img_size, dtype=np.float32).reshape((img_size, img_size))
     file_list = []
-    
+
+    basename = path.join(dir_name, basename)
     for i in range(num_images):
         
         file_list.append(basename.format(i))
@@ -138,8 +159,8 @@ def create_test_imgs(img_size, num_images, dummy_keywords=True, basename='img_{:
         primary_hdu = fits.PrimaryHDU(data=img)
         add_wcs_nosip_keywords(primary_hdu, img_size)
 
-        if dummy_keywords:
-            add_dummy_keywords(primary_hdu)
+        if bad_sip_keywords:
+            add_bad_sip_keywords(primary_hdu)
         
         hdulist = fits.HDUList([primary_hdu])
         hdulist.writeto(file_list[-1], overwrite=True, checksum=True)

@@ -1,4 +1,6 @@
+import pytest
 import numpy as np
+from os import path
 
 from astropy.io import fits
 from astropy import wcs
@@ -8,6 +10,7 @@ import astropy.units as u
 from .utils_for_test import create_test_ffis
 from ..make_cube import CubeFactory
 from ..cube_cut import CutoutFactory
+from ..exceptions import InvalidQueryError, InputWarning
 
 
 def checkcutout(cutfile, pixcrd, world, csize, ecube, eps=1.e-7):
@@ -93,8 +96,8 @@ def test_cube_cutout(tmpdir):
     img_sz = 10
     num_im = 100
     
-    ffi_files = create_test_ffis(img_sz, num_im)
-    cube_file = cube_maker.make_cube(ffi_files, "make_cube-test-cube", verbose=False)
+    ffi_files = create_test_ffis(img_sz, num_im, dir_name=tmpdir)
+    cube_file = cube_maker.make_cube(ffi_files, path.join(tmpdir, "test_cube.fits"), verbose=False)
 
     # Read one of the input images to get the WCS
     img_header = fits.getheader(ffi_files[0], 1)
@@ -112,13 +115,14 @@ def test_cube_cutout(tmpdir):
     world_coords = cube_wcs.all_pix2world(pixcrd, 0)
 
     # Getting the cutouts
-    cutbasename = 'make_cube-cutout{}.fits'
-    cutlist = [cutbasename.format(i) for i in range(len(world_coords))]
+    cutbasename = 'make_cube_cutout_{}.fits'
+    cutlist = [path.join(tmpdir, cutbasename.format(i)) for i in range(len(world_coords))]
     csize = [img_sz//2]*len(world_coords)
     csize[-1] = img_sz+5
     for i, v in enumerate(world_coords):
         coord = SkyCoord(v[0], v[1], frame='icrs', unit='deg')
-        CutoutFactory().cube_cut(cube_file, coord, csize[i], target_pixel_file=cutlist[i], verbose=False)
+        CutoutFactory().cube_cut(cube_file, coord, csize[i], target_pixel_file=cutlist[i],
+                                 output_path=tmpdir, verbose=False)
 
     # expected values for cube
     ecube = np.zeros((img_sz, img_sz, num_im, 2))
@@ -143,7 +147,7 @@ def test_cutout_extras(tmpdir):
     num_im = 100
     
     ffi_files = create_test_ffis(img_sz, num_im)
-    cube_file = cube_maker.make_cube(ffi_files, "make_cube-test-cube", verbose=False)
+    cube_file = cube_maker.make_cube(ffi_files, path.join(tmpdir, "test_cube.fits"), verbose=False)
 
     # Making the cutout
     myfactory = CutoutFactory()
@@ -153,7 +157,8 @@ def test_cutout_extras(tmpdir):
     # Test  _parse_table_info #
     ###########################
     cutout_size = [5, 3]
-    out_file = myfactory.cube_cut(cube_file, coord, cutout_size, verbose=False)
+    out_file = myfactory.cube_cut(cube_file, coord, cutout_size,
+                                  output_path=path.join(tmpdir, "out_dir"), verbose=False)
     assert "256.880000_6.380000_5x3_astrocut.fits" in out_file
 
     assert isinstance(myfactory.cube_wcs, wcs.WCS)
@@ -252,5 +257,122 @@ def test_cutout_extras(tmpdir):
     assert aperture.dtype.name == 'int32'
 
     tpf.close()
+
+
+def test_exceptions(tmpdir):
+    """
+    Testing various error conditions.
+    """
     
+    # Making the test cube
+    cube_maker = CubeFactory()
     
+    img_sz = 10
+    num_im = 100
+    
+    ffi_files = create_test_ffis(img_sz, num_im)
+    cube_file = cube_maker.make_cube(ffi_files, path.join(tmpdir, "test_cube.fits"), verbose=False)
+
+    # Setting up
+    myfactory = CutoutFactory()
+   
+    hdu = fits.open(cube_file)
+    cube_table = hdu[2].data
+     
+    # Testing when none of the FFIs have good wcs info
+    cube_table["WCSAXES"] = 0
+    with pytest.raises(Exception, match='No FFI rows contain valid WCS keywords.') as e:
+        myfactory._parse_table_info(cube_table)
+        assert e.type is wcs.NoWcsKeywordsFoundError
+    cube_table["WCSAXES"] = 2
+
+    # Testing when nans are present 
+    myfactory._parse_table_info(cube_table)
+    wcs_orig = myfactory.cube_wcs
+    cube_table["BARYCORR"] = np.nan
+    myfactory._parse_table_info(cube_table)
+    assert wcs_orig.to_header_string() == myfactory.cube_wcs.to_header_string()
+
+    hdu.close()
+
+    # Testing various off the cube inputs
+    myfactory.center_coord = SkyCoord("50.91092264 6.40588255", unit='deg')
+    with pytest.raises(Exception, match='Cutout location is not in cube footprint!') as e:
+        myfactory._get_cutout_limits(np.array([5, 5]))
+        assert e.type is InvalidQueryError
+         
+    myfactory.center_coord = SkyCoord("257.91092264 6.40588255", unit='deg')
+    with pytest.raises(Exception, match='Cutout location is not in cube footprint!') as e:
+        myfactory._get_cutout_limits(np.array([5, 5]))
+        assert e.type is InvalidQueryError
+
+
+    # Testing the WCS fitting function
+    distmax, sigma = myfactory._fit_cutout_wcs(myfactory.cube_wcs, (100, 100))
+    assert distmax.deg < 0.003
+    assert sigma < 0.03
+
+    distmax, sigma = myfactory._fit_cutout_wcs(myfactory.cube_wcs, (1, 100))
+    assert distmax.deg < 0.003
+    assert sigma < 0.03
+
+    distmax, sigma = myfactory._fit_cutout_wcs(myfactory.cube_wcs, (100, 2))
+    assert distmax.deg < 0.03
+    assert sigma < 0.03
+
+    myfactory.center_coord = SkyCoord("256.38994124 4.88986771", unit='deg')
+    myfactory._get_cutout_limits(np.array([5, 500]))
+
+    hdu = fits.open(cube_file)
+    cutout_wcs = myfactory._get_full_cutout_wcs(hdu[2].header)
+    hdu.close()
+
+    distmax, sigma = myfactory._fit_cutout_wcs(cutout_wcs, (200, 200))
+    assert distmax.deg < 0.004
+    assert sigma < 0.2
+
+    distmax, sigma = myfactory._fit_cutout_wcs(cutout_wcs, (100, 5))
+    assert distmax.deg < 0.003
+    assert sigma < 0.003
+
+    distmax, sigma = myfactory._fit_cutout_wcs(cutout_wcs, (3, 100))
+    assert distmax.deg < 0.003
+    assert sigma < 0.003
+    
+
+def test_inputs(tmpdir, capsys):
+    """
+    Testing with different user input types/combos. And verbose.
+    """
+
+    # Making the test cube
+    cube_maker = CubeFactory()
+    
+    img_sz = 10
+    num_im = 100
+    
+    ffi_files = create_test_ffis(img_sz, num_im)
+    cube_file = cube_maker.make_cube(ffi_files, path.join(tmpdir, "test_cube.fits"), verbose=False)
+
+    # Setting up
+    myfactory = CutoutFactory()
+    coord = "256.88 6.38"
+
+    cutout_size = [5, 3]*u.pixel
+    cutout_file = myfactory.cube_cut(cube_file, coord, cutout_size, output_path=tmpdir, verbose=True)
+    captured = capsys.readouterr()
+    assert "Image cutout cube shape: (100, 3, 5)" in captured.out
+    assert "Using WCS from row 50 out of 100" in captured.out
+    assert "Cutout center coordinate: 256.88,6.38" in captured.out
+    assert "5x3" in cutout_file
+
+    cutout_size = [5, 3]*u.arcmin
+    cutout_file = myfactory.cube_cut(cube_file, coord, cutout_size, output_path=tmpdir, verbose=False)
+    assert "14x9" in cutout_file
+
+    
+    cutout_size = [5, 3, 9]*u.pixel
+    with pytest.warns(InputWarning):
+        cutout_file = myfactory.cube_cut(cube_file, coord, cutout_size, output_path=tmpdir, verbose=False)
+    assert "5x3" in cutout_file
+    assert "x9" not in cutout_file

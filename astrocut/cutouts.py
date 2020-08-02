@@ -55,6 +55,10 @@ def _get_cutout_limits(img_wcs, center_coord, cutout_size):
         center_pixel = center_coord.to_pixel(img_wcs, 1)
     except wcs.NoConvergence:  # If wcs can't converge, center coordinate is far from the footprint
         raise InvalidQueryError("Cutout location is not in image footprint!")
+
+    # For some reason you can sometimes get nans without a no convergance error
+    if np.isnan(center_pixel).all():
+        raise InvalidQueryError("Cutout location is not in image footprint!")
     
     lims = np.zeros((2, 2), dtype=int)
 

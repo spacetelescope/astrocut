@@ -16,7 +16,7 @@ from astropy.coordinates import SkyCoord
 from astropy import wcs
 
 from . import __version__ 
-from .exceptions import InputWarning, TypeWarning, InvalidQueryError
+from .exceptions import InputWarning, InvalidQueryError
 
 # Note: Use the astropy function if available
 import astropy
@@ -84,7 +84,7 @@ class CutoutFactory():
                          "VIGNAPP": [None, "vignetting or collimator correction applied"]}
 
         
-    def _parse_table_info(self, table_header, table_data, verbose=False):
+    def _parse_table_info(self, table_data, verbose=False):
         """
         Takes the header and one entry from the cube table of image header data,
         builds a WCS object that encalpsulates the given WCS information,
@@ -94,21 +94,18 @@ class CutoutFactory():
 
         Parameters
         ----------
-        table_header : `~astropy.io.fits.Header`
-            The cube image header data table header.
-        table_row : `~astropy.io.fits.FITS_record`
-            One row from the cube image header data table.
+        table_data : `~astropy.io.fits.fitsrec.FITS_rec`
+            The cube image header data table.
         """
 
-        data_ind = int(len(table_data)/2)  # using the middle file for table info
+        data_ind = len(table_data)//2  # using the middle file for table info
         table_row = None
 
         # Making sure we have a row with wcs info
         while table_row is None:
             table_row = table_data[data_ind]
-            ra_col = int([x for x in table_header.cards if x[1] == "WCSAXES"][0][0].replace("TTYPE", "")) - 1
-            if table_row[ra_col] == 2:
-                table_row is None
+            if table_row["WCSAXES"] != 2:
+                table_row = None
                 data_ind += 1
                 if data_ind == len(table_data):
                     raise wcs.NoWcsKeywordsFoundError("No FFI rows contain valid WCS keywords.")
@@ -118,29 +115,15 @@ class CutoutFactory():
 
         # Turning the table row into a new header object
         wcs_header = fits.header.Header()
-
-        for header_key, header_val in table_header.items():
-            if 'TTYPE' not in header_key:
-                continue
-        
-            col_num = int(header_key[5:]) - 1
-            tform = table_header[header_key.replace("TTYPE", "TFORM")]
+        for col in table_data.columns:
             
-            wcs_val = table_row[col_num]
+            wcs_val = table_row[col.name]
             if (not isinstance(wcs_val, str)) and (np.isnan(wcs_val)):
                 continue  # Just skip nans
-            
-            if "A" in tform:
-                wcs_header[header_val] = str(table_row[col_num])
-            elif "D" in tform:
-                wcs_header[header_val] = float(table_row[col_num])
-            elif "J" in tform:
-                wcs_header[header_val] = int(table_row[col_num])
-            else:
-                warnings.warn("Unknown data type, keyword value will be parsed as a string.",
-                              TypeWarning)
 
-        # Setting 
+            wcs_header[col.name] = wcs_val
+            
+        # Setting the cube wcs
         self.cube_wcs = wcs.WCS(wcs_header, relax=True)
 
         # Filling the img_kwds dictionary while we are here
@@ -738,7 +721,7 @@ class CutoutFactory():
         with fits.open(cube_file, mode='denywrite', memmap=True) as cube:
 
             # Get the info we need from the data table
-            self._parse_table_info(cube[2].header, cube[2].data, verbose)
+            self._parse_table_info(cube[2].data, verbose)
 
             if isinstance(coordinates, SkyCoord):
                 self.center_coord = coordinates
@@ -761,6 +744,7 @@ class CutoutFactory():
             if len(cutout_size) > 2:
                 warnings.warn("Too many dimensions in cutout size, only the first two will be used.",
                               InputWarning)
+                cutout_size = cutout_size[:2]
                 
             # Get cutout limits
             self._get_cutout_limits(cutout_size)
