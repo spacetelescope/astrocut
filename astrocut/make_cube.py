@@ -269,9 +269,10 @@ class CubeFactory():
         Turns a list of fits image files into one large data-cube.
         Input images must all have the same footprint and resolution.
         The resulting datacube is transposed for quicker cutouts.
-        This function can take some time to run and requires enough 
-        memory to hold the entire cube in memory. 
-        (For full TESS sectors this is about 40 GB)
+        This function can take some time to run, exactly how much time will depend on the number
+        of input files and the maximum allowed memory. The runtime will be fastest if the
+        entire data cube can be held in memory, however that can be quite large (~40GB for a full
+        TESS main mission sector, 3 times that for a TESS extended mission sector).
 
         Parameters
         ----------
@@ -285,6 +286,10 @@ class CubeFactory():
             Optional.  The filename/path to save the output cube in. 
         sector : int
             Optional.  TESS sector to add as header keyword (not present in FFI files).
+        max_memory : float
+            Optional, default is 50. The maximum amount of memory to make available for building
+            the data cube in GB. Note, this is the maximum amount of space to be used for the cube
+            array only, so should not be set to the full amount of memory on the system.
         verbose : bool
             Optional. If true intermediate information is printed. 
 

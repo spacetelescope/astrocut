@@ -25,7 +25,7 @@ This is what allows the cutout operation to be performed efficiently.
 The `~astrocut.CutoutFactory` class performs the actual cutout and builds
 a target pixel file (TPF) that is compatible with TESS pipeline TPFs.
 
-The basic workflow is to first create an image cube from individual FFI files
+The basic work-flow is to first create an image cube from individual FFI files
 (this is one-time work), and then make individual cutout TPFs from this
 large cube file. If you are doing a small number of cutouts, it may make
 sense for you to use our tesscut web service:
@@ -34,18 +34,25 @@ sense for you to use our tesscut web service:
 Making image cubes
 ^^^^^^^^^^^^^^^^^^
 
-Making an image cube is a simple operation, but comes with a vert important
-limitation:
+Making an image cube is a simple operation, but comes with an important
+time/memory trade-off.
 
-.. warning::
-   **Memory Requirements**
+.. important::
+   **Time/Memory Trade-off**
 
-   The entire cube file must be able to fit in your computer's memory!
+   The "max_memory" argument determines the maximum memory in GB that will be used
+   for the image data cube while it is being built. This is *only* for the data cube,
+   and so is somewhat smaller than the amount of memory needed for the program to run.
+   Never set it to your systems total memory.
 
-   For a sector of TESS FFI images from a single camera/chip combination this is ~50 GB.
-
-This operation can also take some time to run. For the 1348 FFI images of the TESS ete-6
-simulated sector, it takes about 12 minutes to run on a computer with 65 GB of memory.
+   Because of this, it is possible to build cube files with much less memory than will
+   hold the final product. However there is a large time trade-off, as the software must
+   run through the list of files multiple times instead of just once. The default value
+   of 50 GB was chosen because it comfortably fits a main mission sector of TESS FFIs,
+   with the default setting on a system with 65 GB of memory it takes about 15 min to
+   build a cube file. On a system with less memory that requires 3 passes through the
+   list of files this time rises to ~45 min. 
+   
 
 By default ``make_cube`` runs in verbose mode and prints out its progress, however setting
 verbose to false will silence all output.
@@ -88,7 +95,7 @@ Making cutout target pixel files
 
 To make a cutout, you must already have an image cube to cut out from.
 Assuming that that step has been completed, you simply give the central
-coordinate and cutout size (in either pixels or angular `~astropy.Quanitity`)
+coordinate and cutout size (in either pixels or angular `~astropy.Quantity`)
 to the *cube_cut* function.
 
 You can either specify a target pixel file name, or it will be built as:
