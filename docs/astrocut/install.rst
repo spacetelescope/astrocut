@@ -26,7 +26,7 @@ The easiest way to install Astrocut is using pip::
 From source
 -----------
 
-To install the bleading edge version from github without donloading,
+To install the bleeding edge version from github without downloading,
 run the following command::
 
   pip git+https://github.com/spacetelescope/astrocut.git
@@ -38,6 +38,6 @@ using this command::
 
 To install astrocut (from the root of the source tree)::
 
-    python setup.py install
+    pip install .
 
    
