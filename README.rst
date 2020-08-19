@@ -60,9 +60,9 @@ Tests can be found in ``astrocut/tests/``.
 
     $ tox -e test
 
- Tests can also be run directly with pytest:
+Tests can also be run directly with pytest:
 
- .. code-block:: bash
+.. code-block:: bash
 
     $ pip install -e .[test]
     $ pytest
@@ -77,7 +77,7 @@ We now build the documentation with `tox <https://tox.readthedocs.io>`_ (``pip i
 
     $ tox -e build_docs
 
-You can also build the documentation with Sphinx directly using::
+You can also build the documentation with Sphinx directly using:
 
 .. code-block:: bash
                 
