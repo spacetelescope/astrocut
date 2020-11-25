@@ -8,6 +8,7 @@ import numpy as np
 
 from time import time
 from datetime import date
+from itertools import product
 
 from astropy import log
 from astropy import units as u
@@ -20,11 +21,10 @@ from astropy.visualization import (SqrtStretch, LogStretch, AsinhStretch, SinhSt
 
 from PIL import Image
 
-from . import __version__
+from .utils.utils import parse_size_input, get_cutout_limits, get_cutout_wcs, remove_sip_coefficients, save_fits
 from .exceptions import InputWarning, DataWarning, InvalidQueryError, InvalidInputError
 
 
-#### FUNCTIONS FOR UTILS ####
 def _get_cutout_limits(img_wcs, center_coord, cutout_size):
     """
     Takes the center coordinates, cutout size, and the wcs from
@@ -190,7 +190,7 @@ def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, verbose=False
         print("Original image shape: {}".format(img_data.shape))
 
     # Get cutout limits
-    cutout_lims = _get_cutout_limits(img_wcs, center_coord, cutout_size)
+    cutout_lims = get_cutout_limits(img_wcs, center_coord, cutout_size)
 
     if verbose:
         print("xmin,xmax: {}".format(cutout_lims[0]))
@@ -231,7 +231,7 @@ def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, verbose=False
         print("Image cutout shape: {}".format(img_cutout.shape))
 
     # Getting the cutout wcs
-    cutout_wcs = _get_cutout_wcs(img_wcs, cutout_lims)
+    cutout_wcs = get_cutout_wcs(img_wcs, cutout_lims)
 
     # Updating the header with the new wcs info
     if no_sip:
@@ -239,7 +239,8 @@ def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, verbose=False
     else:
         hdu_header.update(cutout_wcs.to_header(relax=True))  # relax arg is for sip distortions if they exist
 
-    # Naming the extension
+    # Naming the extension and preserving the original name
+    hdu_header["O_EXT_NM"] = (hdu_header["EXTNAME"], "Original extension name.")
     hdu_header["EXTNAME"] = "CUTOUT"
 
     # Moving the filename, if present, into the ORIG_FLE keyword
@@ -249,76 +250,6 @@ def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, verbose=False
     hdu = fits.ImageHDU(header=hdu_header, data=img_cutout)
 
     return hdu
-
-
-def _save_fits(cutout_hdus, output_path, center_coord):
-    """
-    Save one or more cutout hdus to a single fits file.
-
-    Parameters
-    ----------
-    cutout_hdus : list or `~astropy.io.fits.hdu.image.ImageHDU`
-        The `~astropy.io.fits.hdu.image.ImageHDU` object(s) to be written to the fits file.
-    output_path : str
-        The full path to the output fits file.
-    center_coord : `~astropy.coordinates.sky_coordinate.SkyCoord`
-        The center coordinate of the image cutouts.
-    """
-
-    if isinstance(cutout_hdus, fits.hdu.image.ImageHDU):
-        cutout_hdus = [cutout_hdus]
-    
-    # Setting up the Primary HDU
-    primary_hdu = fits.PrimaryHDU()
-    primary_hdu.header.extend([("ORIGIN", 'STScI/MAST', "institution responsible for creating this file"),
-                               ("DATE", str(date.today()), "file creation date"),
-                               ('PROCVER', __version__, 'software version'),
-                               ('RA_OBJ', center_coord.ra.deg, '[deg] right ascension'),
-                               ('DEC_OBJ', center_coord.dec.deg, '[deg] declination')])
-
-    cutout_hdulist = fits.HDUList([primary_hdu] + cutout_hdus)
-
-    # Writing out the hdu often causes a warning as the ORIG_FLE card description is truncated
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore") 
-        cutout_hdulist.writeto(output_path, overwrite=True, checksum=True)
-        
-
-    
-def _parse_size_input(cutout_size):
-    """
-    Makes the given cutout size into a length 2 array.
-
-    Parameters
-    ----------
-    cutout_size : int, array-like, `~astropy.units.Quantity`
-        The size of the cutout array. If ``cutout_size`` is a scalar number or a scalar 
-        `~astropy.units.Quantity`, then a square cutout of ``cutout_size`` will be created.  
-        If ``cutout_size`` has two elements, they should be in ``(ny, nx)`` order.  Scalar numbers 
-        in ``cutout_size`` are assumed to be in units of pixels. `~astropy.units.Quantity` objects 
-        must be in pixel or angular units.
-
-    Returns
-    -------
-    response : array
-        Length two cutout size array, in the form [ny, nx].
-    """
-
-    # Making size into an array [ny, nx]
-    if np.isscalar(cutout_size):
-        cutout_size = np.repeat(cutout_size, 2)
-
-    if isinstance(cutout_size, u.Quantity):
-        cutout_size = np.atleast_1d(cutout_size)
-        if len(cutout_size) == 1:
-            cutout_size = np.repeat(cutout_size, 2)
-
-    if len(cutout_size) > 2:
-        warnings.warn("Too many dimensions in cutout size, only the first two will be used.",
-                      InputWarning)
-        cutout_size = cutout_size[:2]
-
-    return cutout_size
 
 
 def _parse_extensions(infile_exts, infile_name, user_exts):
@@ -387,7 +318,7 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
         and does not include distortions.
     extension : int, list of ints, None, or 'all'
         Optional, default None. Default is to cutout the first extension that has image data.
-        The user can also supply one or more extensions to cutout from (integers), or "all".
+       The user can also supply one or more extensions to cutout from (integers), or "all".
     single_outfile : bool 
         Default True. If true return all cutouts in a single fits file with one cutout per extension,
         if False return cutouts in individual fits files. If returing a single file the filename will 
@@ -423,7 +354,7 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
         coordinates = SkyCoord(coordinates, unit='deg')
 
     # Turning the cutout size into a 2 member array
-    cutout_size = _parse_size_input(cutout_size)
+    cutout_size = parse_size_input(cutout_size)
 
     # Making the cutouts
     cutout_hdu_dict = {}
@@ -451,7 +382,11 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
                         cutout.header["EMPTY"] = (True, "Indicates no data in cutout image.")
                         num_empty += 1
 
+                    # Adding a few more keywords
                     cutout.header["ORIG_EXT"] = (ind, "Extension in original file.")
+                    if not cutout.header.get("ORIG_FLE") and hdulist[0].header.get("FILENAME"):
+                        cutout.header["ORIG_FLE"] = hdulist[0].header.get("FILENAME")
+                    
                     cutout_hdu_dict[in_fle] = cutout_hdu_dict.get(in_fle, []) + [cutout]
                     
                 except OSError as err:
@@ -477,7 +412,7 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
                                                                     str(cutout_size[1]).replace(' ', ''))
         cutout_path = os.path.join(output_dir, cutout_path)
         cutout_hdus = [x for fle in cutout_hdu_dict for x in cutout_hdu_dict[fle]]
-        _save_fits(cutout_hdus, cutout_path, coordinates)
+        save_fits(cutout_hdus, cutout_path, coordinates)
 
         if verbose:
             print("Cutout fits file: {}".format(cutout_path))
@@ -499,7 +434,7 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
                                                                      str(cutout_size[0]).replace(' ', ''), 
                                                                      str(cutout_size[1]).replace(' ', ''))
             cutout_path = os.path.join(output_dir, filename)
-            _save_fits(cutout_list, cutout_path, coordinates)
+            save_fits(cutout_list, cutout_path, coordinates)
             
             if verbose:
                 print(cutout_path)
@@ -651,7 +586,7 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
         coordinates = SkyCoord(coordinates, unit='deg')
 
     # Turning the cutout size into a 2 member array
-    cutout_size = _parse_size_input(cutout_size)
+    cutout_size = parse_size_input(cutout_size)
 
     # Applying the default scaling
     if (minmax_percent is None) and (minmax_value is None):
@@ -745,6 +680,3 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
         print("Total time: {:.2} sec".format(time()-start_time))
 
     return cutout_path
-    
-    
-    
