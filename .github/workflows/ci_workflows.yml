@@ -26,7 +26,6 @@ jobs:
             python: 3.8
             toxenv: py38-test-alldeps
             toxargs: -v --develop
-            toxposargs: --open-files
 
           - name: Python 3.6 with oldest supported version of all dependencies
             os: ubuntu-16.04
