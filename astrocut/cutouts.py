@@ -11,122 +11,16 @@ from datetime import date
 from itertools import product
 
 from astropy import log
-from astropy import units as u
 from astropy.io import fits
 from astropy.coordinates import SkyCoord
 from astropy import wcs
-from astropy.utils.exceptions import AstropyDeprecationWarning
 from astropy.visualization import (SqrtStretch, LogStretch, AsinhStretch, SinhStretch, LinearStretch,
                                    MinMaxInterval, ManualInterval, AsymmetricPercentileInterval)
 
 from PIL import Image
 
-from .utils.utils import parse_size_input, get_cutout_limits, get_cutout_wcs, remove_sip_coefficients, save_fits
+from .utils.utils import parse_size_input, get_cutout_limits, get_cutout_wcs, save_fits
 from .exceptions import InputWarning, DataWarning, InvalidQueryError, InvalidInputError
-
-
-def _get_cutout_limits(img_wcs, center_coord, cutout_size):
-    """
-    Takes the center coordinates, cutout size, and the wcs from
-    which the cutout is being taken and returns the x and y pixel limits
-    for the cutout.
-
-    Note: This function does no bounds checking, so the returned limits are not 
-          guaranteed to overlap the original image.
-
-    Parameters
-    ----------
-    img_wcs : `~astropy.wcs.WCS`
-        The WCS for the image that the cutout is being cut from.
-    center_coord : `~astropy.coordinates.SkyCoord`
-        The central coordinate for the cutout
-    cutout_size : array
-        [nx,ny] in with ints (pixels) or astropy quantities
-
-    Returns
-    -------
-    response : `numpy.array`
-        The cutout pixel limits in an array of the form [[xmin,xmax],[ymin,ymax]]
-    """
-        
-    # Note: This is returning the center pixel in 1-up
-    try:
-        center_pixel = center_coord.to_pixel(img_wcs, 1)
-    except wcs.NoConvergence:  # If wcs can't converge, center coordinate is far from the footprint
-        raise InvalidQueryError("Cutout location is not in image footprint!")
-
-    # For some reason you can sometimes get nans without a no convergance error
-    if np.isnan(center_pixel).all():
-        raise InvalidQueryError("Cutout location is not in image footprint!")
-    
-    lims = np.zeros((2, 2), dtype=int)
-
-    for axis, size in enumerate(cutout_size):
-        
-        if not isinstance(size, u.Quantity):  # assume pixels
-            dim = size / 2
-        elif size.unit == u.pixel:  # also pixels
-            dim = size.value / 2
-        elif size.unit.physical_type == 'angle':
-            pixel_scale = u.Quantity(wcs.utils.proj_plane_pixel_scales(img_wcs)[axis],
-                                     img_wcs.wcs.cunit[axis])
-            dim = (size / pixel_scale).decompose() / 2
-
-        lims[axis, 0] = int(np.round(center_pixel[axis] - 1 - dim))
-        lims[axis, 1] = int(np.round(center_pixel[axis] - 1 + dim))
-
-        # The case where the requested area is so small it rounds to zero
-        if lims[axis, 0] == lims[axis, 1]:
-            lims[axis, 0] = int(np.floor(center_pixel[axis] - 1))
-            lims[axis, 1] = lims[axis, 0] + 1
-
-    return lims
-
-        
-def _get_cutout_wcs(img_wcs, cutout_lims):
-    """
-    Starting with the full FFI WCS and adjusting it for the cutout WCS.
-    Adjusts CRPIX values and adds physical WCS keywords.
-
-    Parameters
-    ----------
-    img_wcs : `~astropy.wcs.WCS`
-        WCS for the image the cutout is being cut from.
-    cutout_lims : `numpy.array`
-        The cutout pixel limits in an array of the form [[ymin,ymax],[xmin,xmax]]
-
-    Returns
-    --------
-    response :  `~astropy.wcs.WCS`
-        The cutout WCS object including SIP distortions if present.
-    """
-
-    # relax = True is important when the WCS has sip distortions, otherwise it has no effect
-    wcs_header = img_wcs.to_header(relax=True) 
-
-    # Adjusting the CRPIX values
-    wcs_header["CRPIX1"] -= cutout_lims[0, 0]
-    wcs_header["CRPIX2"] -= cutout_lims[1, 0]
-
-    # Adding the physical wcs keywords
-    wcs_header.set("WCSNAMEP", "PHYSICAL", "name of world coordinate system alternate P")
-    wcs_header.set("WCSAXESP", 2, "number of WCS physical axes")
-    
-    wcs_header.set("CTYPE1P", "RAWX", "physical WCS axis 1 type CCD col")
-    wcs_header.set("CUNIT1P", "PIXEL", "physical WCS axis 1 unit")
-    wcs_header.set("CRPIX1P", 1, "reference CCD column")
-    wcs_header.set("CRVAL1P", cutout_lims[0, 0] + 1, "value at reference CCD column")
-    wcs_header.set("CDELT1P", 1.0, "physical WCS axis 1 step")
-                
-    wcs_header.set("CTYPE2P", "RAWY", "physical WCS axis 2 type CCD col")
-    wcs_header.set("CUNIT2P", "PIXEL", "physical WCS axis 2 unit")
-    wcs_header.set("CRPIX2P", 1, "reference CCD row")
-    wcs_header.set("CRVAL2P", cutout_lims[1, 0] + 1, "value at reference CCD row")
-    wcs_header.set("CDELT2P", 1.0, "physical WCS axis 2 step")
-
-    return wcs.WCS(wcs_header)
-
-#### FUNCTIONS FOR UTILS ####
 
 
 def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, verbose=False):
@@ -240,7 +134,7 @@ def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, verbose=False
         hdu_header.update(cutout_wcs.to_header(relax=True))  # relax arg is for sip distortions if they exist
 
     # Naming the extension and preserving the original name
-    hdu_header["O_EXT_NM"] = (hdu_header["EXTNAME"], "Original extension name.")
+    hdu_header["O_EXT_NM"] = (hdu_header.get("EXTNAME"), "Original extension name.")
     hdu_header["EXTNAME"] = "CUTOUT"
 
     # Moving the filename, if present, into the ORIG_FLE keyword
@@ -283,8 +177,8 @@ def _parse_extensions(infile_exts, infile_name, user_exts):
     else:  # User input extentions
         cutout_exts = [x for x in infile_exts if x in user_exts]
         if len(cutout_exts) < len(user_exts):
-            warnings.warn((f"Not all requested extensions in {infile_name} are image extensions or have data, extension(s)"
-                           f" {','.join([x for x in user_exts if x not in cutout_exts])} will be skipped."),
+            warnings.warn((f"Not all requested extensions in {infile_name} are image extensions or have data, "
+                           f"extension(s) {','.join([x for x in user_exts if x not in cutout_exts])} will be skipped."),
                           DataWarning)
 
     return cutout_exts
@@ -368,14 +262,14 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
         with fits.open(in_fle, mode='denywrite', memmap=True) as hdulist:
 
             # Sorting out which extension(s) to cutout
-            all_inds = np.where([x.is_image and (x.data is not None)  for x in hdulist])[0]
+            all_inds = np.where([x.is_image and (x.data is not None) for x in hdulist])[0]
             cutout_inds = _parse_extensions(all_inds, in_fle, extension)
 
             num_cutouts += len(cutout_inds)
             for ind in cutout_inds:            
                 try:
                     cutout = _hducut(hdulist[ind], coordinates, cutout_size,
-                                 correct_wcs=correct_wcs, verbose=verbose)
+                                     correct_wcs=correct_wcs, verbose=verbose)
 
                     # Check that there is data in the cutout image
                     if (cutout.data == 0).all() or (np.isnan(cutout.data)).all():
@@ -390,7 +284,8 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
                     cutout_hdu_dict[in_fle] = cutout_hdu_dict.get(in_fle, []) + [cutout]
                     
                 except OSError as err:
-                    warnings.warn(f"Error {err} encountered when performing cutout on {in_fle}, extension {ind}, skipping...",
+                    warnings.warn((f"Error {err} encountered when performing cutout on {in_fle}, "
+                                   f"extension {ind}, skipping..."),
                                   DataWarning)
                     num_empty += 1
 
@@ -417,7 +312,11 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
         if verbose:
             print("Cutout fits file: {}".format(cutout_path))
 
+        all_paths = cutout_path
+
     else:  # one output file per input file
+        all_paths = []
+        
         if verbose:
             print("Cutout fits files:")
             
@@ -435,6 +334,8 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
                                                                      str(cutout_size[1]).replace(' ', ''))
             cutout_path = os.path.join(output_dir, filename)
             save_fits(cutout_list, cutout_path, coordinates)
+
+            all_paths.append(cutout_path)
             
             if verbose:
                 print(cutout_path)
@@ -442,7 +343,7 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
     if verbose:
         print("Total time: {:.2} sec".format(time()-start_time))
 
-    return cutout_path
+    return all_paths
 
 
 def normalize_img(img_arr, stretch='asinh', minmax_percent=None, minmax_value=None, invert=False):
@@ -603,7 +504,7 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
         with fits.open(in_fle, mode='denywrite', memmap=True) as hdulist:
 
             # Sorting out which extension(s) to cutout
-            all_inds = np.where([x.is_image and (x.data is not None)  for x in hdulist])[0]
+            all_inds = np.where([x.is_image and (x.data is not None) for x in hdulist])[0]
             cutout_inds = _parse_extensions(all_inds, in_fle, extension)
 
             for ind in cutout_inds:   
@@ -634,16 +535,16 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
         
     # Setting up the output file(s) and writing them
     if colorize:
-
-        cutouts = [x for fle in input_files for x in cutout_hdu_dict[fle] if cutout_hdu_dict.get(fle)]
+        cutouts = [x for fle in input_files for x in cutout_hdu_dict.get(fle, [])]
         
         # Doing checks correct number of cutouts
         if len(cutouts) < 3:
-            raise InvalidInputError("Color cutouts require 3 input images (RGB).")
+            raise InvalidInputError(("Color cutouts require 3 input images (RGB)."
+                                     "If you supplied 3 images one of the cutouts may have been empty."))
         if len(cutouts) > 3:
             warnings.warn("Too many inputs for a color cutout, only the first three will be used.",
                           InputWarning)
-            cutouts = input_files[:3]
+            cutouts = cutouts[:3]
 
             
         cutout_path = "{}_{:7f}_{:7f}_{}-x-{}_astrocut.{}".format(cutout_prefix,
@@ -653,6 +554,7 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
                                                                   str(cutout_size[1]).replace(' ', ''),
                                                                   img_format.lower()) 
         cutout_path = os.path.join(output_dir, cutout_path)
+
         Image.fromarray(np.dstack([cutouts[0], cutouts[1], cutouts[2]]).astype(np.uint8)).save(cutout_path)
           
     else:
@@ -660,7 +562,7 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
         cutout_path = []
         for fle in input_files:
 
-            for i,cutout  in enumerate(cutout_hdu_dict.get(fle)):
+            for i, cutout in enumerate(cutout_hdu_dict.get(fle)):
 
 
                 file_path = "{}_{:7f}_{:7f}_{}-x-{}_astrocut_{}.{}".format(os.path.basename(fle).rstrip('.fits'),
