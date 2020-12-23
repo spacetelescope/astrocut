@@ -21,16 +21,13 @@ Documentation is at https://astrocut.readthedocs.io.
 
 Project Status
 --------------
-.. image:: https://travis-ci.org/spacetelescope/astrocut.svg?branch=master
-    :target: https://travis-ci.org/spacetelescope/astrocut
-    :alt: Travis CI status
+.. image:: https://github.com/spacetelescope/astrocut/workflows/CI/badge.svg?branch=master
+    :target: https://github.com/spacetelescope/astrocut
+    :alt: Github actions CI status
     
 .. image:: https://codecov.io/gh/spacetelescope/astrocut/branch/master/graph/badge.svg
   :target: https://codecov.io/gh/spacetelescope/astrocut
   :alt: Codecov coverage status
-
-
-
 
 
 Developer Documentation
