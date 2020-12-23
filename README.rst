@@ -6,7 +6,7 @@ Cutout tools for astronomical images
     :alt: Powered by Astropy Badge
     
 .. image:: https://badge.fury.io/py/astrocut.svg
-    :target: https://badge.fury.io/py/astrocut 
+    :target: https://badge.fury.io/py/astrocut
     :alt: PyPi Status
     
 .. image:: https://readthedocs.org/projects/astrocut/badge/?version=latest
@@ -22,7 +22,7 @@ Documentation is at https://astrocut.readthedocs.io.
 Project Status
 --------------
 .. image:: https://github.com/spacetelescope/astrocut/workflows/CI/badge.svg?branch=master
-    :target: https://github.com/spacetelescope/astrocut
+    :target: https://github.com/spacetelescope/astrocut/actions
     :alt: Github actions CI status
     
 .. image:: https://codecov.io/gh/spacetelescope/astrocut/branch/master/graph/badge.svg
