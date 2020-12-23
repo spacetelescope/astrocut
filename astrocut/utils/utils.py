@@ -13,7 +13,7 @@ from astropy.io import fits
 from astropy import units as u
 
 from .. import __version__
-from ..exceptions import InvalidQueryError
+from ..exceptions import InvalidQueryError, InputWarning
 
 
 def parse_size_input(cutout_size):

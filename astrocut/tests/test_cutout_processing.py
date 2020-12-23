@@ -1,14 +1,22 @@
+import pytest
+
 import numpy as np
-import os
+from os import path
 
 from astropy.io import fits
 from astropy.utils.data import get_pkg_data_filename
 from astropy.wcs import WCS
+from astropy.coordinates import SkyCoord
 from astropy.table import Table
 from astropy.time import Time
+from astropy import units as u
+
+from PIL import Image
 
 from .utils_for_test import create_test_ffis
-from .. import cutout_processing, CubeFactory, CutoutFactory
+from .. import cutout_processing, cutouts, CubeFactory, CutoutFactory
+from ..exceptions import InputWarning, InvalidInputError, InvalidQueryError
+
 
 # Example FFI WCS for testing
 with open(get_pkg_data_filename('data/ex_ffi_wcs.txt'), "r") as FLE:
@@ -139,7 +147,7 @@ def test_moving_target_focus(tmpdir):
     num_im = 10
     
     ffi_files = create_test_ffis(img_sz, num_im, dir_name=tmpdir)
-    cube_file = cube_maker.make_cube(ffi_files, os.path.join(tmpdir, "test_cube.fits"), verbose=False)
+    cube_file = cube_maker.make_cube(ffi_files, path.join(tmpdir, "test_cube.fits"), verbose=False)
 
     cutout_file = CutoutFactory().cube_cut(cube_file, "250.3497414839765  2.280925599609063", 100, 
                                            target_pixel_file="cutout_file.fits", output_path=tmpdir,
@@ -179,7 +187,7 @@ def test_configure_bintable_header(tmpdir):
     num_im = 10
     
     ffi_files = create_test_ffis(img_sz, num_im, dir_name=tmpdir)
-    cube_file = cube_maker.make_cube(ffi_files, os.path.join(tmpdir, "test_cube.fits"), verbose=False)
+    cube_file = cube_maker.make_cube(ffi_files, path.join(tmpdir, "test_cube.fits"), verbose=False)
 
     cutout_file = CutoutFactory().cube_cut(cube_file, "250.3497414839765  2.280925599609063", 100, 
                                            target_pixel_file="cutout_file.fits", output_path=tmpdir,
@@ -217,7 +225,7 @@ def test_center_on_path(tmpdir):
     num_im = 10
     
     ffi_files = create_test_ffis(img_sz, num_im, dir_name=tmpdir)
-    cube_file = cube_maker.make_cube(ffi_files, os.path.join(tmpdir, "test_cube.fits"), verbose=False)
+    cube_file = cube_maker.make_cube(ffi_files, path.join(tmpdir, "test_cube.fits"), verbose=False)
 
     cutout_maker = CutoutFactory()
     cutout_file = cutout_maker.cube_cut(cube_file, "250.3497414839765  2.280925599609063", 100, 
@@ -254,11 +262,70 @@ def test_center_on_path(tmpdir):
     assert hdu[0].header["DATE"] == Time.now().to_value('iso', subfmt='date')
     assert hdu[0].header["OBJECT"] == ""
     hdu.close()
-    
 
-    
 
-    
+def test_default_combine():
+    hdu_1 = fits.ImageHDU(np.array([[1, 1], [0, 0]]))
+    hdu_2 = fits.ImageHDU(np.array([[0, 0], [1, 1]]))
 
+    # Two input arrays no overlapping pixels
+    combine_func = cutout_processing.build_default_combine_function([hdu_1, hdu_2], 0)
+    assert (combine_func([hdu_1, hdu_2]) == 1).all()
+    assert (combine_func([hdu_2, hdu_1]) == 0).all()
+
+    # Three input arrays overlapping pixels
+    hdu_3 = fits.ImageHDU(np.array([[0, 1], [1, 0]]))
+    combine_func = cutout_processing.build_default_combine_function([hdu_1, hdu_2, hdu_3], 0)
+
+    im4 = fits.ImageHDU(np.array([[4, 5], [0, 0]]))
+    im5 = fits.ImageHDU(np.array([[0, 0], [4, 5]]))
+    im6 = fits.ImageHDU(np.array([[0, 3], [8, 0]]))
+    comb_img = combine_func([im4, im5, im6])
+    assert (comb_img == [[4, 4], [6, 5]]).all()
+
+    im4 = fits.ImageHDU(np.array([[4, 5], [-3, 8]]))
+    im5 = fits.ImageHDU(np.array([[5, 2], [4, 5]]))
+    im6 = fits.ImageHDU(np.array([[4, 3], [8, 9]]))
+    assert (combine_func([im4, im5, im6]) == comb_img).all()
+
+    # Two input arrays, with nans and a missing pixel
+    hdu_1 = fits.ImageHDU(np.array([[1, np.nan], [np.nan, np.nan]]))
+    hdu_2 = fits.ImageHDU(np.array([[np.nan, np.nan], [1, 1]]))
+
+    combine_func = cutout_processing.build_default_combine_function([hdu_1, hdu_2])
+    assert np.allclose(combine_func([hdu_1, hdu_2]), [[1, np.nan], [1, 1]], equal_nan=True)
+
+
+def test_combiner(tmpdir):
+
+    test_images = create_test_imgs(50, 6, dir_name=tmpdir)
+    center_coord = SkyCoord("150.1163213 2.200973097", unit='deg')
+    cutout_size = 2
+
+    cutout_file_1 = cutouts.fits_cut(test_images[:3], center_coord, cutout_size, 
+                                     cutout_prefix="cutout_1", output_dir=tmpdir)
+    cutout_file_2 = cutouts.fits_cut(test_images[3:], center_coord, cutout_size, 
+                                     cutout_prefix="cutout_2", output_dir=tmpdir)
+
+    combiner = cutout_processing.CutoutsCombiner([cutout_file_1, cutout_file_2])
+
+    # Checking the load function
+    assert center_coord.separation(combiner.center_coord) == 0
+    assert len(combiner.input_hdulists) == 3
+    assert len(combiner.input_hdulists[0]) == 2
+
+    # Checking the combiner function was set properly
+    comb_1 = combiner.combine_images(combiner.input_hdulists[0])
+    combine_func = cutout_processing.build_default_combine_function(combiner.input_hdulists[0])
+    assert (comb_1 == combine_func(combiner.input_hdulists[0])).all()
+
+    # Running the combine function and checking the results
+    out_fle = combiner.combine(path.join(tmpdir, "combination.fits"))
+    comb_hdu = fits.open(out_fle)
+    assert len(comb_hdu) == 4
+    assert (comb_hdu[1].data == comb_1).all()
+    assert np.isclose(comb_hdu[0].header['RA_OBJ'], center_coord.ra.deg)
+    assert np.isclose(comb_hdu[0].header['DEC_OBJ'], center_coord.dec.deg)
+    comb_hdu.close()
     
     

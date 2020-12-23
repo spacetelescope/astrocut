@@ -8,14 +8,12 @@ from astropy.io import fits
 from astropy import wcs
 from astropy.coordinates import SkyCoord
 from astropy import units as u
-from astropy.utils.exceptions import AstropyDeprecationWarning
 
 from PIL import Image
 
 from .utils_for_test import create_test_imgs
 from .. import cutouts
 from ..exceptions import InputWarning, InvalidInputError, InvalidQueryError
-
 
 def test_get_cutout_limits():
 
@@ -142,20 +140,18 @@ def test_fits_cut(tmpdir, capsys):
     cutout_hdulist.close()
 
     # Multiple files
-    with pytest.warns(AstropyDeprecationWarning):
-        cutout_files = cutouts.fits_cut(test_images, center_coord, cutout_size,
-                                        drop_after="Dummy1", single_outfile=False, output_dir=tmpdir)
+    cutout_files = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=False, output_dir=tmpdir)
 
     assert isinstance(cutout_files, list)
     assert len(cutout_files) == len(test_images)
 
     cutout_hdulist = fits.open(cutout_files[0])
-    assert len(cutout_hdulist) == 1
+    assert len(cutout_hdulist) == 2
     
-    cut1 = cutout_hdulist[0].data
+    cut1 = cutout_hdulist[1].data
     assert cut1.shape == (cutout_size, cutout_size)
     
-    cut_wcs = wcs.WCS(cutout_hdulist[0].header)
+    cut_wcs = wcs.WCS(cutout_hdulist[1].header)
     sra, sdec = cut_wcs.all_pix2world(cutout_size/2, cutout_size/2, 0)
     assert round(float(sra), 4) == round(center_coord.ra.deg, 4)
     assert round(float(sdec), 4) == round(center_coord.dec.deg, 4)
@@ -356,9 +352,7 @@ def test_img_cut(tmpdir, capsys):
         assert IMGFLE.read(3) == b'\xFF\xD8\xFF'  # JPG
 
     # Png (single input file, not as list)
-    with pytest.warns(AstropyDeprecationWarning):
-        img_files = cutouts.img_cut(test_images[0], center_coord, cutout_size, img_format='png',
-                                    output_dir=tmpdir, drop_after="")
+    img_files = cutouts.img_cut(test_images[0], center_coord, cutout_size, img_format='png', output_dir=tmpdir)
     with open(img_files[0], 'rb') as IMGFLE:
         assert IMGFLE.read(8) == b'\x89\x50\x4E\x47\x0D\x0A\x1A\x0A'  # PNG
     assert len(img_files) == 1
@@ -393,10 +387,9 @@ def test_img_cut(tmpdir, capsys):
     hdu.flush()
     hdu.close()
 
-    color_png = cutouts.img_cut(test_images[:3], center_coord, cutout_size, colorize=True,
-                                img_format='png', output_dir=tmpdir)
-    img = Image.open(color_png)
-    assert img.mode == 'RGB'
-    assert (np.asarray(img)[:, :, 0] == 0).all()
+    with pytest.raises(InvalidInputError):
+        cutouts.img_cut(test_images[:3], center_coord, cutout_size,
+                        colorize=True, img_format='png', output_dir=tmpdir)
+
     
     
