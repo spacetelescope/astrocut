@@ -2,7 +2,6 @@
 
 """This module contains various cutout post-processing tools."""
 
-import warnings
 import numpy as np
 import os
 
@@ -65,8 +64,7 @@ def _combine_headers(headers, constant_only=False):
     return fits.Header(uniform_cards+varying_keywords)
 
 
-
-def _get_bounds(x,y,size):
+def _get_bounds(x, y, size):
     """
     Given an x,y coordinates (single or lists) and size, return the bounds of the
     described area(s) as [[[x_min, x_max],[y_min, y_max]],...].
@@ -80,6 +78,7 @@ def _get_bounds(x,y,size):
     return np.stack((np.stack((lower_x, lower_x + size[0]), axis=1),
                      np.stack((lower_y, lower_y + size[1]), axis=1)), axis=1).astype(int)
 
+
 def _combine_bounds(bounds1, bounds2):
     """
     Given two bounds of the form [[x_min, x_max],[y_min, y_max]],
@@ -87,11 +86,11 @@ def _combine_bounds(bounds1, bounds2):
     encompasses both initial bounds.
     """
     
-    bounds_comb = np.zeros((2,2), dtype=int)
-    bounds_comb[0,0] = bounds1[0,0] if (bounds1[0,0] < bounds2[0,0]) else bounds2[0,0]
-    bounds_comb[1,0] = bounds1[1,0] if (bounds1[1,0] < bounds2[1,0]) else bounds2[1,0]
-    bounds_comb[0,1] = bounds1[0,1] if (bounds1[0,1] > bounds2[0,1]) else bounds2[0,1]
-    bounds_comb[1,1] = bounds1[1,1] if (bounds1[1,1] > bounds2[1,1]) else bounds2[1,1]
+    bounds_comb = np.zeros((2, 2), dtype=int)
+    bounds_comb[0, 0] = bounds1[0, 0] if (bounds1[0, 0] < bounds2[0, 0]) else bounds2[0, 0]
+    bounds_comb[1, 0] = bounds1[1, 0] if (bounds1[1, 0] < bounds2[1, 0]) else bounds2[1, 0]
+    bounds_comb[0, 1] = bounds1[0, 1] if (bounds1[0, 1] > bounds2[0, 1]) else bounds2[0, 1]
+    bounds_comb[1, 1] = bounds1[1, 1] if (bounds1[1, 1] > bounds2[1, 1]) else bounds2[1, 1]
     
     return bounds_comb
 
@@ -101,7 +100,7 @@ def _area(bounds):
     Given bounds of the form [[x_min, x_max],[y_min, y_max]] return
     the area of the described rectangle.
     """
-    return (bounds[0,1] - bounds[0,0]) * (bounds[1,1] - bounds[1,0])
+    return (bounds[0, 1] - bounds[0, 0]) * (bounds[1, 1] - bounds[1, 0])
 
 
 def _get_args(bounds, img_wcs):
@@ -110,14 +109,15 @@ def _get_args(bounds, img_wcs):
     `~astropy.wcs.WCS` object return a center coordinate and size
     ([ny, nx] pixels) suitable for creating a rectangular cutout.
     """
-    nx = bounds[0,1]-bounds[0,0]
-    ny = bounds[1,1]-bounds[1,0]
-    x = nx/2 + bounds[0,0]
-    y = ny/2 + bounds[1,0]
-    return {"coordinates":img_wcs.pixel_to_world(x,y),
-            "size":(ny,nx)}
+    nx = bounds[0, 1]-bounds[0, 0]
+    ny = bounds[1, 1]-bounds[1, 0]
+    x = nx/2 + bounds[0, 0]
+    y = ny/2 + bounds[1, 0]
+    return {"coordinates": img_wcs.pixel_to_world(x, y),
+            "size": (ny, nx)}
 
-### TODO: Put this in utils ###
+
+# TODO: Put this in utils 
 def path_to_footprints(path, size, img_wcs, max_pixels=10000):
     """
     Given a path that intersects with a wcs footprint, return
@@ -222,7 +222,7 @@ def _moving_target_focus(path, size, cutout_fles, verbose=False):
         path["x"], path["y"] = cutout_wcs.world_to_pixel(path["position"])
         # This line might need to be refined
         rel_pts = ((path["x"] - size[0]/2 >= 0) & (path["x"] + size[0]/2 < cutout_wcs.array_shape[1]) & 
-                   (path["y"] - size[1]/2 >= 0) & (path["y"] + size[1]/2 < cutout_wcs.array_shape[0]))        
+                   (path["y"] - size[1]/2 >= 0) & (path["y"] + size[1]/2 < cutout_wcs.array_shape[0]))
         
         tck_tuple, u = splprep([path["x"][rel_pts], path["y"][rel_pts]], u=path["time"][rel_pts].jd, s=0)
         
@@ -232,18 +232,18 @@ def _moving_target_focus(path, size, cutout_fles, verbose=False):
                                     (cutout_table["time_jd"] <= np.max(path["time"][rel_pts].jd))]
         
         
-        cutout_table["x"],cutout_table["y"] = splev(cutout_table["time_jd"], tck_tuple)
-        cutout_table["bounds"] = _get_bounds(cutout_table["x"],cutout_table["y"], size)
+        cutout_table["x"], cutout_table["y"] = splev(cutout_table["time_jd"], tck_tuple)
+        cutout_table["bounds"] = _get_bounds(cutout_table["x"], cutout_table["y"], size)
         
         
-        cutout_table["TGT_X"] = cutout_table["x"] - cutout_table["bounds"][:,0,0]
-        cutout_table["TGT_Y"] = cutout_table["y"] - cutout_table["bounds"][:,1,0]
+        cutout_table["TGT_X"] = cutout_table["x"] - cutout_table["bounds"][:, 0, 0]
+        cutout_table["TGT_Y"] = cutout_table["y"] - cutout_table["bounds"][:, 1, 0]
         
         positions = cutout_wcs.pixel_to_world(cutout_table["x"], cutout_table["y"])
         cutout_table["TGT_RA"] = positions.ra.value
         cutout_table["TGT_DEC"] = positions.dec.value
         
-        cutout_table["bounds"] = [(slice(*y), slice(*x)) for x,y in cutout_table["bounds"]]
+        cutout_table["bounds"] = [(slice(*y), slice(*x)) for x, y in cutout_table["bounds"]]
         
         cutout_table["RAW_CNTS"] = [x["RAW_CNTS"][tuple(x["bounds"])] for x in cutout_table]
         cutout_table["FLUX"] = [x["FLUX"][tuple(x["bounds"])] for x in cutout_table]
@@ -254,7 +254,7 @@ def _moving_target_focus(path, size, cutout_fles, verbose=False):
         cutout_table.remove_columns(['time_jd', 'bounds', 'x', 'y'])
         cutout_table_list.append(cutout_table)
         
-    cutout_table =  vstack(cutout_table_list)
+    cutout_table = vstack(cutout_table_list)
     cutout_table.sort("TIME")
     
     return cutout_table
@@ -270,39 +270,39 @@ def _configure_bintable_header(new_header, table_headers):
     # Using a single header to get the column descriptions
     column_info = {}
     for kwd in table_headers[0]:
-        if not "TTYPE" in kwd:
+        if "TTYPE" not in kwd:
             continue
         
         colname = table_headers[0][kwd]
-        num = kwd.replace("TTYPE","")
+        num = kwd.replace("TTYPE", "")
     
         cards = []
         for att in ['TTYPE', 'TFORM', 'TUNIT', 'TDISP', 'TDIM']:
             try:
                 cards.append(table_headers[0].cards[att+num])
             except KeyError:
-                pass # if we don't have info for this keyword, just skip it
+                pass  # if we don't have info for this keyword, just skip it
         
         column_info[colname] = (num, cards)
 
     # Adding column descriptions and additional info
     for kwd in new_header:
-        if not "TTYPE" in kwd:
+        if "TTYPE" not in kwd:
             continue
         
         colname = new_header[kwd]
-        num = kwd.replace("TTYPE","")
+        num = kwd.replace("TTYPE", "")
     
         info_row = column_info.get(colname)
         if not info_row:
             new_header.comments[kwd] = 'column name'
-            new_header.comments[kwd.replace("TTYPE","TFORM")] = 'column format'
+            new_header.comments[kwd.replace("TTYPE", "TFORM")] = 'column format'
             continue
     
         info_num = info_row[0]
         cards = info_row[1]
     
-        for key,val,desc in cards:
+        for key, val, desc in cards:
             key_new = key.replace(info_num, num)
             try:
                 ext_card = new_header.cards[key_new]
@@ -312,18 +312,18 @@ def _configure_bintable_header(new_header, table_headers):
                 if ext_card[2]:
                     desc = ext_card[2]
                 
-                new_header[key_new] = (val,desc)
-            except KeyError: # card does not already exist, just add new one
+                new_header[key_new] = (val, desc)
+            except KeyError:  # card does not already exist, just add new one
                 new_header.set(key_new, val, desc, after=kwd)
 
     # Adding any additional keywords from the original cutout headers
     shared_keywords = _combine_headers(table_headers, constant_only=True)
     for kwd in shared_keywords:
-        if kwd in new_header: # Don't overwrite anything already there
+        if kwd in new_header:  # Don't overwrite anything already there
             continue
 
         if any(x in kwd for x in ["WCA", "WCS", "CTY", "CRP", "CRV", "CUN",
-                                  "CDL", "11PC", "12PC", "21PC", "22PC"]): # Skipping column WCS keywords
+                                  "CDL", "11PC", "12PC", "21PC", "22PC"]):  # Skipping column WCS keywords
             continue
 
         new_header.append(shared_keywords.cards[kwd])
@@ -400,10 +400,14 @@ def center_on_path(path, size, cutout_fles, target=None, img_wcs=None,
 
     # Building the aperture extension if possible
     if img_wcs:
-        aperture = np.zeros(img_wcs.array_shape,dtype=np.int32)
-        x_arr,y_arr = img_wcs.world_to_pixel(SkyCoord(cutout_table["TGT_RA"],cutout_table["TGT_DEC"],unit='deg'))
+        aperture = np.zeros(img_wcs.array_shape, dtype=np.int32)
+        x_arr, y_arr = img_wcs.world_to_pixel(SkyCoord(cutout_table["TGT_RA"],
+                                                       cutout_table["TGT_DEC"], unit='deg'))
         x_2 = size[0]/2
         y_2 = size[1]/2
+        
+        for x, y in zip(x_arr, y_arr):
+            aperture[int(x-x_2): int(x+x_2), int(y-y_2): int(y+y_2)] = 1
 
         aperture_hdu = fits.ImageHDU(data=aperture)
         aperture_hdu.header['EXTNAME'] = 'APERTURE'
