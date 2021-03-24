@@ -69,7 +69,7 @@ def test_combine_bounds():
 
     big_bounds = cutout_processing._combine_bounds(bounds[0], bounds[1])
     
-    assert big_bounds.dtype == np.int64
+    assert big_bounds.dtype == int
     for bx, by in bounds:
         assert big_bounds[0, 0] <= bx[0]
         assert big_bounds[0, 1] >= bx[1]
