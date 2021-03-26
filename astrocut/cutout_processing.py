@@ -74,7 +74,7 @@ def _get_bounds(x, y, size):
 
     lower_x = np.rint(x - size[0]/2)
     lower_y = np.rint(y - size[1]/2)
-   
+
     return np.stack((np.stack((lower_x, lower_x + size[0]), axis=1),
                      np.stack((lower_y, lower_y + size[1]), axis=1)), axis=1).astype(int)
 
@@ -153,14 +153,10 @@ def path_to_footprints(path, size, img_wcs, max_pixels=10000):
     y = y[valid_locs]
     
     bounds_list = _get_bounds(x, y, size)
-    
-    combined_bounds = []
-    cur_bounds = None
-    for bounds in bounds_list:
-        if cur_bounds is None:
-            cur_bounds = bounds
-            continue
-            
+
+    combined_bounds = list()
+    cur_bounds = bounds_list[0]
+    for bounds in bounds_list[1:]:
         new_bounds = _combine_bounds(cur_bounds, bounds)
         
         if _area(new_bounds) > max_pixels:
@@ -242,7 +238,8 @@ def _moving_target_focus(path, size, cutout_fles, verbose=False):
         positions = cutout_wcs.pixel_to_world(cutout_table["x"], cutout_table["y"])
         cutout_table["TGT_RA"] = positions.ra.value
         cutout_table["TGT_DEC"] = positions.dec.value
-        
+
+        # This is y vs x beacuse of the way the pixels are stored by fits
         cutout_table["bounds"] = [(slice(*y), slice(*x)) for x, y in cutout_table["bounds"]]
         
         cutout_table["RAW_CNTS"] = [x["RAW_CNTS"][tuple(x["bounds"])] for x in cutout_table]
