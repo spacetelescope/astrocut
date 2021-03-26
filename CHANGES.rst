@@ -1,7 +1,7 @@
 0.8 (unreleased)
 ----------------
 
-- No changes yet
+- Add moving target cutout functionality [#40]
   
 
 0.7 (2020-08-19)
