@@ -356,7 +356,7 @@ def center_on_path(path, size, cutout_fles, target=None, img_wcs=None,
     target_pixel_file : str
         Optional. The name for the output target pixel file. 
         If no name is supplied, the file will be named: 
-        ``<target/path>_<cutout_size>_astrocut.fits``
+        ``<target/path>_<cutout_size>_<time range>_astrocut.fits``
     output_path : str
         Optional. The path where the output file is saved. 
         The current directory is default.
@@ -388,6 +388,8 @@ def center_on_path(path, size, cutout_fles, target=None, img_wcs=None,
     primary_header['DATE'] = Time.now().to_value('iso', subfmt='date')
     if target:
         primary_header["OBJECT"] = (target, "Moving target object name/identifier")
+    primary_header["TSTART"] = cutout_table["TIME"].min()
+    primary_header["TSTOP"] = cutout_table["TIME"].max()
 
     primary_hdu = fits.PrimaryHDU(header=primary_header)
     
@@ -418,7 +420,8 @@ def center_on_path(path, size, cutout_fles, target=None, img_wcs=None,
         
     if not target_pixel_file:
         target = "path" if not target else target
-        target_pixel_file = f"{target}_{size[0]}-x-{size[1]}_astrocut.fits.fits"
+        target_pixel_file = (f"{target}__{primary_header['TSTART']}-{primary_header['TSTop']}_"
+                             f"{size[0]}-x-{size[1]}_astrocut.fits.fits")
 
     filename = os.path.join(output_path, target_pixel_file)
     mt_hdu_list.writeto(filename, overwrite=True, checksum=True)
