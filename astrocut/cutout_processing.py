@@ -420,8 +420,8 @@ def center_on_path(path, size, cutout_fles, target=None, img_wcs=None,
         
     if not target_pixel_file:
         target = "path" if not target else target
-        target_pixel_file = (f"{target}__{primary_header['TSTART']}-{primary_header['TSTop']}_"
-                             f"{size[0]}-x-{size[1]}_astrocut.fits.fits")
+        target_pixel_file = (f"{target}_{primary_header['TSTART']}-{primary_header['TSTop']}_"
+                             f"{size[0]}-x-{size[1]}_astrocut.fits")
 
     filename = os.path.join(output_path, target_pixel_file)
     mt_hdu_list.writeto(filename, overwrite=True, checksum=True)
