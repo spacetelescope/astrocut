@@ -203,10 +203,10 @@ def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, verbose=False
     if (len(log_list) > 0):
         if ("Inconsistent SIP distortion information" in log_list[0].msg):
             # Delete standard sip keywords
-            remove_sip_coefficients(hdu_header)
+            #remove_sip_coefficients(hdu_header)
         
             # load wcs ignoring any nonstandard keywords
-            img_wcs = wcs.WCS(hdu_header, relax=False)
+            #img_wcs = wcs.WCS(hdu_header, relax=False)
 
             # As an extra precaution make sure the img wcs has no sip coeefficients
             img_wcs.sip = None
