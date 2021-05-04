@@ -111,7 +111,8 @@ def test_get_cutout_wcs():
     cutout_wcs = cutouts._get_cutout_wcs(test_img_wcs, lims)
     assert (cutout_wcs.wcs.crval == [100, 20]).all()
     assert (cutout_wcs.wcs.crpix == [-3, 6]).all() 
-    
+
+
 def test_fits_cut(tmpdir, capsys):
 
     test_images = create_test_imgs(50, 6, dir_name=tmpdir)

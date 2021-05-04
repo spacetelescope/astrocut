@@ -8,7 +8,6 @@ import numpy as np
 
 from time import time
 from datetime import date
-from itertools import product
 
 from astropy import log
 from astropy import units as u
