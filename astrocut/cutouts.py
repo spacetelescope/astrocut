@@ -126,33 +126,7 @@ def _get_cutout_wcs(img_wcs, cutout_lims):
     wcs_header.set("CDELT2P", 1.0, "physical WCS axis 2 step")
 
     return wcs.WCS(wcs_header)
-        
 
-def remove_sip_coefficients(hdu_header):
-    """
-    Remove standard sip coefficient keywords for a fits header.
-
-    Parameters
-    ----------
-    hdu_header : ~astropy.io.fits.Header
-        The header from which SIP keywords will be removed.  This is done in place.
-    """
-
-    for lets in product(["A", "B"], ["", "P"]):
-        lets = ''.join(lets)
-
-        key = "{}_ORDER".format(lets)
-        if key in hdu_header.keys():
-            del hdu_header["{}_ORDER".format(lets)]
-
-        key = "{}_DMAX".format(lets)
-        if key in hdu_header.keys():
-            del hdu_header["{}_DMAX".format(lets)]
-        
-        for i, j in product([0, 1, 2, 3], [0, 1, 2, 3]):
-            key = "{}_{}_{}".format(lets, i, j)
-            if key in hdu_header.keys():
-                del hdu_header["{}_{}_{}".format(lets, i, j)]
 #### FUNCTIONS FOR UTILS ####
 
 
@@ -202,13 +176,8 @@ def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, verbose=False
     no_sip = False
     if (len(log_list) > 0):
         if ("Inconsistent SIP distortion information" in log_list[0].msg):
-            # Delete standard sip keywords
-            #remove_sip_coefficients(hdu_header)
-        
-            # load wcs ignoring any nonstandard keywords
-            #img_wcs = wcs.WCS(hdu_header, relax=False)
 
-            # As an extra precaution make sure the img wcs has no sip coeefficients
+            # Remove sip coefficients
             img_wcs.sip = None
             no_sip = True
             
