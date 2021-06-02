@@ -911,7 +911,7 @@ class S3CubeFile():
     def table(self):
         return self._read_table()
 
-    @lru_cache
+    @lru_cache()
     def _read_table(self):
         """Returns the BinTableHDU for HDU #2."""
         hdu1_data_size = np.product(self.shape) * self.itemsize
