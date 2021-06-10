@@ -154,33 +154,6 @@ def get_cutout_wcs(img_wcs, cutout_lims):
     return wcs.WCS(wcs_header)
 
 
-def remove_sip_coefficients(hdu_header):
-    """
-    Remove standard sip coefficient keywords for a fits header.
-
-    Parameters
-    ----------
-    hdu_header : ~astropy.io.fits.Header
-        The header from which SIP keywords will be removed.  This is done in place.
-    """
-
-    for lets in product(["A", "B"], ["", "P"]):
-        lets = ''.join(lets)
-
-        key = "{}_ORDER".format(lets)
-        if key in hdu_header.keys():
-            del hdu_header["{}_ORDER".format(lets)]
-
-        key = "{}_DMAX".format(lets)
-        if key in hdu_header.keys():
-            del hdu_header["{}_DMAX".format(lets)]
-        
-        for i, j in product([0, 1, 2, 3], [0, 1, 2, 3]):
-            key = "{}_{}_{}".format(lets, i, j)
-            if key in hdu_header.keys():
-                del hdu_header["{}_{}_{}".format(lets, i, j)]
-
-
 def save_fits(cutout_hdus, output_path, center_coord):
     """
     Save one or more cutout hdus to a single fits file.
