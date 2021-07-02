@@ -204,6 +204,8 @@ def _moving_target_focus(path, size, cutout_fles, verbose=False):
     
     cutout_table_list = list()
     
+    tck_tuple, u = splprep([path["position"].ra, path["position"].dec], u=path["time"].jd, s=0)
+    
     for fle in cutout_fles:
         if verbose:
             print(fle)
@@ -220,24 +222,23 @@ def _moving_target_focus(path, size, cutout_fles, verbose=False):
         rel_pts = ((path["x"] - size[0]/2 >= 0) & (path["x"] + size[0]/2 < cutout_wcs.array_shape[1]) & 
                    (path["y"] - size[1]/2 >= 0) & (path["y"] + size[1]/2 < cutout_wcs.array_shape[0]))
         
-        tck_tuple, u = splprep([path["x"][rel_pts], path["y"][rel_pts]], u=path["time"][rel_pts].jd, s=0)
-        
-        
+        if sum(rel_pts) == 0:
+            continue
+         
         cutout_table["time_jd"] = cutout_table["TIME"] + 2457000  # TESS specific code
         cutout_table = cutout_table[(cutout_table["time_jd"] >= np.min(path["time"][rel_pts].jd)) & 
                                     (cutout_table["time_jd"] <= np.max(path["time"][rel_pts].jd))]
         
-        
-        cutout_table["x"], cutout_table["y"] = splev(cutout_table["time_jd"], tck_tuple)
+        cutout_table["positions"] = SkyCoord(*splev(cutout_table["time_jd"], tck_tuple), unit="deg")
+        cutout_table["x"], cutout_table["y"] = cutout_wcs.world_to_pixel(cutout_table["positions"])
         cutout_table["bounds"] = _get_bounds(cutout_table["x"], cutout_table["y"], size)
         
         
         cutout_table["TGT_X"] = cutout_table["x"] - cutout_table["bounds"][:, 0, 0]
         cutout_table["TGT_Y"] = cutout_table["y"] - cutout_table["bounds"][:, 1, 0]
         
-        positions = cutout_wcs.pixel_to_world(cutout_table["x"], cutout_table["y"])
-        cutout_table["TGT_RA"] = positions.ra.value
-        cutout_table["TGT_DEC"] = positions.dec.value
+        cutout_table["TGT_RA"] = cutout_table["positions"].ra.value
+        cutout_table["TGT_DEC"] = cutout_table["positions"].dec.value
 
         # This is y vs x beacuse of the way the pixels are stored by fits
         cutout_table["bounds"] = [(slice(*y), slice(*x)) for x, y in cutout_table["bounds"]]
@@ -248,13 +249,13 @@ def _moving_target_focus(path, size, cutout_fles, verbose=False):
         cutout_table["FLUX_BKG"] = [x["FLUX_BKG"][tuple(x["bounds"])] for x in cutout_table]
         cutout_table["FLUX_BKG_ERR"] = [x["FLUX_BKG_ERR"][tuple(x["bounds"])] for x in cutout_table]
         
-        cutout_table.remove_columns(['time_jd', 'bounds', 'x', 'y'])
+        cutout_table.remove_columns(['time_jd', 'bounds', 'x', 'y', "positions"])
         cutout_table_list.append(cutout_table)
         
     cutout_table = vstack(cutout_table_list)
     cutout_table.sort("TIME")
     
-    return cutout_table
+    return cutout_table 
 
 
 def _configure_bintable_header(new_header, table_headers):
