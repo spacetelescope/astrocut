@@ -1,22 +1,10 @@
-************
-Installation
-************
 
-
-Requirements
-============
-
-Astrocut has the following requirements:
-
-- `Astropy`_ 
-- `NumPy <http://www.numpy.org/>`_
-
-  
-Installing astrocut
-===================
+*******************  
+Installing Astrocut
+*******************
 
 Using pip
----------
+=========
 
 The easiest way to install Astrocut is using pip::
 
@@ -24,7 +12,7 @@ The easiest way to install Astrocut is using pip::
 
 
 From source
------------
+===========
 
 To install the bleeding edge version from github without downloading,
 run the following command::
