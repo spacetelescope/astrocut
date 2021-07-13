@@ -22,10 +22,8 @@ authors:
 affiliations:
  - name: Space Telescope Science Institute, Baltimore, MD, USA
    index: 1
-date: [FILL IN] 2021
+date: 13 August 2021
 bibliography: paper.bib
-
-
 ---
 
 # Summary
