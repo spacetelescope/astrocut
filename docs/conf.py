@@ -28,6 +28,7 @@
 import datetime
 import os
 import sys
+from importlib import import_module
 
 try:
     from sphinx_astropy.conf.v1 import *  # noqa
@@ -56,7 +57,6 @@ highlight_language = 'python3'
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-exclude_patterns.append('_templates')
 
 # This is added to the end of RST files - a good place to put substitutions to
 # be used globally.
@@ -75,7 +75,7 @@ copyright = '{0}, {1}'.format(
 # |version| and |release|, also used in various other places throughout the
 # built documents.
 
-__import__(setup_cfg['name'])
+import_module(setup_cfg['name'])
 package = sys.modules[setup_cfg['name']]
 
 # The short X.Y version.
@@ -96,23 +96,24 @@ release = package.__version__
 
 # Add any paths that contain custom themes here, relative to this directory.
 # To use a different custom theme, add the directory containing the theme.
-#html_theme_path = []
+#html_theme_path = ["_themes",]
+
+# Custome template path, adding custom css and home link
+templates_path = ["_templates"]
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes. To override the custom theme, set this to the
 # name of a builtin theme or the name of a custom theme in html_theme_path.
-#html_theme = None
+html_theme = 'sphinx_rtd_theme'
 
+def setup_style(app):
+    app.add_stylesheet("astrocut.css")
 
-html_theme_options = {
-    'logotext1': 'astro',  # white,  semi-bold
-    'logotext2': 'cut',  # orange, light
-    'logotext3': ':docs'   # white,  light
-    }
-
+master_doc='astrocut/contents'
+html_extra_path=['index.html']
 
 # Custom sidebar templates, maps document names to template names.
-#html_sidebars = {}
+html_sidebars = { '**': ['globaltoc.html', 'localtoc.html', 'searchbox.html'] }
 
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
@@ -136,7 +137,7 @@ htmlhelp_basename = project + 'doc'
 
 # Static files to copy after template files
 html_static_path = ['_static']
-html_style = 'astrocut.css'
+html_css_files = ['astrocut.css']
 
 
 # -- Options for LaTeX output -------------------------------------------------
@@ -157,15 +158,12 @@ man_pages = [('index', project.lower(), project + u' Documentation',
 
 # -- Options for the edit_on_github extension ---------------------------------
 
-if eval(setup_cfg.get('edit_on_github')):
+if setup_cfg.get('edit_on_github').lower() == 'true':
+
     extensions += ['sphinx_astropy.ext.edit_on_github']
 
-    versionmod = __import__(setup_cfg['name'] + '.version')
     edit_on_github_project = setup_cfg['github_project']
-    if versionmod.version.release:
-        edit_on_github_branch = "v" + versionmod.version.version
-    else:
-        edit_on_github_branch = "master"
+    edit_on_github_branch = "main"
 
     edit_on_github_source_root = ""
     edit_on_github_doc_root = "docs"
