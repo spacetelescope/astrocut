@@ -13,9 +13,13 @@ Cutout tools for astronomical images
     :target: https://astrocut.readthedocs.io/en/latest/?badge=latest
     :alt: Documentation Status
 
-Tools for making image cutouts from sets of TESS full frame images.
+Astrocut provides tools for making cutouts from sets of astronomical images with shared footprints. It is under active development.
 
-This package is under active development, and will ultimately grow to encompass a range of cutout activities relevant to images from many missions, however at this time it is focussed on the specific problem of creating Target Pixel File cutouts from sectors of TESS full frame images.
+Three main areas of functionality are included:
+
+- Solving the specific problem of creating image cutouts from sectors of Transiting Exoplanet Survey Satellite (TESS) full-frame images.
+- General fits file cutouts incuding from single images and sets of images with the shared WCS/pixel scale.
+- Cutout post-processing functionality, including centering cutouts along a path (for moving targets) and combining cutouts.
 
 Documentation is at https://astrocut.readthedocs.io.
 
