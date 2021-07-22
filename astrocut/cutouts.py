@@ -211,8 +211,8 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
         Default False. If true a new WCS will be created for the cutout that is tangent projected
         and does not include distortions.
     extension : int, list of ints, None, or 'all'
-        Optional, default None. Default is to cutout the first extension that has image data.
-       The user can also supply one or more extensions to cutout from (integers), or "all".
+       Optional, default None. Default is to cutout the first extension that has image data.
+       The user can also supply one or more extensions to cutout from (integers), or 'all'.
     single_outfile : bool 
         Default True. If true return all cutouts in a single fits file with one cutout per extension,
         if False return cutouts in individual fits files. If returing a single file the filename will 
@@ -232,7 +232,7 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
         If single_outfile is True returns the single output filepath. Otherwise returns a list of all 
         the output filepaths.
     """
-    
+
     if verbose:
         start_time = time()
             
