@@ -366,5 +366,4 @@ function. See the `~astrocut.build_default_combine_function` for an example of h
                 >>> combined_cutout = astrocut.CutoutsCombiner([cutout_1, cutout_2]).combine("combined_cut.fits")
                 >>> plt.imshow(fits.getdata(combined_cutout, 1))
                 
-.. image:: imgs/hapcut_combined.png
-                
+.. image:: imgs/hapcut_combined.png        
