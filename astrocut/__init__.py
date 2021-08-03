@@ -10,7 +10,7 @@ from ._astropy_init import *  # noqa
 # This is the same check as the one at the top of setup.py
 import sys
 
-__minimum_python_version__ = "3.5"
+__minimum_python_version__ = "3.6"
 
 
 class UnsupportedPythonError(Exception):
@@ -25,4 +25,5 @@ if not _ASTROPY_SETUP_:  # noqa
     from .make_cube import CubeFactory  # noqa
     from .cube_cut import CutoutFactory  # noqa
     from .cutouts import fits_cut, img_cut, normalize_img  # noqa
-    from .cutout_processing import center_on_path, path_to_footprints, CutoutsCombiner  # noqa
+    from .cutout_processing import center_on_path, CutoutsCombiner, build_default_combine_function  # noqa
+    from .utils.utils import path_to_footprints  # noqa

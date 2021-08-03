@@ -11,6 +11,7 @@ from itertools import product
 from astropy import wcs
 from astropy.io import fits
 from astropy import units as u
+from astropy.utils import deprecated
 
 from .. import __version__
 from ..exceptions import InvalidQueryError, InputWarning
@@ -154,9 +155,29 @@ def get_cutout_wcs(img_wcs, cutout_lims):
     return wcs.WCS(wcs_header)
 
 
-def save_fits(cutout_hdus, output_path, center_coord):
+def _build_astrocut_primaryhdu(**keywords):
     """
-    Save one or more cutout hdus to a single fits file.
+    TODO: Document
+    """
+
+    primary_hdu = fits.PrimaryHDU()
+    primary_hdu.header.extend([("ORIGIN", 'STScI/MAST', "institution responsible for creating this file"),
+                               ("DATE", str(date.today()), "file creation date"),
+                                ('PROCVER', __version__, 'software version')])
+    for kwd in keywords:
+        primary_hdu.header[kwd] = keywords[kwd]
+
+    return primary_hdu
+
+
+@deprecated(since="v0.9", alternative="make_fits")
+def save_fits(cutout_hdus, output_path, center_coord):
+    return get_fits(cutout_hdus, center_coord=center_coord, output_path=output_path)
+
+
+def get_fits(cutout_hdus, center_coord=None, output_path=None):
+    """
+    Make one or more cutout hdus to a single fits object, optionally save the file to disk.
 
     Parameters
     ----------
@@ -165,23 +186,81 @@ def save_fits(cutout_hdus, output_path, center_coord):
     output_path : str
         The full path to the output fits file.
     center_coord : `~astropy.coordinates.sky_coordinate.SkyCoord`
-        The center coordinate of the image cutouts.
+        The center coordinate of the image cutouts.  TODO: make more general?
     """
 
     if isinstance(cutout_hdus, fits.hdu.image.ImageHDU):
         cutout_hdus = [cutout_hdus]
     
     # Setting up the Primary HDU
-    primary_hdu = fits.PrimaryHDU()
-    primary_hdu.header.extend([("ORIGIN", 'STScI/MAST', "institution responsible for creating this file"),
-                               ("DATE", str(date.today()), "file creation date"),
-                               ('PROCVER', __version__, 'software version'),
-                               ('RA_OBJ', center_coord.ra.deg, '[deg] right ascension'),
-                               ('DEC_OBJ', center_coord.dec.deg, '[deg] declination')])
+    keywords = dict()
+    if center_coord:
+        keywords = {"RA_OBJ": (center_coord.ra.deg, '[deg] right ascension'),
+                    "DEC_OBJ": (center_coord.dec.deg, '[deg] declination')}
+    primary_hdu = _build_astrocut_primaryhdu(**keywords)
 
     cutout_hdulist = fits.HDUList([primary_hdu] + cutout_hdus)
 
-    # Writing out the hdu often causes a warning as the ORIG_FLE card description is truncated
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore") 
-        cutout_hdulist.writeto(output_path, overwrite=True, checksum=True)
+    if output_path:
+        # Writing out the hdu often causes a warning as the ORIG_FLE card description is truncated
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore") 
+            cutout_hdulist.writeto(output_path, overwrite=True, checksum=True)
+
+    return cutout_hdulist
+
+
+def path_to_footprints(path, size, img_wcs, max_pixels=10000):
+    """
+    Given a path that intersects with a wcs footprint, return
+    one or more rectangles that fully contain that intersection 
+    (plus padding given by 'size') with each rectangle no more than 
+    max_pixels in size.
+    
+    Parameters
+    ----------
+    path : `~astropy.coordinate.SkyCoord`
+        SkyCoord object list of coordinates that represent a continuous path.
+    size : array
+        Size of the rectangle centered on the path locations that must 
+        be included in the returned footprint(s). Formatted as [ny,nx]
+    img_wcs : `~astropy.wcs.WCS`
+        WCS object the path intersects with. Must include naxis information.
+    max_pixels : int
+        Optional, default 10000. The maximum area in pixels for individual
+        footprints.
+        
+    Returns
+    -------
+    response : list
+       List of footprints, each a dictionary of the form:
+       {'center_coord': `~astropy.coordinate.SkyCoord`, 'size': [ny,nx]}
+    """
+    
+    x, y = img_wcs.world_to_pixel(path)
+    
+    # Removing any coordinates outside of the img wcs
+    valid_locs = ((x >= 0) & (x < img_wcs.array_shape[0])) & ((y >= 0) & (y < img_wcs.array_shape[1]))
+    x = x[valid_locs]
+    y = y[valid_locs]
+    
+    bounds_list = _get_bounds(x, y, size)
+
+    combined_bounds = list()
+    cur_bounds = bounds_list[0]
+    for bounds in bounds_list[1:]:
+        new_bounds = _combine_bounds(cur_bounds, bounds)
+        
+        if _area(new_bounds) > max_pixels:
+            combined_bounds.append(cur_bounds)
+            cur_bounds = bounds
+        else:
+            cur_bounds = new_bounds
+            
+    combined_bounds.append(cur_bounds)
+    
+    footprints = []
+    for bounds in combined_bounds:
+        footprints.append(_get_args(bounds, img_wcs))
+        
+    return footprints 

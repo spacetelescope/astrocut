@@ -14,8 +14,8 @@ from astropy.time import Time
 
 from scipy.interpolate import splprep, splev
 
-from .utils.utils import save_fits
-from .exceptions import DataWarning
+from .utils.utils import get_fits
+from .exceptions import DataWarning, InvalidInputError
 
 
 def _combine_headers(headers, constant_only=False):
@@ -119,63 +119,6 @@ def _get_args(bounds, img_wcs):
     y = ny/2 + bounds[1, 0]
     return {"coordinates": img_wcs.pixel_to_world(x, y),
             "size": (ny, nx)}
-
-
-# TODO: Put this in utils 
-def path_to_footprints(path, size, img_wcs, max_pixels=10000):
-    """
-    Given a path that intersects with a wcs footprint, return
-    one or more rectangles that fully contain that intersection 
-    (plus padding given by 'size') with each rectangle no more than 
-    max_pixels in size.
-    
-    Parameters
-    ----------
-    path : `~astropy.coordinate.SkyCoord`
-        SkyCoord object list of coordinates that represent a continuous path.
-    size : array
-        Size of the rectangle centered on the path locations that must 
-        be included in the returned footprint(s). Formatted as [ny,nx]
-    img_wcs : `~astropy.wcs.WCS`
-        WCS object the path intersects with. Must include naxis information.
-    max_pixels : int
-        Optional, default 10000. The maximum area in pixels for individual
-        footprints.
-        
-    Returns
-    -------
-    response : list
-       List of footprints, each a dictionary of the form:
-       {'center_coord': `~astropy.coordinate.SkyCoord`, 'size': [ny,nx]}
-    """
-    
-    x, y = img_wcs.world_to_pixel(path)
-    
-    # Removing any coordinates outside of the img wcs
-    valid_locs = ((x >= 0) & (x < img_wcs.array_shape[0])) & ((y >= 0) & (y < img_wcs.array_shape[1]))
-    x = x[valid_locs]
-    y = y[valid_locs]
-    
-    bounds_list = _get_bounds(x, y, size)
-
-    combined_bounds = list()
-    cur_bounds = bounds_list[0]
-    for bounds in bounds_list[1:]:
-        new_bounds = _combine_bounds(cur_bounds, bounds)
-        
-        if _area(new_bounds) > max_pixels:
-            combined_bounds.append(cur_bounds)
-            cur_bounds = bounds
-        else:
-            cur_bounds = new_bounds
-            
-    combined_bounds.append(cur_bounds)
-    
-    footprints = []
-    for bounds in combined_bounds:
-        footprints.append(_get_args(bounds, img_wcs))
-        
-    return footprints 
 
 
 def _moving_target_focus(path, size, cutout_fles, verbose=False):
@@ -504,12 +447,12 @@ class CutoutsCombiner():
     Class for combining cutouts.
     """
 
-    def __init__(self, fle_list=None, exts=None, img_combiner=None):
+    def __init__(self, fits_list=None, exts=None, img_combiner=None):
 
         self.input_hdulists = None
         self.center_coord = None
-        if fle_list:
-            self.load(fle_list, exts)
+        if fits_list:
+            self.load(fits_list, exts)
 
         self.combine_headers = _combine_headers
 
@@ -520,21 +463,28 @@ class CutoutsCombiner():
                                     builder_args=[self.input_hdulists[0], np.nan])
         
             
-    def load(self, fle_list, exts=None):
+    def load(self, fits_list, exts=None):
         """
         Load the input cutout files and select the desired fits extensions.
 
         Parameters
         ----------
-        fle_list : list
-            List of files with cutouts to be combined.
+        fits_list : list
+            List of fits filenames or `~astropy.io.fits.HDUList` objects
+            with cutouts to be combined.
         exts : list or None
             Optional. List of fits extensions to combine.
             Default is None, which means all extensions will be combined.
             If the first extension is a PrimaryHeader with no data it will
             be skipped.      
         """
-        cutout_hdulists = [fits.open(fle) for fle in fle_list]
+
+        if isinstance(fits_list[0], str):  # input is filenames
+            cutout_hdulists = [fits.open(fle) for fle in fle_list]
+        elif isinstance(fits_list[0], fits.HDUList):  # input is HDUList objects
+            cutout_hdulists = fits_list
+        else:
+            raise InvalidInputError("Unsupported input format!")
         
         if exts is None:
             # Go ahead and deal with possible presence of a primaryHeader and no data as first ext
@@ -552,6 +502,7 @@ class CutoutsCombiner():
             ra = cutout_hdulists[0][0].header['RA_OBJ']
             dec = cutout_hdulists[0][0].header['DEC_OBJ']
             self.center_coord = SkyCoord(f"{ra} {dec}", unit='deg')
+            
         except KeyError:
             warnings.warn("Could not find RA/Dec header keywords, center coord will be wrong.",
                           DataWarning)
@@ -578,7 +529,7 @@ class CutoutsCombiner():
         self.combine_images = function_builder(*builder_args)
    
         
-    def combine(self, output_file="./cutout.fits"):
+    def combine(self, output_file="./cutout.fits", memory_only=False):
         """
         Combine cutouts and save the output to a fits file.
 
@@ -586,11 +537,15 @@ class CutoutsCombiner():
         ----------
         output_file : str
             Optional. The filename for the combined cutout file.
+        memory_only : bool
+            Default value False. If set to true, instead of the combined cutout file being 
+            written to disk it is returned as a `~astropy.io.fit.HDUList` object. If set to
+            True, output_file is ignored.
 
         Returns
         -------
         response : str
-            The combined cutout filename.
+            The combined cutout filename. TODO
         """
 
         hdu_list = []
@@ -601,7 +556,9 @@ class CutoutsCombiner():
         
             new_img = self.combine_images([hdu.data for hdu in ext_hdus])
             hdu_list.append(fits.ImageHDU(data=new_img, header=new_header))
- 
-        save_fits(hdu_list, output_path=output_file, center_coord=self.center_coord)
 
-        return output_file
+        if memory_only:
+            return get_fits(hdu_list, center_coord=self.center_coord)
+        else:
+            get_fits(hdu_list, center_coord=self.center_coord, output_path=output_file)
+            return output_file

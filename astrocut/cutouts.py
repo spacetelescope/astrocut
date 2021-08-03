@@ -19,7 +19,7 @@ from astropy.visualization import (SqrtStretch, LogStretch, AsinhStretch, SinhSt
 
 from PIL import Image
 
-from .utils.utils import parse_size_input, get_cutout_limits, get_cutout_wcs, save_fits
+from .utils.utils import parse_size_input, get_cutout_limits, get_cutout_wcs, get_fits
 from .exceptions import InputWarning, DataWarning, InvalidQueryError, InvalidInputError
 
 
@@ -185,7 +185,8 @@ def _parse_extensions(infile_exts, infile_name, user_exts):
 
                     
 def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension=None, 
-             single_outfile=True, cutout_prefix="cutout", output_dir='.', verbose=False):
+             single_outfile=True, cutout_prefix="cutout", output_dir='.',
+             memory_only=False, verbose=False):
     """
     Takes one or more fits files with the same WCS/pointing, makes the same cutout in each file,
     and returns the result either in a single fitsfile with one cutout per extension or in 
@@ -222,7 +223,12 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
         Default value "cutout". Only used if single_outfile is True. A prefix to prepend to the cutout 
         filename. 
     output_dir : str
-        Defaul value '.'. The directory to save the cutout file(s) to.
+        Default value '.'. The directory to save the cutout file(s) to.
+    memory_only : bool
+        Default value False. If set to true, instead of the cutout file(s) being written to disk
+        the cutout(s) are returned as a list of `~astropy.io.fit.HDUList` objects. If set to
+        True cutout_prefix and output_dir are ignored, however single_outfile can still be used to
+        set the number of returned `~astropy.io.fits.HDUList` objects.
     verbose : bool
         Default False. If true intermediate information is printed.
 
@@ -231,6 +237,8 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
     response : str or list
         If single_outfile is True returns the single output filepath. Otherwise returns a list of all 
         the output filepaths.
+        If memory_only is True a list of `~astropy.io.fit.HDUList` objects is returned instead of
+        file name(s).
     """
 
     if verbose:
@@ -250,13 +258,19 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
     # Turning the cutout size into a 2 member array
     cutout_size = parse_size_input(cutout_size)
 
+    if verbose:
+        print(f"Number of input files: {len(input_files)}")
+        print(f"Cutting out {extension} extension(s)")
+        print(f"Center coordinate: {coordinates.to_string()} deg")
+        print(f"Cutout size: {cutout_size}")
+
     # Making the cutouts
     cutout_hdu_dict = {}
     num_empty = 0
     num_cutouts = 0
     for in_fle in input_files:
         if verbose:
-            print("\n{}".format(in_fle))
+            print("\nCutting out {}".format(in_fle))
 
         warnings.filterwarnings("ignore", category=wcs.FITSFixedWarning)
         with fits.open(in_fle, mode='denywrite', memmap=True) as hdulist:
@@ -298,27 +312,41 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
         os.makedirs(output_dir)
         
     # Setting up the output file(s) and writing them
+    cutout_path = None
     if single_outfile:
 
-        cutout_path = "{}_{:7f}_{:7f}_{}-x-{}_astrocut.fits".format(cutout_prefix,
-                                                                    coordinates.ra.value,
-                                                                    coordinates.dec.value,
-                                                                    str(cutout_size[0]).replace(' ', ''), 
-                                                                    str(cutout_size[1]).replace(' ', ''))
-        cutout_path = os.path.join(output_dir, cutout_path)
-        cutout_hdus = [x for fle in cutout_hdu_dict for x in cutout_hdu_dict[fle]]
-        save_fits(cutout_hdus, cutout_path, coordinates)
-
         if verbose:
-            print("Cutout fits file: {}".format(cutout_path))
+            print("Returning cutout as single FITS")
 
-        all_paths = cutout_path
+        if not memory_only:
+            cutout_path = "{}_{:7f}_{:7f}_{}-x-{}_astrocut.fits".format(cutout_prefix,
+                                                                        coordinates.ra.value,
+                                                                        coordinates.dec.value,
+                                                                        str(cutout_size[0]).replace(' ', ''), 
+                                                                        str(cutout_size[1]).replace(' ', ''))
+            cutout_path = os.path.join(output_dir, cutout_path)
+            if verbose:
+                print("Cutout fits file: {}".format(cutout_path))
+            
+        cutout_hdus = [x for fle in cutout_hdu_dict for x in cutout_hdu_dict[fle]]    
+        cutout_fits = get_fits(cutout_hdus, coordinates, cutout_path)
+        
+        if memory_only:
+            all_hdus = [cutout_fits]
+        else:
+            all_paths = cutout_path
 
     else:  # one output file per input file
-        all_paths = []
-        
+
         if verbose:
-            print("Cutout fits files:")
+            print("Returning cutouts as individual FITS")
+            
+        if memory_only:
+            all_hdus = []
+        else:
+            all_paths = []
+            if verbose:
+                print("Cutout fits files:")
             
         for fle in input_files:
             cutout_list = cutout_hdu_dict[fle]
@@ -333,17 +361,23 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
                                                                      str(cutout_size[0]).replace(' ', ''), 
                                                                      str(cutout_size[1]).replace(' ', ''))
             cutout_path = os.path.join(output_dir, filename)
-            save_fits(cutout_list, cutout_path, coordinates)
+            #save_fits(cutout_list, cutout_path, coordinates)
+            cutout_fits = get_fits(cutout_list, coordinates, cutout_path)
 
-            all_paths.append(cutout_path)
-            
-            if verbose:
-                print(cutout_path)
+            if memory_only:
+                all_hdus.append(cutout_fits)
+            else:
+                all_paths.append(cutout_path)
+                if verbose:
+                    print(cutout_path)
         
     if verbose:
         print("Total time: {:.2} sec".format(time()-start_time))
 
-    return all_paths
+    if memory_only:
+        return all_hdus
+    else:
+        return all_paths
 
 
 def normalize_img(img_arr, stretch='asinh', minmax_percent=None, minmax_value=None, invert=False):
