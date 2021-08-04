@@ -59,7 +59,32 @@ The cutout FITS file format is decribed `here <file_formats.html#fits-cutout-fil
                   1  CUTOUT        1 ImageHDU        44   (200, 300)   float32   
                   2  CUTOUT        1 ImageHDU        44   (200, 300)   float32
 
+                  
+The cutout(s) can also be returned in memory as `~astropy.io.fits.HDUList` object(s).
 
+.. code-block:: python
+
+                >>> from astrocut import fits_cut
+                >>> from astropy.io import fits
+                >>> from astropy.coordinates import SkyCoord
+                
+                >>> input_files = ["https://archive.stsci.edu/pub/hlsp/candels/cosmos/cos-tot/v1.0/hlsp_candels_hst_acs_cos-tot-sect23_f606w_v1.0_drz.fits",
+                ...                "https://archive.stsci.edu/pub/hlsp/candels/cosmos/cos-tot/v1.0/hlsp_candels_hst_acs_cos-tot-sect23_f814w_v1.0_drz.fits"]
+
+                >>> center_coord = SkyCoord("150.0945 2.38681", unit='deg')
+                >>> cutout_size = [200,300]
+                
+                >>> cutout_list = fits_cut(input_files, center_coord, cutout_size,
+                ...                        single_outfile=False, memory_only=True)  #doctest: +SKIP
+                >>> cutout_list[0].info() #doctest: +SKIP
+                Filename: ./cutout_150.094500_2.386810_200-x-300_astrocut.fits
+                No.    Name      Ver    Type      Cards   Dimensions   Format
+                  0  PRIMARY       1 PrimaryHDU      11   ()      
+                  1  CUTOUT        1 ImageHDU        44   (200, 300)   float32   
+                  2  CUTOUT        1 ImageHDU        44   (200, 300)   float32
+
+                  
+                  
 Creating image cutouts
 ----------------------
                   
@@ -365,5 +390,42 @@ function. See the `~astrocut.build_default_combine_function` for an example of h
 
                 >>> combined_cutout = astrocut.CutoutsCombiner([cutout_1, cutout_2]).combine("combined_cut.fits")
                 >>> plt.imshow(fits.getdata(combined_cutout, 1))
+                
+.. image:: imgs/hapcut_combined.png        
+
+
+All of the combining can be done in memory, without writing FITS files to disk as well.
+
+.. code-block:: python
+  
+                >>> import astrocut
+                
+                >>> from astropy.coordinates import SkyCoord
+
+                >>> fle_1 = 'hst_skycell-p2381x05y09_wfc3_uvis_f275w-all-all_drc.fits'
+                >>> fle_2 = 'hst_skycell-p2381x06y09_wfc3_uvis_f275w-all-all_drc.fits'
+
+                >>> center_coord = SkyCoord("211.27128477 53.66062066", unit='deg')
+                >>> size = [30,50]
+
+                >>> cutout_1 = astrocut.fits_cut(fle_1, center_coord, size, extension='all',
+                ...                     cutout_prefix="cutout_p2381x05y09", memory_only=True)[0]
+                >>> cutout_2 = astrocut.fits_cut(fle_2, center_coord, size, extension='all', 
+                ...                     cutout_prefix="cutout_p2381x06y09", memory_only=True)[0]
+
+                >>> plt.imshow(cutout_1[1].data)
+                
+.. image:: imgs/hapcut_left.png
+
+.. code-block:: python
+                
+                >>> plt.imshow(cutout_2[1].data)
+                
+.. image:: imgs/hapcut_right.png
+
+.. code-block:: python
+
+                >>> combined_cutout = astrocut.CutoutsCombiner([cutout_1, cutout_2]).combine(memory_only=True)
+                >>> plt.imshow(combined_cutout[1].data)
                 
 .. image:: imgs/hapcut_combined.png        

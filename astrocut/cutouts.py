@@ -189,8 +189,9 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
              memory_only=False, verbose=False):
     """
     Takes one or more fits files with the same WCS/pointing, makes the same cutout in each file,
-    and returns the result either in a single fitsfile with one cutout per extension or in 
-    individual fits files.
+    and returns the result either in a single FITS file with one cutout per extension or in 
+    individual fits files. The memory_only flag allows the cutouts to be returned as 
+    `~astropy.io.fits.HDUList` objects rather than saving to disk.
 
     Note: No checking is done on either the WCS pointing or pixel scale. If images don't line up
     the cutouts will also not line up.

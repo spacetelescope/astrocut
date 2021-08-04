@@ -465,7 +465,7 @@ class CutoutsCombiner():
             
     def load(self, fits_list, exts=None):
         """
-        Load the input cutout files and select the desired fits extensions.
+        Load the input cutouts and select the desired fits extensions.
 
         Parameters
         ----------
@@ -531,7 +531,8 @@ class CutoutsCombiner():
         
     def combine(self, output_file="./cutout.fits", memory_only=False):
         """
-        Combine cutouts and save the output to a fits file.
+        Combine cutouts and either save the output to a FITS file,
+        
 
         Parameters
         ----------
@@ -544,8 +545,9 @@ class CutoutsCombiner():
 
         Returns
         -------
-        response : str
-            The combined cutout filename. TODO
+        response : str, `~astropy.io.fit.HDUList`
+            The combined cutout filename, or if memory_only is True, the cutout as a
+            `~astropy.io.fit.HDUList` object..
         """
 
         hdu_list = []
