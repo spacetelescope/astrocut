@@ -7,8 +7,6 @@ import warnings
 import numpy as np
 
 from time import time
-from datetime import date
-from itertools import product
 
 from astropy import log
 from astropy.io import fits
@@ -362,7 +360,6 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
                                                                      str(cutout_size[0]).replace(' ', ''), 
                                                                      str(cutout_size[1]).replace(' ', ''))
             cutout_path = os.path.join(output_dir, filename)
-            #save_fits(cutout_list, cutout_path, coordinates)
             cutout_fits = get_fits(cutout_list, coordinates, cutout_path)
 
             if memory_only:

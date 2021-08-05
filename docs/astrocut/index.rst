@@ -372,24 +372,24 @@ function. See the `~astrocut.build_default_combine_function` for an example of h
                 >>> size = [30,50]
 
                 >>> cutout_1 = astrocut.fits_cut(fle_1, center_coord, size, extension='all',
-                ...                     cutout_prefix="cutout_p2381x05y09", verbose=False)
+                ...                     cutout_prefix="cutout_p2381x05y09", verbose=False)  #doctest: +SKIP
                 >>> cutout_2 = astrocut.fits_cut(fle_2, center_coord, size, extension='all', 
-                ...                     cutout_prefix="cutout_p2381x06y09", verbose=False)
+                ...                     cutout_prefix="cutout_p2381x06y09", verbose=False)  #doctest: +SKIP
 
-                >>> plt.imshow(fits.getdata(cutout_1, 1))
+                >>> plt.imshow(fits.getdata(cutout_1, 1))  #doctest: +SKIP
                 
 .. image:: imgs/hapcut_left.png
 
 .. code-block:: python
                 
-                >>> plt.imshow(fits.getdata(cutout_2, 1))
+                >>> plt.imshow(fits.getdata(cutout_2, 1))  #doctest: +SKIP
                 
 .. image:: imgs/hapcut_right.png
 
 .. code-block:: python
 
-                >>> combined_cutout = astrocut.CutoutsCombiner([cutout_1, cutout_2]).combine("combined_cut.fits")
-                >>> plt.imshow(fits.getdata(combined_cutout, 1))
+                >>> combined_cutout = astrocut.CutoutsCombiner([cutout_1, cutout_2]).combine("combined_cut.fits")  #doctest: +SKIP
+                >>> plt.imshow(fits.getdata(combined_cutout, 1))  #doctest: +SKIP
                 
 .. image:: imgs/hapcut_combined.png        
 
@@ -409,23 +409,23 @@ All of the combining can be done in memory, without writing FITS files to disk a
                 >>> size = [30,50]
 
                 >>> cutout_1 = astrocut.fits_cut(fle_1, center_coord, size, extension='all',
-                ...                     cutout_prefix="cutout_p2381x05y09", memory_only=True)[0]
+                ...                     cutout_prefix="cutout_p2381x05y09", memory_only=True)[0]  #doctest: +SKIP
                 >>> cutout_2 = astrocut.fits_cut(fle_2, center_coord, size, extension='all', 
-                ...                     cutout_prefix="cutout_p2381x06y09", memory_only=True)[0]
+                ...                     cutout_prefix="cutout_p2381x06y09", memory_only=True)[0]  #doctest: +SKIP
 
-                >>> plt.imshow(cutout_1[1].data)
+                >>> plt.imshow(cutout_1[1].data)  #doctest: +SKIP
                 
 .. image:: imgs/hapcut_left.png
 
 .. code-block:: python
                 
-                >>> plt.imshow(cutout_2[1].data)
+                >>> plt.imshow(cutout_2[1].data)  #doctest: +SKIP
                 
 .. image:: imgs/hapcut_right.png
 
 .. code-block:: python
 
-                >>> combined_cutout = astrocut.CutoutsCombiner([cutout_1, cutout_2]).combine(memory_only=True)
-                >>> plt.imshow(combined_cutout[1].data)
+                >>> combined_cutout = astrocut.CutoutsCombiner([cutout_1, cutout_2]).combine(memory_only=True)  #doctest: +SKIP
+                >>> plt.imshow(combined_cutout[1].data)  #doctest: +SKIP
                 
 .. image:: imgs/hapcut_combined.png        

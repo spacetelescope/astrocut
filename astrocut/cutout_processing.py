@@ -274,6 +274,61 @@ def _configure_bintable_header(new_header, table_headers):
         new_header.append(shared_keywords.cards[kwd])
 
 
+def path_to_footprints(path, size, img_wcs, max_pixels=10000):
+    """
+    Given a path that intersects with a wcs footprint, return
+    one or more rectangles that fully contain that intersection 
+    (plus padding given by 'size') with each rectangle no more than 
+    max_pixels in size.
+    
+    Parameters
+    ----------
+    path : `~astropy.coordinate.SkyCoord`
+        SkyCoord object list of coordinates that represent a continuous path.
+    size : array
+        Size of the rectangle centered on the path locations that must 
+        be included in the returned footprint(s). Formatted as [ny,nx]
+    img_wcs : `~astropy.wcs.WCS`
+        WCS object the path intersects with. Must include naxis information.
+    max_pixels : int
+        Optional, default 10000. The maximum area in pixels for individual
+        footprints.
+        
+    Returns
+    -------
+    response : list
+       List of footprints, each a dictionary of the form:
+       {'center_coord': `~astropy.coordinate.SkyCoord`, 'size': [ny,nx]}
+    """
+    
+    x, y = img_wcs.world_to_pixel(path)
+    
+    # Removing any coordinates outside of the img wcs
+    valid_locs = ((x >= 0) & (x < img_wcs.array_shape[0])) & ((y >= 0) & (y < img_wcs.array_shape[1]))
+    x = x[valid_locs]
+    y = y[valid_locs]
+    
+    bounds_list = _get_bounds(x, y, size)
+
+    combined_bounds = list()
+    cur_bounds = bounds_list[0]
+    for bounds in bounds_list[1:]:
+        new_bounds = _combine_bounds(cur_bounds, bounds)
+        
+        if _area(new_bounds) > max_pixels:
+            combined_bounds.append(cur_bounds)
+            cur_bounds = bounds
+        else:
+            cur_bounds = new_bounds
+            
+    combined_bounds.append(cur_bounds)
+    
+    footprints = []
+    for bounds in combined_bounds:
+        footprints.append(_get_args(bounds, img_wcs))
+        
+    return footprints 
+
 
 def center_on_path(path, size, cutout_fles, target=None, img_wcs=None,
                    target_pixel_file=None, output_path=".", verbose=True):
@@ -480,7 +535,7 @@ class CutoutsCombiner():
         """
 
         if isinstance(fits_list[0], str):  # input is filenames
-            cutout_hdulists = [fits.open(fle) for fle in fle_list]
+            cutout_hdulists = [fits.open(fle) for fle in fits_list]
         elif isinstance(fits_list[0], fits.HDUList):  # input is HDUList objects
             cutout_hdulists = fits_list
         else:

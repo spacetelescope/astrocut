@@ -25,5 +25,5 @@ if not _ASTROPY_SETUP_:  # noqa
     from .make_cube import CubeFactory  # noqa
     from .cube_cut import CutoutFactory  # noqa
     from .cutouts import fits_cut, img_cut, normalize_img  # noqa
-    from .cutout_processing import center_on_path, CutoutsCombiner, build_default_combine_function  # noqa
-    from .utils.utils import path_to_footprints  # noqa
+    from .cutout_processing import (path_to_footprints, center_on_path,  # noqa
+                                    CutoutsCombiner, build_default_combine_function)  # noqa

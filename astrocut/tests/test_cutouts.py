@@ -69,7 +69,13 @@ def test_fits_cut(tmpdir, capsys):
 
     assert isinstance(cutout_files, list)
     assert len(cutout_files) == len(test_images)
-    assert "cutout_files" in cutout_files[0] 
+    assert "cutout_files" in cutout_files[0]
+
+    # Memory only flag
+    cutout_list = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=True, memory_only=True)
+    assert isinstance(cutout_list, list)
+    assert len(cutout_list) == 1
+    assert isinstance(cutout_list[0], fits.HDUList)
     
     # Do an off the edge test
     center_coord = SkyCoord("150.1163213 2.2005731", unit='deg')

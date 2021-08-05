@@ -4,10 +4,16 @@ from astropy.io import fits
 from astropy import wcs
 from astropy.coordinates import SkyCoord
 from astropy import units as u
+from astropy.utils.data import get_pkg_data_filename
 
 from ..utils import utils
 
 
+# Example FFI WCS for testing
+with open(get_pkg_data_filename('data/ex_ffi_wcs.txt'), "r") as FLE:
+    WCS_STR = FLE.read()
+
+    
 def test_get_cutout_limits():
 
     test_img_wcs_kwds = fits.Header(cards=[('NAXIS', 2, 'number of array dimensions'),
@@ -102,3 +108,4 @@ def test_get_cutout_wcs():
     cutout_wcs = utils.get_cutout_wcs(test_img_wcs, lims)
     assert (cutout_wcs.wcs.crval == [100, 20]).all()
     assert (cutout_wcs.wcs.crpix == [-3, 6]).all()
+

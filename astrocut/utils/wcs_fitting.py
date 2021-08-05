@@ -321,6 +321,7 @@ def fit_wcs_from_points(xy, world_coords, proj_point='center',
 
     # set pixel_shape to span of input points
     wcs.pixel_shape = (xp.max()+1-xp.min(), yp.max()+1-yp.min())
+    print(wcs.pixel_shape)
 
     # determine CRVAL from input
     close = lambda l, p: p[np.argmin(np.abs(l))]
@@ -346,7 +347,11 @@ def fit_wcs_from_points(xy, world_coords, proj_point='center',
     xpmin, xpmax, ypmin, ypmax = xp.min(), xp.max(), yp.min(), yp.max()
     if xpmin==xpmax: xpmin, xpmax = xpmin-0.5, xpmax+0.5
     if ypmin==ypmax: ypmin, ypmax = ypmin-0.5, ypmax+0.5
-    
+
+    print(p0)
+    print(wcs)
+    print(xpmin, ypmin)
+    print(xpmax, ypmax)
     fit = least_squares(_linear_wcs_fit, p0,
                         args=(lon, lat, xp, yp, wcs),
                         bounds=[[-np.inf,-np.inf,-np.inf,-np.inf, xpmin, ypmin],

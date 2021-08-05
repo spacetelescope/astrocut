@@ -1,4 +1,3 @@
-import pytest
 import os 
 import numpy as np
 
@@ -8,13 +7,9 @@ from astropy.wcs import WCS
 from astropy.coordinates import SkyCoord
 from astropy.table import Table
 from astropy.time import Time
-from astropy import units as u
-
-from PIL import Image
 
 from .utils_for_test import create_test_ffis, create_test_imgs
 from .. import cutout_processing, cutouts, CubeFactory, CutoutFactory
-from ..exceptions import InputWarning, InvalidInputError, InvalidQueryError
 
 
 # Example FFI WCS for testing
@@ -108,34 +103,6 @@ def test_get_args():
     assert args["coordinates"] == wcs_obj.pixel_to_world(2, 3)
     assert args["size"] == (6, 4)
 
-    
-def test_path_to_footprints():
-
-    img_wcs = WCS(WCS_STR, relax=True)
-    size = [4, 5]
-
-    xs = [10, 20, 30, 40, 50]
-    ys = [1000, 950, 900, 810, 800]
-    path = img_wcs.pixel_to_world(xs, ys)
-
-    footprints = cutout_processing.path_to_footprints(path, size, img_wcs)
-    assert len(footprints) == 1
-
-    assert (np.max(xs) - np.min(xs) + size[0]) == footprints[0]["size"][1]
-    assert (np.max(ys) - np.min(ys) + size[1]) == footprints[0]["size"][0]
-
-    cent_x = (np.max(xs) - np.min(xs) + size[0])//2 + np.min(xs) - size[0]/2 
-    cent_y = (np.max(ys) - np.min(ys) + size[1])//2 + np.min(ys) - size[1]/2 
-    assert (img_wcs.pixel_to_world([cent_x], [cent_y]) == footprints[0]["coordinates"]).all()
-
-    # Lowering the max pixels so we force >1 footprint
-    max_pixels = 100
-    footprints = cutout_processing.path_to_footprints(path, size, img_wcs, max_pixels)
-
-    assert len(footprints) == 5
-    for fp in footprints:
-        assert np.multiply(*fp["size"]) <= max_pixels
-
 
 def test_moving_target_focus(tmpdir):
 
@@ -174,6 +141,34 @@ def test_moving_target_focus(tmpdir):
     mt_cutout_table = cutout_processing._moving_target_focus(path, size, [cutout_file])
     assert mt_cutout_table["TIME"].max() == (times.jd[-1] - 2457000)
     assert len(mt_cutout_table) > len(path)
+
+
+def test_path_to_footprints():
+
+    img_wcs = WCS(WCS_STR, relax=True)
+    size = [4, 5]
+
+    xs = [10, 20, 30, 40, 50]
+    ys = [1000, 950, 900, 810, 800]
+    path = img_wcs.pixel_to_world(xs, ys)
+
+    footprints = cutout_processing.path_to_footprints(path, size, img_wcs)
+    assert len(footprints) == 1
+
+    assert (np.max(xs) - np.min(xs) + size[0]) == footprints[0]["size"][1]
+    assert (np.max(ys) - np.min(ys) + size[1]) == footprints[0]["size"][0]
+
+    cent_x = (np.max(xs) - np.min(xs) + size[0])//2 + np.min(xs) - size[0]/2 
+    cent_y = (np.max(ys) - np.min(ys) + size[1])//2 + np.min(ys) - size[1]/2 
+    assert (img_wcs.pixel_to_world([cent_x], [cent_y]) == footprints[0]["coordinates"]).all()
+
+    # Lowering the max pixels so we force >1 footprint
+    max_pixels = 100
+    footprints = cutout_processing.path_to_footprints(path, size, img_wcs, max_pixels)
+
+    assert len(footprints) == 5
+    for fp in footprints:
+        assert np.multiply(*fp["size"]) <= max_pixels
 
     
 def test_configure_bintable_header(tmpdir):
@@ -326,5 +321,14 @@ def test_combiner(tmpdir):
     assert np.isclose(comb_hdu[0].header['RA_OBJ'], center_coord.ra.deg)
     assert np.isclose(comb_hdu[0].header['DEC_OBJ'], center_coord.dec.deg)
     comb_hdu.close()
-    
-    
+
+    # Checking memory only input and output
+    input_fits_1 = fits.open(cutout_file_1)
+    input_fits_2 = fits.open(cutout_file_2)
+
+    combiner = cutout_processing.CutoutsCombiner([input_fits_1, input_fits_2])
+    assert center_coord.separation(combiner.center_coord) == 0
+    assert len(combiner.input_hdulists) == 3
+    assert len(combiner.input_hdulists[0]) == 2
+
+    comb_hdu = combiner.combine(memory_only=True)
