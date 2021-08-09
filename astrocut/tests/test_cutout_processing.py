@@ -259,6 +259,14 @@ def test_center_on_path(tmpdir):
 
 
 def test_default_combine():
+    """
+    The build_default_combine_function function uses the input hdus
+    to determine which pixels will be used by the combiner function
+    when combining images. The returned combiner function applies
+    that mask before taking the mean of all non-masked pixels to get the
+    output image.
+    """
+
     hdu_1 = fits.ImageHDU(np.array([[1, 1], [0, 0]]))
     hdu_2 = fits.ImageHDU(np.array([[0, 0], [1, 1]]))
 
