@@ -18,9 +18,9 @@ from astropy import wcs
 from . import __version__ 
 from .exceptions import InputWarning, InvalidQueryError
 
-# Note: Use the astropy function if available
+# Note: Use the astropy function if available, TODO: fix > 4.3 astropy fitting
 import astropy
-if astropy.utils.minversion(astropy, "4.0.2"):
+if astropy.utils.minversion(astropy, "4.0.2") and (float(astropy.__version__[:3]) < 4.3):
     from astropy.wcs.utils import fit_wcs_from_points
 else:
     from .utils.wcs_fitting import fit_wcs_from_points

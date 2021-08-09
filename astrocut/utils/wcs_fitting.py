@@ -346,7 +346,7 @@ def fit_wcs_from_points(xy, world_coords, proj_point='center',
     xpmin, xpmax, ypmin, ypmax = xp.min(), xp.max(), yp.min(), yp.max()
     if xpmin==xpmax: xpmin, xpmax = xpmin-0.5, xpmax+0.5
     if ypmin==ypmax: ypmin, ypmax = ypmin-0.5, ypmax+0.5
-    
+
     fit = least_squares(_linear_wcs_fit, p0,
                         args=(lon, lat, xp, yp, wcs),
                         bounds=[[-np.inf,-np.inf,-np.inf,-np.inf, xpmin, ypmin],

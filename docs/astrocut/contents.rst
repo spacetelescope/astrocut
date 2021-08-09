@@ -8,5 +8,6 @@ Site Contents
    Home <../index.html#http://>
    install
    index
+   file_formats
    api
    license

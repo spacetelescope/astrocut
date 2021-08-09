@@ -198,7 +198,7 @@ def test_cutout_extras(tmpdir):
     
     assert (xmax-xmin) == 8
     assert (ymax-ymin) == 15
-
+    
     cutout_size = [1*u.arcsec, 5*u.arcsec]
     out_file = myfactory.cube_cut(cube_file, coord, cutout_size, verbose=False)
     assert "256.880000_6.380000_1x1_astrocut.fits" in out_file

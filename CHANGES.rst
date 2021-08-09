@@ -1,7 +1,7 @@
 0.9 (unreleased)
 ----------------
 
-- No changes yet
+- Add cutout combine functionality [#45]
 
 
 0.8 (2021-07-02)
