@@ -92,7 +92,20 @@ The built docs will be in ``docs/_build/html/``, to view them go to ``file:///pa
 Release Protocol
 ^^^^^^^^^^^^^^^^
 
-Follow the `Astropy template release instructions <https://docs.astropy.org/en/latest/development/astropy-package-template.html>`_.
+Follow the `Astropy template release instructions <https://docs.astropy.org/en/latest/development/astropy-package-template.html>`_. 
+
+*Requirements:*
+
+- build (``pip install build``)
+- twine (``pip install twine``)
+
+*Notes:* 
+
+- Astrocut uses setuptools_scm to manage version numbers.
+- Astrocut does have a pyproject.toml file
+- If the given twine command doesn't work you likely need ``python -m twine upload dist/*``
+- You shouldn't have trigger a readthedocs build manually, it should run on it's own in ~20 min.
+
 
 Contributing
 ------------
