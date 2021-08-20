@@ -18,6 +18,10 @@ from astropy.io import fits
 from astropy.coordinates import SkyCoord
 from astropy import wcs
 
+import aioboto3
+from botocore import UNSIGNED
+from botocore.config import Config
+
 from . import __version__ 
 from .exceptions import InputWarning, InvalidQueryError
 
@@ -871,11 +875,7 @@ class S3CubeFile():
         import nest_asyncio
         nest_asyncio.apply()
 
-        # Setup S3 client
-        import aioboto3
-        from botocore import UNSIGNED
-        from botocore.config import Config
-        self.s3clientmgr = aioboto3.client("s3", config=Config(signature_version=UNSIGNED))
+        self.s3clientmgr = aioboto3.Session().client("s3", config=Config(signature_version=UNSIGNED))
         self.s3_client = asyncio.run(self.s3clientmgr.__aenter__())
 
         # Read the headers of HDU0 and HDU1
