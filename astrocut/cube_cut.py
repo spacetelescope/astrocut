@@ -919,6 +919,12 @@ class S3CubeFile():
         hdu1_data_size = np.product(self.shape) * self.itemsize
         hdu2_offset = self.HDU1_DATA_OFFSET + self.FITS_BLOCK_SIZE * (1 + hdu1_data_size // self.FITS_BLOCK_SIZE)
         hdu2_str = asyncio.run(self._async_read_block(hdu2_offset, length=None))
+        # In some sector-ccd combinations, HDU2 starts a block earlier than expected.
+        # e.g., this is the case for sector=27, camera=3, ccd=3, and,
+        # sector=33, camera=3, ccd=3.
+        if hdu2_str[:8] != b"XTENSION":
+            hdu2_offset -= self.FITS_BLOCK_SIZE
+            hdu2_str = asyncio.run(self._async_read_block(hdu2_offset, length=None))
         tbl = fits.BinTableHDU.fromstring(hdu2_str)
         return tbl
 
