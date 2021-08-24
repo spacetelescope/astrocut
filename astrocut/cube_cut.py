@@ -21,6 +21,7 @@ from astropy import wcs
 import aioboto3
 from botocore import UNSIGNED
 from botocore.config import Config
+import nest_asyncio
 
 from . import __version__ 
 from .exceptions import InputWarning, InvalidQueryError
@@ -734,7 +735,7 @@ class CutoutFactory():
 
         with cubeclass(cube_file) as cube:
 
-             # Get the info we need from the data table
+            # Get the info we need from the data table
             self._parse_table_info(cube.table.data, verbose)
 
             if isinstance(coordinates, SkyCoord):
@@ -851,6 +852,8 @@ class S3CubeFile():
     Susan Mullally, Joseph Curtin, and others.
     """
 
+    # FITS files consist of an integral number of 2880 byte blocks
+    FITS_BLOCK_SIZE = 2880
     # Byte position of the start of HDU[1]'s header
     HDU1_HEADER_OFFSET = 2880
     # Byte position of the start of HDU[1]'s data
@@ -871,8 +874,7 @@ class S3CubeFile():
 
         # Setup asyncio
         # asyncio cannot be used in a Jupyter notebook environment
-        # without first calling `nest_asyncio.apply()` following:
-        import nest_asyncio
+        # without calling `nest_asyncio.apply()` first.
         nest_asyncio.apply()
 
         self.s3clientmgr = aioboto3.Session().client("s3", config=Config(signature_version=UNSIGNED))
@@ -915,7 +917,7 @@ class S3CubeFile():
     def _read_table(self):
         """Returns the BinTableHDU for HDU #2."""
         hdu1_data_size = np.product(self.shape) * self.itemsize
-        hdu2_offset = self.HDU1_DATA_OFFSET + 2880 * (1 + hdu1_data_size // 2880)
+        hdu2_offset = self.HDU1_DATA_OFFSET + self.FITS_BLOCK_SIZE * (1 + hdu1_data_size // self.FITS_BLOCK_SIZE)
         hdu2_str = asyncio.run(self._async_read_block(hdu2_offset, length=None))
         tbl = fits.BinTableHDU.fromstring(hdu2_str)
         return tbl
