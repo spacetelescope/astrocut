@@ -559,7 +559,7 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
 
     # If no cutouts contain data, raise exception
     if not cutout_hdu_dict:
-        raise InvalidQueryError("Cutout contains to data! (Check image footprint.)")
+        raise InvalidQueryError("Cutout contains no data! (Check image footprint.)")
 
     # Make sure the output directory exists
     if not os.path.exists(output_dir):
@@ -593,6 +593,11 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
  
         cutout_path = []
         for fle in input_files:
+
+            if cutout_hdu_dict.get(fle) is None:
+                warnings.warn("Cutout of {} contains no data and will not be written.".format(fle),
+                              DataWarning)
+                continue
 
             for i, cutout in enumerate(cutout_hdu_dict.get(fle)):
 
