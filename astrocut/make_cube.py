@@ -1,8 +1,7 @@
 # Licensed under a 3-clause BSD style license - see LICENSE.rst
 
 """
-This module implements the functionality to create image cubes for the purposes of
-creating cutout target pixel files.
+This module implements the functionality to create image cubes for the purposes of creating cutout target pixel files.
 """
 
 import numpy as np
