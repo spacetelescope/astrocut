@@ -817,7 +817,22 @@ class CutoutFactory():
 
 
 class LocalCubeFile:
-    """Interface for a local Astrocut cube file."""
+    """Interface for a local Astrocut cube file.
+
+    This interface is compatible with the alternative `S3CubeFile` class
+    defined below.  These two classes exist to allow the data cubes to be
+    accessed in a seamless manner whether they are stored on a local file
+    system (`LocalCubeFile`) or in the AWS cloud (`S3CubeFile`).
+
+    Examples
+    --------
+    A 5-by-10 cutout from a TESS cube can be obtained as follows:
+
+        >>> with LocalCubeFile("tess-s0016-2-3-cube.fits") as cube:
+                data = cube.cutout(500, 505, 1000, 1010)
+        >>> data.shape
+        (5, 10, 1121, 2)
+    """
 
     def __init__(self, cube_file):
         self.cube_file = cube_file
@@ -842,6 +857,10 @@ class LocalCubeFile:
         return self.fitsobj[0].header
 
     def cutout(self, xmin, xmax, ymin, ymax):
+        """Returns a 4D `numpy.ndarray` containing cutout data.
+
+        The shape of the array is (n_rows, n_cols, n_cadences, 2).
+        """
         return self.fitsobj[1].data[xmin:xmax, ymin:ymax, :, :]
 
 
