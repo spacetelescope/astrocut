@@ -2,6 +2,7 @@
 
 """This module implements cutout functionality similar to fitscut."""
 
+from collections import defaultdict
 import os
 import warnings
 import numpy as np
