@@ -526,7 +526,7 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
         minmax_percent = [0.5, 99.5]
         
     # Making the cutouts
-    cutout_hdu_dict = {}
+    cutout_hdu_dict = defaultdict(list)
     for in_fle in input_files:
         if verbose:
             print("\n{}".format(in_fle))
@@ -593,11 +593,6 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
  
         cutout_path = []
         for fle in input_files:
-
-            if cutout_hdu_dict.get(fle) is None:
-                warnings.warn("Cutout of {} contains no data and will not be written.".format(fle),
-                              DataWarning)
-                continue
 
             for i, cutout in enumerate(cutout_hdu_dict.get(fle)):
 
