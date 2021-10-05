@@ -725,7 +725,6 @@ class CutoutFactory():
             start_time = time()
 
         warnings.filterwarnings("ignore", category=wcs.FITSFixedWarning)
-        #with fits.open(cube_file, mode='denywrite', memmap=True) as cube:
 
         # Use a different cube file interface for local vs remote (S3) files
         if cube_file.startswith("s3://"):
@@ -828,9 +827,9 @@ class LocalCubeFile:
     --------
     A 5-by-10 cutout from a TESS cube can be obtained as follows:
 
-        >>> with LocalCubeFile("tess-s0016-2-3-cube.fits") as cube:
-                data = cube.cutout(500, 505, 1000, 1010)
-        >>> data.shape
+        >>> with LocalCubeFile("tess-s0016-2-3-cube.fits") as cube:  # doctest: +SKIP
+        >>>    data = cube.cutout(500, 505, 1000, 1010)  # doctest: +SKIP
+        >>> data.shape  # doctest: +SKIP
         (5, 10, 1121, 2)
     """
 
