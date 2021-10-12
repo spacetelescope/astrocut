@@ -879,7 +879,7 @@ class S3CubeFile():
     A 5-by-10 cutout from a TESS cube can be obtained as follows:
 
         >>> cube_uri = "s3://stpubdata/tess/public/mast/tess-s0038-2-2-cube.fits"
-        >>> with S3CubeFile(cube_uri) as cube:
+        >>> with S3CubeFile(cube_uri) as cube:  # doctest: +SKIP
         >>>    data = cube.cutout(500, 505, 1000, 1010)  # doctest: +SKIP
         >>> data.shape  # doctest: +SKIP
         (5, 10, 3705, 2)
@@ -948,7 +948,7 @@ class S3CubeFileAsync():
     A 5-by-10 cutout from a TESS cube can be obtained as follows:
 
         >>> cube_uri = "s3://stpubdata/tess/public/mast/tess-s0038-2-2-cube.fits"
-        >>> async with S3CubeFile(cube_uri) as cube:
+        >>> async with S3CubeFile(cube_uri) as cube:  # doctest: +SKIP
         >>>    data = await cube.async_cutout(500, 505, 1000, 1010)  # doctest: +SKIP
         >>> data.shape  # doctest: +SKIP
     """
