@@ -436,3 +436,4 @@ def test_s3_cube_cut():
     assert np.isclose(hdulist[1].data['FLUX'][100][0, 0], 2329.8127)
     assert np.isclose(hdulist[1].data['FLUX_ERR'][200][1, 2], 1.1239403)
     assert hdulist[0].header['CAMERA'] == 2
+    hdulist.close()
