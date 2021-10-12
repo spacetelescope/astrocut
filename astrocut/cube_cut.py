@@ -867,6 +867,16 @@ class S3CubeFile():
 
     Inspired by earlier proto-types written by Thomas Robitaille, P. L. Lim,
     Susan Mullally, Joseph Curtin, and others.
+
+    Examples
+    --------
+    A 5-by-10 cutout from a TESS cube can be obtained as follows:
+
+        >>> cube_uri = "s3://stpubdata/tess/public/mast/tess-s0038-2-2-cube.fits"
+        >>> with S3CubeFile(cube_uri) as cube:
+        >>>    data = cube.cutout(500, 505, 1000, 1010)  # doctest: +SKIP
+        >>> data.shape  # doctest: +SKIP
+        (5, 10, 3705, 2)
     """
 
     # FITS files consist of an integral number of 2880 byte blocks
