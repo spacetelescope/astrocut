@@ -834,13 +834,16 @@ class LocalCubeFile:
 
     def __init__(self, cube_file):
         self.cube_file = cube_file
-        self.fitsobj = fits.open(cube_file, mode='denywrite', memmap=True)
 
     def __enter__(self):
+        self.open()
         return self
 
     def __exit__(self, *args):
         self.fitsobj.close()
+
+    def open(self):
+        self.fitsobj = fits.open(self.cube_file, mode='denywrite', memmap=True)
 
     @property
     def shape(self):
@@ -896,10 +899,14 @@ class S3CubeFile():
 
         if not cube_file.startswith("s3://"):
             raise ValueError("S3CubeFile expects a cube_file with prefix 's3://'")
-
         self.cube_file = cube_file
-        match = re.findall("s3://([^/]*)/(.*)", cube_file)[0]
-        self.s3_bucket, self.s3_key = match[0], match[1]
+
+        # Extract bucket and key from the S3 URI
+        match = re.findall("s3://([^/]*)/(.*)", cube_file)
+        if match:
+            self.s3_bucket, self.s3_key = match[0][0], match[0][1]
+        else:
+            raise ValueError(f"Invalid S3 URI: {cube_file}")
 
         # The data type is hard-coded to be float32 for TessCut cubes
         data_type = np.float32
