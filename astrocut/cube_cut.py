@@ -3,7 +3,6 @@
 """This module implements the cutout functionality."""
 
 import asyncio
-from functools import lru_cache
 import os
 import re
 import warnings
