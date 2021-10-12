@@ -908,11 +908,6 @@ class S3CubeFile():
         else:
             raise ValueError(f"Invalid S3 URI: {cube_file}")
 
-        # The data type is hard-coded to be float32 for TessCut cubes
-        data_type = np.float32
-        self.data_type = np.dtype(data_type).newbyteorder('>')
-        self.itemsize = np.dtype(data_type).itemsize
-
         # Setup the asynchronous AWS S3 client
         self.s3clientmgr = aioboto3.Session().client("s3", config=Config(signature_version=UNSIGNED))
         try:
@@ -924,6 +919,12 @@ class S3CubeFile():
 
         # Read the headers of HDU0 and HDU1
         self.primary_header, self.header = self._read_headers()
+
+        # Are the pixel values stored as single or double precision floats?
+        bitpix_to_type = {-32: np.float32, -64: np.float64}
+        data_type = bitpix_to_type[self.header["BITPIX"]]
+        self.data_type = np.dtype(data_type).newbyteorder('>')  # FITS uses big endian
+        self.itemsize = np.dtype(data_type).itemsize
 
         # The shape is typically equal to (2078, 2136, n_cadences, 2)
         # and can be interpreted as (n_rows, n_columns, n_times, n_flux_types),
