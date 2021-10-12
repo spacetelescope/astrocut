@@ -3,6 +3,7 @@
 """This module implements the cutout functionality."""
 
 import asyncio
+from functools import lru_cache
 import os
 import re
 import warnings
@@ -849,14 +850,14 @@ class LocalCubeFile:
         return self.fitsobj[1].data.shape
 
     @property
-    def table(self):
-        return self.fitsobj[2]
-
-    @property
-    def primary_header(self):
+    def primary_header(self) -> fits.Header:
         return self.fitsobj[0].header
 
-    def cutout(self, xmin, xmax, ymin, ymax):
+    @property
+    def table(self) -> fits.BinTableHDU:
+        return self.fitsobj[2]
+
+    def cutout(self, xmin, xmax, ymin, ymax) -> np.array:
         """Returns a 4D `numpy.ndarray` containing cutout data.
 
         The shape of the array is (n_rows, n_cols, n_cadences, 2).
@@ -867,11 +868,12 @@ class LocalCubeFile:
 class S3CubeFile():
     """Interface for S3-hosted AstroCut cube files.
 
-    Inspired by earlier proto-types written by Thomas Robitaille, P. L. Lim,
-    Susan Mullally, Joseph Curtin, and others.
-
-    This class provides both synchronous (e.g. cutout) and
-    asynchronous methods (e.g. async_cutout).
+    This is a synchronous wrapper around `S3CubeFileAsync`.
+    The use of asynchronous function calls significantly speeds up data
+    access from S3, because separate HTTP requests are issued to retrieve
+    different parts of the cloud-hosted cube file. The rest of astrocut
+    does not use async functions however, so this class serves as a bridge
+    between `S3CubeFileAsync` and other parts of astrocut.
 
     Examples
     --------
@@ -882,8 +884,69 @@ class S3CubeFile():
         >>>    data = cube.cutout(500, 505, 1000, 1010)  # doctest: +SKIP
         >>> data.shape  # doctest: +SKIP
         (5, 10, 3705, 2)
+    """
 
-    S3CubeFile can also be used in asynchronous mode as follows:
+    def __init__(self, cube_file):
+        self.cube_async = S3CubeFileAsync(cube_file)
+
+    def __enter__(self):
+        try:
+            # get the event loop if one is already running
+            self.loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # if one is not running, create it
+            self.loop = asyncio.new_event_loop()
+
+        try:
+            self.loop.run_until_complete(self.cube_async.__aenter__())
+        except RuntimeError as e:
+            if str(e) == "This event loop is already running":
+                raise RuntimeError("Your environment already appears to be running an event loop.\n"
+                                   "Use `import nest_asyncio; nest_asyncio.apply()` to enable S3CubeFile to work.")
+        return self
+
+    def __exit__(self, *args):
+        self.loop.run_until_complete(self.cube_async.__aexit__(*args))
+        try:
+            self.loop.close()
+        except RuntimeError:
+            # Closing the loop may fail if `nest_asyncio` is being used.
+            # ("RuntimeError: Cannot close a running event loop")
+            pass
+
+    @property
+    def shape(self):
+        return self.cube_async.shape
+
+    @property
+    def primary_header(self) -> fits.Header:
+        return self.cube_async.primary_header
+
+    @property
+    def table(self) -> fits.BinTableHDU:
+        return self.loop.run_until_complete(self.cube_async.table)
+
+    def read_headers(self):
+        return self.loop.run_until_complete(self.cube_async.read_headers())
+
+    def cutout(self, row_min, row_max, col_min, col_max) -> np.array:
+        """Returns a 4D `numpy.ndarray` containing cutout data.
+
+        The shape of the array is (n_rows, n_cols, n_cadences, 2).
+        """
+        tmp = self.loop.run_until_complete(self.cube_async.cutout(row_min, row_max, col_min, col_max))
+        return tmp
+
+
+class S3CubeFileAsync():
+    """Asynchronous interface for S3-hosted AstroCut cube files.
+
+    Inspired by earlier proto-types written by Thomas Robitaille, P. L. Lim,
+    Susan Mullally, Joseph Curtin, and others.
+
+    Examples
+    --------
+    A 5-by-10 cutout from a TESS cube can be obtained as follows:
 
         >>> cube_uri = "s3://stpubdata/tess/public/mast/tess-s0038-2-2-cube.fits"
         >>> async with S3CubeFile(cube_uri) as cube:
@@ -911,20 +974,7 @@ class S3CubeFile():
         else:
             raise ValueError(f"Invalid S3 URI: {cube_file}")
 
-    def __enter__(self):
-        try:
-            # get the event loop if one is already running
-            self.loop = asyncio.get_running_loop()
-        except RuntimeError:
-            # if one is not running, create it
-            self.loop = asyncio.new_event_loop()
-
-        try:
-            return self.loop.run_until_complete(self.__aenter__())
-        except RuntimeError as e:
-            if str(e) == "This event loop is already running":
-                raise RuntimeError("Your environment already appears to be running an event loop.\n"
-                                   "Use `import nest_asyncio; nest_asyncio.apply()` to enable S3CubeFile to work.")
+        self._table = None
 
     async def __aenter__(self):
         # Setup the asynchronous AWS S3 client
@@ -932,7 +982,7 @@ class S3CubeFile():
         self.s3_client = await self.s3clientmgr.__aenter__()
 
         # Read the headers of HDU0 and HDU1
-        self.primary_header, self.header = await self._async_read_headers()
+        self.primary_header, self.header = await self.read_headers()
 
         # Are the pixel values stored as single or double precision floats?
         bitpix_to_type = {-32: np.float32, -64: np.float64}
@@ -956,51 +1006,44 @@ class S3CubeFile():
 
         return self
 
-    def __exit__(self, *args):
-        self.loop.run_until_complete(self.__aexit__(*args))
-        try:
-            self.loop.close()
-        except RuntimeError:
-            # Closing the loop may fail if `nest_asyncio` is being used.
-            # ("RuntimeError: Cannot close a running event loop")
-            pass
-
     async def __aexit__(self, exc_type, exc_value, exc_traceback):
         await self.s3clientmgr.__aexit__(exc_type, exc_value, exc_traceback)
 
     @property
-    def table(self):
+    async def table(self) -> fits.BinTableHDU:
         if self._table is None:
-            self._table = self._read_table()
+            self._table = await self.read_table()
         return self._table
 
-    def _read_table(self):
+    async def read_table(self) -> fits.BinTableHDU:
         """Returns the BinTableHDU for HDU #2."""
         hdu1_data_size = np.product(self.shape) * self.itemsize
         hdu2_offset = self.HDU1_DATA_OFFSET + self.FITS_BLOCK_SIZE * (1 + hdu1_data_size // self.FITS_BLOCK_SIZE)
-        hdu2_str = self.loop.run_until_complete(self._async_read_block(hdu2_offset, length=None))
+        hdu2_str = await self._read_block(hdu2_offset, length=None)
         # In some sector-ccd combinations, HDU2 starts a block earlier than expected.
         # e.g., this is the case for sector=27, camera=3, ccd=3, and,
         # sector=33, camera=3, ccd=3.
         if hdu2_str[:8] != b"XTENSION":
             hdu2_offset -= self.FITS_BLOCK_SIZE
-            hdu2_str = self.loop.run_until_complete(self._async_read_block(hdu2_offset, length=None))
+            hdu2_str = await self._read_block(hdu2_offset, length=None)
         tbl = fits.BinTableHDU.fromstring(hdu2_str)
         return tbl
 
-    def _read_headers(self):
-        return self.loop.run_until_complete(self._async_read_headers())
-
-    async def _async_read_headers(self):
-        hdr_str = await self._async_read_block(0, self.HDU1_HEADER_OFFSET - 1)
+    async def read_headers(self):
+        hdr_str = await self._read_block(0, self.HDU1_HEADER_OFFSET - 1)
         hdu0_header = fits.Header.fromstring(hdr_str.decode('ascii'))
 
-        hdr_str = await self._async_read_block(self.HDU1_HEADER_OFFSET, self.HDU1_DATA_OFFSET - self.HDU1_HEADER_OFFSET)
+        hdr_str = await self._read_block(self.HDU1_HEADER_OFFSET, self.HDU1_DATA_OFFSET - self.HDU1_HEADER_OFFSET)
         hdu1_header = fits.Header.fromstring(hdr_str.decode('ascii'))
 
         return (hdu0_header, hdu1_header)
 
-    async def _async_read_block(self, offset: int, length: int):
+    async def _read_block(self, offset: int, length: int) -> bytes:
+        """Download a range of bytes from the cube.
+
+        This will issue a byte-range request to AWS S3 for the range
+        `bytes={offset}-{offset+length-1}`.
+        """
         if offset is None:
             byterange = ""
         elif length is None:
@@ -1037,14 +1080,7 @@ class S3CubeFile():
 
         return blocks
 
-    def cutout(self, row_min, row_max, col_min, col_max) -> np.array:
-        """Returns a 4D `numpy.ndarray` containing cutout data.
-
-        The shape of the array is (n_rows, n_cols, n_cadences, 2).
-        """
-        return self.loop.run_until_complete(self.async_cutout(row_min, row_max, col_min, col_max))
-
-    async def async_cutout(self, row_min, row_max, col_min, col_max) -> np.array:
+    async def cutout(self, row_min, row_max, col_min, col_max) -> np.array:
         """Returns a 4D `numpy.ndarray` containing cutout data.
 
         The shape of the array is (n_rows, n_cols, n_cadences, 2).
@@ -1052,7 +1088,7 @@ class S3CubeFile():
         blocks = self._identify_byte_blocks(row_min, row_max, col_min, col_max)
         bytedata = await asyncio.gather(
             *[
-                self._async_read_block(offset=blk[0], length=blk[1])
+                self._read_block(offset=blk[0], length=blk[1])
                 for blk in blocks
             ]
         )
