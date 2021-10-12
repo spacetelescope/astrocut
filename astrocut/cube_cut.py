@@ -21,7 +21,6 @@ from astropy import wcs
 import aioboto3
 from botocore import UNSIGNED
 from botocore.config import Config
-import nest_asyncio
 
 from . import __version__ 
 from .exceptions import InputWarning, InvalidQueryError
@@ -878,6 +877,13 @@ class S3CubeFile():
     HDU1_DATA_OFFSET = 5760
 
     def __init__(self, cube_file):
+        try:
+            # get the event loop if one is already running
+            self.loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # if one is not running, create it
+            self.loop = asyncio.new_event_loop()
+
         if not cube_file.startswith("s3://"):
             raise ValueError("S3CubeFile expects a cube_file with prefix 's3://'")
 
@@ -890,13 +896,14 @@ class S3CubeFile():
         self.data_type = np.dtype(data_type).newbyteorder('>')
         self.itemsize = np.dtype(data_type).itemsize
 
-        # Setup asyncio
-        # asyncio cannot be used in a Jupyter notebook environment
-        # without calling `nest_asyncio.apply()` first.
-        nest_asyncio.apply()
-
+        # Setup the asynchronous AWS S3 client
         self.s3clientmgr = aioboto3.Session().client("s3", config=Config(signature_version=UNSIGNED))
-        self.s3_client = asyncio.run(self.s3clientmgr.__aenter__())
+        try:
+            self.s3_client = self.loop.run_until_complete(self.s3clientmgr.__aenter__())
+        except RuntimeError as e:
+            if str(e) == "This event loop is already running":
+                raise RuntimeError("Your environment already appears to be running an event loop.\n"
+                                   "Use `import nest_asyncio; nest_asyncio.apply()` to enable this feature to work.")
 
         # Read the headers of HDU0 and HDU1
         self.primary_header, self.header = self._read_headers()
@@ -922,7 +929,13 @@ class S3CubeFile():
         return self
 
     def __exit__(self, *args):
-        asyncio.run(self.__aexit__(*args))
+        self.loop.run_until_complete(self.__aexit__(*args))
+        try:
+            self.loop.close()
+        except RuntimeError:
+            # Closing the loop may fail if `nest_asyncio` is being used.
+            # ("RuntimeError: Cannot close a running event loop")
+            pass
 
     async def __aexit__(self, exc_type, exc_value, exc_traceback):
         await self.s3clientmgr.__aexit__(exc_type, exc_value, exc_traceback)
@@ -936,18 +949,18 @@ class S3CubeFile():
         """Returns the BinTableHDU for HDU #2."""
         hdu1_data_size = np.product(self.shape) * self.itemsize
         hdu2_offset = self.HDU1_DATA_OFFSET + self.FITS_BLOCK_SIZE * (1 + hdu1_data_size // self.FITS_BLOCK_SIZE)
-        hdu2_str = asyncio.run(self._async_read_block(hdu2_offset, length=None))
+        hdu2_str = self.loop.run_until_complete(self._async_read_block(hdu2_offset, length=None))
         # In some sector-ccd combinations, HDU2 starts a block earlier than expected.
         # e.g., this is the case for sector=27, camera=3, ccd=3, and,
         # sector=33, camera=3, ccd=3.
         if hdu2_str[:8] != b"XTENSION":
             hdu2_offset -= self.FITS_BLOCK_SIZE
-            hdu2_str = asyncio.run(self._async_read_block(hdu2_offset, length=None))
+            hdu2_str = self.loop.run_until_complete(self._async_read_block(hdu2_offset, length=None))
         tbl = fits.BinTableHDU.fromstring(hdu2_str)
         return tbl
 
     def _read_headers(self):
-        return asyncio.run(self._async_read_headers())
+        return self.loop.run_until_complete(self._async_read_headers())
 
     async def _async_read_headers(self):
         hdr_str = await self._async_read_block(0, self.HDU1_HEADER_OFFSET - 1)
@@ -996,7 +1009,7 @@ class S3CubeFile():
         return blocks
 
     def cutout(self, row_min, row_max, col_min, col_max) -> np.array:
-        return asyncio.run(self._async_cutout(row_min, row_max, col_min, col_max))
+        return self.loop.run_until_complete(self._async_cutout(row_min, row_max, col_min, col_max))
 
     async def _async_cutout(self, row_min, row_max, col_min, col_max) -> np.array:
         """Returns a 4D array of pixel values."""
