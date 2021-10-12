@@ -870,6 +870,9 @@ class S3CubeFile():
     Inspired by earlier proto-types written by Thomas Robitaille, P. L. Lim,
     Susan Mullally, Joseph Curtin, and others.
 
+    This class provides both synchronous (e.g. cutout) and
+    asynchronous methods (e.g. async_cutout).
+
     Examples
     --------
     A 5-by-10 cutout from a TESS cube can be obtained as follows:
@@ -879,6 +882,13 @@ class S3CubeFile():
         >>>    data = cube.cutout(500, 505, 1000, 1010)  # doctest: +SKIP
         >>> data.shape  # doctest: +SKIP
         (5, 10, 3705, 2)
+
+    S3CubeFile can also be used in asynchronous mode as follows:
+
+        >>> cube_uri = "s3://stpubdata/tess/public/mast/tess-s0038-2-2-cube.fits"
+        >>> async with S3CubeFile(cube_uri) as cube:
+        >>>    data = await cube.async_cutout(500, 505, 1000, 1010)  # doctest: +SKIP
+        >>> data.shape  # doctest: +SKIP
     """
 
     # FITS files consist of an integral number of 2880 byte blocks
@@ -889,6 +899,19 @@ class S3CubeFile():
     HDU1_DATA_OFFSET = 5760
 
     def __init__(self, cube_file):
+        # Validate cube_file
+        if not cube_file.startswith("s3://"):
+            raise ValueError("S3CubeFile expects `cube_file` to start with prefix 's3://'")
+        self.cube_file = cube_file
+
+        # Extract bucket and key from the S3 URI
+        match = re.findall("s3://([^/]*)/(.*)", self.cube_file)
+        if match:
+            self.s3_bucket, self.s3_key = match[0][0], match[0][1]
+        else:
+            raise ValueError(f"Invalid S3 URI: {cube_file}")
+
+    def __enter__(self):
         try:
             # get the event loop if one is already running
             self.loop = asyncio.get_running_loop()
@@ -896,28 +919,20 @@ class S3CubeFile():
             # if one is not running, create it
             self.loop = asyncio.new_event_loop()
 
-        if not cube_file.startswith("s3://"):
-            raise ValueError("S3CubeFile expects a cube_file with prefix 's3://'")
-        self.cube_file = cube_file
-
-        # Extract bucket and key from the S3 URI
-        match = re.findall("s3://([^/]*)/(.*)", cube_file)
-        if match:
-            self.s3_bucket, self.s3_key = match[0][0], match[0][1]
-        else:
-            raise ValueError(f"Invalid S3 URI: {cube_file}")
-
-        # Setup the asynchronous AWS S3 client
-        self.s3clientmgr = aioboto3.Session().client("s3", config=Config(signature_version=UNSIGNED))
         try:
-            self.s3_client = self.loop.run_until_complete(self.s3clientmgr.__aenter__())
+            return self.loop.run_until_complete(self.__aenter__())
         except RuntimeError as e:
             if str(e) == "This event loop is already running":
                 raise RuntimeError("Your environment already appears to be running an event loop.\n"
-                                   "Use `import nest_asyncio; nest_asyncio.apply()` to enable this feature to work.")
+                                   "Use `import nest_asyncio; nest_asyncio.apply()` to enable S3CubeFile to work.")
+
+    async def __aenter__(self):
+        # Setup the asynchronous AWS S3 client
+        self.s3clientmgr = aioboto3.Session().client("s3", config=Config(signature_version=UNSIGNED))
+        self.s3_client = await self.s3clientmgr.__aenter__()
 
         # Read the headers of HDU0 and HDU1
-        self.primary_header, self.header = self._read_headers()
+        self.primary_header, self.header = await self._async_read_headers()
 
         # Are the pixel values stored as single or double precision floats?
         bitpix_to_type = {-32: np.float32, -64: np.float64}
@@ -939,10 +954,6 @@ class S3CubeFile():
             self.shape[3] * self.itemsize,
             self.itemsize)
 
-    def __enter__(self):
-        return self
-
-    async def __aenter__(self):
         return self
 
     def __exit__(self, *args):
@@ -1027,10 +1038,17 @@ class S3CubeFile():
         return blocks
 
     def cutout(self, row_min, row_max, col_min, col_max) -> np.array:
-        return self.loop.run_until_complete(self._async_cutout(row_min, row_max, col_min, col_max))
+        """Returns a 4D `numpy.ndarray` containing cutout data.
 
-    async def _async_cutout(self, row_min, row_max, col_min, col_max) -> np.array:
-        """Returns a 4D array of pixel values."""
+        The shape of the array is (n_rows, n_cols, n_cadences, 2).
+        """
+        return self.loop.run_until_complete(self.async_cutout(row_min, row_max, col_min, col_max))
+
+    async def async_cutout(self, row_min, row_max, col_min, col_max) -> np.array:
+        """Returns a 4D `numpy.ndarray` containing cutout data.
+
+        The shape of the array is (n_rows, n_cols, n_cadences, 2).
+        """
         blocks = self._identify_byte_blocks(row_min, row_max, col_min, col_max)
         bytedata = await asyncio.gather(
             *[
