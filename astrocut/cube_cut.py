@@ -3,7 +3,6 @@
 """This module implements the cutout functionality."""
 
 import asyncio
-from functools import lru_cache
 import os
 import re
 import warnings
@@ -960,9 +959,10 @@ class S3CubeFile():
 
     @property
     def table(self):
-        return self._read_table()
+        if self._table is None:
+            self._table = self._read_table()
+        return self._table
 
-    @lru_cache()
     def _read_table(self):
         """Returns the BinTableHDU for HDU #2."""
         hdu1_data_size = np.product(self.shape) * self.itemsize
