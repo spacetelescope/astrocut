@@ -900,18 +900,16 @@ class S3CubeFile():
             self.loop.run_until_complete(self.cube_async.__aenter__())
         except RuntimeError as e:
             if str(e) == "This event loop is already running":
-                raise RuntimeError("Your environment already appears to be running an event loop.\n"
-                                   "Use `import nest_asyncio; nest_asyncio.apply()` to enable S3CubeFile to work.")
+                custom_msg = "Your environment already appears to be running an event loop.\n" \
+                             "Use `import nest_asyncio; nest_asyncio.apply()` " \
+                             "to enable S3CubeFile to work."
+                raise RuntimeError(custom_msg) from e
+            else:
+                raise e from e
         return self
 
     def __exit__(self, *args):
         self.loop.run_until_complete(self.cube_async.__aexit__(*args))
-        try:
-            self.loop.close()
-        except RuntimeError:
-            # Closing the loop may fail if `nest_asyncio` is being used.
-            # ("RuntimeError: Cannot close a running event loop")
-            pass
 
     @property
     def shape(self):
