@@ -397,6 +397,20 @@ def test_s3cubefile(sector, camera, ccd):
         assert cube.primary_header['SECTOR'] == sector
         assert cube.primary_header['CAMERA'] == camera
         assert cube.primary_header['CCD'] == ccd
+        # Can the table extension be loaded correctly?
+        tbl = cube.table
+        assert len(tbl.data) == cube.shape[2]
+        assert all(tbl.data['CAMERA'] == camera)
+        assert all(tbl.data['CCD'] == ccd)
+        assert f"s{sector:04d}-{camera}-{ccd}" in tbl.data['FFI_FILE'][0]
+
+
+def test_s3cubefile_validation():
+    """Does the S3CubeFile interface validate the S3 URIs?"""
+    invalid_uris = ["invalid_s3_uri", "http://stpubdata/does/not/exist"]
+    for uri in invalid_uris:
+        with pytest.raises(ValueError):
+            cube = S3CubeFile(uri)
 
 
 @pytest.mark.remote_data  # use `pytest --remote-data` to run this test
