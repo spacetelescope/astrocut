@@ -905,7 +905,7 @@ class S3CubeFile():
                              "to enable S3CubeFile to work."
                 raise RuntimeError(custom_msg) from e
             else:
-                raise e from e
+                raise
         return self
 
     def __exit__(self, *args):
