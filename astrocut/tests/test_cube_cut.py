@@ -410,7 +410,7 @@ def test_s3cubefile_validation():
     invalid_uris = ["invalid_s3_uri", "http://stpubdata/does/not/exist"]
     for uri in invalid_uris:
         with pytest.raises(ValueError):
-            cube = S3CubeFile(uri)
+            S3CubeFile(uri)
 
 
 @pytest.mark.remote_data  # use `pytest --remote-data` to run this test
