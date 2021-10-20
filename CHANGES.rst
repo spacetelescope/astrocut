@@ -1,7 +1,7 @@
 0.10 (unreleased)
 ----------------
 
-- No changes yet
+- Improve file checking prior to cutout creation to avoid errors [#52]
 
 
 0.9 (2021-08-10)
