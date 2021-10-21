@@ -889,6 +889,8 @@ class S3CubeFile():
         self.cube_async = S3CubeFileAsync(cube_file)
 
     def __enter__(self):
+        # asyncio operates using the "event loop" design pattern, which takes care
+        # of switching between different `async` tasks running concurrently
         try:
             # get the event loop if one is already running
             self.loop = asyncio.get_running_loop()
@@ -905,7 +907,7 @@ class S3CubeFile():
                              "to enable S3CubeFile to work."
                 raise RuntimeError(custom_msg) from e
             else:
-                raise
+                raise  # re-raise the RuntimeError if not caused by the event loop
         return self
 
     def __exit__(self, *args):
@@ -921,6 +923,10 @@ class S3CubeFile():
 
     @property
     def table(self) -> fits.BinTableHDU:
+        """Returns the BinTableHDU for HDU #2.
+
+        HDU #2 is the table containing the FFI meta data (e.g., the WCS for each cadence).
+        """
         return self.loop.run_until_complete(self.cube_async.table)
 
     def read_headers(self):
@@ -1014,7 +1020,14 @@ class S3CubeFileAsync():
 
     async def read_table(self) -> fits.BinTableHDU:
         """Returns the BinTableHDU for HDU #2."""
+        # `hdu1_data_size` is the size in bytes of the 4D image data cube (HDU #1)
         hdu1_data_size = np.product(self.shape) * self.itemsize
+        # `hdu2_offset` is the position where the table extension (HDU #2) starts,
+        # counted in bytes from the start of the file. We need to know this position
+        # so that we can download HDU #2 (~few MB) without having to download all the
+        # image data stored before it in HDU #1 (>100 GB).
+        # A future improvement would be to record this position in the primary header
+        # of the cube, so that we do not need to compute it here.
         hdu2_offset = self.HDU1_DATA_OFFSET + self.FITS_BLOCK_SIZE * (1 + hdu1_data_size // self.FITS_BLOCK_SIZE)
         hdu2_str = await self._read_block(hdu2_offset, length=None)
         # In some sector-ccd combinations, HDU2 starts a block earlier than expected.
