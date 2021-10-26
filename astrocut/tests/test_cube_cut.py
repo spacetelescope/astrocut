@@ -9,7 +9,7 @@ import astropy.units as u
 
 from .utils_for_test import create_test_ffis
 from ..make_cube import CubeFactory
-from ..cube_cut import CutoutFactory
+from ..cube_cut import CutoutFactory, S3CubeFile
 from ..exceptions import InvalidQueryError, InputWarning
 
 
@@ -376,3 +376,78 @@ def test_inputs(tmpdir, capsys):
         cutout_file = myfactory.cube_cut(cube_file, coord, cutout_size, output_path=tmpdir, verbose=False)
     assert "5x3" in cutout_file
     assert "x9" not in cutout_file
+
+
+@pytest.mark.remote_data  # use `pytest --remote-data` to run this test
+@pytest.mark.parametrize("sector", range(1, 50, 10))
+@pytest.mark.parametrize("camera", [1, 2, 3, 4])
+@pytest.mark.parametrize("ccd", [1, 2, 3, 4])
+def test_s3cubefile(sector, camera, ccd):
+    """Does the S3CubeFile interface work as expected?
+
+    This test will verify whether the S3CubeFile interface to access AWS-hosted
+    TESS cubes works consistently across different sectors and cameras.
+    """
+    cube_uri = f"s3://stpubdata/tess/public/mast/tess-s{sector:04d}-{camera}-{ccd}-cube.fits"
+    with S3CubeFile(cube_uri) as cube:
+        assert cube.shape[0] == 2078  # TESS CCD rows
+        assert cube.shape[1] == 2136  # TESS CCD columns
+        assert cube.shape[3] == 2     # Cubes provide (FLUX, FLUX_ERR) data
+        assert cube.cutout(0, 1, 0, 1).shape == (1, 1, cube.shape[2], 2)  # rows, cols, times, 2
+        assert cube.primary_header['SECTOR'] == sector
+        assert cube.primary_header['CAMERA'] == camera
+        assert cube.primary_header['CCD'] == ccd
+        # Can the table extension be loaded correctly?
+        tbl = cube.table
+        assert len(tbl.data) == cube.shape[2]
+        assert all(tbl.data['CAMERA'] == camera)
+        assert all(tbl.data['CCD'] == ccd)
+        assert f"s{sector:04d}-{camera}-{ccd}" in tbl.data['FFI_FILE'][0]
+
+
+def test_s3cubefile_validation():
+    """Does the S3CubeFile interface validate the S3 URIs?"""
+    invalid_uris = ["invalid_s3_uri", "http://stpubdata/does/not/exist"]
+    for uri in invalid_uris:
+        with pytest.raises(ValueError):
+            S3CubeFile(uri)
+
+
+@pytest.mark.remote_data  # use `pytest --remote-data` to run this test
+def test_s3_cube_cut():
+    """Does using an S3-hosted TESS cube yield correct results?
+
+    This test implements a spot check which verifies whether a cutout
+    for Proxima Cen (Sector 38) obtained from an S3-hosted cube
+    file yields results that are identical to those returned
+    by the Tesscut service.
+
+    To speed up the test and avoid adding astroquery as a dependency,
+    the test uses hard-coded reference values which were obtained
+    as follows:
+
+    >>> from astroquery.mast import Tesscut  # doctest: +SKIP
+    >>> crd = SkyCoord(217.42893801, -62.67949189, unit="deg")  # doctest: +SKIP
+    >>> cut = Tesscut.get_cutouts(crd, size=3, sector=38)  # doctest: +SKIP
+    >>> cut[0][1].data.shape  # doctest: +SKIP
+    (3705,)
+    >>> cut[0][1].data['TIME'][0]  # doctest: +SKIP
+    2333.8614060219998
+    >>> cut[0][1].data['FLUX'][100][0, 0]  # doctest: +SKIP
+    2329.8127
+    >>> cut[0][1].data['FLUX_ERR'][200][1, 2]  # doctest: +SKIP
+    1.1239403
+    >>> cut[0][0].header['CAMERA']  # doctest: +SKIP
+    2
+    """
+    # Test case: Proxima Cen in Sector 38 (Camera 2, CCD 2)
+    coord = SkyCoord(217.42893801, -62.67949189, unit="deg", frame="icrs")
+    cube_file = "s3://stpubdata/tess/public/mast/tess-s0038-2-2-cube.fits"
+    cutout_file = CutoutFactory().cube_cut(cube_file, coord, 3)
+    hdulist = fits.open(cutout_file)
+    assert hdulist[1].data.shape == (3705,)
+    assert np.isclose(hdulist[1].data['TIME'][0], 2333.8614060219998)
+    assert np.isclose(hdulist[1].data['FLUX'][100][0, 0], 2329.8127)
+    assert np.isclose(hdulist[1].data['FLUX_ERR'][200][1, 2], 1.1239403)
+    assert hdulist[0].header['CAMERA'] == 2
+    hdulist.close()

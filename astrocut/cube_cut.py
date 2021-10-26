@@ -2,7 +2,9 @@
 
 """This module implements the cutout functionality."""
 
+import asyncio
 import os
+import re
 import warnings
 
 from time import time
@@ -14,6 +16,10 @@ import astropy.units as u
 from astropy.io import fits
 from astropy.coordinates import SkyCoord
 from astropy import wcs
+
+import aioboto3
+from botocore import UNSIGNED
+from botocore.config import Config
 
 from . import __version__ 
 from .exceptions import InputWarning, InvalidQueryError
@@ -375,7 +381,7 @@ class CutoutFactory():
         return cutout_wcs_dict
 
 
-    def _get_cutout(self, transposed_cube, verbose=True):
+    def _get_cutout(self, cube, verbose=True):
         """
         Making a cutout from an image/uncertainty cube that has been transposed 
         to have time on the longest axis.
@@ -401,7 +407,7 @@ class CutoutFactory():
         ymin, ymax = self.cutout_lims[0]
 
         # Get the image array limits
-        xmax_cube, ymax_cube, _, _ = transposed_cube.shape
+        xmax_cube, ymax_cube, _, _ = cube.shape
 
         # Adjust limits and figuring out the padding
         padding = np.zeros((3, 2), dtype=int)
@@ -419,8 +425,8 @@ class CutoutFactory():
             ymax = ymax_cube       
         
         # Doing the cutout
-        cutout = transposed_cube[xmin:xmax, ymin:ymax, :, :]
-    
+        cutout = cube.cutout(xmin, xmax, ymin, ymax)
+
         img_cutout = cutout[:, :, :, 0].transpose((2, 0, 1))
         uncert_cutout = cutout[:, :, :, 1].transpose((2, 0, 1))
     
@@ -564,7 +570,7 @@ class CutoutFactory():
                         hdu.header[kwd] = (primary_header[kwd], primary_header.comments[kwd])
             
 
-    def _build_tpf(self, cube_fits, img_cube, uncert_cube, cutout_wcs_dict, aperture, verbose=True):
+    def _build_tpf(self, cube, img_cube, uncert_cube, cutout_wcs_dict, aperture, verbose=True):
         """
         Building the cutout target pixel file (TPF) and formatting it to match TESS pipeline TPFs.
 
@@ -593,8 +599,7 @@ class CutoutFactory():
         
         # The primary hdu is just the main header, which is the same
         # as the one on the cube file
-        primary_hdu = cube_fits[0]
-        self._update_primary_header(primary_hdu.header)
+        self._update_primary_header(cube.primary_header)
 
         cols = list()
 
@@ -605,10 +610,10 @@ class CutoutFactory():
 
         # Adding the Time relates columns
         cols.append(fits.Column(name='TIME', format='D', unit='BJD - 2457000, days', disp='D14.7',
-                                array=(cube_fits[2].columns['TSTART'].array + cube_fits[2].columns['TSTOP'].array)/2))
+                                array=(cube.table.columns['TSTART'].array + cube.table.columns['TSTOP'].array)/2))
 
         cols.append(fits.Column(name='TIMECORR', format='E', unit='d', disp='E14.7',
-                                array=cube_fits[2].columns['BARYCORR'].array))
+                                array=cube.table.columns['BARYCORR'].array))
 
         # Adding CADENCENO as zeros b/c we don't have this info
         cols.append(fits.Column(name='CADENCENO', format='J', disp='I10', array=empty_arr[:, 0, 0]))
@@ -628,7 +633,7 @@ class CutoutFactory():
 
         # Adding the quality flags
         cols.append(fits.Column(name='QUALITY', format='J', disp='B16.16',
-                                array=cube_fits[2].columns['DQUALITY'].array))
+                                array=cube.table.columns['DQUALITY'].array))
 
         # Adding the position correction info (zeros b.c we don't have this info)
         cols.append(fits.Column(name='POS_CORR1', format='E', unit='pixel', disp='E14.7', array=empty_arr[:, 0, 0]))
@@ -636,7 +641,7 @@ class CutoutFactory():
 
         # Adding the FFI_FILE column (not in the pipeline tpfs)
         cols.append(fits.Column(name='FFI_FILE', format='38A', unit='pixel',
-                                array=cube_fits[2].columns['FFI_FILE'].array))
+                                array=cube.table.columns['FFI_FILE'].array))
         
         # making the table HDU
         table_hdu = fits.BinTableHDU.from_columns(cols)
@@ -665,7 +670,7 @@ class CutoutFactory():
         
         aperture_hdu.header['INHERIT'] = True
     
-        cutout_hdu_list = fits.HDUList([primary_hdu, table_hdu, aperture_hdu])
+        cutout_hdu_list = fits.HDUList([fits.PrimaryHDU(header=cube.primary_header), table_hdu, aperture_hdu])
         
         self._apply_header_inherit(cutout_hdu_list)
 
@@ -718,10 +723,17 @@ class CutoutFactory():
             start_time = time()
 
         warnings.filterwarnings("ignore", category=wcs.FITSFixedWarning)
-        with fits.open(cube_file, mode='denywrite', memmap=True) as cube:
+
+        # Use a different cube file interface for local vs remote (S3) files
+        if cube_file.startswith("s3://"):
+            cubeclass = S3CubeFile
+        else:
+            cubeclass = LocalCubeFile
+
+        with cubeclass(cube_file) as cube:
 
             # Get the info we need from the data table
-            self._parse_table_info(cube[2].data, verbose)
+            self._parse_table_info(cube.table.data, verbose)
 
             if isinstance(coordinates, SkyCoord):
                 self.center_coord = coordinates
@@ -754,10 +766,10 @@ class CutoutFactory():
                 print("ymin,ymax: {}".format(self.cutout_lims[0]))
 
             # Make the cutout
-            img_cutout, uncert_cutout, aperture = self._get_cutout(cube[1].data, verbose=verbose)
+            img_cutout, uncert_cutout, aperture = self._get_cutout(cube, verbose=verbose)
 
             # Get cutout wcs info
-            cutout_wcs_full = self._get_full_cutout_wcs(cube[2].header)
+            cutout_wcs_full = self._get_full_cutout_wcs(cube.table.header)
             max_dist, sigma = self._fit_cutout_wcs(cutout_wcs_full, img_cutout.shape[1:])
             if verbose:
                 print("Maximum distance between approximate and true location: {}".format(max_dist))
@@ -800,3 +812,302 @@ class CutoutFactory():
 
         return target_pixel_file
 
+
+class LocalCubeFile:
+    """Interface for a local Astrocut cube file.
+
+    This interface is compatible with the alternative `S3CubeFile` class
+    defined below.  These two classes exist to allow the data cubes to be
+    accessed in a seamless manner whether they are stored on a local file
+    system (`LocalCubeFile`) or in the AWS cloud (`S3CubeFile`).
+
+    Examples
+    --------
+    A 5-by-10 cutout from a TESS cube can be obtained as follows:
+
+        >>> with LocalCubeFile("tess-s0016-2-3-cube.fits") as cube:  # doctest: +SKIP
+        >>>    data = cube.cutout(500, 505, 1000, 1010)  # doctest: +SKIP
+        >>> data.shape  # doctest: +SKIP
+        (5, 10, 1121, 2)
+    """
+
+    def __init__(self, cube_file):
+        self.cube_file = cube_file
+
+    def __enter__(self):
+        self.open()
+        return self
+
+    def __exit__(self, *args):
+        self.fitsobj.close()
+
+    def open(self):
+        self.fitsobj = fits.open(self.cube_file, mode='denywrite', memmap=True)
+
+    @property
+    def shape(self):
+        return self.fitsobj[1].data.shape
+
+    @property
+    def primary_header(self) -> fits.Header:
+        return self.fitsobj[0].header
+
+    @property
+    def table(self) -> fits.BinTableHDU:
+        return self.fitsobj[2]
+
+    def cutout(self, xmin, xmax, ymin, ymax) -> np.array:
+        """Returns a 4D `numpy.ndarray` containing cutout data.
+
+        The shape of the array is (n_rows, n_cols, n_cadences, 2).
+        """
+        return self.fitsobj[1].data[xmin:xmax, ymin:ymax, :, :]
+
+
+class S3CubeFile():
+    """Interface for S3-hosted AstroCut cube files.
+
+    This is a synchronous wrapper around `S3CubeFileAsync`.
+    The use of asynchronous function calls significantly speeds up data
+    access from S3, because separate HTTP requests are issued to retrieve
+    different parts of the cloud-hosted cube file. The rest of astrocut
+    does not use async functions however, so this class serves as a bridge
+    between `S3CubeFileAsync` and other parts of astrocut.
+
+    Examples
+    --------
+    A 5-by-10 cutout from a TESS cube can be obtained as follows:
+
+        >>> cube_uri = "s3://stpubdata/tess/public/mast/tess-s0038-2-2-cube.fits"
+        >>> with S3CubeFile(cube_uri) as cube:  # doctest: +SKIP
+        >>>    data = cube.cutout(500, 505, 1000, 1010)  # doctest: +SKIP
+        >>> data.shape  # doctest: +SKIP
+        (5, 10, 3705, 2)
+    """
+
+    def __init__(self, cube_file):
+        self.cube_async = S3CubeFileAsync(cube_file)
+
+    def __enter__(self):
+        # asyncio operates using the "event loop" design pattern, which takes care
+        # of switching between different `async` tasks running concurrently
+        try:
+            # get the event loop if one is already running
+            self.loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # if one is not running, create it
+            self.loop = asyncio.new_event_loop()
+
+        try:
+            self.loop.run_until_complete(self.cube_async.__aenter__())
+        except RuntimeError as e:
+            if str(e) == "This event loop is already running":
+                custom_msg = "Your environment already appears to be running an event loop.\n" \
+                             "Use `import nest_asyncio; nest_asyncio.apply()` " \
+                             "to enable S3CubeFile to work."
+                raise RuntimeError(custom_msg) from e
+            else:
+                raise  # re-raise the RuntimeError if not caused by the event loop
+        return self
+
+    def __exit__(self, *args):
+        self.loop.run_until_complete(self.cube_async.__aexit__(*args))
+
+    @property
+    def shape(self):
+        return self.cube_async.shape
+
+    @property
+    def primary_header(self) -> fits.Header:
+        return self.cube_async.primary_header
+
+    @property
+    def table(self) -> fits.BinTableHDU:
+        """Returns the BinTableHDU for HDU #2.
+
+        HDU #2 is the table containing the FFI meta data (e.g., the WCS for each cadence).
+        """
+        return self.loop.run_until_complete(self.cube_async.table)
+
+    def read_headers(self):
+        return self.loop.run_until_complete(self.cube_async.read_headers())
+
+    def cutout(self, row_min, row_max, col_min, col_max) -> np.array:
+        """Returns a 4D `numpy.ndarray` containing cutout data.
+
+        The shape of the array is (n_rows, n_cols, n_cadences, 2).
+        """
+        tmp = self.loop.run_until_complete(self.cube_async.cutout(row_min, row_max, col_min, col_max))
+        return tmp
+
+
+class S3CubeFileAsync():
+    """Asynchronous interface for S3-hosted AstroCut cube files.
+
+    Inspired by earlier proto-types written by Thomas Robitaille, P. L. Lim,
+    Susan Mullally, Joseph Curtin, and others.
+
+    Examples
+    --------
+    A 5-by-10 cutout from a TESS cube can be obtained as follows:
+
+        >>> cube_uri = "s3://stpubdata/tess/public/mast/tess-s0038-2-2-cube.fits"
+        >>> async with S3CubeFile(cube_uri) as cube:  # doctest: +SKIP
+        >>>    data = await cube.async_cutout(500, 505, 1000, 1010)  # doctest: +SKIP
+        >>> data.shape  # doctest: +SKIP
+    """
+
+    # FITS files consist of an integral number of 2880 byte blocks
+    FITS_BLOCK_SIZE = 2880
+    # Byte position of the start of HDU[1]'s header
+    HDU1_HEADER_OFFSET = 2880
+    # Byte position of the start of HDU[1]'s data
+    HDU1_DATA_OFFSET = 5760
+
+    def __init__(self, cube_file):
+        # Validate cube_file
+        if not cube_file.startswith("s3://"):
+            raise ValueError("S3CubeFile expects `cube_file` to start with prefix 's3://'")
+        self.cube_file = cube_file
+
+        # Extract bucket and key from the S3 URI
+        match = re.findall("s3://([^/]*)/(.*)", self.cube_file)
+        if match:
+            self.s3_bucket, self.s3_key = match[0][0], match[0][1]
+        else:
+            raise ValueError(f"Invalid S3 URI: {cube_file}")
+
+        self._table = None
+
+    async def __aenter__(self):
+        # Setup the asynchronous AWS S3 client
+        self.s3clientmgr = aioboto3.Session().client("s3", config=Config(signature_version=UNSIGNED))
+        self.s3_client = await self.s3clientmgr.__aenter__()
+
+        # Read the headers of HDU0 and HDU1
+        self.primary_header, self.header = await self.read_headers()
+
+        # Are the pixel values stored as single or double precision floats?
+        bitpix_to_type = {-32: np.float32, -64: np.float64}
+        data_type = bitpix_to_type[self.header["BITPIX"]]
+        self.data_type = np.dtype(data_type).newbyteorder('>')  # FITS uses big endian
+        self.itemsize = np.dtype(data_type).itemsize
+
+        # The shape is typically equal to (2078, 2136, n_cadences, 2)
+        # and can be interpreted as (n_rows, n_columns, n_times, n_flux_types),
+        # matching the FITS header values (NAXIS4, NAXIS3, NAXIS2, NAXIS1).
+        # Caveat: FITS and Python use reversed shape notations!
+        self.shape = tuple([self.header['NAXIS{0}'.format(i + 1)]
+                            for i in range(self.header['NAXIS'])][::-1])
+
+        # strides detail how many bytes separate elements along different dimensions
+        self.strides = (
+            self.shape[1] * self.shape[2] * self.shape[3] * self.itemsize,
+            self.shape[2] * self.shape[3] * self.itemsize,
+            self.shape[3] * self.itemsize,
+            self.itemsize)
+
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, exc_traceback):
+        await self.s3clientmgr.__aexit__(exc_type, exc_value, exc_traceback)
+
+    @property
+    async def table(self) -> fits.BinTableHDU:
+        if self._table is None:
+            self._table = await self.read_table()
+        return self._table
+
+    async def read_table(self) -> fits.BinTableHDU:
+        """Returns the BinTableHDU for HDU #2."""
+        # `hdu1_data_size` is the size in bytes of the 4D image data cube (HDU #1)
+        hdu1_data_size = np.product(self.shape) * self.itemsize
+        # `hdu2_offset` is the position where the table extension (HDU #2) starts,
+        # counted in bytes from the start of the file. We need to know this position
+        # so that we can download HDU #2 (~few MB) without having to download all the
+        # image data stored before it in HDU #1 (>100 GB).
+        # A future improvement would be to record this position in the primary header
+        # of the cube, so that we do not need to compute it here.
+        hdu2_offset = self.HDU1_DATA_OFFSET + self.FITS_BLOCK_SIZE * (1 + hdu1_data_size // self.FITS_BLOCK_SIZE)
+        hdu2_str = await self._read_block(hdu2_offset, length=None)
+        # In some sector-ccd combinations, HDU2 starts a block earlier than expected.
+        # e.g., this is the case for sector=27, camera=3, ccd=3, and,
+        # sector=33, camera=3, ccd=3.
+        if hdu2_str[:8] != b"XTENSION":
+            hdu2_offset -= self.FITS_BLOCK_SIZE
+            hdu2_str = await self._read_block(hdu2_offset, length=None)
+        tbl = fits.BinTableHDU.fromstring(hdu2_str)
+        return tbl
+
+    async def read_headers(self):
+        hdr_str = await self._read_block(0, self.HDU1_HEADER_OFFSET - 1)
+        hdu0_header = fits.Header.fromstring(hdr_str.decode('ascii'))
+
+        hdr_str = await self._read_block(self.HDU1_HEADER_OFFSET, self.HDU1_DATA_OFFSET - self.HDU1_HEADER_OFFSET)
+        hdu1_header = fits.Header.fromstring(hdr_str.decode('ascii'))
+
+        return (hdu0_header, hdu1_header)
+
+    async def _read_block(self, offset: int, length: int) -> bytes:
+        """Download a range of bytes from the cube.
+
+        This will issue a byte-range request to AWS S3 for the range
+        `bytes={offset}-{offset+length-1}`.
+        """
+        if offset is None:
+            byterange = ""
+        elif length is None:
+            byterange = f"bytes={offset}-"  # read until the end
+        else:
+            byterange = f"bytes={offset}-{offset+length-1}"
+
+        resp = await self.s3_client.get_object(
+            Bucket=self.s3_bucket, Key=self.s3_key, Range=byterange
+        )
+        return await resp["Body"].read()
+
+    def _identify_byte_blocks(self, row_min, row_max, col_min, col_max):
+        """Returns the byte ranges of a rectangle."""
+        # We will obtain every byte along NAXIS1 (flux type) and NAXIS2 (time);
+        # how many bytes does this contain per pixel?
+        stride_all_fluxes_and_times = self.strides[2] * self.shape[2]
+
+        # How many bytes must be obtain to retrieve N columns along NAXIS3?
+        stride_columns = (col_max - col_min - 1) * self.strides[1]
+
+        # What is the offset to the first column?
+        col_offset = col_min * self.strides[1]
+
+        # Iterate over rows in NAXIS4
+        blocks = []
+        for row in range(row_min, row_max):
+            row_offset = row * self.strides[0]
+            offset = self.HDU1_DATA_OFFSET + col_offset + row_offset
+            length = stride_all_fluxes_and_times + stride_columns
+            # Sanity check
+            assert length == self.itemsize * (col_max - col_min) * self.shape[2] * self.shape[3]
+            blocks.append((offset, length))
+
+        return blocks
+
+    async def cutout(self, row_min, row_max, col_min, col_max) -> np.array:
+        """Returns a 4D `numpy.ndarray` containing cutout data.
+
+        The shape of the array is (n_rows, n_cols, n_cadences, 2).
+        """
+        blocks = self._identify_byte_blocks(row_min, row_max, col_min, col_max)
+        bytedata = await asyncio.gather(
+            *[
+                self._read_block(offset=blk[0], length=blk[1])
+                for blk in blocks
+            ]
+        )
+
+        data = b''.join(bytedata)
+        array = np.frombuffer(data, dtype=self.data_type)
+
+        new_shape = ((row_max - row_min),
+                     (col_max - col_min),
+                     self.shape[2],
+                     self.shape[3])
+        return array.reshape(new_shape)

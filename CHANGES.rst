@@ -1,7 +1,7 @@
 0.10 (unreleased)
 ----------------
 
-- No changes yet
+- Add ability to create cutouts from S3-hosted cubes [#44]
 
 
 0.9 (2021-08-10)
