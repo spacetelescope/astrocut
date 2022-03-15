@@ -247,14 +247,18 @@ def test_center_on_path(tmpdir):
     assert primary_header["OBJECT"] == "Test Target"
 
     # Using the default output filename and not giving an image wcs
-    out_file = cutout_processing.center_on_path(path, size, [cutout_file],
-                                                output_path=tmpdir, verbose=False)
+    target = "C/ Targetname" 
+    out_file = cutout_processing.center_on_path(path, size, [cutout_file], 
+                                                target=target, output_path=tmpdir, 
+                                                verbose=False)
     assert "path" in out_file
+    # Making sure special characters are taken careof
+    assert "C-_Targetname" in out_file
 
     hdu = fits.open(out_file)
     assert len(hdu) == 2
     assert hdu[0].header["DATE"] == Time.now().to_value('iso', subfmt='date')
-    assert hdu[0].header["OBJECT"] == ""
+    assert hdu[0].header["OBJECT"] == target
     hdu.close()
 
 
