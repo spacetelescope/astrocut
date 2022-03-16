@@ -5,6 +5,7 @@ on:
     branches:
     - main
     tags:
+    - '*'
   pull_request:
 
 jobs:
@@ -56,9 +57,12 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python }}
+    - name: Updating apt-get before install
+      if: startsWith(matrix.os, 'ubuntu')
+      run: sudo apt-get update 
     - name: Install language-pack-de and tzdata
       if: startsWith(matrix.os, 'ubuntu')
-      run: sudo apt-get install language-pack-de tzdata
+      run: sudo apt-get --fix-missing install language-pack-de tzdata
     - name: Install Python dependencies
       run: python -m pip install --upgrade tox codecov
     - name: Run tests
@@ -96,9 +100,12 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python }}
+    - name: Updating apt-get before install
+      if: startsWith(matrix.os, 'ubuntu')
+      run: sudo apt-get update 
     - name: Install language-pack-de and tzdata
       if: startsWith(matrix.os, 'ubuntu')
-      run: sudo apt-get install language-pack-de tzdata
+      run: sudo apt-get --fix-missing install language-pack-de tzdata
     - name: Install Python dependencies
       run: python -m pip install --upgrade tox codecov
     - name: Run tests
