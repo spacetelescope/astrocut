@@ -252,7 +252,7 @@ def test_center_on_path(tmpdir):
                                                 target=target, output_path=tmpdir, 
                                                 verbose=False)
     assert "path" in out_file
-    # Making sure special characters are taken careof
+    # Making sure special characters are taken care of
     assert "C-_Targetname" in out_file
 
     hdu = fits.open(out_file)
