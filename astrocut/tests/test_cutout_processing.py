@@ -210,7 +210,8 @@ def test_configure_bintable_header(tmpdir):
     # TODO: add test where there are more than one cutout headers
 
 
-def test_center_on_path(tmpdir):
+@pytest.mark.parametrize("in_target, out_file", [(None, "path_"), ("C/ Targetname", "C-_Targetname")])
+def test_center_on_path(tmpdir, in_target, out_file):
     
     # Making the test cube/cutout
     cube_maker = CubeFactory()
@@ -233,32 +234,40 @@ def test_center_on_path(tmpdir):
     path = Table({"time": times, "position": coords})
     size = [4, 4]
 
-    # Giving both a target name and a specific output filename
+    # Test 1: Giving both a target name and a specific output filename
     img_wcs = cutout_maker.cube_wcs
-    out_file = cutout_processing.center_on_path(path, size, [cutout_file], "Test Target", img_wcs, 
-                                                "mt_cutout.fits", tmpdir, False)
-    assert "mt_cutout.fits" in out_file
+    output = cutout_processing.center_on_path(path, 
+                                              size, 
+                                              cutout_fles=[cutout_file], 
+                                              target="Target Name", 
+                                              img_wcs=img_wcs, 
+                                              target_pixel_file="mt_cutout.fits", 
+                                              output_path=tmpdir, 
+                                              verbose=False)
+    assert "mt_cutout.fits" in output
     
-    mt_wcs = WCS(fits.getheader(out_file, 2))
+    mt_wcs = WCS(fits.getheader(output, 2))
     assert img_wcs.to_header(relax=True) == mt_wcs.to_header(relax=True)
 
-    primary_header = fits.getheader(out_file)
+    primary_header = fits.getheader(output)
     assert primary_header["DATE"] == Time.now().to_value('iso', subfmt='date')
-    assert primary_header["OBJECT"] == "Test Target"
+    assert primary_header["OBJECT"] == "Target Name"
 
-    # Using the default output filename and not giving an image wcs
-    target = "C/ Targetname" 
-    out_file = cutout_processing.center_on_path(path, size, [cutout_file], 
-                                                target=target, output_path=tmpdir, 
-                                                verbose=False)
-    assert "path" in out_file
-    # Making sure special characters are taken care of
-    assert "C-_Targetname" in out_file
+    # Test 2: Parametrization of 2 tests
+    # Test 2.1: Using the default output filename and not giving an image wcs
+    # Test 2.2: Using target name with special characters and not giving an image wcs
+    output = cutout_processing.center_on_path(path, size, 
+                                              cutout_fles=[cutout_file], 
+                                              target=in_target, 
+                                              output_path=tmpdir, 
+                                              verbose=False)
+    output_file = os.path.basename(output)
+    assert output_file.startswith(out_file)
 
-    hdu = fits.open(out_file)
+    hdu = fits.open(output)
     assert len(hdu) == 2
     assert hdu[0].header["DATE"] == Time.now().to_value('iso', subfmt='date')
-    assert hdu[0].header["OBJECT"] == target
+    assert hdu[0].header["OBJECT"] == '' if in_target is None else in_target
     hdu.close()
 
 
