@@ -385,7 +385,6 @@ def center_on_path(path, size, cutout_fles, target=None, img_wcs=None,
         primary_header_list.append(hdu[0].header)
         table_headers.append(hdu[1].header)
         hdu.close()
-    
     # Building the new primary header
     primary_header = _combine_headers(primary_header_list, constant_only=True)
     primary_header['DATE'] = Time.now().to_value('iso', subfmt='date')
