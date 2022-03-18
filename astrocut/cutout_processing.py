@@ -425,7 +425,7 @@ def center_on_path(path, size, cutout_fles, target=None, img_wcs=None,
         target_pixel_file = (f"{target}_{primary_header['TSTART']}-{primary_header['TSTop']}_"
                              f"{size[0]}-x-{size[1]}_astrocut.fits")
     
-    # Replace any slashes/spaces with % for filename conventions
+    # Replace any slashes/spaces for filename conventions
     target_pixel_file = target_pixel_file.replace('/', '-').replace(' ', '_')
 
     filename = os.path.join(output_path, target_pixel_file)
