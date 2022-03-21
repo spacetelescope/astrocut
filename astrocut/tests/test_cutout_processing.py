@@ -236,7 +236,48 @@ def test_center_on_path(tmpdir, in_target, out_file):
     path = Table({"time": times, "position": coords})
     size = [4, 4]
 
-    # Test 1: Giving both a target name and a specific output filename
+    # Parametrization of 2 tests
+    # Test 1: Using the default output filename and not giving an image wcs
+    # Test 2: Using target name with special characters and not giving an image wcs
+    output = cutout_processing.center_on_path(path, size, 
+                                              cutout_fles=[cutout_file], 
+                                              target=in_target, 
+                                              output_path=tmpdir, 
+                                              verbose=False)
+    output_file = os.path.basename(output)
+    assert output_file.startswith(out_file)
+
+    hdu = fits.open(output)
+    assert len(hdu) == 2
+    assert hdu[0].header["DATE"] == Time.now().to_value('iso', subfmt='date')
+    assert hdu[0].header["OBJECT"] == '' if in_target is None else in_target
+    hdu.close()
+
+
+def test_center_on_path_input_tpf(tmpdir):
+    
+    # Making the test cube/cutout
+    cube_maker = CubeFactory()
+    
+    img_sz = 1000
+    num_im = 10
+    
+    ffi_files = create_test_ffis(img_sz, num_im, dir_name=tmpdir)
+    cube_file = cube_maker.make_cube(ffi_files, os.path.join(tmpdir, "test_cube.fits"), verbose=False)
+
+    cutout_maker = CutoutFactory()
+    cutout_file = cutout_maker.cube_cut(cube_file, "250.3497414839765  2.280925599609063", 100, 
+                                        target_pixel_file="cutout_file.fits", output_path=tmpdir,
+                                        verbose=False)
+
+    cutout_wcs = WCS(fits.getheader(cutout_file, 2))
+
+    coords = cutout_wcs.pixel_to_world([4, 5, 10, 20], [10, 10, 11, 12])
+    times = Time(Table(fits.getdata(cutout_file, 1))["TIME"].data[:len(coords)] + 2457000, format="jd")
+    path = Table({"time": times, "position": coords})
+    size = [4, 4]
+
+    # Giving both a target name and a specific output filename
     img_wcs = cutout_maker.cube_wcs
     output = cutout_processing.center_on_path(path, 
                                               size, 
@@ -254,23 +295,6 @@ def test_center_on_path(tmpdir, in_target, out_file):
     primary_header = fits.getheader(output)
     assert primary_header["DATE"] == Time.now().to_value('iso', subfmt='date')
     assert primary_header["OBJECT"] == "Target Name"
-
-    # Test 2: Parametrization of 2 tests
-    # Test 2.1: Using the default output filename and not giving an image wcs
-    # Test 2.2: Using target name with special characters and not giving an image wcs
-    output = cutout_processing.center_on_path(path, size, 
-                                              cutout_fles=[cutout_file], 
-                                              target=in_target, 
-                                              output_path=tmpdir, 
-                                              verbose=False)
-    output_file = os.path.basename(output)
-    assert output_file.startswith(out_file)
-
-    hdu = fits.open(output)
-    assert len(hdu) == 2
-    assert hdu[0].header["DATE"] == Time.now().to_value('iso', subfmt='date')
-    assert hdu[0].header["OBJECT"] == '' if in_target is None else in_target
-    hdu.close()
 
 
 def test_default_combine():
