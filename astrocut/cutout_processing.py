@@ -376,7 +376,6 @@ def center_on_path(path, size, cutout_fles, target=None, img_wcs=None,
 
     # Performing the path transformation
     cutout_table = _moving_target_focus(path, size, cutout_fles, verbose)
-    
     # Collecting header info we need
     primary_header_list = list()
     table_headers = list()
