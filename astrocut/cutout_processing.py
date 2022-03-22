@@ -371,12 +371,11 @@ def center_on_path(path, size, cutout_fles, target=None, img_wcs=None,
     response : str
         The file path for the output target pixel file.
     """
-
-    # TODO: add ability to take sizes like in rest of cutout functionality
     
+    # TODO: add ability to take sizes like in rest of cutout functionality
+
     # Performing the path transformation
     cutout_table = _moving_target_focus(path, size, cutout_fles, verbose)
-
     # Collecting header info we need
     primary_header_list = list()
     table_headers = list()
@@ -385,7 +384,6 @@ def center_on_path(path, size, cutout_fles, target=None, img_wcs=None,
         primary_header_list.append(hdu[0].header)
         table_headers.append(hdu[1].header)
         hdu.close()
-
     # Building the new primary header
     primary_header = _combine_headers(primary_header_list, constant_only=True)
     primary_header['DATE'] = Time.now().to_value('iso', subfmt='date')
@@ -425,8 +423,12 @@ def center_on_path(path, size, cutout_fles, target=None, img_wcs=None,
         target = "path" if not target else target
         target_pixel_file = (f"{target}_{primary_header['TSTART']}-{primary_header['TSTop']}_"
                              f"{size[0]}-x-{size[1]}_astrocut.fits")
+    
+    # Replace any slashes/spaces for filename conventions
+    target_pixel_file = target_pixel_file.replace('/', '-').replace(' ', '_')
 
     filename = os.path.join(output_path, target_pixel_file)
+    
     mt_hdu_list.writeto(filename, overwrite=True, checksum=True)
 
     return filename
