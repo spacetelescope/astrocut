@@ -19,6 +19,7 @@ from sys import version_info, platform
 if (version_info >= (3, 8)) and (platform != "win32"):
     from mmap import MADV_SEQUENTIAL
 
+__all__ = ['CubeFactory', 'TicaCubeFactory']
 
 class CubeFactory():
     """
@@ -346,3 +347,48 @@ class CubeFactory():
             print(f"Total time elapsed: {(time() - startTime)/60:.2f} min")
 
         return self.cube_file
+
+class TicaCubeFactory():
+
+    def _configure_cube(self, file_list, **extra_keywords):
+        """ 
+        Run through all the files and set up the  basic parameters for the cube.
+        Set up the cube primary header.
+        """
+
+        file_list = np.array(file_list)
+        image_shape = None
+        start_times = np.zeros(len(file_list))
+        for i, ffi in enumerate(file_list):
+            ffi_data = fits.open(ffi, mode='denywrite', memmap=True)
+            
+            start_times[i] = ffi_data[1].header.get('STARTTJD')
+
+            if image_shape is None:  # Only need to fill this once
+                image_shape = ffi_data[0].data.shape
+                print(image_shape)
+            """
+            if self.template_file is None:  # Only check this if we don't already have it
+
+                is_template = True
+                for key, value in self.template_requirements.items():
+                    if ffi_data[1].header.get(key) != value:  # Checking for a good image header
+                        is_template = False
+                        
+                if is_template:
+                    self.template_file = ffi
+            """
+                    
+            ffi_data.close()
+
+        self.file_list = file_list[np.argsort(start_times)]
+
+        # Working out the block size and number of blocks needed for writing the cube
+        # without using too much memory
+        slice_size = image_shape[1] * len(self.file_list) * 2 * 4  # in bytes (float32)
+        max_block_size = int((self.max_memory * 1e9)//slice_size)
+        
+        self.num_blocks = int(image_shape[0]/max_block_size + 1)
+        self.block_size = int(image_shape[0]/self.num_blocks + 1)
+        self.cube_shape = (image_shape[0], image_shape[1], len(self.file_list), 2)
+
