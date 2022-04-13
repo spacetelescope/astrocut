@@ -379,8 +379,7 @@ class TicaCubeFactory():
         self.cube_file = None
 
     def _configure_cube(self, file_list, **extra_keywords):
-        """ 
-        Run through all the files and set up the  basic parameters for the cube.
+        """ Run through all the files and set up the  basic parameters for the cube.
         Set up the cube primary header.
         """
 
@@ -446,3 +445,81 @@ class TicaCubeFactory():
         self.primary_header = header
 
         print(header)
+
+    def _build_info_table(self):
+        """ Reading the keywords and setting up the table to hold the image headers (extension 1)
+        from every input file.
+        """
+
+        with fits.open(self.template_file, mode='denywrite', memmap=True) as ffi_data:
+            
+            # The image specific header information will be saved in a table in the second extension
+            secondary_header = ffi_data[0].header
+
+            # set up the image info table
+            cols = []
+            for kwd, val, cmt in secondary_header.cards: 
+                if type(val) == str:
+                    tpe = "S" + str(len(val))  # TODO: Maybe switch to U?
+                elif type(val) == int:
+                    tpe = np.int32
+                else:
+                    tpe = np.float64
+                    
+                cols.append(Column(name=kwd, dtype=tpe, length=len(self.file_list), meta={"comment": cmt}))
+                    
+            cols.append(Column(name="FFI_FILE", dtype="S" + str(len(os.path.basename(self.template_file))),
+                               length=len(self.file_list)))
+            self.info_table = Table(cols)
+
+            print('INFO TABLE')
+            print(' ')
+            print(self.info_table)
+
+    def _build_cube_file(self, cube_file):
+        """ Build the cube file on disk with primary header, cube extension header,
+        and space for the cube, filled with zeros.
+
+        Note, this will overwrite the file if it already exists.
+
+        Parameters
+        ----------
+        cube_file : str 
+            Optional. The filename/path to save the output cube in. 
+        """
+        
+        # Making sure the output directory exists
+        direc, _ = os.path.split(cube_file)
+        if direc and not os.path.exists(direc):
+            os.makedirs(direc)
+
+        # Writing the primary header
+        self.primary_header.tofile(cube_file, overwrite=True)
+
+        # Making the cube header and writing it
+        data = np.zeros((100, 100, 10, 2), dtype=np.float32)
+        hdu = fits.ImageHDU(data)
+        header = hdu.header
+        header["NAXIS4"], header["NAXIS3"], header["NAXIS2"], header["NAXIS1"] = self.cube_shape
+
+        with open(cube_file, 'ab') as CUBE:
+            CUBE.write(bytearray(header.tostring(), encoding="utf-8"))
+
+        # Expanding the file to fit the full data cube
+        # fits requires all blocks to be a multiple of 2880
+        cubesize_in_bytes = ((np.prod(self.cube_shape) * 4 + 2880 - 1) // 2880) * 2880
+        filelen = os.path.getsize(cube_file)
+        with open(cube_file, 'r+b') as CUBE:
+            CUBE.seek(filelen + cubesize_in_bytes - 1)
+            CUBE.write(b'\0')
+
+        self.cube_file = cube_file
+
+    def make_cube(self, file_list, cube_file='img-cube.fits', **extra_keywords):
+
+        self._configure_cube(file_list)
+
+        self._build_info_table()
+
+        self._build_cube_file(cube_file)
+
