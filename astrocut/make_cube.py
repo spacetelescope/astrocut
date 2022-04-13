@@ -357,7 +357,8 @@ class TicaCubeFactory():
         
         Modifying the __init__ 
         in CubeFactory so that it can switch parameters based on whether 
-        we want cubes for TICA or TESS will probably be the route I take. 
+        we want cubes for TICA or TESS will probably be the route I take.
+        Or see how this is generalized when Zcut wraps CubeFactory? 
         """
 
         self.max_memory = max_memory  # in GB
@@ -514,6 +515,55 @@ class TicaCubeFactory():
             CUBE.write(b'\0')
 
         self.cube_file = cube_file
+
+    def _write_block(self, cube_hdu, start_row=0, end_row=None, fill_info_table=False, verbose=False):
+        """ Do one pass through the image files and write a block of the cube.
+
+        cube_hdu is an hdulist object opened in update mode
+        """
+
+        # Initializing the sub-cube
+        nrows = (self.cube_shape[0] - start_row) if (end_row is None) else (end_row - start_row)
+        sub_cube = np.zeros((nrows, *self.cube_shape[1:]), dtype=np.float32)
+        
+        # Loop through files
+        for i, fle in enumerate(self.file_list):
+
+            if verbose:
+                st = time()
+
+            with fits.open(fle, mode='denywrite', memmap=True) as ffi_data:
+
+                # add the image and info to the arrays
+                sub_cube[:, :, i, 0] = ffi_data[1].data[start_row:end_row, :]
+                sub_cube[:, :, i, 1] = ffi_data[2].data[start_row:end_row, :]
+
+                del ffi_data[1].data
+                del ffi_data[2].data
+                
+                if fill_info_table:  # Also save the header info in the info table
+
+                    for kwd in self.info_table.columns:
+                        if kwd == "FFI_FILE":
+                            self.info_table[kwd][i] = os.path.basename(fle)
+                        else:
+                            nulval = None
+                            if self.info_table[kwd].dtype.name == "int32":
+                                nulval = 0
+                            elif self.info_table[kwd].dtype.char == "S":  # hacky way to check if it's a string
+                                nulval = ""
+                            self.info_table[kwd][i] = ffi_data[1].header.get(kwd, nulval)
+            
+            if verbose:
+                print(f"Completed file {i} in {time()-st:.3} sec.")
+
+        # Fill block and flush to disk
+        cube_hdu[1].data[start_row:end_row, :, :, :] = sub_cube
+
+        if (version_info <= (3, 8)) or (platform == "win32"):
+            cube_hdu.flush()
+
+        del sub_cube
 
     def make_cube(self, file_list, cube_file='img-cube.fits', **extra_keywords):
 
