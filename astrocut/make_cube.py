@@ -350,6 +350,36 @@ class CubeFactory():
 
 class TicaCubeFactory():
 
+    def __init__(self, max_memory=50):
+        """ Setting up the class members. NOTE: Later down the line 
+        we might want to generalize CubeFactory so that we no longer need 
+        a separate class for the TICA cubes. 
+        
+        Modifying the __init__ 
+        in CubeFactory so that it can switch parameters based on whether 
+        we want cubes for TICA or TESS will probably be the route I take. 
+        """
+
+        self.max_memory = max_memory  # in GB
+        self.block_size = None  # Number of rows
+        self.num_blocks = None
+        self.cube_shape = None
+        
+        self.time_keyword = 'STARTTJD'  # TICA-specific
+        self.last_file_keywords = ['ENDTJD', 'ENDTJD']  # TICA-specific (assumed to be in extension 0)
+        self.image_header_keywords['CAMNUM', 'CCDNUM'] # TICA-specific (assumed to be in extension 0)
+        #self.image_header_keywords = ['CAMERA', 'CCD']  # TESS-specific
+        self.template_requirement = ['NAXIS'] # Assuming NAXIS and WCSAXES would always have same values.
+                                              # TICA headers doesnt have WCSAXES kw.
+        #self.template_requirements = {"WCSAXES": 2}  # TESS-specific (assumed to be in extension 1)
+
+        self.file_list = None
+        self.template_file = None
+        
+        self.primary_header = None
+        self.info_table = None
+        self.cube_file = None
+
     def _configure_cube(self, file_list, **extra_keywords):
         """ 
         Run through all the files and set up the  basic parameters for the cube.
@@ -362,7 +392,7 @@ class TicaCubeFactory():
         for i, ffi in enumerate(file_list):
             ffi_data = fits.open(ffi, mode='denywrite', memmap=True)
             
-            start_times[i] = ffi_data[1].header.get('STARTTJD')
+            start_times[i] = ffi_data[0].header.get('STARTTJD')
 
             if image_shape is None:  # Only need to fill this once
                 image_shape = ffi_data[0].data.shape
