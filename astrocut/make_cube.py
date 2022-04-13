@@ -415,7 +415,16 @@ class TicaCubeFactory():
         slice_size = image_shape[1] * len(self.file_list) * 2 * 4  # in bytes (float32)
         max_block_size = int((self.max_memory * 1e9)//slice_size)
         
+        print('SLICE SIZE, MAX BLOCK SIZE, IMAGE SHAPE')
+        print(slice_size)
+        print(max_block_size)
+        print(image_shape[0])
+    
         self.num_blocks = int(image_shape[0]/max_block_size + 1)
+
+        print('NUM BLOCKS')
+        print(self.num_blocks)
+
         self.block_size = int(image_shape[0]/self.num_blocks + 1)
         self.cube_shape = (image_shape[0], image_shape[1], len(self.file_list), 2)
 
@@ -535,12 +544,12 @@ class TicaCubeFactory():
             with fits.open(fle, mode='denywrite', memmap=True) as ffi_data:
 
                 # add the image and info to the arrays
-                sub_cube[:, :, i, 0] = ffi_data[1].data[start_row:end_row, :]
-                sub_cube[:, :, i, 1] = ffi_data[2].data[start_row:end_row, :]
+                sub_cube[:, :, i, 0] = ffi_data[0].data[start_row:end_row, :]
+                #sub_cube[:, :, i, 1] = ffi_data[2].data[start_row:end_row, :]
 
-                del ffi_data[1].data
-                del ffi_data[2].data
-                
+                del ffi_data[0].data
+                #del ffi_data[2].data
+               
                 if fill_info_table:  # Also save the header info in the info table
 
                     for kwd in self.info_table.columns:
@@ -552,8 +561,8 @@ class TicaCubeFactory():
                                 nulval = 0
                             elif self.info_table[kwd].dtype.char == "S":  # hacky way to check if it's a string
                                 nulval = ""
-                            self.info_table[kwd][i] = ffi_data[1].header.get(kwd, nulval)
-            
+                            self.info_table[kwd][i] = ffi_data[0].header.get(kwd, nulval)
+        """     
             if verbose:
                 print(f"Completed file {i} in {time()-st:.3} sec.")
 
@@ -564,12 +573,47 @@ class TicaCubeFactory():
             cube_hdu.flush()
 
         del sub_cube
+        """
 
-    def make_cube(self, file_list, cube_file='img-cube.fits', **extra_keywords):
+    def make_cube(self, file_list, cube_file='img-cube.fits', verbose=True, max_memory=50):
 
+        print('TEST')
+        if verbose:
+            startTime = time()
+
+        self.max_memory = max_memory
+
+        # Set up the basic cube parameters
         self._configure_cube(file_list)
 
+        if verbose:
+            print("Using {} to initialize the image header table.".format(os.path.basename(self.template_file)))
+            print(f"Cube will be made in {self.num_blocks} blocks of {self.block_size} rows each.")
+
+        # Set up the table to old the individual image headers
         self._build_info_table()
 
+        # Write the empty file, ready for the cube to be added
         self._build_cube_file(cube_file)
+
+        # Fill the image cube
+        with fits.open(self.cube_file, mode='update', memmap=True) as cube_hdu:
+            
+            if (version_info >= (3, 8)) and (platform != "win32"):
+                mm = fits.util._get_array_mmap(cube_hdu[0].data)
+                mm.madvise(MADV_SEQUENTIAL)
+
+            for i in range(self.num_blocks):
+                start_row = i * self.block_size
+                end_row = start_row + self.block_size
+
+                if end_row >= self.cube_shape[0]:
+                    end_row = None
+
+                fill_info_table = True if (i == 0) else False
+                self._write_block(cube_hdu, start_row, end_row, fill_info_table, verbose)
+                  
+                if verbose:
+                    print(f"Completed block {i+1} of {self.num_blocks}")
+
 
