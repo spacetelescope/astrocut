@@ -365,14 +365,16 @@ class TicaCubeFactory():
         self.num_blocks = None
         self.cube_shape = None
         
-        self.time_keyword = 'STARTTJD'  # TICA-specific
-        self.last_file_keywords = ['ENDTJD', 'ENDTJD']  # TICA-specific (assumed to be in extension 0)
-        self.image_header_keywords['CAMNUM', 'CCDNUM'] # TICA-specific (assumed to be in extension 0)
-        #self.image_header_keywords = ['CAMERA', 'CCD']  # TESS-specific
-        self.template_requirement = ['NAXIS'] # Assuming NAXIS and WCSAXES would always have same values.
-                                              # TICA headers doesnt have WCSAXES kw.
-        #self.template_requirements = {"WCSAXES": 2}  # TESS-specific (assumed to be in extension 1)
-
+        self.time_keyword = 'STARTTJD'  # Start time in TJD. TICA-specific.
+        self.last_file_keywords = ['ENDTJD', 'ENDTJD']  # Stop time in TJD. TICA-specific (assumed to be in extension 0)
+                                                        # First element should be ENDTJD but in MJD. 
+                                                        # That kw doesn't exist in TICA headers, however, so 
+                                                        # we will have to do some time manipulation with astropy.time 
+                                                        # wherever the first element is called. 
+        self.image_header_keywords = ['CAMNUM', 'CCDNUM'] # Camera number and CCD number being used for the sector observation. 
+                                                       # TICA-specific (assumed to be in extension 0)
+        self.template_requirements = {'NAXIS': 2} # Using NAXIS instead of WCSAXES because TICA headers dont have WCSAXES kw.
+                                              # Assuming NAXIS and WCSAXES would always have same values.
         self.file_list = None
         self.template_file = None
         
@@ -397,7 +399,7 @@ class TicaCubeFactory():
             if image_shape is None:  # Only need to fill this once
                 image_shape = ffi_data[0].data.shape
                 print(image_shape)
-            """
+            
             if self.template_file is None:  # Only check this if we don't already have it
 
                 is_template = True
@@ -407,7 +409,7 @@ class TicaCubeFactory():
                         
                 if is_template:
                     self.template_file = ffi
-            """
+            
                     
             ffi_data.close()
 
