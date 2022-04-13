@@ -366,11 +366,7 @@ class TicaCubeFactory():
         self.cube_shape = None
         
         self.time_keyword = 'STARTTJD'  # Start time in TJD. TICA-specific.
-        self.last_file_keywords = ['ENDTJD', 'ENDTJD']  # Stop time in TJD. TICA-specific (assumed to be in extension 0)
-                                                        # First element should be ENDTJD but in MJD. 
-                                                        # That kw doesn't exist in TICA headers, however, so 
-                                                        # we will have to do some time manipulation with astropy.time 
-                                                        # wherever the first element is called. 
+        self.last_file_keywords = ['ENDTJD']  # Stop time in TJD. TICA-specific (assumed to be in extension 0)                  
         self.image_header_keywords = ['CAMNUM', 'CCDNUM'] # Camera number and CCD number being used for the sector observation. 
                                                        # TICA-specific (assumed to be in extension 0)
         self.template_requirements = {'NAXIS': 2} # Using NAXIS instead of WCSAXES because TICA headers dont have WCSAXES kw.
@@ -409,7 +405,6 @@ class TicaCubeFactory():
                         
                 if is_template:
                     self.template_file = ffi
-            
                     
             ffi_data.close()
 
@@ -424,3 +419,30 @@ class TicaCubeFactory():
         self.block_size = int(image_shape[0]/self.num_blocks + 1)
         self.cube_shape = (image_shape[0], image_shape[1], len(self.file_list), 2)
 
+        # Making the primary header
+        with fits.open(self.file_list[0], mode='denywrite', memmap=True) as first_file:
+            header = deepcopy(first_file[0].header)
+            header.remove('CHECKSUM', ignore_missing=True)
+
+            # Adding standard keywords
+            header['ORIGIN'] = 'STScI/MAST'
+            header['DATE'] = str(date.today())
+
+            # Adding factory specific keywords
+            for kwd in self.image_header_keywords:
+                header[kwd] = (first_file[0].header[kwd], first_file[0].header.comments[kwd])
+
+            # Adding the extra keywords passed in
+            for kwd, value in extra_keywords.items():
+                header[kwd] = (value[0], value[1])
+                
+        # Adding the keywords from the last file
+        with fits.open(self.file_list[-1], mode='denywrite', memmap=True) as last_file:
+            for kwd in self.last_file_keywords:
+                header[kwd] = (last_file[0].header[kwd], last_file[0].header.comments[kwd])
+
+        header["EXTNAME"] = "PRIMARY"
+
+        self.primary_header = header
+
+        print(header)
