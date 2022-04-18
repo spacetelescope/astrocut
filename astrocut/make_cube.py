@@ -552,7 +552,7 @@ class TicaCubeFactory():
                
                 if fill_info_table:  # Also save the header info in the info table
 
-                    for kwd in self.info_table.columns:
+                    for kwd in self.info_table.columns: # Iterate over every keyword in the TICA FFI primary header
                         if kwd == "FFI_FILE":
                             self.info_table[kwd][i] = os.path.basename(fle)
                         else:
@@ -561,8 +561,24 @@ class TicaCubeFactory():
                                 nulval = 0
                             elif self.info_table[kwd].dtype.char == "S":  # hacky way to check if it's a string
                                 nulval = ""
-                            self.info_table[kwd][i] = ffi_data[0].header.get(kwd, nulval)
-        """     
+                            
+                            # A header keyword in TICA was found to return a string 
+                            # value in the form of a _HeaderCommentaryCard, which 
+                            # could not be fed into the info table because the info table 
+                            # doesn't understand what a FITS header commentary card is. 
+                            # This try/except is a way to catch when these instances happen 
+                            # and turn the keyword value from a _HeaderCommentaryCard to a
+                            # string, which is what it's meant to be in the info table. 
+                            #
+                            # TO-DO: Find a more elegant way to handle these stray 
+                            # _HeaderCommentaryCards. 
+                            try:
+                                self.info_table[kwd][i] = ffi_data[0].header.get(kwd, nulval)
+                            except ValueError:
+                                kwd_val = ffi_data[0].header.get(kwd)
+                                if isinstance(kwd_val, fits.header._HeaderCommentaryCards):
+                                    self.info_table[kwd][i] = str(kwd_val)
+
             if verbose:
                 print(f"Completed file {i} in {time()-st:.3} sec.")
 
@@ -573,7 +589,7 @@ class TicaCubeFactory():
             cube_hdu.flush()
 
         del sub_cube
-        """
+        
 
     def make_cube(self, file_list, cube_file='img-cube.fits', verbose=True, max_memory=50):
 
