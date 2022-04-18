@@ -562,11 +562,11 @@ class TicaCubeFactory():
                             elif self.info_table[kwd].dtype.char == "S":  # hacky way to check if it's a string
                                 nulval = ""
                             
-                            # A header keyword in TICA was found to return a string 
-                            # value in the form of a _HeaderCommentaryCard, which 
-                            # could not be fed into the info table because the info table 
+                            # A header keyword ('COMMENT') in TICA returns a keyword 
+                            # value in the form of a _HeaderCommentaryCard instead of a STRING. 
+                            # This breaks the info table because the info table 
                             # doesn't understand what a FITS header commentary card is. 
-                            # This try/except is a way to catch when these instances happen 
+                            # Adding a try/except is a way to catch when these instances happen 
                             # and turn the keyword value from a _HeaderCommentaryCard to a
                             # string, which is what it's meant to be in the info table. 
                             #
@@ -583,7 +583,7 @@ class TicaCubeFactory():
                 print(f"Completed file {i} in {time()-st:.3} sec.")
 
         # Fill block and flush to disk
-        cube_hdu[1].data[start_row:end_row, :, :, :] = sub_cube
+        cube_hdu[0].data[start_row:end_row, :, :, :] = sub_cube
 
         if (version_info <= (3, 8)) or (platform == "win32"):
             cube_hdu.flush()
