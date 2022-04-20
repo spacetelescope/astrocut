@@ -612,7 +612,7 @@ class TicaCubeFactory():
         with fits.open(self.cube_file, mode='update', memmap=True) as cube_hdu:
             
             if (version_info >= (3, 8)) and (platform != "win32"):
-                mm = fits.util._get_array_mmap(cube_hdu[0].data)
+                mm = fits.util._get_array_mmap(cube_hdu[1].data)
                 mm.madvise(MADV_SEQUENTIAL)
 
             for i in range(self.num_blocks):
