@@ -400,7 +400,7 @@ class TicaCubeFactory():
 
                 is_template = True
                 for key, value in self.template_requirements.items():
-                    if ffi_data[1].header.get(key) != value:  # Checking for a good image header
+                    if ffi_data[0].header.get(key) != value:  # Checking for a good image header
                         is_template = False
                         
                 if is_template:
@@ -415,19 +415,13 @@ class TicaCubeFactory():
         slice_size = image_shape[1] * len(self.file_list) * 2 * 4  # in bytes (float32)
         max_block_size = int((self.max_memory * 1e9)//slice_size)
         
-        print('SLICE SIZE, MAX BLOCK SIZE, IMAGE SHAPE')
-        print(slice_size)
-        print(max_block_size)
-        print(image_shape[0])
-    
         self.num_blocks = int(image_shape[0]/max_block_size + 1)
-
-        print('NUM BLOCKS')
-        print(self.num_blocks)
-
         self.block_size = int(image_shape[0]/self.num_blocks + 1)
+        #                  NROWS,           NCOLS,         Num. Images,       
         self.cube_shape = (image_shape[0], image_shape[1], len(self.file_list), 2)
 
+        print('cube shape')
+        print(self.cube_shape)
         # Making the primary header
         with fits.open(self.file_list[0], mode='denywrite', memmap=True) as first_file:
             header = deepcopy(first_file[0].header)
@@ -453,8 +447,6 @@ class TicaCubeFactory():
         header["EXTNAME"] = "PRIMARY"
 
         self.primary_header = header
-
-        print(header)
 
     def _build_info_table(self):
         """ Reading the keywords and setting up the table to hold the image headers (extension 1)
@@ -482,10 +474,6 @@ class TicaCubeFactory():
                                length=len(self.file_list)))
             self.info_table = Table(cols)
 
-            print('INFO TABLE')
-            print(' ')
-            print(self.info_table)
-
     def _build_cube_file(self, cube_file):
         """ Build the cube file on disk with primary header, cube extension header,
         and space for the cube, filled with zeros.
@@ -504,7 +492,9 @@ class TicaCubeFactory():
             os.makedirs(direc)
 
         # Writing the primary header
-        self.primary_header.tofile(cube_file, overwrite=True)
+        hdu0 = fits.PrimaryHDU(header=self.primary_header)
+        hdul = fits.HDUList([hdu0])
+        hdul.writeto(cube_file, overwrite=True)
 
         # Making the cube header and writing it
         data = np.zeros((100, 100, 10, 2), dtype=np.float32)
@@ -513,15 +503,22 @@ class TicaCubeFactory():
         header["NAXIS4"], header["NAXIS3"], header["NAXIS2"], header["NAXIS1"] = self.cube_shape
 
         with open(cube_file, 'ab') as CUBE:
+            print('~~~~~')
+            print(bytearray(header.tostring(), encoding="utf-8"))
             CUBE.write(bytearray(header.tostring(), encoding="utf-8"))
 
         # Expanding the file to fit the full data cube
         # fits requires all blocks to be a multiple of 2880
         cubesize_in_bytes = ((np.prod(self.cube_shape) * 4 + 2880 - 1) // 2880) * 2880
         filelen = os.path.getsize(cube_file)
+        
         with open(cube_file, 'r+b') as CUBE:
+            # What is this .seek?
+            # Looks like it's expanding the buffer size of the file?
             CUBE.seek(filelen + cubesize_in_bytes - 1)
+            # b for buffer?
             CUBE.write(b'\0')
+        
 
         self.cube_file = cube_file
 
@@ -583,7 +580,7 @@ class TicaCubeFactory():
                 print(f"Completed file {i} in {time()-st:.3} sec.")
 
         # Fill block and flush to disk
-        cube_hdu[0].data[start_row:end_row, :, :, :] = sub_cube
+        cube_hdu[1].data[start_row:end_row, :, :, :] = sub_cube
 
         if (version_info <= (3, 8)) or (platform == "win32"):
             cube_hdu.flush()
@@ -593,7 +590,6 @@ class TicaCubeFactory():
 
     def make_cube(self, file_list, cube_file='img-cube.fits', verbose=True, max_memory=50):
 
-        print('TEST')
         if verbose:
             startTime = time()
 
@@ -605,13 +601,13 @@ class TicaCubeFactory():
         if verbose:
             print("Using {} to initialize the image header table.".format(os.path.basename(self.template_file)))
             print(f"Cube will be made in {self.num_blocks} blocks of {self.block_size} rows each.")
-
+        
         # Set up the table to old the individual image headers
         self._build_info_table()
-
+        
         # Write the empty file, ready for the cube to be added
         self._build_cube_file(cube_file)
-
+        
         # Fill the image cube
         with fits.open(self.cube_file, mode='update', memmap=True) as cube_hdu:
             
@@ -631,5 +627,5 @@ class TicaCubeFactory():
                   
                 if verbose:
                     print(f"Completed block {i+1} of {self.num_blocks}")
-
+        
 
