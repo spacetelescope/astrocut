@@ -502,6 +502,8 @@ class TicaCubeFactory():
         header = hdu.header
         header["NAXIS4"], header["NAXIS3"], header["NAXIS2"], header["NAXIS1"] = self.cube_shape
 
+        # I think this part increases the buffer size of ext1 and writes 
+        # the cube in there?
         with open(cube_file, 'ab') as CUBE:
             print('~~~~~')
             print(bytearray(header.tostring(), encoding="utf-8"))
@@ -587,6 +589,36 @@ class TicaCubeFactory():
 
         del sub_cube
         
+    def _write_info_table(self):
+        """
+        Turn the info table into an HDU object and append it to the cube file
+        """
+
+        # Make table hdu 
+        cols = []
+        for kwd in self.info_table.columns:
+            if self.info_table[kwd].dtype == np.float64:
+                tpe = 'D'
+            elif self.info_table[kwd].dtype == np.int32:
+                tpe = 'J'
+            else:
+                tpe = str(self.info_table[kwd].dtype).replace("S", "A").strip("|")
+        
+            cols.append(fits.Column(name=kwd, format=tpe, array=self.info_table[kwd]))
+        
+        col_def = fits.ColDefs(cols)
+        table_hdu = fits.BinTableHDU.from_columns(col_def)
+
+        # Adding the comments to the header
+        for kwd in self.info_table.columns:
+            if kwd in ['XTENSION', 'BITPIX', 'NAXIS', 'NAXIS1', 'NAXIS2', 'PCOUNT', 'GCOUNT', 'TFIELDS']:
+                continue  # skipping the keyword already in use
+            table_hdu.header[kwd] = self.info_table[kwd].meta.get("comment", "")
+
+        # Appending to the cube file
+        with fits.open(self.cube_file, mode='append', memmap=True) as cube_hdus:
+            cube_hdus.append(table_hdu)
+
 
     def make_cube(self, file_list, cube_file='img-cube.fits', verbose=True, max_memory=50):
 
@@ -627,5 +659,12 @@ class TicaCubeFactory():
                   
                 if verbose:
                     print(f"Completed block {i+1} of {self.num_blocks}")
+
+        # Add the info table to the cube file
+        self._write_info_table()
+        if verbose:
+            print(f"Total time elapsed: {(time() - startTime)/60:.2f} min")
+
+        return self.cube_file
         
 
