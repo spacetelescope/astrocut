@@ -394,7 +394,6 @@ class TicaCubeFactory():
 
             if image_shape is None:  # Only need to fill this once
                 image_shape = ffi_data[0].data.shape
-                print(image_shape)
             
             if self.template_file is None:  # Only check this if we don't already have it
 
@@ -420,8 +419,6 @@ class TicaCubeFactory():
         #                  NROWS,           NCOLS,         Num. Images,       
         self.cube_shape = (image_shape[0], image_shape[1], len(self.file_list), 2)
 
-        print('cube shape')
-        print(self.cube_shape)
         # Making the primary header
         with fits.open(self.file_list[0], mode='denywrite', memmap=True) as first_file:
             header = deepcopy(first_file[0].header)
@@ -505,8 +502,6 @@ class TicaCubeFactory():
         # I think this part increases the buffer size of ext1 and writes 
         # the cube in there?
         with open(cube_file, 'ab') as CUBE:
-            print('~~~~~')
-            print(bytearray(header.tostring(), encoding="utf-8"))
             CUBE.write(bytearray(header.tostring(), encoding="utf-8"))
 
         # Expanding the file to fit the full data cube
@@ -544,10 +539,8 @@ class TicaCubeFactory():
 
                 # add the image and info to the arrays
                 sub_cube[:, :, i, 0] = ffi_data[0].data[start_row:end_row, :]
-                #sub_cube[:, :, i, 1] = ffi_data[2].data[start_row:end_row, :]
 
                 del ffi_data[0].data
-                #del ffi_data[2].data
                
                 if fill_info_table:  # Also save the header info in the info table
 
