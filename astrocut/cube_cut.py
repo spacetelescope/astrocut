@@ -913,8 +913,60 @@ class TicaCutoutFactory():
         self.img_kwds["WCS_FFI"] = [table_data[data_ind]["FFI_FILE"],
                                     "FFI useTd for cutout WCS"]
 
-    def cube_cut(self, cube_file, verbose=True):#, coordinates, cutout_size,
-                 #target_pixel_file=None, output_path=".", verbose=False):
+    
+    def _get_cutout_limits(self, cutout_size):
+        """
+        Takes the center coordinates, cutout size, and the wcs from
+        which the cutout is being taken and returns the x and y pixel limits
+        for the cutout.
+
+        Parameters
+        ----------
+        cutout_size : array
+            [ny,nx] in with ints (pixels) or astropy quantities
+
+        Returns
+        -------
+        response : `numpy.array`
+            The cutout pixel limits in an array of the form [[ymin,ymax],[xmin,xmax]]
+        """
+        
+        # Note: This is returning the center pixel in 1-up
+        try:
+            center_pixel = self.center_coord.to_pixel(self.cube_wcs, 1)
+        except wcs.NoConvergence:  # If wcs can't converge, center coordinate is far from the footprint
+            raise InvalidQueryError("Cutout location is not in cube footprint!")
+
+        lims = np.zeros((2, 2), dtype=int)
+
+        for axis, size in enumerate(cutout_size):
+        
+            if not isinstance(size, u.Quantity):  # assume pixels
+                dim = size / 2
+            elif size.unit == u.pixel:  # also pixels
+                dim = size.value / 2
+            elif size.unit.physical_type == 'angle':
+                pixel_scale = u.Quantity(wcs.utils.proj_plane_pixel_scales(self.cube_wcs)[axis],
+                                         self.cube_wcs.wcs.cunit[axis])
+                dim = (size / pixel_scale).decompose() / 2
+
+            lims[axis, 0] = int(np.round(center_pixel[axis] - 1 - dim))
+            lims[axis, 1] = int(np.round(center_pixel[axis] - 1 + dim))
+
+            # The case where the requested area is so small it rounds to zero
+            if lims[axis, 0] == lims[axis, 1]:
+                lims[axis, 0] = int(np.floor(center_pixel[axis] - 1))
+                lims[axis, 1] = int(np.ceil(center_pixel[axis] - 1))
+
+        # Checking at least some of the cutout is on the cube
+        if ((lims[0, 0] <= 0) and (lims[0, 1] <= 0)) or ((lims[1, 0] <= 0) and (lims[1, 1] <= 0)):
+            raise InvalidQueryError("Cutout location is not in cube footprint!")
+
+        self.cutout_lims = lims
+
+
+    def cube_cut(self, cube_file, coordinates, cutout_size,
+                 target_pixel_file=None, output_path=".", verbose=False):
         
         if verbose:
             start_time = time()
@@ -929,3 +981,29 @@ class TicaCutoutFactory():
             print(self.cube_wcs)
             print('done')
 
+            if isinstance(coordinates, SkyCoord):
+                self.center_coord = coordinates
+            else:
+                self.center_coord = SkyCoord(coordinates, unit='deg')
+
+            if verbose:
+                print("Cutout center coordinate: {},{}".format(self.center_coord.ra.deg,
+                                                               self.center_coord.dec.deg))
+
+            # Making size into an array [ny, nx]
+            if np.isscalar(cutout_size):
+                cutout_size = np.repeat(cutout_size, 2)
+
+            if isinstance(cutout_size, u.Quantity):
+                cutout_size = np.atleast_1d(cutout_size)
+                if len(cutout_size) == 1:
+                    cutout_size = np.repeat(cutout_size, 2)
+
+            if len(cutout_size) > 2:
+                warnings.warn("Too many dimensions in cutout size, only the first two will be used.",
+                              InputWarning)
+                cutout_size = cutout_size[:2]
+
+            # Get cutout limits
+            self._get_cutout_limits(cutout_size)
+            print(self.cutout_lims)
