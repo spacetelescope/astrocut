@@ -816,6 +816,8 @@ class TicaCutoutFactory():
         self.center_coord = None  # Central skycoord
         
         # Extra keywords from the FFI image headers (TICA specific)
+        self.img_kwds = {}
+        """
         self.img_kwds = {"BACKAPP": [None, "background is subtracted"],
                          "CDPP0_5": [None, "RMS CDPP on 0.5-hr time scales"],
                          "CDPP1_0": [None, "RMS CDPP on 1.0-hr time scales"],
@@ -849,7 +851,7 @@ class TicaCutoutFactory():
                          "TIMEPIXR": [None, "bin time beginning=0 middle=0.5 end=1"],
                          "TMOFST11": [None, "(s) readout delay for camera 1 and ccd 1"],
                          "VIGNAPP": [None, "vignetting or collimator correction applied"]}
-
+        """
     def _parse_table_info(self, table_data, verbose=False):
         """
         Takes the header and one entry from the cube table of image header data,
@@ -864,30 +866,42 @@ class TicaCutoutFactory():
             The cube image header data table.
         """
 
-        data_ind = len(table_data)//2  # using the middle file for table info
+        # using the FFI in the middle of the stack for table info
+        # so for example: if there are 100 FFIs in the cube, we will be getting 
+        # info from the 50th FFI
+        data_ind = len(table_data)//2  
         table_row = None
-
-        # Making sure we have a row with wcs info
+        
+        # Populating `table_row` with the primary header keywords 
+        # of the middle FFI
         while table_row is None:
             table_row = table_data[data_ind]
+            """
+            # Making sure we have a row with wcs info.
+            # NOTE: This is tailored for TESS. 
+            # TICA doesnt have a kw called `WCSAXES`
             if table_row["WCSAXES"] != 2:
+                # Setting the WCSAXES table row to None if it's not 2
                 table_row = None
                 data_ind += 1
                 if data_ind == len(table_data):
                     raise wcs.NoWcsKeywordsFoundError("No FFI rows contain valid WCS keywords.")
-
+            """
         if verbose:
             print("Using WCS from row {} out of {}".format(data_ind, len(table_data)))
-
+        
         # Turning the table row into a new header object
         wcs_header = fits.header.Header()
+
         for col in table_data.columns:
             
-            wcs_val = table_row[col.name]
-            if (not isinstance(wcs_val, str)) and (np.isnan(wcs_val)):
+            print(col.name)
+            kwd_value = table_row[col.name]
+            
+            if (not isinstance(kwd_value, str)) and (np.isnan(kwd_value)):
                 continue  # Just skip nans
 
-            wcs_header[col.name] = wcs_val
+            wcs_header[col.name] = kwd_value
             
         # Setting the cube wcs
         self.cube_wcs = wcs.WCS(wcs_header, relax=True)
@@ -897,10 +911,10 @@ class TicaCutoutFactory():
             self.img_kwds[kwd][0] = wcs_header.get(kwd)
         # Adding the info about which FFI we got the 
         self.img_kwds["WCS_FFI"] = [table_data[data_ind]["FFI_FILE"],
-                                    "FFI used for cutout WCS"]
+                                    "FFI useTd for cutout WCS"]
 
-    def cube_cut(self, cube_file, coordinates, cutout_size,
-                 target_pixel_file=None, output_path=".", verbose=False):
+    def cube_cut(self, cube_file, verbose=True):#, coordinates, cutout_size,
+                 #target_pixel_file=None, output_path=".", verbose=False):
         
         if verbose:
             start_time = time()
@@ -910,4 +924,8 @@ class TicaCutoutFactory():
 
             # Get the info we need from the data table
             self._parse_table_info(cube[2].data, verbose)
+
+            print(self.img_kwds)
+            print(self.cube_wcs)
+            print('done')
 
