@@ -965,6 +965,428 @@ class TicaCutoutFactory():
         self.cutout_lims = lims
 
 
+    def _get_full_cutout_wcs(self, cube_table_header):
+        """
+        Starting with the full FFI WCS and adjusting it for the cutout WCS.
+        Adjusts CRPIX values and adds physical WCS keywords.
+
+        Parameters
+        ----------
+        cube_table_header :  `~astropy.io.fits.Header`
+           The FFI cube header for the data table extension. This allows the cutout WCS information
+           to more closely match the mission TPF format.
+
+        Resturns
+        --------
+        response :  `~astropy.wcs.WCS`
+            The cutout WCS object including SIP distortions.
+        """
+        
+        wcs_header = self.cube_wcs.to_header(relax=True)
+
+        for kwd in wcs_header:
+            # The .get() method will return the keyword value of the input 
+            # kwd. Or it will return the default value if it's provided. 
+            # In this case, if kwd is not in the header, Python will return None.
+            if cube_table_header.get(kwd, None):
+                # Using table comment rather than the default ones if available 
+                wcs_header.comments[kwd] = cube_table_header[kwd]
+
+        # CRPIX1/2 is the pixel coordinate of the reference point.
+        # Replacing these with the cutout limits derived from self._get_cutout_limits()
+        wcs_header["CRPIX1"] -= self.cutout_lims[0, 0]
+        wcs_header["CRPIX2"] -= self.cutout_lims[1, 0]
+
+        # Adding the physical wcs keywords
+        wcs_header.set("WCSNAMEP", "PHYSICAL", "name of world coordinate system alternate P")
+        wcs_header.set("WCSAXESP", 2, "number of WCS physical axes")
+    
+        wcs_header.set("CTYPE1P", "RAWX", "physical WCS axis 1 type CCD col")
+        wcs_header.set("CUNIT1P", "PIXEL", "physical WCS axis 1 unit")
+        wcs_header.set("CRPIX1P", 1, "reference CCD column")
+        wcs_header.set("CRVAL1P", self.cutout_lims[0, 0] + 1, "value at reference CCD column")
+        wcs_header.set("CDELT1P", 1.0, "physical WCS axis 1 step")
+                
+        wcs_header.set("CTYPE2P", "RAWY", "physical WCS axis 2 type CCD col")
+        wcs_header.set("CUNIT2P", "PIXEL", "physical WCS axis 2 unit")
+        wcs_header.set("CRPIX2P", 1, "reference CCD row")
+        wcs_header.set("CRVAL2P", self.cutout_lims[1, 0] + 1, "value at reference CCD row")
+        wcs_header.set("CDELT2P", 1.0, "physical WCS axis 2 step")
+
+        print('NEW WCS_HEADER')
+        print(wcs_header)
+        return wcs.WCS(wcs_header)
+
+
+    def _get_cutout(self, transposed_cube, verbose=True):
+        """
+        Making a cutout from an image/uncertainty cube that has been transposed 
+        to have time on the longest axis.
+        
+        Parameters
+        ----------
+        transposed_cube : `numpy.array`
+            Transposed image/uncertainty array.
+        verbose :  bool
+            Optional. If true intermediate information is printed. 
+
+        Returns
+        -------
+        response :  `numpy.array`, `numpy.array`, `numpy.array`
+            The untransposed image cutout array,
+            the untransposeduncertainty cutout array,
+            and the aperture array (an array the size of a single cutout 
+            that is 1 where there is image data and 0 where there isn't)
+        """
+
+        # These limits are not guarenteed to be within the image footprint
+        xmin, xmax = self.cutout_lims[1]
+        ymin, ymax = self.cutout_lims[0]
+
+        # Get the image array limits
+        xmax_cube, ymax_cube, _, _ = transposed_cube.shape
+
+        # Adjust limits and figuring out the padding
+        padding = np.zeros((3, 2), dtype=int)
+        if xmin < 0:
+            padding[1, 0] = -xmin
+            xmin = 0
+        if ymin < 0:
+            padding[2, 0] = -ymin
+            ymin = 0
+        if xmax > xmax_cube:
+            padding[1, 1] = xmax - xmax_cube
+            xmax = xmax_cube
+        if ymax > ymax_cube:
+            padding[2, 1] = ymax - ymax_cube
+            ymax = ymax_cube       
+        
+        # Doing the cutout
+        cutout = transposed_cube[xmin:xmax, ymin:ymax, :, :]
+    
+        img_cutout = cutout[:, :, :, 0].transpose((2, 0, 1))
+        uncert_cutout = cutout[:, :, :, 1].transpose((2, 0, 1))
+    
+        # Making the aperture array
+        aperture = np.ones((xmax-xmin, ymax-ymin), dtype=np.int32)
+
+        # Adding padding to the cutouts so that it's the expected size
+        if padding.any():  # only do if we need to pad
+            img_cutout = np.pad(img_cutout, padding, 'constant', constant_values=np.nan)
+            uncert_cutout = np.pad(uncert_cutout, padding, 'constant', constant_values=np.nan)
+            aperture = np.pad(aperture, padding[1:], 'constant', constant_values=0)
+
+        if verbose:
+            print("Image cutout cube shape: {}".format(img_cutout.shape))
+            print("Uncertainty cutout cube shape: {}".format(uncert_cutout.shape))
+    
+        return img_cutout, uncert_cutout, aperture
+
+
+    def _fit_cutout_wcs(self, cutout_wcs, cutout_shape):
+        """
+        Given a full (including SIP coefficients) wcs for the cutout, 
+        calculate the best fit linear wcs, and a measure of the goodness-of-fit.
+        
+        The new WCS is stored in ``self.cutout_wcs``.
+        Goodness-of-fit measures are returned and stored in ``self.cutout_wcs_fit``.
+
+        Parameters
+        ----------
+        cutout_wcs :  `~astropy.wcs.WCS`
+            The full (including SIP coefficients) cutout WCS object 
+        cutout_shape : tuple
+            The shape of the cutout in the form (width, height).
+
+        Returns
+        -------
+        response : tuple
+            Goodness-of-fit statistics. (max dist, sigma)
+        """
+
+        # Getting matched pixel, world coordinate pairs
+        # We will choose no more than 100 pixels spread evenly throughout the image
+        # Centered on the center pixel.
+        # To do this we the appropriate "step size" between pixel coordinates
+        # (i.e. we take every ith pixel in each row/column) [TODOOOOOO]
+        # For example in a 5x7 cutout with i = 2 we get:
+        #
+        # xxoxoxx
+        # ooooooo
+        # xxoxoxx
+        # ooooooo
+        # xxoxoxx
+        #
+        # Where x denotes the indexes that will be used in the fit.
+        y, x = cutout_shape
+        i = 1
+        while (x/i)*(y/i) > 100:
+            i += 1
+            
+        xvals = list(reversed(range(x//2, -1, -i)))[:-1] + list(range(x//2, x, i))
+        if xvals[-1] != x-1:
+            xvals += [x-1]
+        if xvals[0] != 0:
+            xvals = [0] + xvals
+        
+        yvals = list(reversed(range(y//2, -1, -i)))[:-1] + list(range(y//2, y, i))
+        if yvals[-1] != y-1:
+            yvals += [y-1]
+        if yvals[0] != 0:
+            yvals = [0] + yvals
+        
+        pix_inds = np.array(list(product(xvals, yvals)))
+        world_pix = SkyCoord(cutout_wcs.all_pix2world(pix_inds, 0), unit='deg')
+
+        # Getting the fit WCS
+        linear_wcs = fit_wcs_from_points([pix_inds[:, 0], pix_inds[:, 1]], world_pix, proj_point='center')
+
+        self.cutout_wcs = linear_wcs
+
+        # Checking the fit (we want to use all of the pixels for this)
+        pix_inds = np.array(list(product(list(range(cutout_shape[1])), list(range(cutout_shape[0])))))
+        world_pix = SkyCoord(cutout_wcs.all_pix2world(pix_inds, 0), unit='deg')
+        world_pix_new = SkyCoord(linear_wcs.all_pix2world(pix_inds, 0), unit='deg')
+
+        dists = world_pix.separation(world_pix_new).to('deg')
+        sigma = np.sqrt(sum(dists.value**2))
+
+        self.cutout_wcs_fit['WCS_MSEP'][0] = dists.max().value
+        self.cutout_wcs_fit['WCS_SIG'][0] = sigma
+
+        return (dists.max(), sigma)
+
+
+    def _get_cutout_wcs_dict(self):
+        """
+        Transform the cutout WCS object into the cutout column WCS keywords.
+        Adds the physical keywords for transformation back from cutout to location on FFI.
+        This is a very TESS specific function.
+        
+        Returns
+        -------
+        response: dict
+            Cutout wcs column header keywords as dictionary of 
+            ``{<kwd format string>: [value, desc]} pairs.``
+        """
+        wcs_header = self.cutout_wcs.to_header()
+
+        cutout_wcs_dict = dict()
+
+        
+        ## Cutout array keywords ##
+
+        cutout_wcs_dict["WCAX{}"] = [wcs_header['WCSAXES'], "number of WCS axes"]
+        # TODO: check for 2? this must be two
+
+        cutout_wcs_dict["1CTYP{}"] = [wcs_header["CTYPE1"], "right ascension coordinate type"]
+        cutout_wcs_dict["2CTYP{}"] = [wcs_header["CTYPE2"], "declination coordinate type"]
+        
+        cutout_wcs_dict["1CRPX{}"] = [wcs_header["CRPIX1"], "[pixel] reference pixel along image axis 1"]
+        cutout_wcs_dict["2CRPX{}"] = [wcs_header["CRPIX2"], "[pixel] reference pixel along image axis 2"]
+    
+        cutout_wcs_dict["1CRVL{}"] = [wcs_header["CRVAL1"], "[deg] right ascension at reference pixel"]
+        cutout_wcs_dict["2CRVL{}"] = [wcs_header["CRVAL2"], "[deg] declination at reference pixel"]
+
+        cutout_wcs_dict["1CUNI{}"] = [wcs_header["CUNIT1"], "physical unit in column dimension"]
+        cutout_wcs_dict["2CUNI{}"] = [wcs_header["CUNIT2"], "physical unit in row dimension"]
+
+        cutout_wcs_dict["1CDLT{}"] = [wcs_header["CDELT1"], "[deg] pixel scale in RA dimension"]
+        cutout_wcs_dict["2CDLT{}"] = [wcs_header["CDELT1"], "[deg] pixel scale in DEC dimension"]
+
+        cutout_wcs_dict["11PC{}"] = [wcs_header["PC1_1"], "Coordinate transformation matrix element"]
+        cutout_wcs_dict["12PC{}"] = [wcs_header["PC1_2"], "Coordinate transformation matrix element"]
+        cutout_wcs_dict["21PC{}"] = [wcs_header["PC2_1"], "Coordinate transformation matrix element"]
+        cutout_wcs_dict["22PC{}"] = [wcs_header["PC2_2"], "Coordinate transformation matrix element"]
+
+        
+        ## Physical keywords ##
+        # TODO: Make sure these are correct
+        cutout_wcs_dict["WCSN{}P"] = ["PHYSICAL", "table column WCS name"]
+        cutout_wcs_dict["WCAX{}P"] = [2, "table column physical WCS dimensions"]
+    
+        cutout_wcs_dict["1CTY{}P"] = ["RAWX", "table column physical WCS axis 1 type, CCD col"]
+        cutout_wcs_dict["2CTY{}P"] = ["RAWY", "table column physical WCS axis 2 type, CCD row"]
+    
+        cutout_wcs_dict["1CUN{}P"] = ["PIXEL", "table column physical WCS axis 1 unit"]
+        cutout_wcs_dict["2CUN{}P"] = ["PIXEL", "table column physical WCS axis 2 unit"]
+    
+        cutout_wcs_dict["1CRV{}P"] = [self.cutout_lims[0, 0] + 1,
+                                      "table column physical WCS ax 1 ref value"]
+        cutout_wcs_dict["2CRV{}P"] = [self.cutout_lims[1, 0] + 1,
+                                      "table column physical WCS ax 2 ref value"]
+
+        # TODO: can we calculate these? or are they fixed?
+        cutout_wcs_dict["1CDL{}P"] = [1.0, "table column physical WCS a1 step"]    
+        cutout_wcs_dict["2CDL{}P"] = [1.0, "table column physical WCS a2 step"]
+    
+        cutout_wcs_dict["1CRP{}P"] = [1, "table column physical WCS a1 reference"]
+        cutout_wcs_dict["2CRP{}P"] = [1, "table column physical WCS a2 reference"]
+
+        return cutout_wcs_dict
+
+
+    def _update_primary_header(self, primary_header):
+        """
+        Updates the primary header for the cutout target pixel file by filling in 
+        the object ra and dec with the central cutout coordinates and filling in
+        the rest of the TESS target pixel file keywords wil 0/empty strings
+        as we do not have access to this information.
+        This is a TESS-specific function.
+
+        Parameters
+        ----------
+        primary_header : `~astropy.io.fits.Header`
+            The primary header from the cube file that will be modified in place for the cutout.
+        """
+
+        # Adding cutout specific headers
+        primary_header['CREATOR'] = ('astrocut', 'software used to produce this file')
+        primary_header['PROCVER'] = (__version__, 'software version')
+
+        primary_header['RA_OBJ'] = (self.center_coord.ra.deg, '[deg] right ascension')
+        primary_header['DEC_OBJ'] = (self.center_coord.dec.deg, '[deg] declination')
+
+        primary_header['TIMEREF'] = ('SOLARSYSTEM', 'barycentric correction applied to times')        
+        primary_header['TASSIGN'] = ('SPACECRAFT', 'where time is assigned')                         
+        primary_header['TIMESYS'] = ('TDB', 'time system is Barycentric Dynamical Time (TDB)')
+        primary_header['BJDREFI'] = (2457000, 'integer part of BTJD reference date')           
+        primary_header['BJDREFF'] = (0.00000000, 'fraction of the day in BTJD reference date')    
+        primary_header['TIMEUNIT'] = ('d', 'time unit for TIME, TSTART and TSTOP')
+
+        telapse = primary_header.get("TSTOP", 0) - primary_header.get("TSTART", 0)
+        primary_header['TELAPSE '] = (telapse, '[d] TSTOP - TSTART')
+        
+        # These are all the things in the TESS pipeline tpfs about the object that we can't fill
+        primary_header['OBJECT'] = ("", 'string version of target id ')
+        primary_header['TCID'] = (0, 'unique tess target identifier')
+        primary_header['PXTABLE'] = (0, 'pixel table id') 
+        primary_header['PMRA'] = (0.0, '[mas/yr] RA proper motion') 
+        primary_header['PMDEC'] = (0.0, '[mas/yr] Dec proper motion') 
+        primary_header['PMTOTAL'] = (0.0, '[mas/yr] total proper motion') 
+        primary_header['TESSMAG'] = (0.0, '[mag] TESS magnitude') 
+        primary_header['TEFF'] = (0.0, '[K] Effective temperature') 
+        primary_header['LOGG'] = (0.0, '[cm/s2] log10 surface gravity') 
+        primary_header['MH'] = (0.0, '[log10([M/H])] metallicity') 
+        primary_header['RADIUS'] = (0.0, '[solar radii] stellar radius')
+        primary_header['TICVER'] = (0, 'TICVER')
+        primary_header['TICID'] = (None, 'unique tess target identifier')
+
+
+
+    def _build_tpf(self, cube_fits, img_cube, uncert_cube, cutout_wcs_dict, aperture, verbose=True):
+        """
+        Building the cutout target pixel file (TPF) and formatting it to match TESS pipeline TPFs.
+
+        Paramters
+        ---------
+        cube_fits : `~astropy.io.fits.hdu.hdulist.HDUList`
+            The cube hdu list.
+        img_cube : `numpy.array`
+            The untransposed image cutout array
+        uncert_cube : `numpy.array`
+            The untransposed uncertainty cutout array
+        cutout_wcs_dict : dict
+            Dictionary of wcs keyword/value pairs to be added to each array 
+            column in the cutout table header.
+        aperture : `numpy.array`
+            The aperture array (an array the size of a single cutout 
+            that is 1 where there is image data and 0 where there isn't)        
+        verbose : bool
+            Optional. If true intermediate information is printed. 
+
+        Returns
+        -------
+        response :  `~astropy.io.fits.HDUList`
+            Target pixel file HDU list
+        """
+        
+        # The primary hdu is just the main header, which is the same
+        # as the one on the cube file
+        primary_hdu = cube_fits[0]
+        self._update_primary_header(primary_hdu.header)
+
+        cols = list()
+
+        # Adding the cutouts
+        tform = str(img_cube[0].size) + "E"
+        dims = str(img_cube[0].shape[::-1])
+        empty_arr = np.zeros(img_cube.shape)
+
+        # Adding the Time relates columns
+        # TESS --> TICA keyword analogs:
+        # TSTART --> STARTTJD
+        # TSTOP --> ENDTJD
+        cols.append(fits.Column(name='TIME', format='D', unit='BJD - 2457000, days', disp='D14.7',
+                                array=(cube_fits[2].columns['STARTTJD'].array + cube_fits[2].columns['ENDTJD'].array)/2))
+
+        # JENNY: TICA does not seem to have a barycentric time correction.
+        # Is this necessary?
+        #cols.append(fits.Column(name='TIMECORR', format='E', unit='d', disp='E14.7',
+        #                        array=cube_fits[2].columns['BARYCORR'].array))
+
+        # Adding CADENCENO as zeros b/c we don't have this info
+        cols.append(fits.Column(name='CADENCENO', format='J', disp='I10', array=empty_arr[:, 0, 0]))
+
+        # Adding counts (-1 b/c we don't have data)
+        cols.append(fits.Column(name='RAW_CNTS', format=tform.replace('E', 'J'), unit='count', dim=dims, disp='I8',
+                                array=empty_arr-1, null=-1))
+
+        # Adding flux and flux_err (data we actually have!)
+        cols.append(fits.Column(name='FLUX', format=tform, dim=dims, unit='e-/s', disp='E14.7', array=img_cube))
+        cols.append(fits.Column(name='FLUX_ERR', format=tform, dim=dims, unit='e-/s', disp='E14.7', array=uncert_cube)) 
+   
+        # Adding the background info (zeros b.c we don't have this info)
+        cols.append(fits.Column(name='FLUX_BKG', format=tform, dim=dims, unit='e-/s', disp='E14.7', array=empty_arr))
+        cols.append(fits.Column(name='FLUX_BKG_ERR', format=tform, dim=dims,
+                                unit='e-/s', disp='E14.7', array=empty_arr))
+
+        # Adding the quality flags
+        cols.append(fits.Column(name='QUALITY', format='J', disp='B16.16',
+                                array=cube_fits[2].columns['DQUALITY'].array))
+
+        # Adding the position correction info (zeros b.c we don't have this info)
+        cols.append(fits.Column(name='POS_CORR1', format='E', unit='pixel', disp='E14.7', array=empty_arr[:, 0, 0]))
+        cols.append(fits.Column(name='POS_CORR2', format='E', unit='pixel', disp='E14.7', array=empty_arr[:, 0, 0]))
+
+        # Adding the FFI_FILE column (not in the pipeline tpfs)
+        cols.append(fits.Column(name='FFI_FILE', format='38A', unit='pixel',
+                                array=cube_fits[2].columns['FFI_FILE'].array))
+        
+        # making the table HDU
+        table_hdu = fits.BinTableHDU.from_columns(cols)
+        table_hdu.header['EXTNAME'] = 'PIXELS'
+        table_hdu.header['INHERIT'] = True
+    
+        # Adding the wcs keywords to the columns and removing from the header
+        self._add_column_wcs(table_hdu.header, cutout_wcs_dict)
+
+        # Adding the extra image keywords
+        self._add_img_kwds(table_hdu.header)
+
+        # Building the aperture HDU
+        aperture_hdu = fits.ImageHDU(data=aperture)
+        aperture_hdu.header['EXTNAME'] = 'APERTURE'
+        for kwd, val, cmt in self.cutout_wcs.to_header().cards: 
+            aperture_hdu.header.set(kwd, val, cmt)
+
+        # Adding extra aperture keywords (TESS specific)
+        aperture_hdu.header.set("NPIXMISS", None, "Number of op. aperture pixels not collected")
+        aperture_hdu.header.set("NPIXSAP", None, "Number of pixels in optimal aperture")
+
+        # Adding goodness-of-fit keywords
+        for key in self.cutout_wcs_fit:
+            aperture_hdu.header[key] = tuple(self.cutout_wcs_fit[key])
+        
+        aperture_hdu.header['INHERIT'] = True
+    
+        cutout_hdu_list = fits.HDUList([primary_hdu, table_hdu, aperture_hdu])
+        
+        self._apply_header_inherit(cutout_hdu_list)
+
+        return cutout_hdu_list
+
+
     def cube_cut(self, cube_file, coordinates, cutout_size,
                  target_pixel_file=None, output_path=".", verbose=False):
         
@@ -1007,3 +1429,59 @@ class TicaCutoutFactory():
             # Get cutout limits
             self._get_cutout_limits(cutout_size)
             print(self.cutout_lims)
+
+            if verbose:
+                print("xmin,xmax: {}".format(self.cutout_lims[1]))
+                print("ymin,ymax: {}".format(self.cutout_lims[0]))
+
+            # Make the cutout
+            img_cutout, uncert_cutout, aperture = self._get_cutout(cube[1].data, verbose=verbose)
+            print('IMAGE CUTOUT')
+            print(img_cutout)
+            print(img_cutout.shape)
+            # Get cutout wcs info
+            cutout_wcs_full = self._get_full_cutout_wcs(cube[2].header)
+            max_dist, sigma = self._fit_cutout_wcs(cutout_wcs_full, img_cutout.shape[1:])
+            if verbose:
+                print("Maximum distance between approximate and true location: {}".format(max_dist))
+                print("Error in approximate WCS (sigma): {}".format(sigma))
+             
+            cutout_wcs_dict = self._get_cutout_wcs_dict()
+
+            # Build the TPF
+            tpf_object = self._build_tpf(cube, img_cutout, uncert_cutout, cutout_wcs_dict, aperture)
+            print('TPF BUILT')
+            """  
+            if verbose:
+                write_time = time()
+
+            if not target_pixel_file:
+                _, flename = os.path.split(cube_file)
+
+                width = self.cutout_lims[0, 1]-self.cutout_lims[0, 0]
+                height = self.cutout_lims[1, 1]-self.cutout_lims[1, 0]
+                target_pixel_file = "{}_{:7f}_{:7f}_{}x{}_astrocut.fits".format(flename.rstrip('.fits').rstrip("-cube"),
+                                                                                self.center_coord.ra.value,
+                                                                                self.center_coord.dec.value,
+                                                                                width,
+                                                                                height)
+            target_pixel_file = os.path.join(output_path, target_pixel_file)
+            
+        
+            if verbose:
+                print("Target pixel file: {}".format(target_pixel_file))
+
+            # Make sure the output directory exists
+            if not os.path.exists(output_path):
+                os.makedirs(output_path)
+        
+            # Write the TPF
+            tpf_object.writeto(target_pixel_file, overwrite=True, checksum=True)
+
+        if verbose:
+            print("Write time: {:.2} sec".format(time()-write_time))
+            print("Total time: {:.2} sec".format(time()-start_time))
+
+        return target_pixel_file
+        """
+    
