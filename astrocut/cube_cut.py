@@ -1273,6 +1273,84 @@ class TicaCutoutFactory():
         primary_header['TICID'] = (None, 'unique tess target identifier')
 
 
+    def _add_column_wcs(self, table_header, wcs_dict):
+        """
+        Adds WCS information for the array columns to the cutout table header.
+
+        Parameters
+        ----------
+        table_header : `~astropy.io.fits.Header`
+            The table header for the cutout table that will be modified in place to include 
+            WCS information.
+        wcs_dict : dict
+            Dictionary of wcs keyword/value pairs to be added to each array column in the 
+            cutout table header.
+        """
+
+        wcs_col = False  # says if column is one that requires wcs info
+    
+        for kwd in table_header:
+
+            # Adding header descriptions for the table keywords
+            if "TTYPE" in kwd:
+                table_header.comments[kwd] = "column name"
+            elif "TFORM" in kwd:
+                table_header.comments[kwd] = "column format"
+            elif "TUNIT" in kwd:
+                table_header.comments[kwd] = "unit"
+            elif "TDISP" in kwd:
+                table_header.comments[kwd] = "display format"
+            elif "TDIM" in kwd:
+                table_header.comments[kwd] = "multi-dimensional array spec"
+                wcs_col = True  # if column holds 2D array need to add wcs info
+            elif "TNULL" in kwd:
+                table_header.comments[kwd] = "null value"
+
+            # Adding wcs info if necessary
+            if (kwd[:-1] == "TTYPE") and wcs_col:
+                wcs_col = False  # reset
+                for wcs_key, (val, com) in wcs_dict.items():
+                    table_header.insert(kwd, (wcs_key.format(int(kwd[-1])-1), val, com))
+
+
+    def _apply_header_inherit(self, hdu_list):
+        """
+        The INHERIT keyword indicated that keywords from the primary header should be duplicated in 
+        the headers of all subsequent extensions.  This function performs this addition in place to 
+        the given hdu list.
+        
+        Parameters
+        ----------
+        hdu_list : `~astropy.io.fits.HDUList`
+            The hdu list to aaply the INHERIT keyword to.
+        """
+    
+        primary_header = hdu_list[0].header
+
+        reserved_kwds = ["COMMENT", "SIMPLE", "BITPIX", "EXTEND", "NEXTEND"]
+
+        for hdu in hdu_list[1:]:
+            if hdu.header.get("INHERIT", False):
+                for kwd in primary_header:
+                    if (kwd not in hdu.header) and (kwd not in reserved_kwds):
+                        hdu.header[kwd] = (primary_header[kwd], primary_header.comments[kwd])
+    
+
+
+    def _add_img_kwds(self, table_header):
+        """
+        Adding extra keywords to the table header.
+
+        Parameters
+        ----------
+        table_header : `~astropy.io.fits.Header`
+            The table header to add keywords to.  It will be modified in place.
+        """
+
+        for key in self.img_kwds:
+            table_header[key] = tuple(self.img_kwds[key])
+
+
 
     def _build_tpf(self, cube_fits, img_cube, uncert_cube, cutout_wcs_dict, aperture, verbose=True):
         """
@@ -1322,6 +1400,8 @@ class TicaCutoutFactory():
 
         # JENNY: TICA does not seem to have a barycentric time correction.
         # Is this necessary?
+        # The assumption from Scott & co is that the time correction is already 
+        # implemented when the data flows thru the TICA pipeline
         #cols.append(fits.Column(name='TIMECORR', format='E', unit='d', disp='E14.7',
         #                        array=cube_fits[2].columns['BARYCORR'].array))
 
@@ -1342,8 +1422,10 @@ class TicaCutoutFactory():
                                 unit='e-/s', disp='E14.7', array=empty_arr))
 
         # Adding the quality flags
+        # TESS --> TICA keyword analogs:
+        # DQUALITY --> QUAL_BIT
         cols.append(fits.Column(name='QUALITY', format='J', disp='B16.16',
-                                array=cube_fits[2].columns['DQUALITY'].array))
+                                array=cube_fits[2].columns['QUAL_BIT'].array))
 
         # Adding the position correction info (zeros b.c we don't have this info)
         cols.append(fits.Column(name='POS_CORR1', format='E', unit='pixel', disp='E14.7', array=empty_arr[:, 0, 0]))
