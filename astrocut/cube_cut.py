@@ -602,7 +602,7 @@ class CutoutFactory():
         tform = str(img_cube[0].size) + "E"
         dims = str(img_cube[0].shape[::-1])
         empty_arr = np.zeros(img_cube.shape)
-
+        
         # Adding the Time relates columns
         cols.append(fits.Column(name='TIME', format='D', unit='BJD - 2457000, days', disp='D14.7',
                                 array=(cube_fits[2].columns['TSTART'].array + cube_fits[2].columns['TSTOP'].array)/2))
@@ -1533,7 +1533,7 @@ class TicaCutoutFactory():
             # Build the TPF
             tpf_object = self._build_tpf(cube, img_cutout, uncert_cutout, cutout_wcs_dict, aperture)
             print('TPF BUILT')
-            """  
+            
             if verbose:
                 write_time = time()
 
@@ -1565,5 +1565,5 @@ class TicaCutoutFactory():
             print("Total time: {:.2} sec".format(time()-start_time))
 
         return target_pixel_file
-        """
+        
     
