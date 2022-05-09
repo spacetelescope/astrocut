@@ -416,26 +416,35 @@ class TicaCubeFactory():
         
         self.num_blocks = int(image_shape[0]/max_block_size + 1)
         self.block_size = int(image_shape[0]/self.num_blocks + 1)
-        #                  NROWS,           NCOLS,         Num. Images,       
-        self.cube_shape = (image_shape[0], image_shape[1], len(self.file_list), 2)
-
+        #                  NROWS,           NCOLS,         Num. Images, 
+        if self.cube_file is None:
+            self.cube_shape = (image_shape[0], image_shape[1], len(self.file_list), 2)
+        else:  
+            self.cube_shape = fits.getdata(self.cube_file, 1).shape   
+            
         # Making the primary header
-        with fits.open(self.file_list[0], mode='denywrite', memmap=True) as first_file:
-            header = deepcopy(first_file[0].header)
-            header.remove('CHECKSUM', ignore_missing=True)
+        if self.cube_file is None:
+            with fits.open(self.file_list[0], mode='denywrite', memmap=True) as first_file:
+                header = deepcopy(first_file[0].header)
+                header.remove('CHECKSUM', ignore_missing=True)
 
-            # Adding standard keywords
-            header['ORIGIN'] = 'STScI/MAST'
-            header['DATE'] = str(date.today())
+                # Adding standard keywords
+                header['ORIGIN'] = 'STScI/MAST'
+                header['DATE'] = str(date.today())
 
-            # Adding factory specific keywords
-            for kwd in self.image_header_keywords:
-                header[kwd] = (first_file[0].header[kwd], first_file[0].header.comments[kwd])
+                # Adding factory specific keywords
+                for kwd in self.image_header_keywords:
+                    header[kwd] = (first_file[0].header[kwd], first_file[0].header.comments[kwd])
 
-            # Adding the extra keywords passed in
-            for kwd, value in extra_keywords.items():
-                header[kwd] = (value[0], value[1])
-                
+                # Adding the extra keywords passed in
+                for kwd, value in extra_keywords.items():
+                    header[kwd] = (value[0], value[1])
+
+        else:
+            with fits.open(self.cube_file, mode='update', memmap=True) as cube_hdu:
+                header = cube_hdu[0].header 
+                header['DATE'] = str(date.today()) # Update
+
         # Adding the keywords from the last file
         with fits.open(self.file_list[-1], mode='denywrite', memmap=True) as last_file:
             for kwd in self.last_file_keywords:
@@ -613,6 +622,30 @@ class TicaCubeFactory():
             cube_hdus.append(table_hdu)
 
 
+    def update_cube(self, file_list, cube_file, verbose=True):
+        """ Updates an existing cube file if one has already been made and a new delivery is being appended to it. 
+        Same functionality as make_cube(...), but working on an already existing file rather than building a new one. 
+        """
+
+        if verbose:
+            startTime = time()
+            
+        # First locate the existing cube file and assign it a variable
+        assert os.path.exists(cube_file), 'Location of the cube file was unsuccessful. Please ensure the correct path was provided. If file does not exist, create a new cube using ``~TicaCubeFactory.make_cube()``.'
+        self.cube_file = cube_file
+
+        # Ensure that none of the files in file_list are in the cube already, to avoid duplicates
+        in_cube = fits.getdata(self.cube_file, 2)['FFI_FILE']
+        for file in file_list: 
+            assert file not in in_cube, f'FFI {file} is already in the cube. Removing from ``file_list``.'
+            file_list.del(file)
+
+        if verbose:
+            print(f'Working on cube file: {cube_file}')
+        
+        self._configure_cube(file_list)
+        
+        
     def make_cube(self, file_list, cube_file='img-cube.fits', verbose=True, max_memory=50):
 
         if verbose:
