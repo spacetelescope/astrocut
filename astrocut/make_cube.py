@@ -634,17 +634,26 @@ class TicaCubeFactory():
         assert os.path.exists(cube_file), 'Location of the cube file was unsuccessful. Please ensure the correct path was provided. If file does not exist, create a new cube using ``~TicaCubeFactory.make_cube()``.'
         self.cube_file = cube_file
 
-        # Ensure that none of the files in file_list are in the cube already, to avoid duplicates
-        in_cube = fits.getdata(self.cube_file, 2)['FFI_FILE']
-        for file in file_list: 
-            assert file not in in_cube, f'FFI {file} is already in the cube. Removing from ``file_list``.'
-            file_list.del(file)
-
         if verbose:
             print(f'Working on cube file: {cube_file}')
+
+        # Ensure that none of the files in file_list are in the cube already, to avoid duplicates
+        in_cube = list(fits.getdata(self.cube_file, 2)['FFI_FILE'])
+
+        for file in file_list: 
+            assert file not in in_cube, f'FFI {file} is already in the cube. Removing it from ``file_list``.'
+            file_list.remove(file)
         
         self._configure_cube(file_list)
+
+        if verbose:
+            print(f"Cube will be appended in {self.num_blocks} blocks of {self.block_size} rows each.")
         
+        # Preparing to update the info table to hold image header keywords of the new FFIs
+        self.info_table = fits.getdata(self.cube_file, 2)
+
+        # Update the image cube 
+        self._write_block(cube_hdu, start_row, end_row, fill_info_table, verbose)
         
     def make_cube(self, file_list, cube_file='img-cube.fits', verbose=True, max_memory=50):
 
@@ -660,7 +669,7 @@ class TicaCubeFactory():
             print("Using {} to initialize the image header table.".format(os.path.basename(self.template_file)))
             print(f"Cube will be made in {self.num_blocks} blocks of {self.block_size} rows each.")
         
-        # Set up the table to old the individual image headers
+        # Set up the table to hold the individual image headers
         self._build_info_table()
         
         # Write the empty file, ready for the cube to be added
