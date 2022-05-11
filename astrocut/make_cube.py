@@ -635,7 +635,7 @@ class TicaCubeFactory():
         self.cube_file = cube_file
 
         if verbose:
-            print(f'Working on cube file: {cube_file}')
+            print(f'Updating cube file: {cube_file}')
 
         # Ensure that none of the files in file_list are in the cube already, to avoid duplicates
         in_cube = list(fits.getdata(self.cube_file, 2)['FFI_FILE'])
@@ -647,7 +647,7 @@ class TicaCubeFactory():
         self._configure_cube(file_list)
 
         if verbose:
-            print(f"Cube will be appended in {self.num_blocks} blocks of {self.block_size} rows each.")
+            print(f"FFIs will be appended in {self.num_blocks} blocks of {self.block_size} rows each.")
         
         # Preparing to update the info table to hold image header keywords of the new FFIs
         self.info_table = fits.getdata(self.cube_file, 2)
