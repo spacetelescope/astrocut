@@ -138,7 +138,8 @@ class CubeFactory():
                     tpe = np.int32
                 else:
                     tpe = np.float64
-                    
+
+                # Adding columns one by one 
                 cols.append(Column(name=kwd, dtype=tpe, length=len(self.file_list), meta={"comment": cmt}))
                     
             cols.append(Column(name="FFI_FILE", dtype="S" + str(len(os.path.basename(self.template_file))),
@@ -220,7 +221,7 @@ class CubeFactory():
                             elif self.info_table[kwd].dtype.char == "S":  # hacky way to check if it's a string
                                 nulval = ""
                             self.info_table[kwd][i] = ffi_data[1].header.get(kwd, nulval)
-            
+                    
             if verbose:
                 print(f"Completed file {i} in {time()-st:.3} sec.")
 
@@ -378,6 +379,7 @@ class TicaCubeFactory():
         self.primary_header = None
         self.info_table = None
         self.cube_file = None
+        self.old_cols = None
 
     def _configure_cube(self, file_list, **extra_keywords):
         """ Run through all the files and set up the  basic parameters for the cube.
@@ -420,9 +422,11 @@ class TicaCubeFactory():
         if self.cube_file is None:
             self.cube_shape = (image_shape[0], image_shape[1], len(self.file_list), 2)
         else:  
-            self.cube_shape = fits.getdata(self.cube_file, 1).shape   
+            cube_shape = list(fits.getdata('tica-s0027-1-2-cube.fits', 1).shape)
+            cube_shape[2] = cube_shape[2] + len(self.file_list)
+            self.cube_shape = cube_shape  
             
-        # Making the primary header
+        # Making the primary header if there's no cube_file yet
         if self.cube_file is None:
             with fits.open(self.file_list[0], mode='denywrite', memmap=True) as first_file:
                 header = deepcopy(first_file[0].header)
@@ -440,6 +444,7 @@ class TicaCubeFactory():
                 for kwd, value in extra_keywords.items():
                     header[kwd] = (value[0], value[1])
 
+        # Otherwise we're updating an existing cube file
         else:
             with fits.open(self.cube_file, mode='update', memmap=True) as cube_hdu:
                 header = cube_hdu[0].header 
@@ -474,10 +479,20 @@ class TicaCubeFactory():
                 else:
                     tpe = np.float64
                     
-                cols.append(Column(name=kwd, dtype=tpe, length=len(self.file_list), meta={"comment": cmt}))
-                    
+                # If there's already an info table, this means we are
+                # updating a cube instead of making a new one, so expanding 
+                # the length by the new FFIs (hence +self.file_list)
+
+                if self.info_table is not None: 
+                    length = len(self.info_table)+len(self.file_list)
+                else: 
+                    length = len(self.file_list)
+
+                cols.append(Column(name=kwd, dtype=tpe, length=length, meta={"comment": cmt}))
+
             cols.append(Column(name="FFI_FILE", dtype="S" + str(len(os.path.basename(self.template_file))),
-                               length=len(self.file_list)))
+                               length=length))
+    
             self.info_table = Table(cols)
 
     def _build_cube_file(self, cube_file):
@@ -544,6 +559,9 @@ class TicaCubeFactory():
             if verbose:
                 st = time()
 
+            if self.old_cols: 
+                i = len(self.old_cols['SIMPLE']) + i 
+
             with fits.open(fle, mode='denywrite', memmap=True) as ffi_data:
 
                 # add the image and info to the arrays
@@ -579,6 +597,25 @@ class TicaCubeFactory():
                                 kwd_val = ffi_data[0].header.get(kwd)
                                 if isinstance(kwd_val, fits.header._HeaderCommentaryCards):
                                     self.info_table[kwd][i] = str(kwd_val)
+
+                elif self.old_cols:
+
+                    for kwd in self.info_table.columns:
+                        if kwd == "FFI_FILE":
+                            self.info_table[kwd] = self.old_cols[kwd].append(fle)
+                        else:
+                            nulval = None
+                            if self.info_table[kwd].dtype.name == "int32":
+                                nulval = 0
+                            elif self.info_table[kwd].dtype.char == "S":  # hacky way to check if it's a string
+                                nulval = ""
+                            
+                            try:
+                                self.info_table[kwd] = self.old_cols[kwd].append(ffi_data[0].header.get(kwd, nulval))
+                            except ValueError:
+                                kwd_val = ffi_data[0].header.get(kwd)
+                                if isinstance(kwd_val, fits.header._HeaderCommentaryCards):
+                                    self.info_table[kwd] = self.old_cols[kwd].append(str(kwd_val))
 
             if verbose:
                 print(f"Completed file {i} in {time()-st:.3} sec.")
@@ -649,12 +686,52 @@ class TicaCubeFactory():
         if verbose:
             print(f"FFIs will be appended in {self.num_blocks} blocks of {self.block_size} rows each.")
         
-        # Preparing to update the info table to hold image header keywords of the new FFIs
+        # Expanding the length of the info table to accomodate new FFIs
         self.info_table = fits.getdata(self.cube_file, 2)
+        self.old_cols = {}
+        for column in self.info_table.columns:
+            
+            col = list(self.info_table[column.name])
+            self.old_cols[column.name] = col
+
+        self._build_info_table()
 
         # Update the image cube 
-        self._write_block(cube_hdu, start_row, end_row, fill_info_table, verbose)
-        
+        with fits.open(self.cube_file, mode='update', memmap=True) as cube_hdu:
+
+            # mmap: "allows you to take advantage of lower-level operating system 
+            # functionality to read files as if they were one large string or array. 
+            # This can provide significant performance improvements in code that 
+            # requires a lot of file I/O."
+            if (version_info >= (3, 8)) and (platform != "win32"):
+                mm = fits.util._get_array_mmap(cube_hdu[1].data)
+                # madvise: "Send advice option to the kernel about the memory region 
+                # beginning at start and extending length bytes.""
+                mm.madvise(MADV_SEQUENTIAL)
+
+            for i in range(self.num_blocks):
+                start_row = i * self.block_size
+                end_row = start_row + self.block_size
+
+                if end_row >= self.cube_shape[0]:
+                    end_row = None
+
+                # filling in the cube file with the new FFIs
+                # the info table also gets updated here 
+                fill_info_table = False
+                self._write_block(cube_hdu, start_row, end_row, fill_info_table, verbose)
+
+                if verbose:
+                    print(f"Completed block {i+1} of {self.num_blocks}")
+
+        # Add the info table to the cube file
+        self._write_info_table()
+        if verbose:
+            print(f"Total time elapsed: {(time() - startTime)/60:.2f} min")
+
+        return self.cube_file
+
+
     def make_cube(self, file_list, cube_file='img-cube.fits', verbose=True, max_memory=50):
 
         if verbose:
