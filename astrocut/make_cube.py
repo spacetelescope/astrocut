@@ -381,6 +381,8 @@ class TicaCubeFactory():
         self.cube_file = None
         self.old_cols = None
 
+        self.update = False
+
     def _configure_cube(self, file_list, **extra_keywords):
         """ Run through all the files and set up the  basic parameters for the cube.
         Set up the cube primary header.
@@ -418,16 +420,16 @@ class TicaCubeFactory():
         
         self.num_blocks = int(image_shape[0]/max_block_size + 1)
         self.block_size = int(image_shape[0]/self.num_blocks + 1)
-        #                  NROWS,           NCOLS,         Num. Images, 
-        if self.cube_file is None:
+        
+        if not self.update:
             self.cube_shape = (image_shape[0], image_shape[1], len(self.file_list), 2)
         else:  
-            cube_shape = list(fits.getdata('tica-s0027-1-2-cube.fits', 1).shape)
+            cube_shape = list(fits.getdata(self.cube_file, 1).shape)
             cube_shape[2] = cube_shape[2] + len(self.file_list)
-            self.cube_shape = cube_shape  
+            self.cube_shape = cube_shape
             
         # Making the primary header if there's no cube_file yet
-        if self.cube_file is None:
+        if not self.update:
             with fits.open(self.file_list[0], mode='denywrite', memmap=True) as first_file:
                 header = deepcopy(first_file[0].header)
                 header.remove('CHECKSUM', ignore_missing=True)
@@ -483,11 +485,11 @@ class TicaCubeFactory():
                 # updating a cube instead of making a new one, so expanding 
                 # the length by the new FFIs (hence +self.file_list)
 
-                if self.info_table is not None: 
-                    length = len(self.info_table)+len(self.file_list)
-                else: 
+                if not self.update: 
                     length = len(self.file_list)
-
+                else: 
+                    length = len(self.info_table)+len(self.file_list)
+                    
                 cols.append(Column(name=kwd, dtype=tpe, length=length, meta={"comment": cmt}))
 
             cols.append(Column(name="FFI_FILE", dtype="S" + str(len(os.path.basename(self.template_file))),
@@ -560,7 +562,8 @@ class TicaCubeFactory():
                 st = time()
 
             if self.old_cols: 
-                i = len(self.old_cols['SIMPLE']) + i 
+                i = len(self.old_cols['SIMPLE']) + i - 2
+                print(f'INDEX IS: {str(i)}') 
 
             with fits.open(fle, mode='denywrite', memmap=True) as ffi_data:
 
@@ -598,8 +601,8 @@ class TicaCubeFactory():
                                 if isinstance(kwd_val, fits.header._HeaderCommentaryCards):
                                     self.info_table[kwd][i] = str(kwd_val)
 
-                elif self.old_cols:
-
+                elif self.update:
+                    
                     for kwd in self.info_table.columns:
                         if kwd == "FFI_FILE":
                             self.info_table[kwd] = self.old_cols[kwd].append(fle)
@@ -610,18 +613,26 @@ class TicaCubeFactory():
                             elif self.info_table[kwd].dtype.char == "S":  # hacky way to check if it's a string
                                 nulval = ""
                             
+                            # Updating the already-existing list of kwd vals for 
+                            # all the FFIs, with the latest entry 
+                            self.old_cols[kwd].append(ffi_data[0].header.get(kwd, nulval))
+                            
+                            # Try/except is for the same _HeaderCommentaryCard issue from above. 
+                            # Just need to convert it from a _HeaderCommentaryCard to a string.
                             try:
-                                self.info_table[kwd] = self.old_cols[kwd].append(ffi_data[0].header.get(kwd, nulval))
+                                self.info_table[kwd] = list(self.old_cols[kwd])
                             except ValueError:
-                                kwd_val = ffi_data[0].header.get(kwd)
-                                if isinstance(kwd_val, fits.header._HeaderCommentaryCards):
-                                    self.info_table[kwd] = self.old_cols[kwd].append(str(kwd_val))
-
+                                self.old_cols[kwd][-1] = str(self.old_cols[kwd][-1])
+                                print(self.old_cols[kwd])
+                        
             if verbose:
                 print(f"Completed file {i} in {time()-st:.3} sec.")
 
         # Fill block and flush to disk
-        cube_hdu[1].data[start_row:end_row, :, :, :] = sub_cube
+        if not self.update:
+            cube_hdu[1].data[start_row:end_row, :, :, :] = sub_cube
+        else: 
+            cube_hdu_appendasjdnfahsdfiuhadsifuhdaslifuhadlsiufhladsiufhalduishf
 
         if (version_info <= (3, 8)) or (platform == "win32"):
             cube_hdu.flush()
@@ -664,6 +675,8 @@ class TicaCubeFactory():
         Same functionality as make_cube(...), but working on an already existing file rather than building a new one. 
         """
 
+        self.update = True # we're updating!
+
         if verbose:
             startTime = time()
             
@@ -677,9 +690,12 @@ class TicaCubeFactory():
         # Ensure that none of the files in file_list are in the cube already, to avoid duplicates
         in_cube = list(fits.getdata(self.cube_file, 2)['FFI_FILE'])
 
+        # JENNY: add warning message isntead of this verbose print stmnt
         for file in file_list: 
-            assert file not in in_cube, f'FFI {file} is already in the cube. Removing it from ``file_list``.'
-            file_list.remove(file)
+            if file in in_cube:
+                if verbose:
+                    print(f'FFI {file} is already in the cube. Removing it from ``file_list``.')
+                file_list.remove(file)
         
         self._configure_cube(file_list)
 
