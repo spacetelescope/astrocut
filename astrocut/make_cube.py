@@ -427,10 +427,10 @@ class TicaCubeFactory():
         if not self.update:
             self.cube_shape = (image_shape[0], image_shape[1], len(self.file_list), 2)
         # Else, if it's an update to an existing cube, the shape is (nRows, nCols, nImages + nNewImages, 2)
-        else:  
-            cube_shape = list(fits.getdata(self.cube_file, 1).shape)
-            cube_shape[2] = cube_shape[2] + len(self.file_list)
-            self.cube_shape = cube_shape
+        else: 
+            self.cube_shape = self.cube_append.shape
+            print('new shape:')
+            print(self.cube_shape)
             
         # Making the primary header if there's no cube_file yet
         if not self.update:
@@ -454,7 +454,8 @@ class TicaCubeFactory():
         else:
             with fits.open(self.cube_file, mode='update', memmap=True) as cube_hdu:
                 header = cube_hdu[0].header 
-                header['DATE'] = str(date.today()) # Update
+                header['HISTORY'] = f'Updated on {str(date.today())} with new FFI delivery.' 
+                header['HISTORY'] = f'First FFI is {str(os.path.basename(self.file_list[0]))}'
 
         # Adding the keywords from the last file
         with fits.open(self.file_list[-1], mode='denywrite', memmap=True) as last_file:
@@ -565,10 +566,6 @@ class TicaCubeFactory():
             if verbose:
                 st = time()
 
-            if self.old_cols: 
-                i = len(self.old_cols['SIMPLE']) + i - 2
-                print(f'INDEX IS: {str(i)}') 
-
             with fits.open(fle, mode='denywrite', memmap=True) as ffi_data:
 
                 # add the image and info to the arrays
@@ -629,7 +626,6 @@ class TicaCubeFactory():
                                 self.info_table[kwd] = list(self.old_cols[kwd])
                             except ValueError:
                                 self.old_cols[kwd][-1] = str(self.old_cols[kwd][-1])
-                                print(self.old_cols[kwd])
                         
             if verbose:
                 print(f"Completed file {i} in {time()-st:.3} sec.")
@@ -637,8 +633,10 @@ class TicaCubeFactory():
         # Fill block and flush to disk
         if not self.update:
             cube_hdu[1].data[start_row:end_row, :, :, :] = sub_cube
-        else: 
-            self.cube_append[start_row:end_row, :, :, 0] = sub_cube
+        else:
+            print(self.cube_append[start_row:end_row, :, :, :].shape)
+            print(sub_cube.shape)
+            self.cube_append[start_row:end_row, :, :, :] = sub_cube
 
         if (version_info <= (3, 8)) or (platform == "win32"):
             cube_hdu.flush()
@@ -690,16 +688,16 @@ class TicaCubeFactory():
 
         self.update = True # we're updating!
 
+        if verbose:
+            startTime = time()
+            
         # Creating an empty cube that will be appended to the existing cube
         og_cube = fits.getdata(cube_file, 1)
         dimensions = list(og_cube.shape)
         dimensions[2] = len(file_list)
         self.cube_append = np.zeros(tuple(dimensions))
 
-        if verbose:
-            startTime = time()
-            
-        # First locate the existing cube file and assign it a variable
+        # Next locate the existing cube file and assign it a variable
         assert os.path.exists(cube_file), 'Location of the cube file was unsuccessful. Please ensure the correct path was provided. If file does not exist, create a new cube using ``~TicaCubeFactory.make_cube()``.'
         self.cube_file = cube_file
 
