@@ -454,8 +454,8 @@ class TicaCubeFactory():
         else:
             with fits.open(self.cube_file, mode='update', memmap=True) as cube_hdu:
                 header = cube_hdu[0].header 
-                header['HISTORY'] = f'Updated on {str(date.today())} with new FFI delivery.' 
-                header['HISTORY'] = f'First FFI is {str(os.path.basename(self.file_list[0]))}'
+                #header['HISTORY'] = f'Updated on {str(date.today())} with new FFI delivery.' 
+                #header['HISTORY'] = f'First FFI is {str(os.path.basename(self.file_list[0]))}'
 
         # Adding the keywords from the last file
         with fits.open(self.file_list[-1], mode='denywrite', memmap=True) as last_file:
@@ -634,8 +634,6 @@ class TicaCubeFactory():
         if not self.update:
             cube_hdu[1].data[start_row:end_row, :, :, :] = sub_cube
         else:
-            print(self.cube_append[start_row:end_row, :, :, :].shape)
-            print(sub_cube.shape)
             self.cube_append[start_row:end_row, :, :, :] = sub_cube
 
         if (version_info <= (3, 8)) or (platform == "win32"):
@@ -770,9 +768,9 @@ class TicaCubeFactory():
             hdul[1].data = new_cube
 
         # Add the info table to the cube file
-        self._write_info_table()
-        if verbose:
-            print(f"Total time elapsed: {(time() - startTime)/60:.2f} min")
+        #self._write_info_table()
+        #if verbose:
+        #    print(f"Total time elapsed: {(time() - startTime)/60:.2f} min")
 
         return self.cube_file
 
