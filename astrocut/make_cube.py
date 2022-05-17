@@ -382,6 +382,7 @@ class TicaCubeFactory():
         self.old_cols = None
 
         self.update = False
+        self.cube_append = None
 
     def _configure_cube(self, file_list, **extra_keywords):
         """ Run through all the files and set up the  basic parameters for the cube.
@@ -676,6 +677,11 @@ class TicaCubeFactory():
         """
 
         self.update = True # we're updating!
+
+        cube = fits.getdata(cube_file, 1)
+        dimensions = list(cube.shape)
+        dimensions[2] = len(file_list)
+        self.cube_append = np.zeros(tuple(dimensions))
 
         if verbose:
             startTime = time()
