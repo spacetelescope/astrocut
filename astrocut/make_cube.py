@@ -422,8 +422,11 @@ class TicaCubeFactory():
         self.num_blocks = int(image_shape[0]/max_block_size + 1)
         self.block_size = int(image_shape[0]/self.num_blocks + 1)
         
+        # Determining cube shape: 
+        # If it's a new cube, the shape is (nRows, nCols, nImages, 2)
         if not self.update:
             self.cube_shape = (image_shape[0], image_shape[1], len(self.file_list), 2)
+        # Else, if it's an update to an existing cube, the shape is (nRows, nCols, nImages + nNewImages, 2)
         else:  
             cube_shape = list(fits.getdata(self.cube_file, 1).shape)
             cube_shape[2] = cube_shape[2] + len(self.file_list)
@@ -585,6 +588,7 @@ class TicaCubeFactory():
                             elif self.info_table[kwd].dtype.char == "S":  # hacky way to check if it's a string
                                 nulval = ""
                             
+                            # NOTE: 
                             # A header keyword ('COMMENT') in TICA returns a keyword 
                             # value in the form of a _HeaderCommentaryCard instead of a STRING. 
                             # This breaks the info table because the info table 
@@ -618,6 +622,7 @@ class TicaCubeFactory():
                             # all the FFIs, with the latest entry 
                             self.old_cols[kwd].append(ffi_data[0].header.get(kwd, nulval))
                             
+                            # NOTE:
                             # Try/except is for the same _HeaderCommentaryCard issue from above. 
                             # Just need to convert it from a _HeaderCommentaryCard to a string.
                             try:
@@ -633,7 +638,7 @@ class TicaCubeFactory():
         if not self.update:
             cube_hdu[1].data[start_row:end_row, :, :, :] = sub_cube
         else: 
-            cube_hdu_appendasjdnfahsdfiuhadsifuhdaslifuhadlsiufhladsiufhalduishf
+            self.cube_append[start_row:end_row, :, :, 0] = sub_cube
 
         if (version_info <= (3, 8)) or (platform == "win32"):
             cube_hdu.flush()
@@ -674,12 +679,20 @@ class TicaCubeFactory():
     def update_cube(self, file_list, cube_file, verbose=True):
         """ Updates an existing cube file if one has already been made and a new delivery is being appended to it. 
         Same functionality as make_cube(...), but working on an already existing file rather than building a new one. 
+        This function will: 
+
+        1. Create a new cube consisting of the new FFIs that will be appended to the existing cube
+        2. Update primary header keywords to reflect the update to the file
+        3. Expand the file size of the FITS file containing the cube, to accomodate for the updated one 
+        4. Rename the file accordingly(?)
+
         """
 
         self.update = True # we're updating!
 
-        cube = fits.getdata(cube_file, 1)
-        dimensions = list(cube.shape)
+        # Creating an empty cube that will be appended to the existing cube
+        og_cube = fits.getdata(cube_file, 1)
+        dimensions = list(og_cube.shape)
         dimensions[2] = len(file_list)
         self.cube_append = np.zeros(tuple(dimensions))
 
@@ -696,7 +709,7 @@ class TicaCubeFactory():
         # Ensure that none of the files in file_list are in the cube already, to avoid duplicates
         in_cube = list(fits.getdata(self.cube_file, 2)['FFI_FILE'])
 
-        # JENNY: add warning message isntead of this verbose print stmnt
+        # TO-DO: Add warning message instead of this verbose print stmnt.
         for file in file_list: 
             if file in in_cube:
                 if verbose:
@@ -745,6 +758,18 @@ class TicaCubeFactory():
 
                 if verbose:
                     print(f"Completed block {i+1} of {self.num_blocks}")
+
+        # Append the new cube to the existing cube
+        new_cube = np.concatenate((og_cube, self.cube_append), axis=2)
+
+        # Add it to the HDU list 
+        with fits.open(self.cube_file, mode='update') as hdul:
+            
+            if verbose:
+                print(f'Original cube of size: {str(og_cube.shape)}')
+                print(f'will now be replaced with cube of size: {str(new_cube.shape)}')
+                print(f'for file {cube_file}')
+            hdul[1].data = new_cube
 
         # Add the info table to the cube file
         self._write_info_table()
