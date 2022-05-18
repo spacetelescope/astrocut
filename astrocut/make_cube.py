@@ -579,8 +579,7 @@ class TicaCubeFactory():
                     for kwd in self.info_table.columns: # Iterate over every keyword in the TICA FFI primary header
                         if kwd == "FFI_FILE":
                             self.info_table[kwd][i] = os.path.basename(fle)
-                            print('FILE BEING APPENDED')
-                            print(fle)
+                            
                         else:
                             nulval = None
                             if self.info_table[kwd].dtype.name == "int32":
@@ -653,7 +652,6 @@ class TicaCubeFactory():
         del sub_cube
     
     def _update_info_table(self):
-
         """ Updating an existing info table with newly created
         """
 
@@ -687,11 +685,11 @@ class TicaCubeFactory():
 
             with fits.open(self.cube_file, mode='readonly') as hdul:
 
-                    og_table = hdul[2].data
-                    appended_column = np.concatenate((og_table['FFI_FILE'], self.info_table['FFI_FILE']))
+                og_table = hdul[2].data
+                appended_column = np.concatenate((og_table['FFI_FILE'], self.info_table['FFI_FILE']))
 
-            cols.append(Column(name="FFI_FILE", dtype="S" + str(len(os.path.basename(self.template_file))),
-                               length=length))
+                cols.append(Column(appended_column, name="FFI_FILE", dtype="S" + str(len(os.path.basename(self.template_file))),
+                                length=length))
     
             self.info_table = Table(cols)
 
@@ -815,7 +813,7 @@ class TicaCubeFactory():
 
                 if verbose:
                     print(f"Completed block {i+1} of {self.num_blocks}")
-
+       
         # Append the new cube to the existing cube
         new_cube = np.concatenate((og_cube, self.cube_append), axis=2)
 
@@ -825,14 +823,15 @@ class TicaCubeFactory():
             if verbose:
                 print(f'Original cube of size: {str(og_cube.shape)}')
                 print(f'will now be replaced with cube of size: {str(new_cube.shape)}')
-                print(f'for file {cube_file}')
+                print(f'for file ``{cube_file}``')
             hdul[1].data = new_cube
 
         # Appending new info table to original 
         self._update_info_table()
         
-        print(self.info_table['FFI_FILE'])
+        # Writing the info table to EXT2 of the FITS file 
         self._write_info_table()
+
         if verbose:
             print(f"Total time elapsed: {(time() - startTime)/60:.2f} min")
 
