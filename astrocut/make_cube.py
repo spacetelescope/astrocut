@@ -9,7 +9,7 @@ import numpy as np
 import os
 
 from astropy.io import fits
-from astropy.table import Table, Column
+from astropy.table import Table, Column, vstack
 
 from time import time
 from datetime import date
@@ -489,11 +489,13 @@ class TicaCubeFactory():
                 # updating a cube instead of making a new one, so expanding 
                 # the length by the new FFIs (hence +self.file_list)
 
+                length = len(self.file_list)
+                """
                 if not self.update: 
                     length = len(self.file_list)
                 else: 
                     length = len(self.info_table)+len(self.file_list)
-                    
+                """
                 cols.append(Column(name=kwd, dtype=tpe, length=length, meta={"comment": cmt}))
 
             cols.append(Column(name="FFI_FILE", dtype="S" + str(len(os.path.basename(self.template_file))),
@@ -577,6 +579,8 @@ class TicaCubeFactory():
                     for kwd in self.info_table.columns: # Iterate over every keyword in the TICA FFI primary header
                         if kwd == "FFI_FILE":
                             self.info_table[kwd][i] = os.path.basename(fle)
+                            print('FILE BEING APPENDED')
+                            print(fle)
                         else:
                             nulval = None
                             if self.info_table[kwd].dtype.name == "int32":
@@ -603,6 +607,8 @@ class TicaCubeFactory():
                                 if isinstance(kwd_val, fits.header._HeaderCommentaryCards):
                                     self.info_table[kwd][i] = str(kwd_val)
 
+                            
+                """
                 elif self.update:
                     
                     for kwd in self.info_table.columns:
@@ -631,7 +637,7 @@ class TicaCubeFactory():
 
                             if kwd == 'SIMPLE':
                                 self.old_cols[kwd] = [float(bool(x)) for x in self.old_cols[kwd]]
-                        
+                """ 
             if verbose:
                 print(f"Completed file {i} in {time()-st:.3} sec.")
 
@@ -645,7 +651,51 @@ class TicaCubeFactory():
             cube_hdu.flush()
 
         del sub_cube
-        
+    
+    def _update_info_table(self):
+
+        """ Updating an existing info table with newly created
+        """
+
+        with fits.open(self.template_file, mode='denywrite', memmap=True) as ffi_data:
+            
+            # The image specific header information will be saved in a table in the second extension
+            secondary_header = ffi_data[0].header
+
+            # set up the image info table
+            cols = []
+            for kwd, val, cmt in secondary_header.cards: 
+                if type(val) == str:
+                    tpe = "S" + str(len(val))  # TODO: Maybe switch to U?
+                elif type(val) == int:
+                    tpe = np.int32
+                else:
+                    tpe = np.float64
+                    
+                # If there's already an info table, this means we are
+                # updating a cube instead of making a new one, so expanding 
+                # the length by the new FFIs (hence +self.file_list)
+
+                with fits.open(self.cube_file, mode='readonly') as hdul:
+
+                    og_table = hdul[2].data
+                    appended_column = np.concatenate((og_table[kwd], self.info_table[kwd]))
+
+                length = len(og_table)+len(self.info_table[kwd])  
+                
+                cols.append(Column(appended_column, name=kwd, dtype=tpe, length=length, meta={"comment": cmt}))
+
+            with fits.open(self.cube_file, mode='readonly') as hdul:
+
+                    og_table = hdul[2].data
+                    appended_column = np.concatenate((og_table['FFI_FILE'], self.info_table['FFI_FILE']))
+
+            cols.append(Column(name="FFI_FILE", dtype="S" + str(len(os.path.basename(self.template_file))),
+                               length=length))
+    
+            self.info_table = Table(cols)
+
+
     def _write_info_table(self):
         """
         Turn the info table into an HDU object and append it to the cube file
@@ -662,9 +712,7 @@ class TicaCubeFactory():
                 tpe = 'J'
             else:
                 tpe = str(self.info_table[kwd].dtype).replace("S", "A").strip("|")
-            print(kwd)
-            print(self.info_table[kwd].dtype)
-            print(tpe)
+            
             cols.append(fits.Column(name=kwd, format=tpe, array=self.info_table[kwd]))
         
         col_def = fits.ColDefs(cols)
@@ -677,7 +725,9 @@ class TicaCubeFactory():
             table_hdu.header[kwd] = self.info_table[kwd].meta.get("comment", "")
 
         # Appending to the cube file
-        with fits.open(self.cube_file, mode='append', memmap=True) as cube_hdus:
+        with fits.open(self.cube_file, mode='update', memmap=True) as cube_hdus:
+            if self.update:
+                cube_hdus.pop(index=2)
             cube_hdus.append(table_hdu)
 
 
@@ -727,13 +777,14 @@ class TicaCubeFactory():
             print(f"FFIs will be appended in {self.num_blocks} blocks of {self.block_size} rows each.")
         
         # Expanding the length of the info table to accomodate new FFIs
-        self.info_table = fits.getdata(self.cube_file, 2)
+        #self.info_table = fits.getdata(self.cube_file, 2)
+        """
         self.old_cols = {}
         for column in self.info_table.columns:
             
             col = list(self.info_table[column.name])
             self.old_cols[column.name] = col
-
+        """
         # Starting a new info table from scratch with new rows
         self._build_info_table()
 
@@ -759,7 +810,7 @@ class TicaCubeFactory():
 
                 # filling in the cube file with the new FFIs
                 # the info table also gets updated here 
-                fill_info_table = False
+                fill_info_table = True
                 self._write_block(cube_hdu, start_row, end_row, fill_info_table, verbose)
 
                 if verbose:
@@ -777,11 +828,10 @@ class TicaCubeFactory():
                 print(f'for file {cube_file}')
             hdul[1].data = new_cube
 
-        # Add the info table to the cube file
-        for kwd in self.info_table.columns:
-            self.info_table[kwd] = np.array(self.old_cols[kwd])
-            #print(self.info_table[kwd])
-        print(self.info_table['ACS_MODE'])
+        # Appending new info table to original 
+        self._update_info_table()
+        
+        print(self.info_table['FFI_FILE'])
         self._write_info_table()
         if verbose:
             print(f"Total time elapsed: {(time() - startTime)/60:.2f} min")
