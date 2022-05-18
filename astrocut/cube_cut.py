@@ -457,6 +457,7 @@ class CutoutFactory():
         # Adding cutout specific headers
         primary_header['CREATOR'] = ('astrocut', 'software used to produce this file')
         primary_header['PROCVER'] = (__version__, 'software version')
+        primary_header['FFI_TYPE'] = ('TESS', 'the FFI type used to make the cutouts')
 
         primary_header['RA_OBJ'] = (self.center_coord.ra.deg, '[deg] right ascension')
         primary_header['DEC_OBJ'] = (self.center_coord.dec.deg, '[deg] declination')
@@ -1243,13 +1244,7 @@ class TicaCutoutFactory():
         # Adding cutout specific headers
         primary_header['CREATOR'] = ('astrocut', 'software used to produce this file')
         primary_header['PROCVER'] = (__version__, 'software version')
-
-        print('aksdhfaushfiuasdhfuashfasjdflkajs')
-        try:
-            primary_header['UNITS'] # just calling this to trigger an error for TESS
-            primary_header['FFI_TYPE'] = ('TICA', 'the FFI type used to make the cutouts')
-        except KeyError: # TESS primary header doesnt have a UNITS kw so we can deduce that if this fails it's a TESS cube
-            primary_header['FFI_TYPE'] = ('TESS', 'the FFI type used to make the cutouts')
+        primary_header['FFI_TYPE'] = ('TICA', 'the FFI type used to make the cutouts')
 
         primary_header['RA_OBJ'] = (self.center_coord.ra.deg, '[deg] right ascension')
         primary_header['DEC_OBJ'] = (self.center_coord.dec.deg, '[deg] declination')
