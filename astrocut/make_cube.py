@@ -427,6 +427,7 @@ class TicaCubeFactory():
         # If it's a new cube, the shape is (nRows, nCols, nImages, 2)
         if not self.update:
             self.cube_shape = (image_shape[0], image_shape[1], len(self.file_list), 2)
+            
         # Else, if it's an update to an existing cube, the shape is (nRows, nCols, nImages + nNewImages, 2)
         else: 
             self.cube_shape = self.cube_append.shape
