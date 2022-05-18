@@ -379,8 +379,9 @@ class TicaCubeFactory():
         self.primary_header = None
         self.info_table = None
         self.cube_file = None
-        self.old_cols = None
 
+        # Used when updating an existing cube 
+        self.old_cols = None
         self.update = False
         self.cube_append = None
 
@@ -429,8 +430,6 @@ class TicaCubeFactory():
         # Else, if it's an update to an existing cube, the shape is (nRows, nCols, nImages + nNewImages, 2)
         else: 
             self.cube_shape = self.cube_append.shape
-            print('new shape:')
-            print(self.cube_shape)
             
         # Making the primary header if there's no cube_file yet
         if not self.update:
@@ -596,6 +595,7 @@ class TicaCubeFactory():
                             #
                             # TO-DO: Find a more elegant way to handle these stray 
                             # _HeaderCommentaryCards. 
+                            
                             try:
                                 self.info_table[kwd][i] = ffi_data[0].header.get(kwd, nulval)
                             except ValueError:
@@ -606,26 +606,31 @@ class TicaCubeFactory():
                 elif self.update:
                     
                     for kwd in self.info_table.columns:
+                        
                         if kwd == "FFI_FILE":
-                            self.info_table[kwd] = self.old_cols[kwd].append(fle)
+                            self.old_cols[kwd].append(fle)
+                           
                         else:
                             nulval = None
-                            if self.info_table[kwd].dtype.name == "int32":
+                            dtype_name = self.info_table[kwd].dtype.name
+                            dtype_char = self.info_table[kwd].dtype.char
+
+                            if dtype_name == "int32":
                                 nulval = 0
-                            elif self.info_table[kwd].dtype.char == "S":  # hacky way to check if it's a string
+                            elif dtype_char == "S":  # hacky way to check if it's a string
                                 nulval = ""
                             
                             # Updating the already-existing list of kwd vals for 
                             # all the FFIs, with the latest entry 
-                            self.old_cols[kwd].append(ffi_data[0].header.get(kwd, nulval))
-                            
-                            # NOTE:
-                            # Try/except is for the same _HeaderCommentaryCard issue from above. 
-                            # Just need to convert it from a _HeaderCommentaryCard to a string.
-                            try:
-                                self.info_table[kwd] = list(self.old_cols[kwd])
-                            except ValueError:
-                                self.old_cols[kwd][-1] = str(self.old_cols[kwd][-1])
+
+                            kwd_val = ffi_data[0].header.get(kwd)
+                            if isinstance(kwd_val, fits.header._HeaderCommentaryCards):
+                                self.old_cols[kwd].append(str(kwd_val))
+                            else:
+                                self.old_cols[kwd].append(ffi_data[0].header.get(kwd, nulval))
+
+                            if kwd == 'SIMPLE':
+                                self.old_cols[kwd] = [float(bool(x)) for x in self.old_cols[kwd]]
                         
             if verbose:
                 print(f"Completed file {i} in {time()-st:.3} sec.")
@@ -655,7 +660,7 @@ class TicaCubeFactory():
                 tpe = 'J'
             else:
                 tpe = str(self.info_table[kwd].dtype).replace("S", "A").strip("|")
-        
+    
             cols.append(fits.Column(name=kwd, format=tpe, array=self.info_table[kwd]))
         
         col_def = fits.ColDefs(cols)
@@ -725,6 +730,7 @@ class TicaCubeFactory():
             col = list(self.info_table[column.name])
             self.old_cols[column.name] = col
 
+        # Starting a new info table from scratch with new rows
         self._build_info_table()
 
         # Update the image cube 
@@ -768,9 +774,13 @@ class TicaCubeFactory():
             hdul[1].data = new_cube
 
         # Add the info table to the cube file
-        #self._write_info_table()
-        #if verbose:
-        #    print(f"Total time elapsed: {(time() - startTime)/60:.2f} min")
+        for kwd in self.info_table.columns:
+            self.info_table[kwd] = np.array(self.old_cols[kwd])
+            print(self.info_table[kwd])
+        #print(self.old_cols['FFI_FILE'])
+        self._write_info_table()
+        if verbose:
+            print(f"Total time elapsed: {(time() - startTime)/60:.2f} min")
 
         return self.cube_file
 
