@@ -654,13 +654,17 @@ class TicaCubeFactory():
         # Make table hdu 
         cols = []
         for kwd in self.info_table.columns:
+            #print(self.info_table[kwd].dtype)
+            
             if self.info_table[kwd].dtype == np.float64:
                 tpe = 'D'
             elif self.info_table[kwd].dtype == np.int32:
                 tpe = 'J'
             else:
                 tpe = str(self.info_table[kwd].dtype).replace("S", "A").strip("|")
-    
+            print(kwd)
+            print(self.info_table[kwd].dtype)
+            print(tpe)
             cols.append(fits.Column(name=kwd, format=tpe, array=self.info_table[kwd]))
         
         col_def = fits.ColDefs(cols)
@@ -776,8 +780,8 @@ class TicaCubeFactory():
         # Add the info table to the cube file
         for kwd in self.info_table.columns:
             self.info_table[kwd] = np.array(self.old_cols[kwd])
-            print(self.info_table[kwd])
-        #print(self.old_cols['FFI_FILE'])
+            #print(self.info_table[kwd])
+        print(self.info_table['ACS_MODE'])
         self._write_info_table()
         if verbose:
             print(f"Total time elapsed: {(time() - startTime)/60:.2f} min")
