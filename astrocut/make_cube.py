@@ -730,7 +730,7 @@ class TicaCubeFactory():
             cube_hdus.append(table_hdu)
 
 
-    def update_cube(self, file_list, cube_file, verbose=True):
+    def update_cube(self, file_list, cube_file, sector=None, verbose=True):
         """ Updates an existing cube file if one has already been made and a new delivery is being appended to it. 
         Same functionality as make_cube(...), but working on an already existing file rather than building a new one. 
         This function will: 
@@ -770,7 +770,9 @@ class TicaCubeFactory():
                     print(f'FFI {file} is already in the cube. Removing it from ``file_list``.')
                 file_list.remove(file)
         
-        self._configure_cube(file_list)
+        # Set up the basic cube parameters
+        sector = (sector, "Observing sector")
+        self._configure_cube(file_list, sector=sector)
 
         if verbose:
             print(f"FFIs will be appended in {self.num_blocks} blocks of {self.block_size} rows each.")
@@ -839,7 +841,7 @@ class TicaCubeFactory():
         return self.cube_file
 
 
-    def make_cube(self, file_list, cube_file='img-cube.fits', verbose=True, max_memory=50):
+    def make_cube(self, file_list, cube_file="img-cube.fits", sector=None, max_memory=50, verbose=True):
 
         if verbose:
             startTime = time()
@@ -847,7 +849,8 @@ class TicaCubeFactory():
         self.max_memory = max_memory
 
         # Set up the basic cube parameters
-        self._configure_cube(file_list)
+        sector = (sector, "Observing sector")
+        self._configure_cube(file_list, sector=sector)
 
         if verbose:
             print("Using {} to initialize the image header table.".format(os.path.basename(self.template_file)))
