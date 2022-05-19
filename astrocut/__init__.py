@@ -22,7 +22,7 @@ if sys.version_info < tuple((int(val) for val in __minimum_python_version__.spli
 
 
 if not _ASTROPY_SETUP_:  # noqa
-    from .make_cube import CubeFactory  # noqa
+    from .make_cube import CubeFactory, TicaCubeFactory  # noqa
     from .cube_cut import CutoutFactory  # noqa
     from .cutouts import fits_cut, img_cut, normalize_img  # noqa
     from .cutout_processing import (path_to_footprints, center_on_path,  # noqa
