@@ -479,24 +479,15 @@ class TicaCubeFactory():
             # set up the image info table
             cols = []
             for kwd, val, cmt in secondary_header.cards: 
-                if type(val) == str:
+                if type(val) == str:  
                     tpe = "S" + str(len(val))  # TODO: Maybe switch to U?
                 elif type(val) == int:
                     tpe = np.int32
                 else:
                     tpe = np.float64
                     
-                # If there's already an info table, this means we are
-                # updating a cube instead of making a new one, so expanding 
-                # the length by the new FFIs (hence +self.file_list)
-
                 length = len(self.file_list)
-                """
-                if not self.update: 
-                    length = len(self.file_list)
-                else: 
-                    length = len(self.info_table)+len(self.file_list)
-                """
+
                 cols.append(Column(name=kwd, dtype=tpe, length=length, meta={"comment": cmt}))
 
             cols.append(Column(name="FFI_FILE", dtype="S" + str(len(os.path.basename(self.template_file))),
@@ -607,37 +598,6 @@ class TicaCubeFactory():
                                 if isinstance(kwd_val, fits.header._HeaderCommentaryCards):
                                     self.info_table[kwd][i] = str(kwd_val)
 
-                            
-                """
-                elif self.update:
-                    
-                    for kwd in self.info_table.columns:
-                        
-                        if kwd == "FFI_FILE":
-                            self.old_cols[kwd].append(fle)
-                           
-                        else:
-                            nulval = None
-                            dtype_name = self.info_table[kwd].dtype.name
-                            dtype_char = self.info_table[kwd].dtype.char
-
-                            if dtype_name == "int32":
-                                nulval = 0
-                            elif dtype_char == "S":  # hacky way to check if it's a string
-                                nulval = ""
-                            
-                            # Updating the already-existing list of kwd vals for 
-                            # all the FFIs, with the latest entry 
-
-                            kwd_val = ffi_data[0].header.get(kwd)
-                            if isinstance(kwd_val, fits.header._HeaderCommentaryCards):
-                                self.old_cols[kwd].append(str(kwd_val))
-                            else:
-                                self.old_cols[kwd].append(ffi_data[0].header.get(kwd, nulval))
-
-                            if kwd == 'SIMPLE':
-                                self.old_cols[kwd] = [float(bool(x)) for x in self.old_cols[kwd]]
-                """ 
             if verbose:
                 print(f"Completed file {i} in {time()-st:.3} sec.")
 
@@ -777,15 +737,6 @@ class TicaCubeFactory():
         if verbose:
             print(f"FFIs will be appended in {self.num_blocks} blocks of {self.block_size} rows each.")
         
-        # Expanding the length of the info table to accomodate new FFIs
-        #self.info_table = fits.getdata(self.cube_file, 2)
-        """
-        self.old_cols = {}
-        for column in self.info_table.columns:
-            
-            col = list(self.info_table[column.name])
-            self.old_cols[column.name] = col
-        """
         # Starting a new info table from scratch with new rows
         self._build_info_table()
 
@@ -842,7 +793,7 @@ class TicaCubeFactory():
 
 
     def make_cube(self, file_list, cube_file="img-cube.fits", sector=None, max_memory=50, verbose=True):
-
+        
         if verbose:
             startTime = time()
 
