@@ -910,7 +910,7 @@ class TicaCutoutFactory():
         # Filling the img_kwds dictionary while we are here
         for kwd in self.img_kwds:
             self.img_kwds[kwd][0] = wcs_header.get(kwd)
-        # Adding the info about which FFI we got the 
+        # Adding the info about which FFI we got the WCS info from
         self.img_kwds["WCS_FFI"] = [table_data[data_ind]["FFI_FILE"],
                                     "FFI useTd for cutout WCS"]
 
