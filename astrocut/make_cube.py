@@ -9,7 +9,7 @@ import numpy as np
 import os
 
 from astropy.io import fits
-from astropy.table import Table, Column, vstack
+from astropy.table import Table, Column
 
 from time import time
 from datetime import date
@@ -20,6 +20,7 @@ if (version_info >= (3, 8)) and (platform != "win32"):
     from mmap import MADV_SEQUENTIAL
 
 __all__ = ['CubeFactory', 'TicaCubeFactory']
+
 
 class CubeFactory():
     """
@@ -349,6 +350,7 @@ class CubeFactory():
 
         return self.cube_file
 
+
 class TicaCubeFactory():
 
     def __init__(self, max_memory=50):
@@ -369,10 +371,9 @@ class TicaCubeFactory():
         
         self.time_keyword = 'STARTTJD'  # Start time in TJD. TICA-specific.
         self.last_file_keywords = ['ENDTJD']  # Stop time in TJD. TICA-specific (assumed to be in extension 0)                  
-        self.image_header_keywords = ['CAMNUM', 'CCDNUM'] # Camera number and CCD number being used for the sector observation. 
-                                                       # TICA-specific (assumed to be in extension 0)
-        self.template_requirements = {'NAXIS': 2} # Using NAXIS instead of WCSAXES because TICA headers dont have WCSAXES kw.
-                                              # Assuming NAXIS and WCSAXES would always have same values.
+        self.image_header_keywords = ['CAMNUM', 'CCDNUM']  # Camera number and CCD number being used for the sector observation. 
+        self.template_requirements = {'NAXIS': 2}  # Using NAXIS instead of WCSAXES. JENNY: Verify this is OK.
+                                                   
         self.file_list = None
         self.template_file = None
         
@@ -454,8 +455,8 @@ class TicaCubeFactory():
         else:
             with fits.open(self.cube_file, mode='update', memmap=True) as cube_hdu:
                 header = cube_hdu[0].header 
-                #header['HISTORY'] = f'Updated on {str(date.today())} with new FFI delivery.' 
-                #header['HISTORY'] = f'First FFI is {str(os.path.basename(self.file_list[0]))}'
+                # header['HISTORY'] = f'Updated on {str(date.today())} with new FFI delivery.' 
+                # header['HISTORY'] = f'First FFI is {str(os.path.basename(self.file_list[0]))}'
 
         # Adding the keywords from the last file
         with fits.open(self.file_list[-1], mode='denywrite', memmap=True) as last_file:
@@ -568,7 +569,7 @@ class TicaCubeFactory():
                
                 if fill_info_table:  # Also save the header info in the info table
 
-                    for kwd in self.info_table.columns: # Iterate over every keyword in the TICA FFI primary header
+                    for kwd in self.info_table.columns:  # Iterate over every keyword in the TICA FFI primary header
                         if kwd == "FFI_FILE":
                             self.info_table[kwd][i] = os.path.basename(fle)
                             
@@ -649,8 +650,8 @@ class TicaCubeFactory():
                 og_table = hdul[2].data
                 appended_column = np.concatenate((og_table['FFI_FILE'], self.info_table['FFI_FILE']))
 
-                cols.append(Column(appended_column, name="FFI_FILE", dtype="S" + str(len(os.path.basename(self.template_file))),
-                                length=length))
+                str_length = str(len(os.path.basename(self.template_file)))
+                cols.append(Column(appended_column, name="FFI_FILE", dtype="S" + str_length, length=length))
     
             self.info_table = Table(cols)
 
@@ -663,8 +664,7 @@ class TicaCubeFactory():
         # Make table hdu 
         cols = []
         for kwd in self.info_table.columns:
-            #print(self.info_table[kwd].dtype)
-            
+
             if self.info_table[kwd].dtype == np.float64:
                 tpe = 'D'
             elif self.info_table[kwd].dtype == np.int32:
@@ -702,7 +702,7 @@ class TicaCubeFactory():
 
         """
 
-        self.update = True # we're updating!
+        self.update = True  # we're updating!
 
         if verbose:
             startTime = time()
@@ -714,7 +714,8 @@ class TicaCubeFactory():
         self.cube_append = np.zeros(tuple(dimensions))
 
         # Next locate the existing cube file and assign it a variable
-        assert os.path.exists(cube_file), 'Location of the cube file was unsuccessful. Please ensure the correct path was provided. If file does not exist, create a new cube using ``~TicaCubeFactory.make_cube()``.'
+        err_msg = 'Location of the cube file was unsuccessful. Please ensure the correct path was provided.'
+        assert os.path.exists(cube_file), err_msg
         self.cube_file = cube_file
 
         if verbose:
