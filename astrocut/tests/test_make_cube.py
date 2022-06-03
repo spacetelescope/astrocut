@@ -6,7 +6,7 @@ from re import findall
 from os import path
 
 from .utils_for_test import create_test_ffis
-from ..make_cube import CubeFactory
+from ..make_cube import CubeFactory, TicaCubeFactory
 
 
 def test_make_cube(tmpdir):
@@ -22,7 +22,7 @@ def test_make_cube(tmpdir):
     
     ffi_files = create_test_ffis(img_sz, num_im, dir_name=tmpdir)
     cube_file = cube_maker.make_cube(ffi_files, path.join(tmpdir, "out_dir", "test_cube.fits"), verbose=False)
-
+ 
     hdu = fits.open(cube_file)
     cube = hdu[1].data
     
@@ -35,9 +35,9 @@ def test_make_cube(tmpdir):
         ecube[:, :, i, 0] = -plane
         ecube[:, :, i, 1] = plane
         plane += img_sz*img_sz
-
+   
     assert np.alltrue(cube == ecube), "Cube values do not match expected values"
-        
+    
     tab = Table(hdu[2].data)
     assert np.alltrue(tab['TSTART'] == np.arange(num_im)), "TSTART mismatch in table"
     assert np.alltrue(tab['TSTOP'] == np.arange(num_im)+1), "TSTOP mismatch in table"
@@ -47,7 +47,50 @@ def test_make_cube(tmpdir):
 
     hdu.close()
     
+def test_update_cube(tmpdir):
+    """
+    Testing the make cube and update cube functionality for TICACubeFactory by making a bunch of test FFIs, 
+    making the cube with first half of the FFIs, updating the same cube with the second half,
+    and checking the results.
+    """
 
+    cube_maker = TicaCubeFactory()
+
+    img_sz = 10
+    num_im = 100
+    
+    ffi_files = create_test_ffis(img_sz, num_im, product='tica', dir_name=tmpdir)
+
+    cube_maker.make_cube(ffi_files[0:num_im//2], path.join(tmpdir, "out_dir", "test_update_cube.fits"), verbose=False)
+    cube_file = cube_maker.update_cube(ffi_files[num_im//2:], path.join(tmpdir, "out_dir", "test_update_cube.fits"), verbose=False)
+
+    hdu = fits.open(cube_file)
+    cube = hdu[1].data
+
+    # expected values for cube
+    ecube = np.zeros((img_sz, img_sz, num_im, 2))
+    plane = np.arange(img_sz*img_sz, dtype=np.float32).reshape((img_sz, img_sz))
+    
+    assert cube.shape == ecube.shape, "Mismatch between cube shape and expected shape"
+
+    for i in range(num_im):
+        ecube[:, :, i, 0] = -plane
+        # we don't need to test error array because TICA doesnt come with error arrays
+        # so index 1 will always be blank
+        #ecube[:, :, i, 1] = plane
+        plane += img_sz*img_sz
+
+    assert np.alltrue(cube == ecube), "Cube values do not match expected values"
+
+    tab = Table(hdu[2].data)
+    assert np.alltrue(tab['STARTTJD'] == np.arange(num_im)), "STARTTJD mismatch in table"
+    assert np.alltrue(tab['ENDTJD'] == np.arange(num_im)+1), "ENDTJD mismatch in table"
+
+    filenames = np.array([path.split(x)[1] for x in ffi_files])
+    assert np.alltrue(tab['FFI_FILE'] == np.array(filenames)), "FFI_FILE mismatch in table"
+
+    hdu.close()
+    
 def test_iteration(tmpdir, capsys):
     """
     Testing cubes made with different numbers of iterations against each other.
