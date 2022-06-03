@@ -818,11 +818,11 @@ class TicaCutoutFactory():
         
         # Extra keywords from the FFI image headers (TICA specific)
         self.img_kwds = {}
-        """
-        self.img_kwds = {"BACKAPP": [None, "background is subtracted"],
-                         "CDPP0_5": [None, "RMS CDPP on 0.5-hr time scales"],
-                         "CDPP1_0": [None, "RMS CDPP on 1.0-hr time scales"],
-                         "CDPP2_0": [None, "RMS CDPP on 2.0-hr time scales"],
+        
+        self.img_kwds = #{"BACKAPP": [None, "background is subtracted"],
+                         #"CDPP0_5": [None, "RMS CDPP on 0.5-hr time scales"],
+                         #"CDPP1_0": [None, "RMS CDPP on 1.0-hr time scales"],
+                         #"CDPP2_0": [None, "RMS CDPP on 2.0-hr time scales"],
                          "CROWDSAP": [None, "Ratio of target flux to total flux in op. ap."],
                          "DEADAPP": [None, "deadtime applied"], 
                          "DEADC": [None, "deadtime correction"],
@@ -852,7 +852,7 @@ class TicaCutoutFactory():
                          "TIMEPIXR": [None, "bin time beginning=0 middle=0.5 end=1"],
                          "TMOFST11": [None, "(s) readout delay for camera 1 and ccd 1"],
                          "VIGNAPP": [None, "vignetting or collimator correction applied"]}
-        """
+        
     def _parse_table_info(self, table_data, verbose=False):
         """
         Takes the header and one entry from the cube table of image header data,
