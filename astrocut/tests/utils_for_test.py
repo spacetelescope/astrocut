@@ -56,6 +56,7 @@ def add_keywords(hdu, extname, time_increment, primary=False):
         hdu.header['A_DMAX'] = 44.72893589844534
         hdu.header['B_DMAX'] = 44.62692873032506
 
+
 def add_tica_keywords(hdu, time_increment):
     """
     Add a bunch of required keywords (mostly fake values). TICA specific. 
@@ -68,9 +69,9 @@ def add_tica_keywords(hdu, time_increment):
     hdu.header['QUAL_BIT'] = 0
 
     # WCS keywords just copied from example
-    #hdu.header['RADESYS'] = 'ICRS    '
+    # hdu.header['RADESYS'] = 'ICRS    '
     hdu.header['EQUINOX'] = 2000.0
-    #hdu.header['WCSAXES'] = 2
+    # hdu.header['WCSAXES'] = 2
     hdu.header['CTYPE1'] = ('RA---TAN-SIP', "Gnomonic projection + SIP distortions")
     hdu.header['CTYPE2'] = ('DEC--TAN-SIP', "Gnomonic projection + SIP distortions")
     hdu.header['CRVAL1'] = 250.3497414839765200
@@ -104,6 +105,7 @@ def add_tica_keywords(hdu, time_increment):
     hdu.header['A_DMAX'] = 44.72893589844534
     hdu.header['B_DMAX'] = 44.62692873032506
 
+
 def create_test_ffis(img_size, num_images, dir_name=".", product='spoc', basename='make_cube-test{:04d}.fits'):
     """
     Create test fits files
@@ -120,17 +122,17 @@ def create_test_ffis(img_size, num_images, dir_name=".", product='spoc', basenam
         
         file_list.append(basename.format(i))
 
-        if product=='spoc':
+        if product == 'spoc':
             primary_hdu = fits.PrimaryHDU()
-        elif product=='tica':
+        elif product == 'tica':
             primary_hdu = fits.PrimaryHDU(-img)
 
-        if product=='spoc':
+        if product == 'spoc':
             add_keywords(primary_hdu, "PRIMARY", i, primary=True)
-        elif product=='tica':
+        elif product == 'tica':
             add_tica_keywords(primary_hdu, i)
 
-        if product=='spoc':   
+        if product == 'spoc':   
             hdu = fits.ImageHDU(-img)
             add_keywords(hdu, 'CAMERA.CCD 1.1 cal', i)
             
@@ -139,7 +141,7 @@ def create_test_ffis(img_size, num_images, dir_name=".", product='spoc', basenam
             
             hdulist = fits.HDUList([primary_hdu, hdu, ehdu])
 
-        elif product=='tica':
+        elif product == 'tica':
             hdulist = fits.HDUList([primary_hdu])   
 
         hdulist.writeto(file_list[-1], overwrite=True, checksum=True)

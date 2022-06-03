@@ -47,6 +47,7 @@ def test_make_cube(tmpdir):
 
     hdu.close()
     
+
 def test_update_cube(tmpdir):
     """
     Testing the make cube and update cube functionality for TICACubeFactory by making a bunch of test FFIs, 
@@ -61,8 +62,9 @@ def test_update_cube(tmpdir):
     
     ffi_files = create_test_ffis(img_sz, num_im, product='tica', dir_name=tmpdir)
 
-    cube_maker.make_cube(ffi_files[0:num_im//2], path.join(tmpdir, "out_dir", "test_update_cube.fits"), verbose=False)
-    cube_file = cube_maker.update_cube(ffi_files[num_im//2:], path.join(tmpdir, "out_dir", "test_update_cube.fits"), verbose=False)
+    cube_file = path.join(tmpdir, "out_dir", "test_update_cube.fits")
+    cube_maker.make_cube(ffi_files[0:num_im//2], cube_file, verbose=False)
+    cube_file = cube_maker.update_cube(ffi_files[num_im//2:], cube_file, verbose=False)
 
     hdu = fits.open(cube_file)
     cube = hdu[1].data
@@ -77,7 +79,7 @@ def test_update_cube(tmpdir):
         ecube[:, :, i, 0] = -plane
         # we don't need to test error array because TICA doesnt come with error arrays
         # so index 1 will always be blank
-        #ecube[:, :, i, 1] = plane
+        # ecube[:, :, i, 1] = plane
         plane += img_sz*img_sz
 
     assert np.alltrue(cube == ecube), "Cube values do not match expected values"
@@ -91,6 +93,7 @@ def test_update_cube(tmpdir):
 
     hdu.close()
     
+
 def test_iteration(tmpdir, capsys):
     """
     Testing cubes made with different numbers of iterations against each other.
