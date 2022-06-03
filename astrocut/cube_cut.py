@@ -872,16 +872,6 @@ class TicaCutoutFactory():
                          "TESS_VX": [None, "Spacecraft X velocity (km/s)"],
                          "TESS_VY": [None, "Spacecraft Y velocity (km/s)"],
                          "TESS_VZ": [None, "Spacecraft Z velocity (km/s)"],
-                         "CTYPE1": [None, ""],
-                         "CTYPE2": [None, ""],
-                         "CRPIX1": [None, ""],
-                         "CRPIX2": [None, ""],
-                         "CRVAL1": [None, ""],
-                         "CRVAL2": [None, ""],
-                         "A_ORDER": [None, ""],
-                         "B_ORDER": [None, ""],
-                         "AP_ORDER": [None, ""],
-                         "BP_ORDER": [None, ""],
                          "RA_TARG": [None, ""],
                          "DEC_TARG": [None, ""],
                          "RMSA": [None, "WCS fit resid all targs [arcsec]"],
@@ -898,7 +888,7 @@ class TicaCutoutFactory():
                          "FLXWIN": [None, "Width in pixels of Flux-weight centroid region"],
                          "CHECKSUM": [None, "HDU checksum updated 2021-07-25T06:54:54"],
                          "DATASUM": [None, "data unit checksum updated 2021-07-25T06:54:54"],
-                         "COMMENT": [None, "Additional comments"],}
+                         "COMMENT": [None, "Additional comments"]}
         
     def _parse_table_info(self, table_data, verbose=False):
         """
@@ -1301,7 +1291,7 @@ class TicaCutoutFactory():
         primary_header['TIMESYS'] = ('TDB', 'time system is Barycentric Dynamical Time (TDB)')
         primary_header['BJDREFI'] = (2457000, 'integer part of BTJD reference date')           
         primary_header['BJDREFF'] = (0.00000000, 'fraction of the day in BTJD reference date')    
-        primary_header['TIMEUNIT'] = ('d', 'time unit for TIME, TSTART and TSTOP')
+        primary_header['TIMEUNIT'] = ('d', 'time unit for STARTTJD and ENDTJD')
 
         telapse = primary_header.get("TSTOP", 0) - primary_header.get("TSTART", 0)
         primary_header['TELAPSE '] = (telapse, '[d] TSTOP - TSTART')
@@ -1451,24 +1441,22 @@ class TicaCutoutFactory():
         # Is this necessary?
         # The assumption from Scott & co is that the time correction is already 
         # implemented when the data flows thru the TICA pipeline
-        #cols.append(fits.Column(name='TIMECORR', format='E', unit='d', disp='E14.7',
-        #                        array=cube_fits[2].columns['BARYCORR'].array))
+        #cols.append(fits.Column(name='TIMECORR', format='E', unit='d', disp='E14.7', array=cube_fits[2].columns['BARYCORR'].array))
 
-        # Adding CADENCENO as zeros b/c we don't have this info
-        cols.append(fits.Column(name='CADENCENO', format='J', disp='I10', array=empty_arr[:, 0, 0]))
+        # Adding CADENCENO 
+        cols.append(fits.Column(name='CADENCENO', format='J', disp='I10', array=cube_fits[2].columns['CADENCE'].array))
 
         # Adding counts (-1 b/c we don't have data)
         cols.append(fits.Column(name='RAW_CNTS', format=tform.replace('E', 'J'), unit='count', dim=dims, disp='I8',
                                 array=empty_arr-1, null=-1))
 
         # Adding flux and flux_err (data we actually have!)
-        cols.append(fits.Column(name='FLUX', format=tform, dim=dims, unit='e-/s', disp='E14.7', array=img_cube))
-        cols.append(fits.Column(name='FLUX_ERR', format=tform, dim=dims, unit='e-/s', disp='E14.7', array=uncert_cube)) 
+        cols.append(fits.Column(name='FLUX', format=tform, dim=dims, unit='e-', disp='E14.7', array=img_cube))
+        cols.append(fits.Column(name='FLUX_ERR', format=tform, dim=dims, unit='e-', disp='E14.7', array=empty_arr)) 
    
         # Adding the background info (zeros b.c we don't have this info)
         cols.append(fits.Column(name='FLUX_BKG', format=tform, dim=dims, unit='e-/s', disp='E14.7', array=empty_arr))
-        cols.append(fits.Column(name='FLUX_BKG_ERR', format=tform, dim=dims,
-                                unit='e-/s', disp='E14.7', array=empty_arr))
+        cols.append(fits.Column(name='FLUX_BKG_ERR', format=tform, dim=dims, unit='e-/s', disp='E14.7', array=empty_arr))
 
         # Adding the quality flags
         # TESS --> TICA keyword analogs:
