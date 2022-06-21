@@ -3,6 +3,7 @@
 """This module implements the cutout functionality."""
 
 import os
+from unittest import skip
 import warnings
 
 from time import time
@@ -932,8 +933,7 @@ class TicaCutoutFactory():
         wcs_header = fits.header.Header()
 
         for col in table_data.columns:
-            
-            print(col.name)
+
             kwd_value = table_row[col.name]
             
             if (not isinstance(kwd_value, str)) and (np.isnan(kwd_value)):
@@ -1051,8 +1051,6 @@ class TicaCutoutFactory():
         wcs_header.set("CRVAL2P", self.cutout_lims[1, 0] + 1, "value at reference CCD row")
         wcs_header.set("CDELT2P", 1.0, "physical WCS axis 2 step")
 
-        print('NEW WCS_HEADER')
-        print(wcs_header)
         return wcs.WCS(wcs_header)
 
 
@@ -1387,9 +1385,9 @@ class TicaCutoutFactory():
         """
 
         for key in self.img_kwds:
+            if key == 'COMMENT':
+                continue
             table_header[key] = tuple(self.img_kwds[key])
-
-
 
     def _build_tpf(self, cube_fits, img_cube, uncert_cube, cutout_wcs_dict, aperture, verbose=True):
         """
@@ -1518,10 +1516,6 @@ class TicaCutoutFactory():
             # Get the info we need from the data table
             self._parse_table_info(cube[2].data, verbose)
 
-            print(self.img_kwds)
-            print(self.cube_wcs)
-            print('done')
-
             if isinstance(coordinates, SkyCoord):
                 self.center_coord = coordinates
             else:
@@ -1547,7 +1541,6 @@ class TicaCutoutFactory():
 
             # Get cutout limits
             self._get_cutout_limits(cutout_size)
-            print(self.cutout_lims)
 
             if verbose:
                 print("xmin,xmax: {}".format(self.cutout_lims[1]))
@@ -1555,9 +1548,7 @@ class TicaCutoutFactory():
 
             # Make the cutout
             img_cutout, uncert_cutout, aperture = self._get_cutout(cube[1].data, verbose=verbose)
-            print('IMAGE CUTOUT')
-            print(img_cutout)
-            print(img_cutout.shape)
+            
             # Get cutout wcs info
             cutout_wcs_full = self._get_full_cutout_wcs(cube[2].header)
             max_dist, sigma = self._fit_cutout_wcs(cutout_wcs_full, img_cutout.shape[1:])
