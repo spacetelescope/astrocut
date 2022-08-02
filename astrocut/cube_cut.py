@@ -1277,6 +1277,21 @@ class TicaCutoutFactory():
             The primary header from the cube file that will be modified in place for the cutout.
         """
         
+        # Adding cutout specific headers
+        primary_header['CREATOR'] = ('astrocut', 'software used to produce this file')
+        primary_header['PROCVER'] = (__version__, 'software version')
+        primary_header['FFI_TYPE'] = ('TICA', 'the FFI type used to make the cutouts')
+
+        primary_header['RA_OBJ'] = (self.center_coord.ra.deg, '[deg] right ascension')
+        primary_header['DEC_OBJ'] = (self.center_coord.dec.deg, '[deg] declination')
+
+        primary_header['TIMEREF'] = ('SOLARSYSTEM', 'barycentric correction applied to times')        
+        primary_header['TASSIGN'] = ('SPACECRAFT', 'where time is assigned')                         
+        primary_header['TIMESYS'] = ('TDB', 'time system is Barycentric Dynamical Time (TDB)')
+        primary_header['BJDREFI'] = (2457000, 'integer part of BTJD reference date')           
+        primary_header['BJDREFF'] = (0.00000000, 'fraction of the day in BTJD reference date')    
+        primary_header['TIMEUNIT'] = ('d', 'time unit for STARTTJD and ENDTJD')
+
         # Adding some missing kwds not in TICA (but in Ames-produced SPOC ffis)
         primary_header['EXTVER'] = ('1', 'extension version number (not format version)')
         primary_header['SIMDATA'] = ('F', 'file is based on simulated data')
@@ -1337,21 +1352,6 @@ class TicaCutoutFactory():
         del primary_header['CRM_N']
         del primary_header['ORBIT_ID']
         del primary_header['MIDTJD']
-
-        # Adding cutout specific headers
-        primary_header['CREATOR'] = ('astrocut', 'software used to produce this file')
-        primary_header['PROCVER'] = (__version__, 'software version')
-        primary_header['FFI_TYPE'] = ('TICA', 'the FFI type used to make the cutouts')
-
-        primary_header['RA_OBJ'] = (self.center_coord.ra.deg, '[deg] right ascension')
-        primary_header['DEC_OBJ'] = (self.center_coord.dec.deg, '[deg] declination')
-
-        primary_header['TIMEREF'] = ('SOLARSYSTEM', 'barycentric correction applied to times')        
-        primary_header['TASSIGN'] = ('SPACECRAFT', 'where time is assigned')                         
-        primary_header['TIMESYS'] = ('TDB', 'time system is Barycentric Dynamical Time (TDB)')
-        primary_header['BJDREFI'] = (2457000, 'integer part of BTJD reference date')           
-        primary_header['BJDREFF'] = (0.00000000, 'fraction of the day in BTJD reference date')    
-        primary_header['TIMEUNIT'] = ('d', 'time unit for STARTTJD and ENDTJD')
 
         telapse = primary_header.get("TSTOP", 0) - primary_header.get("TSTART", 0)
         primary_header['TELAPSE '] = (telapse, '[d] TSTOP - TSTART')
