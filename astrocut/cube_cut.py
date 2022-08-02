@@ -12,9 +12,10 @@ from itertools import product
 import numpy as np
 import astropy.units as u
 
-from astropy.io import fits
-from astropy.coordinates import SkyCoord
 from astropy import wcs
+from astropy.coordinates import SkyCoord
+from astropy.io import fits
+from astropy.time import Time
 
 from . import __version__ 
 from .exceptions import InputWarning, InvalidQueryError
@@ -458,7 +459,7 @@ class CutoutFactory():
         # Adding cutout specific headers
         primary_header['CREATOR'] = ('astrocut', 'software used to produce this file')
         primary_header['PROCVER'] = (__version__, 'software version')
-        primary_header['FFI_TYPE'] = ('TESS', 'the FFI type used to make the cutouts')
+        primary_header['FFI_TYPE'] = ('SPOC', 'the FFI type used to make the cutouts')
 
         primary_header['RA_OBJ'] = (self.center_coord.ra.deg, '[deg] right ascension')
         primary_header['DEC_OBJ'] = (self.center_coord.dec.deg, '[deg] declination')
@@ -1275,6 +1276,67 @@ class TicaCutoutFactory():
         primary_header : `~astropy.io.fits.Header`
             The primary header from the cube file that will be modified in place for the cutout.
         """
+        
+        # Adding some missing kwds not in TICA (but in Ames-produced SPOC ffis)
+        primary_header['EXTVER'] = ('1', 'extension version number (not format version)')
+        primary_header['SIMDATA'] = ('F', 'file is based on simulated data')
+        primary_header['NEXTEND'] = ('2', 'number of standard extensions')
+        primary_header['TSTART'] = (primary_header['STARTTJD'], 'observation start time in TJD')
+        primary_header['TSTOP'] = (primary_header['ENDTJD'], 'observation stop time in TJD')
+        primary_header['CAMERA'] = (primary_header['CAMNUM'], 'Camera number')
+        primary_header['CCD'] = (primary_header['CCDNUM'], 'CCD chip number')
+        primary_header['ASTATE'] = ('N/A', 'archive state F indicates single orbit processi')
+        primary_header['CRMITEN'] = (primary_header['CRM'], 'spacecraft cosmic ray mitigation enabled')
+        primary_header['CRBLKSZ'] = ('N/A', '[exposures] s/c cosmic ray mitigation block siz')
+        primary_header['FFIINDEX'] = (primary_header['CADENCE'], 'number of FFI cadence interval')
+        primary_header['DATA_REL'] = ('N/A', 'data release version number')
+        primary_header['DATE-OBS'] = (Time(primary_header['TSTART']+primary_header['BJDREFI'], format='jd').iso, 'TSTART as UTC calendar date')
+        primary_header['DATE-END'] = (Time(primary_header['TSTOP']+primary_header['BJDREFI'], format='jd').iso, 'TSTOP as UTC calendar date')
+        primary_header['FILEVER'] = ('N/A', 'file format version')
+        primary_header['RADESYS'] = ('N/A', 'reference frame of celestial coordinates')
+        primary_header['SCCONFIG'] = ('N/A', 'spacecraft configuration ID')
+        primary_header['TIMVERSN'] = ('N/A', 'OGIP memo number for file format')
+                                    
+        # Bulk removal with wildcards
+        del primary_header['SC_*'] # removes predicted RA, Dec, Roll, etc
+        del primary_header['RMS*'] # removes WCS fit residual 
+        del primary_header['A_*'] # removes some WCS constants and other miscellaneous kwds
+        del primary_header['AP_*'] # removes some WCS constants and other miscellaneous kwds
+        del primary_header['B_*'] # removes some WCS constants and other miscellaneous kwds
+        del primary_header['BP*'] # removes some WCS constants and other miscellaneous kwds
+        del primary_header['GAIN*'] # removes gain for each quadrant 
+        del primary_header['TESS_*'] # removes spacecraft coordinates
+        del primary_header['CD*'] # removes WCS CD matrix components
+        del primary_header['CT*'] # removes ctypes
+        del primary_header['CRPIX*']
+        del primary_header['CRVAL*']
+        del primary_header['MJD*']
+        
+        # Removal of specific kwds
+        del primary_header['ACS_MODE']
+        del primary_header['DEC_TARG']
+        del primary_header['FLXWIN']
+        del primary_header['RA_TARG']                             
+        del primary_header['CCDNUM']
+        del primary_header['CAMNUM']
+        del primary_header['WCSGDF']
+        del primary_header['UNITS']
+        del primary_header['CADENCE']
+        del primary_header['SCIPIXS']
+        del primary_header['INT_TIME']
+        del primary_header['PIX_CAT']
+        del primary_header['REQUANT']
+        del primary_header['DIFF_HUF']
+        del primary_header['PRIM_HUF']
+        del primary_header['QUAL_BIT']
+        del primary_header['SPM']
+        del primary_header['STARTTJD']
+        del primary_header['ENDTJD']
+        del primary_header['CRM']
+        del primary_header['TJD_ZERO']
+        del primary_header['CRM_N']
+        del primary_header['ORBIT_ID']
+        del primary_header['MIDTJD']
 
         # Adding cutout specific headers
         primary_header['CREATOR'] = ('astrocut', 'software used to produce this file')
