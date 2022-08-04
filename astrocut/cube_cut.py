@@ -803,11 +803,12 @@ class CutoutFactory():
 
         return target_pixel_file
 
+
 class TicaCutoutFactory():
 
     def __init__(self):
         """
-        Initiazation function.
+        Initialization function.
         """
 
         self.cube_wcs = None  # WCS information from the image cube
@@ -819,9 +820,8 @@ class TicaCutoutFactory():
         self.center_coord = None  # Central skycoord
         
         # Extra keywords from the FFI image headers (TICA specific)
-        # And keywords from SPOC that must be added to TICA
-        self.img_kwds = {
-                         'BACKAPP': [None, 'background is subtracted'],
+        # And keywords from SPOC that must be added to TICA for consistency
+        self.img_kwds = {'BACKAPP': [None, 'background is subtracted'],
                          'CROWDSAP': [None, 'Ratio of target flux to total flux in op. ap.'],
                          'DEADAPP': [None, 'deadtime applied'],
                          'DEADC': [None, 'deadtime correction'],
@@ -858,7 +858,6 @@ class TicaCutoutFactory():
                          "GAINB": [None, "[electrons/count] CCD output B gain"],
                          "GAINC": [None, "[electrons/count] CCD output C gain"],
                          "GAIND": [None, "[electrons/count] CCD output D gain"],
-                         "INT_TIME": [None, "[s] photon accumulation time per frame"],
                          "SIMPLE": [None, "conforms to FITS standard"],
                          "CRM_N": [None, "Window for CRM min/max rejection"],
                          "ORBIT_ID": [None, "Orbit ID, not a physical orbit"],
@@ -875,7 +874,6 @@ class TicaCutoutFactory():
                          "MIDTJD": [None, "Mid TJD of exposures"],
                          "ENDTJD": [None, "End of integration in TJD"],
                          "EXPTIME": [None, "Effective exposures corrected for CRM"],
-                         "INT_TIME": [None, "Seconds of integration"],
                          "PIX_CAT": [None, "ADHU target pixel bitmask ID"],
                          "REQUANT": [None, "Requant table id"],
                          "DIFF_HUF": [None, "Huffman table for differenced data"],
@@ -1332,24 +1330,28 @@ class TicaCutoutFactory():
         primary_header['CRBLKSZ'] = ('N/A', '[exposures] s/c cosmic ray mitigation block siz')
         primary_header['FFIINDEX'] = (primary_header['CADENCE'], 'number of FFI cadence interval')
         primary_header['DATA_REL'] = ('N/A', 'data release version number')
-        primary_header['DATE-OBS'] = (Time(primary_header['TSTART']+primary_header['BJDREFI'], format='jd').iso, 'TSTART as UTC calendar date')
-        primary_header['DATE-END'] = (Time(primary_header['TSTOP']+primary_header['BJDREFI'], format='jd').iso, 'TSTOP as UTC calendar date')
+
+        date_obs = Time(primary_header['TSTART']+primary_header['BJDREFI'], format='jd').iso
+        date_end = Time(primary_header['TSTOP']+primary_header['BJDREFI'], format='jd').iso
+        primary_header['DATE-OBS'] = (date_obs, 'TSTART as UTC calendar date')
+        primary_header['DATE-END'] = (date_end, 'TSTOP as UTC calendar date')
+
         primary_header['FILEVER'] = ('N/A', 'file format version')
         primary_header['RADESYS'] = ('N/A', 'reference frame of celestial coordinates')
         primary_header['SCCONFIG'] = ('N/A', 'spacecraft configuration ID')
         primary_header['TIMVERSN'] = ('N/A', 'OGIP memo number for file format')
                                     
         # Bulk removal with wildcards
-        del primary_header['SC_*'] # removes predicted RA, Dec, Roll, etc
-        del primary_header['RMS*'] # removes WCS fit residual 
-        del primary_header['A_*'] # removes some WCS constants and other miscellaneous kwds
-        del primary_header['AP_*'] # removes some WCS constants and other miscellaneous kwds
-        del primary_header['B_*'] # removes some WCS constants and other miscellaneous kwds
-        del primary_header['BP*'] # removes some WCS constants and other miscellaneous kwds
-        del primary_header['GAIN*'] # removes gain for each quadrant 
-        del primary_header['TESS_*'] # removes spacecraft coordinates
-        del primary_header['CD*'] # removes WCS CD matrix components
-        del primary_header['CT*'] # removes ctypes
+        del primary_header['SC_*']  # removes predicted RA, Dec, Roll, etc
+        del primary_header['RMS*']  # removes WCS fit residual 
+        del primary_header['A_*']  # removes some WCS constants and other miscellaneous kwds
+        del primary_header['AP_*']  # removes some WCS constants and other miscellaneous kwds
+        del primary_header['B_*']  # removes some WCS constants and other miscellaneous kwds
+        del primary_header['BP*']  # removes some WCS constants and other miscellaneous kwds
+        del primary_header['GAIN*']  # removes gain for each quadrant 
+        del primary_header['TESS_*']  # removes spacecraft coordinates
+        del primary_header['CD*']  # removes WCS CD matrix components
+        del primary_header['CT*']  # removes ctypes
         del primary_header['CRPIX*']
         del primary_header['CRVAL*']
         del primary_header['MJD*']
@@ -1518,26 +1520,17 @@ class TicaCutoutFactory():
         empty_arr = np.zeros(img_cube.shape)
 
         # Adding the Time relates columns
-        # TESS --> TICA keyword analogs:
-        # TSTART --> STARTTJD
-        # TSTOP --> ENDTJD
         cols.append(fits.Column(name='TIME', format='D', unit='BJD - 2457000, days', disp='D14.7',
-                                array=(cube_fits[2].columns['STARTTJD'].array + cube_fits[2].columns['ENDTJD'].array)/2))
-
-        # JENNY: TICA does not seem to have a barycentric time correction.
-        # Is this necessary?
-        # The assumption from Scott & co is that the time correction is already 
-        # implemented when the data flows thru the TICA pipeline
-        #cols.append(fits.Column(name='TIMECORR', format='E', unit='d', disp='E14.7', array=cube_fits[2].columns['BARYCORR'].array))
+                                array=(cube_fits[2].columns['TSTART'].array + cube_fits[2].columns['TSTOP'].array)/2))
 
         # Adding CADENCENO 
-        cols.append(fits.Column(name='CADENCENO', format='J', disp='I10', array=cube_fits[2].columns['CADENCE'].array))
+        cols.append(fits.Column(name='CADENCENO', format='J', disp='I10', array=empty_arr))
 
         # Adding counts (-1 b/c we don't have data)
         cols.append(fits.Column(name='RAW_CNTS', format=tform.replace('E', 'J'), unit='count', dim=dims, disp='I8',
                                 array=empty_arr-1, null=-1))
 
-        # Adding flux and flux_err (data we actually have!)
+        # Adding flux and flux_err 
         cols.append(fits.Column(name='FLUX', format=tform, dim=dims, unit='e-', disp='E14.7', array=img_cube))
         cols.append(fits.Column(name='FLUX_ERR', format=tform, dim=dims, unit='e-', disp='E14.7', array=empty_arr)) 
    
@@ -1649,7 +1642,6 @@ class TicaCutoutFactory():
 
             # Build the TPF
             tpf_object = self._build_tpf(cube, img_cutout, uncert_cutout, cutout_wcs_dict, aperture)
-            print('TPF BUILT')
             
             if verbose:
                 write_time = time()
