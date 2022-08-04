@@ -1535,8 +1535,10 @@ class TicaCutoutFactory():
         cols.append(fits.Column(name='FLUX_ERR', format=tform, dim=dims, unit='e-', disp='E14.7', array=empty_arr)) 
    
         # Adding the background info (zeros b.c we don't have this info)
-        cols.append(fits.Column(name='FLUX_BKG', format=tform, dim=dims, unit='e-/s', disp='E14.7', array=empty_arr))
-        cols.append(fits.Column(name='FLUX_BKG_ERR', format=tform, dim=dims, unit='e-/s', disp='E14.7', array=empty_arr))
+        cols.append(fits.Column(name='FLUX_BKG', format=tform, dim=dims, unit='e-/s', disp='E14.7', 
+                                array=empty_arr))
+        cols.append(fits.Column(name='FLUX_BKG_ERR', format=tform, dim=dims, unit='e-/s', disp='E14.7', 
+                                array=empty_arr))
 
         # Adding the quality flags
         # TESS --> TICA keyword analogs:
