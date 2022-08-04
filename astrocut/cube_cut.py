@@ -3,7 +3,6 @@
 """This module implements the cutout functionality."""
 
 import os
-from unittest import skip
 import warnings
 
 from time import time
