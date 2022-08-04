@@ -84,6 +84,7 @@ def check1(flux, x1, x2, y1, y2, ecube, label, cutfile):
 
     return
 
+
 @pytest.mark.parametrize('ffi_type', ['SPOC', 'TICA'])
 def test_cube_cutout(tmpdir, ffi_type):
     """
@@ -91,7 +92,7 @@ def test_cube_cutout(tmpdir, ffi_type):
     """
 
     # Making the test cube
-    if ffi_type=='SPOC':
+    if ffi_type == 'SPOC':
         cube_maker = CubeFactory()
         cutout_maker = CutoutFactory()
     else:
@@ -140,12 +141,13 @@ def test_cube_cutout(tmpdir, ffi_type):
     # Doing the actual checking
     for i, cutfile in enumerate(cutlist):
         checkcutout(cutfile, pixcrd[i], world_coords[i], csize[i], ecube)
-               
+
+
 @pytest.mark.parametrize('ffi_type', ['SPOC', 'TICA'])
 def test_cutout_extras(tmpdir, ffi_type):
 
     # Making the test cube
-    if ffi_type=='SPOC':
+    if ffi_type == 'SPOC':
         cube_maker = CubeFactory()
         cutout_maker = CutoutFactory()
     else:
@@ -165,8 +167,12 @@ def test_cutout_extras(tmpdir, ffi_type):
     # Test  _parse_table_info #
     ###########################
     cutout_size = [5, 3]
-    out_file = cutout_maker.cube_cut(cube_file, coord, cutout_size,
-                                  output_path=path.join(tmpdir, "out_dir"), verbose=False)
+    out_file = cutout_maker.cube_cut(cube_file, 
+                                     coord, 
+                                     cutout_size,
+                                     output_path=path.join(tmpdir, "out_dir"), 
+                                     verbose=False)
+                                      
     assert "256.880000_6.380000_5x3_astrocut.fits" in out_file
 
     assert isinstance(cutout_maker.cube_wcs, wcs.WCS)
@@ -274,7 +280,7 @@ def test_exceptions(tmpdir, ffi_type):
     """
     
     # Making the test cube
-    if ffi_type=='SPOC':
+    if ffi_type == 'SPOC':
         cube_maker = CubeFactory()
         cutout_maker = CutoutFactory()
     else:
@@ -358,7 +364,7 @@ def test_inputs(tmpdir, capsys, ffi_type):
     """
 
     # Making the test cube
-    if ffi_type=='SPOC':
+    if ffi_type == 'SPOC':
         cube_maker = CubeFactory()
         cutout_maker = CutoutFactory()
     else:
