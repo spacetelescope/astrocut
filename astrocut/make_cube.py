@@ -397,7 +397,7 @@ class TicaCubeFactory():
         for i, ffi in enumerate(file_list):
             ffi_data = fits.open(ffi, mode='denywrite', memmap=True)
             
-            start_times[i] = ffi_data[0].header.get('STARTTJD')
+            start_times[i] = ffi_data[0].header.get(self.time_keyword)
 
             if image_shape is None:  # Only need to fill this once
                 image_shape = ffi_data[0].data.shape
@@ -455,8 +455,8 @@ class TicaCubeFactory():
         else:
             with fits.open(self.cube_file, mode='update', memmap=True) as cube_hdu:
                 header = cube_hdu[0].header 
-                # header['HISTORY'] = f'Updated on {str(date.today())} with new FFI delivery.' 
-                # header['HISTORY'] = f'First FFI is {str(os.path.basename(self.file_list[0]))}'
+                header['HISTORY'] = f'Updated on {str(date.today())} with new FFI delivery.' 
+                header['HISTORY'] = f'First FFI is {str(os.path.basename(self.file_list[0]))}'
 
         # Adding the keywords from the last file
         with fits.open(self.file_list[-1], mode='denywrite', memmap=True) as last_file:
