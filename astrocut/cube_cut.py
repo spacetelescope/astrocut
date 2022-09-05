@@ -1520,7 +1520,7 @@ class TicaCutoutFactory():
 
         # Adding the Time relates columns
         cols.append(fits.Column(name='TIME', format='D', unit='BJD - 2457000, days', disp='D14.7',
-                                array=(cube_fits[2].columns['TSTART'].array + cube_fits[2].columns['TSTOP'].array)/2))
+                                array=(cube_fits[2].columns['STARTTJD'].array + cube_fits[2].columns['ENDTJD'].array)/2))
 
         # Adding CADENCENO 
         cols.append(fits.Column(name='CADENCENO', format='J', disp='I10', array=empty_arr))
