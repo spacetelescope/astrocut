@@ -1517,20 +1517,20 @@ class TicaCutoutFactory():
         tform = str(img_cube[0].size) + "E"
         dims = str(img_cube[0].shape[::-1])
         empty_arr = np.zeros(img_cube.shape)
-
+        
         # Adding the Time relates columns
         cols.append(fits.Column(name='TIME', format='D', unit='BJD - 2457000, days', disp='D14.7',
                                 array=(cube_fits[2].columns['STARTTJD'].array + cube_fits[2].columns['ENDTJD'].array)/2))
-
+        
         # Adding CADENCENO 
-        cols.append(fits.Column(name='CADENCENO', format='J', disp='I10', array=empty_arr))
-
+        cols.append(fits.Column(name='CADENCENO', format='J', disp='I10', array=empty_arr[:, 0, 0]))
+        
         # Adding counts (-1 b/c we don't have data)
         cols.append(fits.Column(name='RAW_CNTS', format=tform.replace('E', 'J'), unit='count', dim=dims, disp='I8',
                                 array=empty_arr-1, null=-1))
-
+        
         # Adding flux and flux_err 
-        cols.append(fits.Column(name='FLUX', format=tform, dim=dims, unit='e-', disp='E14.7', array=img_cube))
+        cols.append(fits.Column(name='FLUX', format=tform, dim=dims, unit='e-', disp='E14.7', array=empty_arr))
         cols.append(fits.Column(name='FLUX_ERR', format=tform, dim=dims, unit='e-', disp='E14.7', array=empty_arr)) 
    
         # Adding the background info (zeros b.c we don't have this info)
@@ -1648,6 +1648,7 @@ class TicaCutoutFactory():
                 write_time = time()
 
             if not target_pixel_file:
+                
                 _, flename = os.path.split(cube_file)
 
                 width = self.cutout_lims[0, 1]-self.cutout_lims[0, 0]
@@ -1657,6 +1658,7 @@ class TicaCutoutFactory():
                                                                                 self.center_coord.dec.value,
                                                                                 width,
                                                                                 height)
+            
             target_pixel_file = os.path.join(output_path, target_pixel_file)
             
         
