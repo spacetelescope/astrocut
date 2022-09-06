@@ -1120,8 +1120,8 @@ class TicaCutoutFactory():
             xmax = xmax_cube
         if ymax > ymax_cube:
             padding[2, 1] = ymax - ymax_cube
-            ymax = ymax_cube       
-        
+            ymax = ymax_cube
+
         # Doing the cutout
         cutout = transposed_cube[xmin:xmax, ymin:ymax, :, :]
     
@@ -1530,8 +1530,8 @@ class TicaCutoutFactory():
                                 array=empty_arr-1, null=-1))
         
         # Adding flux and flux_err 
-        cols.append(fits.Column(name='FLUX', format=tform, dim=dims, unit='e-', disp='E14.7', array=empty_arr))
-        cols.append(fits.Column(name='FLUX_ERR', format=tform, dim=dims, unit='e-', disp='E14.7', array=empty_arr)) 
+        cols.append(fits.Column(name='FLUX', format=tform, dim=dims, unit='e-', disp='E14.7', array=img_cube))
+        cols.append(fits.Column(name='FLUX_ERR', format=tform, dim=dims, unit='e-', disp='E14.7', array=uncert_cube)) 
    
         # Adding the background info (zeros b.c we don't have this info)
         cols.append(fits.Column(name='FLUX_BKG', format=tform, dim=dims, unit='e-/s', disp='E14.7', 
@@ -1557,7 +1557,7 @@ class TicaCutoutFactory():
         table_hdu = fits.BinTableHDU.from_columns(cols)
         table_hdu.header['EXTNAME'] = 'PIXELS'
         table_hdu.header['INHERIT'] = True
-    
+        
         # Adding the wcs keywords to the columns and removing from the header
         self._add_column_wcs(table_hdu.header, cutout_wcs_dict)
 
