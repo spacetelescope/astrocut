@@ -1,4 +1,5 @@
 import numpy as np
+import os
 
 from astropy.io import fits
 from astropy.table import Table
@@ -63,7 +64,10 @@ def test_update_cube(tmpdir):
     ffi_files = create_test_ffis(img_sz, num_im, product='tica', dir_name=tmpdir)
 
     cube_file = path.join(tmpdir, "out_dir", "test_update_cube.fits")
+
     cube_maker.make_cube(ffi_files[0:num_im//2], cube_file, verbose=False)
+    os.chmod(cube_file, 0o777)
+
     cube_file = cube_maker.update_cube(ffi_files[num_im//2:], cube_file, verbose=False)
 
     hdu = fits.open(cube_file)
