@@ -63,14 +63,9 @@ def test_update_cube(tmpdir):
     
     ffi_files = create_test_ffis(img_sz, num_im, product='tica', dir_name=tmpdir)
 
-    cube_file = path.join(tmpdir, "out_dir", "test_update_cube.fits")
+    cube_file = path.join(os.getcwd(), "out_dir", "test_update_cube.fits")
 
     cube_maker.make_cube(ffi_files[0:num_im//2], cube_file, verbose=False)
-    try:
-        os.system(f'TASKKILL /F /IM {cube_file}')
-
-    except Exception:
-       pass
 
     cube_file = cube_maker.update_cube(ffi_files[num_im//2:], cube_file, verbose=False)
 
@@ -100,6 +95,8 @@ def test_update_cube(tmpdir):
     assert np.alltrue(tab['FFI_FILE'] == np.array(filenames)), "FFI_FILE mismatch in table"
 
     hdu.close()
+
+    os.remove(cube_file)
     
 
 def test_iteration(tmpdir, capsys):
