@@ -66,7 +66,11 @@ def test_update_cube(tmpdir):
     cube_file = path.join(tmpdir, "out_dir", "test_update_cube.fits")
 
     cube_maker.make_cube(ffi_files[0:num_im//2], cube_file, verbose=False)
-    os.chmod(cube_file, 0o777)
+    try:
+        os.system(f'TASKKILL /F /IM {cube_file}')
+
+    except Exception:
+       pass
 
     cube_file = cube_maker.update_cube(ffi_files[num_im//2:], cube_file, verbose=False)
 
