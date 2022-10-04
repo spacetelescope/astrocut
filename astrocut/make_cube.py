@@ -522,8 +522,7 @@ class TicaCubeFactory():
         header = hdu.header
         header["NAXIS4"], header["NAXIS3"], header["NAXIS2"], header["NAXIS1"] = self.cube_shape
 
-        # I think this part increases the buffer size of ext1 and writes 
-        # the cube in there?
+        # Writes the header into the cube as an array of bytes
         with open(cube_file, 'ab') as CUBE:
             CUBE.write(bytearray(header.tostring(), encoding="utf-8"))
 
