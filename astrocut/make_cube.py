@@ -531,11 +531,9 @@ class TicaCubeFactory():
         cubesize_in_bytes = ((np.prod(self.cube_shape) * 4 + 2880 - 1) // 2880) * 2880
         filelen = os.path.getsize(cube_file)
         
+        # Seek to end of file and write null byte
         with open(cube_file, 'r+b') as CUBE:
-            # What is this .seek?
-            # Looks like it's expanding the buffer size of the file?
             CUBE.seek(filelen + cubesize_in_bytes - 1)
-            # b for buffer?
             CUBE.write(b'\0')
         
 
