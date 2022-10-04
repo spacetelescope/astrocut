@@ -476,6 +476,7 @@ class TicaCubeFactory():
             # set up the image info table
             existing_cols = []
             cols = []
+            length = len(self.file_list)
             for kwd, val, cmt in primary_header.cards: 
                 if type(val) == str:  
                     tpe = "S" + str(len(val))  # TODO: Maybe switch to U?
@@ -484,7 +485,6 @@ class TicaCubeFactory():
                 else:
                     tpe = np.float64
                     
-                length = len(self.file_list)
                 if kwd not in existing_cols:
                     existing_cols.append(kwd)
                     cols.append(Column(name=kwd, dtype=tpe, length=length, meta={"comment": cmt}))
