@@ -471,12 +471,12 @@ class TicaCubeFactory():
         with fits.open(self.template_file, mode='denywrite', memmap=True) as ffi_data:
             
             # The image specific header information will be saved in a table in the second extension
-            secondary_header = ffi_data[0].header
+            primary_header = ffi_data[0].header
 
             # set up the image info table
             already_there = []
             cols = []
-            for kwd, val, cmt in secondary_header.cards: 
+            for kwd, val, cmt in primary_header.cards: 
                 if type(val) == str:  
                     tpe = "S" + str(len(val))  # TODO: Maybe switch to U?
                 elif type(val) == int:
