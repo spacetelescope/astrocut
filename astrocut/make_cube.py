@@ -379,7 +379,7 @@ class TicaCubeFactory():
         self.cube_append = None
 
     def _configure_cube(self, file_list, **extra_keywords):
-        """ Run through all the files and set up the  basic parameters for the cube.
+        """ Run through all the files and set up the basic parameters for the cube.
         Set up the cube primary header.
         """
 
