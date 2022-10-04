@@ -437,8 +437,8 @@ class TicaCubeFactory():
 
                 # Adding factory specific keywords
                 for kwd in self.image_header_keywords:
-                    # TICA file structure differs from SPOC in that factory-specific kwds 
-                    # are in the 0th extension, along with the science data. 
+                    # TICA file structure differs from SPOC in that factory-specific kwds
+                    # are in the 0th extension, along with the science data.
                     header[kwd] = (first_file[0].header[kwd], first_file[0].header.comments[kwd])
 
                 # Adding the extra keywords passed in
@@ -455,6 +455,8 @@ class TicaCubeFactory():
         # Adding the keywords from the last file
         with fits.open(self.file_list[-1], mode='denywrite', memmap=True) as last_file:
             for kwd in self.last_file_keywords:
+                # TICA file structure differs from SPOC in that factory-specific kwds
+                # are in the 0th extension, along with the science data.
                 header[kwd] = (last_file[0].header[kwd], last_file[0].header.comments[kwd])
 
         header["EXTNAME"] = "PRIMARY"
