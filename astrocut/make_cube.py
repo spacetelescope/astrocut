@@ -474,7 +474,7 @@ class TicaCubeFactory():
             primary_header = ffi_data[0].header
 
             # set up the image info table
-            already_there = []
+            existing_cols = []
             cols = []
             for kwd, val, cmt in primary_header.cards: 
                 if type(val) == str:  
@@ -485,11 +485,9 @@ class TicaCubeFactory():
                     tpe = np.float64
                     
                 length = len(self.file_list)
-                if kwd not in already_there:
-                    already_there.append(kwd)
-                else: 
-                    continue
-                cols.append(Column(name=kwd, dtype=tpe, length=length, meta={"comment": cmt}))
+                if kwd not in existing_cols:
+                    existing_cols.append(kwd)
+                    cols.append(Column(name=kwd, dtype=tpe, length=length, meta={"comment": cmt}))
 
             cols.append(Column(name="FFI_FILE", dtype="S" + str(len(os.path.basename(self.template_file))),
                                length=length))
