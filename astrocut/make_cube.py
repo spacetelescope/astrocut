@@ -437,6 +437,8 @@ class TicaCubeFactory():
 
                 # Adding factory specific keywords
                 for kwd in self.image_header_keywords:
+                    # TICA file structure differs from SPOC in that factory-specific kwds 
+                    # are in the 0th extension, along with the science data. 
                     header[kwd] = (first_file[0].header[kwd], first_file[0].header.comments[kwd])
 
                 # Adding the extra keywords passed in
