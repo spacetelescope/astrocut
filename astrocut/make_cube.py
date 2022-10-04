@@ -364,7 +364,7 @@ class TicaCubeFactory():
         self.time_keyword = 'STARTTJD'  # Start time in TJD. TICA-specific.
         self.last_file_keywords = ['ENDTJD']  # Stop time in TJD. TICA-specific (assumed to be in extension 0)                  
         self.image_header_keywords = ['CAMNUM', 'CCDNUM']  # Camera number and CCD number 
-        self.template_requirements = {'NAXIS': 2}  # Using NAXIS instead of WCSAXES. JENNY: Verify this is OK.
+        self.template_requirements = {'NAXIS': 2}  # Using NAXIS instead of WCSAXES. 
                                                    
         self.file_list = None
         self.template_file = None
