@@ -690,6 +690,8 @@ class TicaCubeFactory():
 
         # Appending to the cube file
         with fits.open(self.cube_file, mode='update', memmap=True) as cube_hdus:
+            # If we're updating the cube, get rid of the existing table 
+            # so we can replace it with the new one. 
             if self.update:
                 cube_hdus.pop(index=2)
             cube_hdus.append(table_hdu)
