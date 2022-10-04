@@ -555,16 +555,24 @@ class TicaCubeFactory():
             if verbose:
                 st = time()
 
+            # In this section we will take the SCI data from self.file_list above
+            # and "paste" a cutout of the full SCI array into a 4d array called 
+            # sub_cube. We iterate this process until the full SCI array for each 
+            # FFI is copied onto the cube. Usually the sub_cube is ~1/3 the size of 
+            # the full SCI array, so there are 3 iterations. 
+            # For TICA, the SCI data exists in the 0th extension. 
             with fits.open(fle, mode='denywrite', memmap=True) as ffi_data:
 
-                # add the image and info to the arrays
+                # Add the image and info to the arrays
                 sub_cube[:, :, i, 0] = ffi_data[0].data[start_row:end_row, :]
 
                 del ffi_data[0].data
                
-                if fill_info_table:  # Also save the header info in the info table
+                # Also save the header info in the info table
+                if fill_info_table:
 
-                    for kwd in self.info_table.columns:  # Iterate over every keyword in the TICA FFI primary header
+                    # Iterate over every keyword in the TICA FFI primary header
+                    for kwd in self.info_table.columns:
                         if kwd == "FFI_FILE":
                             self.info_table[kwd][i] = os.path.basename(fle)
                             
