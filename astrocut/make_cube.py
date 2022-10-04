@@ -354,15 +354,7 @@ class CubeFactory():
 class TicaCubeFactory():
 
     def __init__(self, max_memory=50):
-        """ Setting up the class members. NOTE: Later down the line 
-        we might want to generalize CubeFactory so that we no longer need 
-        a separate class for the TICA cubes. 
-        
-        Modifying the __init__ 
-        in CubeFactory so that it can switch parameters based on whether 
-        we want cubes for TICA or TESS will probably be the route I take.
-        Or see how this is generalized when Zcut wraps CubeFactory? 
-        """
+        """ Setting up the class members."""
 
         self.max_memory = max_memory  # in GB
         self.block_size = None  # Number of rows
