@@ -719,7 +719,7 @@ class TicaCubeFactory():
         og_cube = fits.getdata(cube_file, 1)
         dimensions = list(og_cube.shape)
         dimensions[2] = len(file_list)
-        self.cube_append = np.zeros(tuple(dimensions))
+        self.cube_append = np.zeros(dimensions)
 
         # Next locate the existing cube file and assign it a variable
         err_msg = 'Location of the cube file was unsuccessful. Please ensure the correct path was provided.'
