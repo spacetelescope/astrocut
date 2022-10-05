@@ -85,11 +85,6 @@ jobs:
             python: 3.7
             toxenv: py37-test-devdeps
 
-          - name: (Allowed Failure) Python 3.8 with all optional dependencies (Windows)
-             os: windows-latest
-             python: 3.8
-             toxenv: py38-test-alldeps
-
     steps:
     - name: Checkout code
       uses: actions/checkout@v2
