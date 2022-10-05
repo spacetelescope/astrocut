@@ -62,6 +62,7 @@ class CubeFactory():
         image_shape = None
         start_times = np.zeros(len(file_list))
         for i, ffi in enumerate(file_list):
+
             ffi_data = fits.open(ffi, mode='denywrite', memmap=True)
             
             start_times[i] = ffi_data[1].header.get(self.time_keyword)
@@ -307,12 +308,12 @@ class CubeFactory():
             startTime = time()
 
         self.max_memory = max_memory
-            
+
         # Set up the basic cube parameters
         sector = (sector, "Observing sector")
+    
         self._configure_cube(file_list, sector=sector)
     
-        
         if verbose:
             print("Using {} to initialize the image header table.".format(os.path.basename(self.template_file)))
             print(f"Cube will be made in {self.num_blocks} blocks of {self.block_size} rows each.")
@@ -382,7 +383,7 @@ class TicaCubeFactory():
         """ Run through all the files and set up the basic parameters for the cube.
         Set up the cube primary header.
         """
-
+        
         file_list = np.array(file_list)
         image_shape = None
         start_times = np.zeros(len(file_list))
@@ -801,7 +802,42 @@ class TicaCubeFactory():
 
 
     def make_cube(self, file_list, cube_file="img-cube.fits", sector=None, max_memory=50, verbose=True):
-        
+        """
+        Analogous to CubeFactory.make_cube(...). 
+        Turns a list of fits image files into one large data-cube.
+        Input images must all have the same footprint and resolution.
+        The resulting datacube is transposed for quicker cutouts.
+        This function can take some time to run, exactly how much time will depend on the number
+        of input files and the maximum allowed memory. The runtime will be fastest if the
+        entire data cube can be held in memory, however that can be quite large (~40GB for a full
+        TESS main mission sector, 3 times that for a TESS extended mission sector).
+
+        Parameters
+        ----------
+        file_list : array
+            The list of fits image files to cube.  
+            Assumed to have the format of a TESS FFI:
+            - A primary HDU consisting only of a primary header
+            - An image HDU containing the image
+            - A second image HDU containing the uncertainty image
+        cube_file : string
+            Optional.  The filename/path to save the output cube in. 
+        sector : int
+            Optional.  TESS sector to add as header keyword (not present in FFI files).
+        max_memory : float
+            Optional, default is 50. The maximum amount of memory to make available for building
+            the data cube in GB. Note, this is the maximum amount of space to be used for the cube
+            array only, so should not be set to the full amount of memory on the system.
+        verbose : bool
+            Optional. If true intermediate information is printed. 
+
+        Returns
+        -------
+        response: string or None
+            If successful, returns the path to the cube fits file, 
+            if unsuccessful returns None.
+        """
+
         if verbose:
             startTime = time()
 
