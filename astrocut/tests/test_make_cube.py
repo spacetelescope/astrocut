@@ -35,7 +35,6 @@ def test_make_cube(tmpdir):
         ecube[:, :, i, 0] = -plane
         ecube[:, :, i, 1] = plane
         plane += img_sz*img_sz
-   
     assert np.alltrue(cube == ecube), "Cube values do not match expected values"
     
     tab = Table(hdu[2].data)
