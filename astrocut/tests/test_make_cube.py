@@ -23,7 +23,6 @@ def test_make_cube(tmpdir):
     
     ffi_files = create_test_ffis(img_sz, num_im, dir_name=tmpdir)
     cube_file = cube_maker.make_cube(ffi_files, path.join(tmpdir, "out_dir", "test_cube.fits"), verbose=False)
- 
     hdu = fits.open(cube_file)
     cube = hdu[1].data
     
