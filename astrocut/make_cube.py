@@ -353,6 +353,19 @@ class CubeFactory():
 
 
 class TicaCubeFactory():
+    """
+    Class for creating TICA image cubes.
+    
+    This class emcompasses all of the cube making functionality.  
+    In the current version this means creating image cubes fits files from TESS full frame image sets.
+    Future versions will include more generalized cubing functionality.
+
+    The TESS Image CAlibrator (TICA) products are high level science products (HLSPs) 
+    developed by the MIT Quick Look Pipeline (https://github.com/mmfausnaugh/tica). These 
+    images are produced and delivered up to 4x sooner than their SPOC counterparts (as of TESS EM2),
+    and can therefore be used to produce the most up-to-date cutouts of a target. 
+    More information on TICA can be found here: https://archive.stsci.edu/hlsp/tica
+    """
 
     def __init__(self, max_memory=50):
         """ Setting up the class members."""
