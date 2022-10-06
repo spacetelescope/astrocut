@@ -28,20 +28,20 @@ jobs:
             toxenv: py38-test-alldeps
             toxargs: -v --develop
 
-          - name: Python 3.6 with oldest supported version of all dependencies
-            os: ubuntu-16.04
-            python: 3.6
-            toxenv: py36-test-oldestdeps   
+          # Commenting out the test below due to outdated ubuntu OS 
+          # (16.04) which is no longer supported, 
+          # and Python 3.6 is no longer being supported. 
+          # TODO: Might be worth keeping this test for users who 
+          # are still on 3.6 and just update the os to ubuntu-18.04
+          #- name: Python 3.6 with oldest supported version of all dependencies
+          #  os: ubuntu-16.04
+          #  python: 3.6
+          #  toxenv: py36-test-oldestdeps   
             
           - name: Python 3.7 with numpy 1.21 and full coverage
             os: ubuntu-latest
             python: 3.7
             toxenv: py37-test-alldeps-numpy121-cov
-
-          - name: Python 3.8 with all optional dependencies (Windows)
-            os: windows-latest
-            python: 3.8
-            toxenv: py38-test-alldeps
             
           - name: Python 3.7 with all optional dependencies (MacOS X)
             os: macos-latest
