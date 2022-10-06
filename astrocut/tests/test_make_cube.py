@@ -47,7 +47,7 @@ def test_make_cube(tmpdir):
     hdu.close()
     
 
-def test_update_cube(tmpdir):
+def test_make_and_update_cube(tmpdir):
     """
     Testing the make cube and update cube functionality for TICACubeFactory by making a bunch of test FFIs, 
     making the cube with first half of the FFIs, updating the same cube with the second half,
