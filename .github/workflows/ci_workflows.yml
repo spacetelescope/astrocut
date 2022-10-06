@@ -28,6 +28,11 @@ jobs:
             toxenv: py38-test-alldeps
             toxargs: -v --develop
 
+          # Commenting out the test below due to outdated ubuntu OS 
+          # (16.04) which is no longer supported, 
+          # and Python 3.6 is no longer being supported. 
+          # TODO: Might be worth keeping this test for users who 
+          # are still on 3.6 and just update the os to ubuntu-18.04
           #- name: Python 3.6 with oldest supported version of all dependencies
           #  os: ubuntu-16.04
           #  python: 3.6
