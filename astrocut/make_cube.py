@@ -223,7 +223,7 @@ class CubeFactory():
                             elif self.info_table[kwd].dtype.char == "S":  # hacky way to check if it's a string
                                 nulval = ""
                             self.info_table[kwd][i] = ffi_data[1].header.get(kwd, nulval)
-                    
+
             if verbose:
                 print(f"Completed file {i} in {time()-st:.3} sec.")
 
