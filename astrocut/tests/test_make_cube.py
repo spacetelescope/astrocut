@@ -63,17 +63,41 @@ def test_make_and_update_cube(tmpdir):
 
     cube_file = path.join(os.getcwd(), "out_dir", "test_update_cube.fits")
 
-    cube_maker.make_cube(ffi_files[0:num_im//2], cube_file, verbose=False)
-
-    cube_file = cube_maker.update_cube(ffi_files[num_im//2:], cube_file, verbose=False)
+    # Testing make_cube
+    
+    cube_maker.make_cube(ffi_files[0:num_im // 2], cube_file, verbose=False)
 
     hdu = fits.open(cube_file)
     cube = hdu[1].data
 
-    # expected values for cube
+    # expected values for cube before update_cube
+    ecube = np.zeros((img_sz, img_sz, num_im // 2, 2))
+    plane = np.arange(img_sz*img_sz, dtype=np.float32).reshape((img_sz, img_sz))
+
+    assert cube.shape == ecube.shape, "Mismatch between cube shape and expected shape"
+
+    for i in range(num_im // 2):
+        ecube[:, :, i, 0] = -plane
+        # we don't need to test error array because TICA doesnt come with error arrays
+        # so index 1 will always be blank
+        # ecube[:, :, i, 1] = plane
+        plane += img_sz*img_sz
+
+    assert np.alltrue(cube == ecube), "Cube values do not match expected values"
+
+    hdu.close()
+
+    # Testing update_cube
+
+    cube_file = cube_maker.update_cube(ffi_files[num_im // 2:], cube_file, verbose=False)
+
+    hdu = fits.open(cube_file)
+    cube = hdu[1].data
+    
+    # expected values for cube after update_cube
     ecube = np.zeros((img_sz, img_sz, num_im, 2))
     plane = np.arange(img_sz*img_sz, dtype=np.float32).reshape((img_sz, img_sz))
-    
+
     assert cube.shape == ecube.shape, "Mismatch between cube shape and expected shape"
 
     for i in range(num_im):
