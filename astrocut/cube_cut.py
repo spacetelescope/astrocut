@@ -130,7 +130,7 @@ class CutoutFactory():
         # Filling the img_kwds dictionary while we are here
         for kwd in self.img_kwds:
             self.img_kwds[kwd][0] = wcs_header.get(kwd)
-        # Adding the info about which FFI we got the 
+        # Adding the info about which FFI we got the WCS info from
         self.img_kwds["WCS_FFI"] = [table_data[data_ind]["FFI_FILE"],
                                     "FFI used for cutout WCS"]
 
@@ -722,6 +722,11 @@ class CutoutFactory():
         warnings.filterwarnings("ignore", category=wcs.FITSFixedWarning)
         with fits.open(cube_file, mode='denywrite', memmap=True) as cube:
 
+            # Get the first FFI file, which is used to generate the 
+            # primary header keyword values 
+            self.first_ffi = cube[2].data['FFI_FILE'][0]
+            self.last_ffi = cube[2].data['FFI_FILE'][-1]
+
             # Get the info we need from the data table
             self._parse_table_info(cube[2].data, verbose)
 
@@ -1305,6 +1310,8 @@ class TicaCutoutFactory():
         primary_header['CREATOR'] = ('astrocut', 'software used to produce this file')
         primary_header['PROCVER'] = (__version__, 'software version')
         primary_header['FFI_TYPE'] = ('TICA', 'the FFI type used to make the cutouts')
+        primary_header['FIRST_FFI'] = (self.first_ffi, 'the FFI used for the primary header keyword values, except TSTOP')
+        primary_header['LAST_FFI'] = (self.last_ffi, 'the FFI used for the TSTOP keyword value')
 
         primary_header['RA_OBJ'] = (self.center_coord.ra.deg, '[deg] right ascension')
         primary_header['DEC_OBJ'] = (self.center_coord.dec.deg, '[deg] declination')
@@ -1320,20 +1327,20 @@ class TicaCutoutFactory():
         primary_header['EXTVER'] = ('1', 'extension version number (not format version)')
         primary_header['SIMDATA'] = ('F', 'file is based on simulated data')
         primary_header['NEXTEND'] = ('2', 'number of standard extensions')
-        primary_header['TSTART'] = (primary_header['STARTTJD'], 'observation start time in TJD')
-        primary_header['TSTOP'] = (primary_header['ENDTJD'], 'observation stop time in TJD')
+        primary_header['TSTART'] = (primary_header['STARTTJD'], 'observation start time in TJD of FIRST_FFI')
+        primary_header['TSTOP'] = (primary_header['ENDTJD'], 'observation stop time in TJD of LAST_FFI')
         primary_header['CAMERA'] = (primary_header['CAMNUM'], 'Camera number')
         primary_header['CCD'] = (primary_header['CCDNUM'], 'CCD chip number')
         primary_header['ASTATE'] = ('N/A', 'archive state F indicates single orbit processi')
         primary_header['CRMITEN'] = (primary_header['CRM'], 'spacecraft cosmic ray mitigation enabled')
         primary_header['CRBLKSZ'] = ('N/A', '[exposures] s/c cosmic ray mitigation block siz')
-        primary_header['FFIINDEX'] = (primary_header['CADENCE'], 'number of FFI cadence interval')
+        primary_header['FFIINDEX'] = (primary_header['CADENCE'], 'number of FFI cadence interval of FIRST_FFI')
         primary_header['DATA_REL'] = ('N/A', 'data release version number')
 
         date_obs = Time(primary_header['TSTART']+primary_header['BJDREFI'], format='jd').iso
         date_end = Time(primary_header['TSTOP']+primary_header['BJDREFI'], format='jd').iso
-        primary_header['DATE-OBS'] = (date_obs, 'TSTART as UTC calendar date')
-        primary_header['DATE-END'] = (date_end, 'TSTOP as UTC calendar date')
+        primary_header['DATE-OBS'] = (date_obs, 'TSTART as UTC calendar date of FIRST_FFI')
+        primary_header['DATE-END'] = (date_end, 'TSTOP as UTC calendar date of LAST_FFI')
 
         primary_header['FILEVER'] = ('N/A', 'file format version')
         primary_header['RADESYS'] = ('N/A', 'reference frame of celestial coordinates')
