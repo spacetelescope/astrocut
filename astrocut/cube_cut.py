@@ -1318,7 +1318,7 @@ class TicaCutoutFactory():
 
         primary_header['TIMEREF'] = ('SOLARSYSTEM', 'barycentric correction applied to times')        
         primary_header['TASSIGN'] = ('SPACECRAFT', 'where time is assigned')                         
-        primary_header['TIMESYS'] = ('TDB', 'time system is Barycentric Dynamical Time (TDB)')
+        primary_header['TIMESYS'] = ('TDT', 'time system is Terrestrial Dynamical Time (TDT)')
         primary_header['BJDREFI'] = (2457000, 'integer part of BTJD reference date')           
         primary_header['BJDREFF'] = (0.00000000, 'fraction of the day in BTJD reference date')    
         primary_header['TIMEUNIT'] = ('d', 'time unit for STARTTJD and ENDTJD')
