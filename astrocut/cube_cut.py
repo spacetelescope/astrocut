@@ -49,43 +49,43 @@ class CutoutFactory():
         self.cutout_lims = np.zeros((2, 2), dtype=int)  # Cutout pixel limits, [[ymin,ymax],[xmin,xmax]]
         self.center_coord = None  # Central skycoord
         
-        # Extra keywords from the FFI image headers (TESS specific)
+        # Extra keywords from the FFI image headers 
         self.img_kwds = {"BACKAPP": [None, "background is subtracted"],
-                         "CDPP0_5": [None, "RMS CDPP on 0.5-hr time scales"],
-                         "CDPP1_0": [None, "RMS CDPP on 1.0-hr time scales"],
-                         "CDPP2_0": [None, "RMS CDPP on 2.0-hr time scales"],
-                         "CROWDSAP": [None, "Ratio of target flux to total flux in op. ap."],
-                         "DEADAPP": [None, "deadtime applied"], 
-                         "DEADC": [None, "deadtime correction"],
-                         "EXPOSURE": [None, "[d] time on source"],
-                         "FLFRCSAP": [None, "Frac. of target flux w/in the op. aperture"],
-                         "FRAMETIM": [None, "[s] frame time [INT_TIME + READTIME]"],
-                         "FXDOFF": [None, "compression fixed offset"],
-                         "GAINA": [None, "[electrons/count] CCD output A gain"],
-                         "GAINB": [None, "[electrons/count] CCD output B gain"],
-                         "GAINC": [None, "[electrons/count] CCD output C gain"],
-                         "GAIND": [None, "[electrons/count] CCD output D gain"],
-                         "INT_TIME": [None, "[s] photon accumulation time per frame"],
-                         "LIVETIME": [None, "[d] TELAPSE multiplied by DEADC"],
-                         "MEANBLCA": [None, "[count] FSW mean black level CCD output A"],
-                         "MEANBLCB": [None, "[count] FSW mean black level CCD output B"],
-                         "MEANBLCC": [None, "[count] FSW mean black level CCD output C"],
-                         "MEANBLCD": [None, "[count] FSW mean black level CCD output D"],
-                         "NREADOUT": [None, "number of read per cadence"],
-                         "NUM_FRM": [None, "number of frames per time stamp"],
-                         "READNOIA": [None, "[electrons] read noise CCD output A"],
-                         "READNOIB": [None, "[electrons] read noise CCD output B"],
-                         "READNOIC": [None, "[electrons] read noise CCD output C"],
-                         "READNOID": [None, "[electrons] read noise CCD output D"],
-                         "READTIME": [None, "[s] readout time per frame"],
-                         "TIERRELA": [None, "[d] relative time error"],
-                         "TIMEDEL": [None, "[d] time resolution of data"],
-                         "TIMEPIXR": [None, "bin time beginning=0 middle=0.5 end=1"],
-                         "TMOFST11": [None, "(s) readout delay for camera 1 and ccd 1"],
-                         "VIGNAPP": [None, "vignetting or collimator correction applied"]}
+                        "CDPP0_5": [None, "RMS CDPP on 0.5-hr time scales"],
+                        "CDPP1_0": [None, "RMS CDPP on 1.0-hr time scales"],
+                        "CDPP2_0": [None, "RMS CDPP on 2.0-hr time scales"],
+                        "CROWDSAP": [None, "Ratio of target flux to total flux in op. ap."],
+                        "DEADAPP": [None, "deadtime applied"], 
+                        "DEADC": [None, "deadtime correction"],
+                        "EXPOSURE": [None, "[d] time on source"],
+                        "FLFRCSAP": [None, "Frac. of target flux w/in the op. aperture"],
+                        "FRAMETIM": [None, "[s] frame time [INT_TIME + READTIME]"],
+                        "FXDOFF": [None, "compression fixed offset"],
+                        "GAINA": [None, "[electrons/count] CCD output A gain"],
+                        "GAINB": [None, "[electrons/count] CCD output B gain"],
+                        "GAINC": [None, "[electrons/count] CCD output C gain"],
+                        "GAIND": [None, "[electrons/count] CCD output D gain"],
+                        "INT_TIME": [None, "[s] photon accumulation time per frame"],
+                        "LIVETIME": [None, "[d] TELAPSE multiplied by DEADC"],
+                        "MEANBLCA": [None, "[count] FSW mean black level CCD output A"],
+                        "MEANBLCB": [None, "[count] FSW mean black level CCD output B"],
+                        "MEANBLCC": [None, "[count] FSW mean black level CCD output C"],
+                        "MEANBLCD": [None, "[count] FSW mean black level CCD output D"],
+                        "NREADOUT": [None, "number of read per cadence"],
+                        "NUM_FRM": [None, "number of frames per time stamp"],
+                        "READNOIA": [None, "[electrons] read noise CCD output A"],
+                        "READNOIB": [None, "[electrons] read noise CCD output B"],
+                        "READNOIC": [None, "[electrons] read noise CCD output C"],
+                        "READNOID": [None, "[electrons] read noise CCD output D"],
+                        "READTIME": [None, "[s] readout time per frame"],
+                        "TIERRELA": [None, "[d] relative time error"],
+                        "TIMEDEL": [None, "[d] time resolution of data"],
+                        "TIMEPIXR": [None, "bin time beginning=0 middle=0.5 end=1"],
+                        "TMOFST11": [None, "(s) readout delay for camera 1 and ccd 1"],
+                        "VIGNAPP": [None, "vignetting or collimator correction applied"]}
 
         
-    def _parse_table_info(self, table_data, verbose=False):
+    def _parse_table_info(self, product, table_data, verbose=False):
         """
         Takes the header and one entry from the cube table of image header data,
         builds a WCS object that encalpsulates the given WCS information,
@@ -102,14 +102,18 @@ class CutoutFactory():
         data_ind = len(table_data)//2  # using the middle file for table info
         table_row = None
 
-        # Making sure we have a row with wcs info
+        # Populating `table_row` with the primary header keywords 
+        # of the middle FFI
         while table_row is None:
             table_row = table_data[data_ind]
-            if table_row["WCSAXES"] != 2:
-                table_row = None
-                data_ind += 1
-                if data_ind == len(table_data):
-                    raise wcs.NoWcsKeywordsFoundError("No FFI rows contain valid WCS keywords.")
+
+            # Making sure we have a row with wcs info.
+            if product == 'SPOC':
+                if table_row["WCSAXES"] != 2:
+                    table_row = None
+                    data_ind += 1
+                    if data_ind == len(table_data):
+                        raise wcs.NoWcsKeywordsFoundError("No FFI rows contain valid WCS keywords.")
 
         if verbose:
             print("Using WCS from row {} out of {}".format(data_ind, len(table_data)))
@@ -323,7 +327,6 @@ class CutoutFactory():
 
         cutout_wcs_dict = dict()
 
-        
         ## Cutout array keywords ##
 
         cutout_wcs_dict["WCAX{}"] = [wcs_header['WCSAXES'], "number of WCS axes"]
@@ -441,7 +444,7 @@ class CutoutFactory():
         return img_cutout, uncert_cutout, aperture
 
 
-    def _update_primary_header(self, primary_header):
+    def _update_primary_header(self, product, primary_header):
         """
         Updates the primary header for the cutout target pixel file by filling in 
         the object ra and dec with the central cutout coordinates and filling in
@@ -458,17 +461,91 @@ class CutoutFactory():
         # Adding cutout specific headers
         primary_header['CREATOR'] = ('astrocut', 'software used to produce this file')
         primary_header['PROCVER'] = (__version__, 'software version')
-        primary_header['FFI_TYPE'] = ('SPOC', 'the FFI type used to make the cutouts')
+        primary_header['FFI_TYPE'] = (product, 'the FFI type used to make the cutouts')
+        # TODO : The name of FIRST_FFI (and LAST_FFI) is too long to be a header kwd value.
+        # Find a way to include these in the headers without breaking astropy (maybe abbreviate?)
+        #primary_header['FIRST_FFI'] = (self.first_ffi, 'the FFI used for the primary header keyword values, except TSTOP')
+        #primary_header['LAST_FFI'] = (self.last_ffi, 'the FFI used for the TSTOP keyword value')
 
         primary_header['RA_OBJ'] = (self.center_coord.ra.deg, '[deg] right ascension')
         primary_header['DEC_OBJ'] = (self.center_coord.dec.deg, '[deg] declination')
 
         primary_header['TIMEREF'] = ('SOLARSYSTEM', 'barycentric correction applied to times')        
-        primary_header['TASSIGN'] = ('SPACECRAFT', 'where time is assigned')                         
-        primary_header['TIMESYS'] = ('TDB', 'time system is Barycentric Dynamical Time (TDB)')
+        primary_header['TASSIGN'] = ('SPACECRAFT', 'where time is assigned')
+
+        timesys = 'TDB' if product == 'SPOC' else 'TDT'
+        timesys_desc = 'Barycentric' if product == 'SPOC' else 'Terrestrial'
+        primary_header['TIMESYS'] = (f'{timesys}', f'time system is {timesys_desc} Dynamical Time ({timesys})')
+
         primary_header['BJDREFI'] = (2457000, 'integer part of BTJD reference date')           
         primary_header['BJDREFF'] = (0.00000000, 'fraction of the day in BTJD reference date')    
         primary_header['TIMEUNIT'] = ('d', 'time unit for TIME, TSTART and TSTOP')
+
+        if product == 'TICA':
+            # Adding some missing kwds not in TICA (but in Ames-produced SPOC ffis)
+            primary_header['EXTVER'] = ('1', 'extension version number (not format version)')
+            primary_header['SIMDATA'] = ('F', 'file is based on simulated data')
+            primary_header['NEXTEND'] = ('2', 'number of standard extensions')
+            primary_header['TSTART'] = (primary_header['STARTTJD'], 'observation start time in TJD of FIRST_FFI')
+            primary_header['TSTOP'] = (primary_header['ENDTJD'], 'observation stop time in TJD of LAST_FFI')
+            primary_header['CAMERA'] = (primary_header['CAMNUM'], 'Camera number')
+            primary_header['CCD'] = (primary_header['CCDNUM'], 'CCD chip number')
+            primary_header['ASTATE'] = ('N/A', 'archive state F indicates single orbit processi')
+            primary_header['CRMITEN'] = (primary_header['CRM'], 'spacecraft cosmic ray mitigation enabled')
+            primary_header['CRBLKSZ'] = ('N/A', '[exposures] s/c cosmic ray mitigation block siz')
+            primary_header['FFIINDEX'] = (primary_header['CADENCE'], 'number of FFI cadence interval of FIRST_FFI')
+            primary_header['DATA_REL'] = ('N/A', 'data release version number')
+
+            date_obs = Time(primary_header['TSTART']+primary_header['BJDREFI'], format='jd').iso
+            date_end = Time(primary_header['TSTOP']+primary_header['BJDREFI'], format='jd').iso
+            primary_header['DATE-OBS'] = (date_obs, 'TSTART as UTC calendar date of FIRST_FFI')
+            primary_header['DATE-END'] = (date_end, 'TSTOP as UTC calendar date of LAST_FFI')
+
+            primary_header['FILEVER'] = ('N/A', 'file format version')
+            primary_header['RADESYS'] = ('N/A', 'reference frame of celestial coordinates')
+            primary_header['SCCONFIG'] = ('N/A', 'spacecraft configuration ID')
+            primary_header['TIMVERSN'] = ('N/A', 'OGIP memo number for file format')
+
+            # Bulk removal with wildcards
+            del primary_header['SC_*']  # removes predicted RA, Dec, Roll, etc
+            del primary_header['RMS*']  # removes WCS fit residual 
+            del primary_header['A_*']  # removes some WCS constants and other miscellaneous kwds
+            del primary_header['AP_*']  # removes some WCS constants and other miscellaneous kwds
+            del primary_header['B_*']  # removes some WCS constants and other miscellaneous kwds
+            del primary_header['BP*']  # removes some WCS constants and other miscellaneous kwds
+            del primary_header['GAIN*']  # removes gain for each quadrant 
+            del primary_header['TESS_*']  # removes spacecraft coordinates
+            del primary_header['CD*']  # removes WCS CD matrix components
+            del primary_header['CT*']  # removes ctypes
+            del primary_header['CRPIX*']
+            del primary_header['CRVAL*']
+            del primary_header['MJD*']
+            
+            # Removal of specific kwds
+            del primary_header['ACS_MODE']
+            del primary_header['DEC_TARG']
+            del primary_header['FLXWIN']
+            del primary_header['RA_TARG']                             
+            del primary_header['CCDNUM']
+            del primary_header['CAMNUM']
+            del primary_header['WCSGDF']
+            del primary_header['UNITS']
+            del primary_header['CADENCE']
+            del primary_header['SCIPIXS']
+            del primary_header['INT_TIME']
+            del primary_header['PIX_CAT']
+            del primary_header['REQUANT']
+            del primary_header['DIFF_HUF']
+            del primary_header['PRIM_HUF']
+            del primary_header['QUAL_BIT']
+            del primary_header['SPM']
+            del primary_header['STARTTJD']
+            del primary_header['ENDTJD']
+            del primary_header['CRM']
+            del primary_header['TJD_ZERO']
+            del primary_header['CRM_N']
+            del primary_header['ORBIT_ID']
+            del primary_header['MIDTJD']
 
         telapse = primary_header.get("TSTOP", 0) - primary_header.get("TSTART", 0)
         primary_header['TELAPSE '] = (telapse, '[d] TSTOP - TSTART')
@@ -540,6 +617,9 @@ class CutoutFactory():
         """
 
         for key in self.img_kwds:
+            # TODO: Test if commented lines below are necessary
+            #if (key == 'COMMENT') & (product == 'SPOC'):
+            #    continue
             table_header[key] = tuple(self.img_kwds[key])
 
             
@@ -566,7 +646,7 @@ class CutoutFactory():
                         hdu.header[kwd] = (primary_header[kwd], primary_header.comments[kwd])
             
 
-    def _build_tpf(self, cube_fits, img_cube, uncert_cube, cutout_wcs_dict, aperture, verbose=True):
+    def _build_tpf(self, product, cube_fits, img_cube, uncert_cube, cutout_wcs_dict, aperture, verbose=True):
         """
         Building the cutout target pixel file (TPF) and formatting it to match TESS pipeline TPFs.
 
@@ -596,7 +676,7 @@ class CutoutFactory():
         # The primary hdu is just the main header, which is the same
         # as the one on the cube file
         primary_hdu = cube_fits[0]
-        self._update_primary_header(primary_hdu.header)
+        self._update_primary_header(product, primary_hdu.header)
 
         cols = list()
 
@@ -606,11 +686,14 @@ class CutoutFactory():
         empty_arr = np.zeros(img_cube.shape)
         
         # Adding the Time relates columns
+        start = 'TSTART' if product == 'SPOC' else 'STARTTJD'
+        stop = 'TSTOP' if product == 'SPOC' else 'ENDTJD'
         cols.append(fits.Column(name='TIME', format='D', unit='BJD - 2457000, days', disp='D14.7',
-                                array=(cube_fits[2].columns['TSTART'].array + cube_fits[2].columns['TSTOP'].array)/2))
+                                array=(cube_fits[2].columns[start].array + cube_fits[2].columns[stop].array)/2))
 
-        cols.append(fits.Column(name='TIMECORR', format='E', unit='d', disp='E14.7',
-                                array=cube_fits[2].columns['BARYCORR'].array))
+        if product=='SPOC':
+            cols.append(fits.Column(name='TIMECORR', format='E', unit='d', disp='E14.7',
+                                    array=cube_fits[2].columns['BARYCORR'].array))
 
         # Adding CADENCENO as zeros b/c we don't have this info
         cols.append(fits.Column(name='CADENCENO', format='J', disp='I10', array=empty_arr[:, 0, 0]))
@@ -629,8 +712,9 @@ class CutoutFactory():
                                 unit='e-/s', disp='E14.7', array=empty_arr))
 
         # Adding the quality flags
+        data_quality = 'QUALITY' if product == 'SPOC' else 'QUAL_BIT'
         cols.append(fits.Column(name='QUALITY', format='J', disp='B16.16',
-                                array=cube_fits[2].columns['DQUALITY'].array))
+                                array=cube_fits[2].columns[data_quality].array))
 
         # Adding the position correction info (zeros b.c we don't have this info)
         cols.append(fits.Column(name='POS_CORR1', format='E', unit='pixel', disp='E14.7', array=empty_arr[:, 0, 0]))
@@ -676,7 +760,7 @@ class CutoutFactory():
 
 
     def cube_cut(self, cube_file, coordinates, cutout_size,
-                 target_pixel_file=None, output_path=".", verbose=False):
+                 product='SPOC', target_pixel_file=None, output_path=".", verbose=False):
         """
         Takes a cube file (as created by `~astrocut.CubeFactory`), and makes a cutout target pixel 
         file of the given size around the given coordinates. The target pixel file is formatted like
@@ -728,7 +812,7 @@ class CutoutFactory():
             self.last_ffi = cube[2].data['FFI_FILE'][-1]
 
             # Get the info we need from the data table
-            self._parse_table_info(cube[2].data, verbose)
+            self._parse_table_info(product, cube[2].data, verbose)
 
             if isinstance(coordinates, SkyCoord):
                 self.center_coord = coordinates
@@ -773,7 +857,7 @@ class CutoutFactory():
             cutout_wcs_dict = self._get_cutout_wcs_dict()
     
             # Build the TPF
-            tpf_object = self._build_tpf(cube, img_cutout, uncert_cutout, cutout_wcs_dict, aperture)
+            tpf_object = self._build_tpf(product, cube, img_cutout, uncert_cutout, cutout_wcs_dict, aperture)
 
             if verbose:
                 write_time = time()
