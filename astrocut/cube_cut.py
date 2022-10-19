@@ -486,20 +486,20 @@ class CutoutFactory():
             primary_header['EXTVER'] = ('1', 'extension version number (not format version)')
             primary_header['SIMDATA'] = ('F', 'file is based on simulated data')
             primary_header['NEXTEND'] = ('2', 'number of standard extensions')
-            primary_header['TSTART'] = (primary_header['STARTTJD'], 'observation start time in TJD of FIRST_FFI')
-            primary_header['TSTOP'] = (primary_header['ENDTJD'], 'observation stop time in TJD of LAST_FFI')
+            primary_header['TSTART'] = (primary_header['STARTTJD'], 'observation start time in TJD of first FFI')
+            primary_header['TSTOP'] = (primary_header['ENDTJD'], 'observation stop time in TJD of last FFI')
             primary_header['CAMERA'] = (primary_header['CAMNUM'], 'Camera number')
             primary_header['CCD'] = (primary_header['CCDNUM'], 'CCD chip number')
             primary_header['ASTATE'] = ('N/A', 'archive state F indicates single orbit processi')
             primary_header['CRMITEN'] = (primary_header['CRM'], 'spacecraft cosmic ray mitigation enabled')
             primary_header['CRBLKSZ'] = ('N/A', '[exposures] s/c cosmic ray mitigation block siz')
-            primary_header['FFIINDEX'] = (primary_header['CADENCE'], 'number of FFI cadence interval of FIRST_FFI')
+            primary_header['FFIINDEX'] = (primary_header['CADENCE'], 'number of FFI cadence interval of first FFI')
             primary_header['DATA_REL'] = ('N/A', 'data release version number')
 
             date_obs = Time(primary_header['TSTART']+primary_header['BJDREFI'], format='jd').iso
             date_end = Time(primary_header['TSTOP']+primary_header['BJDREFI'], format='jd').iso
-            primary_header['DATE-OBS'] = (date_obs, 'TSTART as UTC calendar date of FIRST_FFI')
-            primary_header['DATE-END'] = (date_end, 'TSTOP as UTC calendar date of LAST_FFI')
+            primary_header['DATE-OBS'] = (date_obs, 'TSTART as UTC calendar date of first FFI')
+            primary_header['DATE-END'] = (date_end, 'TSTOP as UTC calendar date of last FFI')
 
             primary_header['FILEVER'] = ('N/A', 'file format version')
             primary_header['RADESYS'] = ('N/A', 'reference frame of celestial coordinates')
@@ -522,6 +522,10 @@ class CutoutFactory():
             del primary_header['MJD*']
             
             # Removal of specific kwds
+            del primary_header['COMMENT']
+            del primary_header['FILTER']
+            del primary_header['TIME']
+            del primary_header['EXPTIME']
             del primary_header['ACS_MODE']
             del primary_header['DEC_TARG']
             del primary_header['FLXWIN']
@@ -712,7 +716,7 @@ class CutoutFactory():
                                 unit='e-/s', disp='E14.7', array=empty_arr))
 
         # Adding the quality flags
-        data_quality = 'QUALITY' if product == 'SPOC' else 'QUAL_BIT'
+        data_quality = 'DQUALITY' if product == 'SPOC' else 'QUAL_BIT'
         cols.append(fits.Column(name='QUALITY', format='J', disp='B16.16',
                                 array=cube_fits[2].columns[data_quality].array))
 
@@ -756,7 +760,6 @@ class CutoutFactory():
         self._apply_header_inherit(cutout_hdu_list)
 
         return cutout_hdu_list
-
 
 
     def cube_cut(self, cube_file, coordinates, cutout_size,
