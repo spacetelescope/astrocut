@@ -470,8 +470,10 @@ class CutoutFactory():
         primary_header['RA_OBJ'] = (self.center_coord.ra.deg, '[deg] right ascension')
         primary_header['DEC_OBJ'] = (self.center_coord.dec.deg, '[deg] declination')
 
-        primary_header['TIMEREF'] = ('SOLARSYSTEM', 'barycentric correction applied to times')        
-        primary_header['TASSIGN'] = ('SPACECRAFT', 'where time is assigned')
+        timeref = 'SOLARSYSTEM' if product == 'SPOC' else 'N/A'
+        tassign = 'SPACECRAFT' if product == 'SPOC' else 'N/A'
+        primary_header['TIMEREF'] = (timeref, 'barycentric correction applied to times')        
+        primary_header['TASSIGN'] = (tassign, 'where time is assigned')
 
         timesys = 'TDB' if product == 'SPOC' else 'TDT'
         timesys_desc = 'Barycentric' if product == 'SPOC' else 'Terrestrial'
