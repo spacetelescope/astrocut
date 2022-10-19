@@ -167,7 +167,7 @@ class CutoutFactory():
         lims = np.zeros((2, 2), dtype=int)
 
         for axis, size in enumerate(cutout_size):
-        
+
             if not isinstance(size, u.Quantity):  # assume pixels
                 dim = size / 2
             elif size.unit == u.pixel:  # also pixels
@@ -561,7 +561,18 @@ class CutoutFactory():
 
         telapse = primary_header.get("TSTOP", 0) - primary_header.get("TSTART", 0)
         primary_header['TELAPSE '] = (telapse, '[d] TSTOP - TSTART')
-        
+
+        # Updating card comment to be more explicit
+        primary_header['DATE'] = (primary_header['DATE'], 'FFI cube creation date')
+
+        # Specifying that some of these headers keyword values are inherited from the first FFI
+        if product == 'SPOC':
+            primary_header['TSTART'] = (primary_header['TSTART'], 'observation start time in TJD of first FFI')
+            primary_header['TSTOP'] = (primary_header['TSTOP'], 'observation stop time in TJD of last FFI')
+            primary_header['DATE-OBS'] = (primary_header['DATE-OBS'], 'TSTART as UTC calendar date of first FFI')
+            primary_header['DATE-END'] = (primary_header['DATE-END'], 'TSTOP as UTC calendar date of last FFI')
+            primary_header['FFIINDEX'] = (primary_header['FFIINDEX'], 'number of FFI cadence interval of first FFI')
+
         # These are all the things in the TESS pipeline tpfs about the object that we can't fill
         primary_header['OBJECT'] = ("", 'string version of target id ')
         primary_header['TCID'] = (0, 'unique tess target identifier')
