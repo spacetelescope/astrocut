@@ -701,8 +701,9 @@ class CutoutFactory():
             cols.append(fits.Column(name='TIMECORR', format='E', unit='d', disp='E14.7',
                                     array=cube_fits[2].columns['BARYCORR'].array))
 
-        # Adding CADENCENO as zeros b/c we don't have this info
-        cols.append(fits.Column(name='CADENCENO', format='J', disp='I10', array=empty_arr[:, 0, 0]))
+        # Adding CADENCENO as zeros for SPOC b/c we don't have this info
+        cadence_array = empty_arr[:, 0, 0] if product == 'SPOC' else cube_fits[2].columns['CADENCE'].array
+        cols.append(fits.Column(name='CADENCENO', format='J', disp='I10', array=cadence_array))
 
         # Adding counts (-1 b/c we don't have data)
         cols.append(fits.Column(name='RAW_CNTS', format=tform.replace('E', 'J'), unit='count', dim=dims, disp='I8',
