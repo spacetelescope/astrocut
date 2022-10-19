@@ -41,15 +41,15 @@ class CutoutFactory():
         Initiazation function.
         """
 
-        self.cube_wcs = None  # WCS information from the image cube
-        self.cutout_wcs = None  # WCS information (linear) for the cutout
+        self.cube_wcs = None # WCS information from the image cube
+        self.cutout_wcs = None # WCS information (linear) for the cutout
         self.cutout_wcs_fit = {'WCS_MSEP': [None, "[deg] Max offset between cutout WCS and FFI WCS"],
                                'WCS_SIG': [None, "[deg] Error measurement of cutout WCS fit"]}
         
-        self.cutout_lims = np.zeros((2, 2), dtype=int)  # Cutout pixel limits, [[ymin,ymax],[xmin,xmax]]
-        self.center_coord = None  # Central skycoord
+        self.cutout_lims = np.zeros((2, 2), dtype=int) # Cutout pixel limits, [[ymin,ymax],[xmin,xmax]]
+        self.center_coord = None # Central skycoord
         
-        # Extra keywords from the FFI image headers 
+        # Extra keywords from the FFI image headers in SPOC
         self.img_kwds = {"BACKAPP": [None, "background is subtracted"],
                         "CDPP0_5": [None, "RMS CDPP on 0.5-hr time scales"],
                         "CDPP1_0": [None, "RMS CDPP on 1.0-hr time scales"],
@@ -99,15 +99,17 @@ class CutoutFactory():
             The cube image header data table.
         """
 
-        data_ind = len(table_data)//2  # using the middle file for table info
-        table_row = None
-
         # Populating `table_row` with the primary header keywords 
         # of the middle FFI
+        data_ind = len(table_data)//2
+        table_row = None
+
         while table_row is None:
             table_row = table_data[data_ind]
 
             # Making sure we have a row with wcs info.
+            # TODO: Add a check for TICA. 
+            # TICA does not have WCSAXES, but it has WCAX# 
             if product == 'SPOC':
                 if table_row["WCSAXES"] != 2:
                     table_row = None
@@ -463,7 +465,7 @@ class CutoutFactory():
         primary_header['PROCVER'] = (__version__, 'software version')
         primary_header['FFI_TYPE'] = (product, 'the FFI type used to make the cutouts')
         # TODO : The name of FIRST_FFI (and LAST_FFI) is too long to be a header kwd value.
-        # Find a way to include these in the headers without breaking astropy (maybe abbreviate?)
+        # Find a way to include these in the headers without breaking astropy (maybe abbreviate?).
         #primary_header['FIRST_FFI'] = (self.first_ffi, 'the FFI used for the primary header keyword values, except TSTOP')
         #primary_header['LAST_FFI'] = (self.last_ffi, 'the FFI used for the TSTOP keyword value')
 
@@ -484,6 +486,7 @@ class CutoutFactory():
         primary_header['TIMEUNIT'] = ('d', 'time unit for TIME, TSTART and TSTOP')
 
         if product == 'TICA':
+
             # Adding some missing kwds not in TICA (but in Ames-produced SPOC ffis)
             primary_header['EXTVER'] = ('1', 'extension version number (not format version)')
             primary_header['SIMDATA'] = ('F', 'file is based on simulated data')
@@ -508,7 +511,7 @@ class CutoutFactory():
             primary_header['SCCONFIG'] = ('N/A', 'spacecraft configuration ID')
             primary_header['TIMVERSN'] = ('N/A', 'OGIP memo number for file format')
 
-            # Bulk removal with wildcards
+            # Bulk removal with wildcards. Most of these should only live in EXT 1 header.
             del primary_header['SC_*']  # removes predicted RA, Dec, Roll, etc
             del primary_header['RMS*']  # removes WCS fit residual 
             del primary_header['A_*']  # removes some WCS constants and other miscellaneous kwds
@@ -523,7 +526,10 @@ class CutoutFactory():
             del primary_header['CRVAL*']
             del primary_header['MJD*']
             
-            # Removal of specific kwds
+            # Removal of specific kwds not relevant for cutouts.
+            # Most likely these describe a single FFI, and not
+            # the whole cube, which is misleading because we are 
+            # working with entire stacks of FFIs.
             del primary_header['COMMENT']
             del primary_header['FILTER']
             del primary_header['TIME']
@@ -623,7 +629,8 @@ class CutoutFactory():
         """
 
         for key in self.img_kwds:
-            # We'll skip these TICA-specific image keywords that are not helpful for this
+            # We'll skip these TICA-specific image keywords that are single-FFI specific
+            # or just not helpful
             if (key == 'TIME') | (key == 'EXPTIME') | (key == 'FILTER'):
                 continue
             table_header[key] = tuple(self.img_kwds[key])
