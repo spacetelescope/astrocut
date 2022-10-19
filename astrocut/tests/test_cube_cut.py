@@ -9,7 +9,7 @@ import astropy.units as u
 
 from .utils_for_test import create_test_ffis
 from ..make_cube import CubeFactory, TicaCubeFactory
-from ..cube_cut import CutoutFactory, TicaCutoutFactory
+from ..cube_cut import CutoutFactory
 from ..exceptions import InvalidQueryError, InputWarning
 
 
