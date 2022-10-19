@@ -97,7 +97,7 @@ def test_cube_cutout(tmpdir, ffi_type):
         cutout_maker = CutoutFactory()
     else:
         cube_maker = TicaCubeFactory()
-        cutout_maker = TicaCutoutFactory()
+        cutout_maker = CutoutFactory()
     
     img_sz = 10
     num_im = 100
@@ -127,7 +127,7 @@ def test_cube_cutout(tmpdir, ffi_type):
     csize[-1] = img_sz+5
     for i, v in enumerate(world_coords):
         coord = SkyCoord(v[0], v[1], frame='icrs', unit='deg')
-        cutout_maker.cube_cut(cube_file, coord, csize[i], target_pixel_file=cutlist[i],
+        cutout_maker.cube_cut(cube_file, coord, csize[i], ffi_type, target_pixel_file=cutlist[i],
                               output_path=tmpdir, verbose=False)
 
     # expected values for cube
@@ -152,7 +152,7 @@ def test_cutout_extras(tmpdir, ffi_type):
         cutout_maker = CutoutFactory()
     else:
         cube_maker = TicaCubeFactory()
-        cutout_maker = TicaCutoutFactory()
+        cutout_maker = CutoutFactory()
     
     img_sz = 10
     num_im = 100
@@ -170,6 +170,7 @@ def test_cutout_extras(tmpdir, ffi_type):
     out_file = cutout_maker.cube_cut(cube_file, 
                                      coord, 
                                      cutout_size,
+                                     ffi_type,
                                      output_path=path.join(tmpdir, "out_dir"), 
                                      verbose=False)
                                       
@@ -194,7 +195,7 @@ def test_cutout_extras(tmpdir, ffi_type):
     assert (ymax-ymin) == cutout_size[1]
 
     cutout_size = [5*u.pixel, 7*u.pixel]
-    out_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, verbose=False)
+    out_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, ffi_type, verbose=False)
     assert "256.880000_6.380000_5x7_astrocut.fits" in out_file
     
     xmin, xmax = cutout_maker.cutout_lims[0]
@@ -204,7 +205,7 @@ def test_cutout_extras(tmpdir, ffi_type):
     assert (ymax-ymin) == cutout_size[1].value
 
     cutout_size = [3*u.arcmin, 5*u.arcmin]
-    out_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, verbose=False)
+    out_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, ffi_type, verbose=False)
     assert "256.880000_6.380000_8x15_astrocut.fits" in out_file
     
     xmin, xmax = cutout_maker.cutout_lims[0]
@@ -214,7 +215,7 @@ def test_cutout_extras(tmpdir, ffi_type):
     assert (ymax-ymin) == 15
     
     cutout_size = [1*u.arcsec, 5*u.arcsec]
-    out_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, verbose=False)
+    out_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, ffi_type, verbose=False)
     assert "256.880000_6.380000_1x1_astrocut.fits" in out_file
     
     xmin, xmax = cutout_maker.cutout_lims[0]
@@ -227,7 +228,7 @@ def test_cutout_extras(tmpdir, ffi_type):
     # Test _get_full_cutout_wcs #
     #############################
     cutout_size = [5, 3]
-    out_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, verbose=False)
+    out_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, ffi_type, verbose=False)
 
     cutout_wcs_full = cutout_maker._get_full_cutout_wcs(fits.getheader(cube_file, 2))
     assert (cutout_wcs_full.wcs.crpix == [1045 - cutout_maker.cutout_lims[0, 0],
@@ -381,7 +382,7 @@ def test_inputs(tmpdir, capsys, ffi_type):
     coord = "256.88 6.38"
 
     cutout_size = [5, 3]*u.pixel
-    cutout_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, output_path=tmpdir, verbose=True)
+    cutout_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, ffi_type, output_path=tmpdir, verbose=True)
     captured = capsys.readouterr()
     assert "Image cutout cube shape: (100, 3, 5)" in captured.out
     assert "Using WCS from row 50 out of 100" in captured.out
@@ -389,12 +390,12 @@ def test_inputs(tmpdir, capsys, ffi_type):
     assert "5x3" in cutout_file
 
     cutout_size = [5, 3]*u.arcmin
-    cutout_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, output_path=tmpdir, verbose=False)
+    cutout_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, ffi_type, output_path=tmpdir, verbose=False)
     assert "14x9" in cutout_file
 
     
     cutout_size = [5, 3, 9]*u.pixel
     with pytest.warns(InputWarning):
-        cutout_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, output_path=tmpdir, verbose=False)
+        cutout_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, ffi_type, output_path=tmpdir, verbose=False)
     assert "5x3" in cutout_file
     assert "x9" not in cutout_file
