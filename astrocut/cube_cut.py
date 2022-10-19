@@ -623,9 +623,9 @@ class CutoutFactory():
         """
 
         for key in self.img_kwds:
-            # TODO: Test if commented lines below are necessary
-            #if (key == 'COMMENT') & (product == 'SPOC'):
-            #    continue
+            # We'll skip these TICA-specific image keywords that are not helpful for this
+            if (key == 'TIME') | (key == 'EXPTIME') | (key == 'FILTER'):
+                continue
             table_header[key] = tuple(self.img_kwds[key])
 
             
