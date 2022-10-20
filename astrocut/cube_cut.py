@@ -476,10 +476,7 @@ class CutoutFactory():
         tassign = 'SPACECRAFT' if product == 'SPOC' else 'N/A'
         primary_header['TIMEREF'] = (timeref, 'barycentric correction applied to times')        
         primary_header['TASSIGN'] = (tassign, 'where time is assigned')
-
-        timesys = 'TDB' if product == 'SPOC' else 'TDT'
-        timesys_desc = 'Barycentric' if product == 'SPOC' else 'Terrestrial'
-        primary_header['TIMESYS'] = (f'{timesys}', f'time system is {timesys_desc} Dynamical Time ({timesys})')
+        primary_header['TIMESYS'] = ('TDB', 'time system is Barycentric Dynamical Time (TDB)')
 
         primary_header['BJDREFI'] = (2457000, 'integer part of BTJD reference date')           
         primary_header['BJDREFF'] = (0.00000000, 'fraction of the day in BTJD reference date')    
