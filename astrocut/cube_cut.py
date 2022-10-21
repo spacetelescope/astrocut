@@ -472,8 +472,8 @@ class CutoutFactory():
         primary_header['RA_OBJ'] = (self.center_coord.ra.deg, '[deg] right ascension')
         primary_header['DEC_OBJ'] = (self.center_coord.dec.deg, '[deg] declination')
 
-        timeref = 'SOLARSYSTEM' if product == 'SPOC' else 'N/A'
-        tassign = 'SPACECRAFT' if product == 'SPOC' else 'N/A'
+        timeref = 'SOLARSYSTEM' if product == 'SPOC' else 'None'
+        tassign = 'SPACECRAFT' if product == 'SPOC' else 'None'
         primary_header['TIMEREF'] = (timeref, 'barycentric correction applied to times')        
         primary_header['TASSIGN'] = (tassign, 'where time is assigned')
         primary_header['TIMESYS'] = ('TDB', 'time system is Barycentric Dynamical Time (TDB)')
@@ -492,21 +492,21 @@ class CutoutFactory():
             primary_header['TSTOP'] = (primary_header['ENDTJD'], 'observation stop time in TJD of last FFI')
             primary_header['CAMERA'] = (primary_header['CAMNUM'], 'Camera number')
             primary_header['CCD'] = (primary_header['CCDNUM'], 'CCD chip number')
-            primary_header['ASTATE'] = ('N/A', 'archive state F indicates single orbit processi')
+            primary_header['ASTATE'] = ('None', 'archive state F indicates single orbit processi')
             primary_header['CRMITEN'] = (primary_header['CRM'], 'spacecraft cosmic ray mitigation enabled')
-            primary_header['CRBLKSZ'] = ('N/A', '[exposures] s/c cosmic ray mitigation block siz')
+            primary_header['CRBLKSZ'] = ('None', '[exposures] s/c cosmic ray mitigation block siz')
             primary_header['FFIINDEX'] = (primary_header['CADENCE'], 'number of FFI cadence interval of first FFI')
-            primary_header['DATA_REL'] = ('N/A', 'data release version number')
+            primary_header['DATA_REL'] = ('None', 'data release version number')
 
             date_obs = Time(primary_header['TSTART']+primary_header['BJDREFI'], format='jd').iso
             date_end = Time(primary_header['TSTOP']+primary_header['BJDREFI'], format='jd').iso
             primary_header['DATE-OBS'] = (date_obs, 'TSTART as UTC calendar date of first FFI')
             primary_header['DATE-END'] = (date_end, 'TSTOP as UTC calendar date of last FFI')
 
-            primary_header['FILEVER'] = ('N/A', 'file format version')
-            primary_header['RADESYS'] = ('N/A', 'reference frame of celestial coordinates')
-            primary_header['SCCONFIG'] = ('N/A', 'spacecraft configuration ID')
-            primary_header['TIMVERSN'] = ('N/A', 'OGIP memo number for file format')
+            primary_header['FILEVER'] = ('None', 'file format version')
+            primary_header['RADESYS'] = ('None', 'reference frame of celestial coordinates')
+            primary_header['SCCONFIG'] = ('None', 'spacecraft configuration ID')
+            primary_header['TIMVERSN'] = ('None', 'OGIP memo number for file format')
 
             # Bulk removal with wildcards. Most of these should only live in EXT 1 header.
             del primary_header['SC_*']  # removes predicted RA, Dec, Roll, etc
