@@ -486,7 +486,7 @@ class CutoutFactory():
 
             # Adding some missing kwds not in TICA (but in Ames-produced SPOC ffis)
             primary_header['EXTVER'] = ('1', 'extension version number (not format version)')
-            primary_header['SIMDATA'] = ('F', 'file is based on simulated data')
+            primary_header['SIMDATA'] = (False, 'file is based on simulated data')
             primary_header['NEXTEND'] = ('2', 'number of standard extensions')
             primary_header['TSTART'] = (primary_header['STARTTJD'], 'observation start time in TJD of first FFI')
             primary_header['TSTOP'] = (primary_header['ENDTJD'], 'observation stop time in TJD of last FFI')
