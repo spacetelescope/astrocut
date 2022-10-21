@@ -725,13 +725,14 @@ class CutoutFactory():
                                 array=empty_arr-1, null=-1))
 
         # Adding flux and flux_err (data we actually have!)
-        cols.append(fits.Column(name='FLUX', format=tform, dim=dims, unit='e-/s', disp='E14.7', array=img_cube))
-        cols.append(fits.Column(name='FLUX_ERR', format=tform, dim=dims, unit='e-/s', disp='E14.7', array=uncert_cube)) 
+        pixel_unit = 'e-/s' if product == 'SPOC' else 'e-'
+        cols.append(fits.Column(name='FLUX', format=tform, dim=dims, unit=pixel_unit, disp='E14.7', array=img_cube))
+        cols.append(fits.Column(name='FLUX_ERR', format=tform, dim=dims, unit=pixel_unit, disp='E14.7', array=uncert_cube)) 
    
         # Adding the background info (zeros b.c we don't have this info)
-        cols.append(fits.Column(name='FLUX_BKG', format=tform, dim=dims, unit='e-/s', disp='E14.7', array=empty_arr))
+        cols.append(fits.Column(name='FLUX_BKG', format=tform, dim=dims, unit=pixel_unit, disp='E14.7', array=empty_arr))
         cols.append(fits.Column(name='FLUX_BKG_ERR', format=tform, dim=dims,
-                                unit='e-/s', disp='E14.7', array=empty_arr))
+                                unit=pixel_unit, disp='E14.7', array=empty_arr))
 
         # Adding the quality flags
         data_quality = 'DQUALITY' if product == 'SPOC' else 'QUAL_BIT'
