@@ -8,8 +8,8 @@ import warnings
 from time import time
 from itertools import product
 
-import numpy as np
 import astropy.units as u
+import numpy as np
 
 from astropy import wcs
 from astropy.coordinates import SkyCoord
@@ -32,13 +32,16 @@ class CutoutFactory():
     Class for creating image cutouts.
 
     This class emcompasses all of the cutout functionality.  
-    In the current version this means creating cutout target pixel files from TESS full frame image cubes.
+    In the current version this means creating cutout target pixel files from both 
+    SPOC (Science Processing Operations Center) and TICA (Tess Image CAlibration) 
+    full frame image cubes.
+
     Future versions will include more generalized cutout functionality.
     """
 
     def __init__(self):
         """
-        Initiazation function.
+        Initialization function.
         """
 
         self.cube_wcs = None # WCS information from the image cube
@@ -49,7 +52,8 @@ class CutoutFactory():
         self.cutout_lims = np.zeros((2, 2), dtype=int) # Cutout pixel limits, [[ymin,ymax],[xmin,xmax]]
         self.center_coord = None # Central skycoord
         
-        # Extra keywords from the FFI image headers in SPOC
+        # Extra keywords from the FFI image headers in SPOC.
+        # These are applied to both SPOC and TICA cutouts for consistency.
         self.img_kwds = {"BACKAPP": [None, "background is subtracted"],
                         "CDPP0_5": [None, "RMS CDPP on 0.5-hr time scales"],
                         "CDPP1_0": [None, "RMS CDPP on 1.0-hr time scales"],
@@ -87,7 +91,7 @@ class CutoutFactory():
         
     def _parse_table_info(self, product, table_data, verbose=False):
         """
-        Takes the header and one entry from the cube table of image header data,
+        Takes the header and the middle entry from the cube table (EXT 2) of image header data,
         builds a WCS object that encalpsulates the given WCS information,
         and collects into a dictionary the other keywords we care about.  
 
@@ -95,6 +99,9 @@ class CutoutFactory():
 
         Parameters
         ----------
+        product : str
+            The product type to make the cutouts from.
+            Can either be 'SPOC' or 'TICA'.
         table_data : `~astropy.io.fits.fitsrec.FITS_rec`
             The cube image header data table.
         """
@@ -456,6 +463,9 @@ class CutoutFactory():
 
         Parameters
         ----------
+        product : str
+            The product type to make the cutouts from.
+            Can either be 'SPOC' or 'TICA'.
         primary_header : `~astropy.io.fits.Header`
             The primary header from the cube file that will be modified in place for the cutout.
         """
@@ -667,12 +677,15 @@ class CutoutFactory():
                         hdu.header[kwd] = (primary_header[kwd], primary_header.comments[kwd])
             
 
-    def _build_tpf(self, product, cube_fits, img_cube, uncert_cube, cutout_wcs_dict, aperture, verbose=True):
+    def _build_tpf(self, product, cube_fits, img_cube, uncert_cube, cutout_wcs_dict, aperture):
         """
         Building the cutout target pixel file (TPF) and formatting it to match TESS pipeline TPFs.
 
         Paramters
         ---------
+        product : str
+            The product type to make the cutouts from.
+            Can either be 'SPOC' or 'TICA'.
         cube_fits : `~astropy.io.fits.hdu.hdulist.HDUList`
             The cube hdu list.
         img_cube : `numpy.array`
@@ -805,6 +818,9 @@ class CutoutFactory():
             order.  Scalar numbers in ``cutout_size`` are assumed to be in
             units of pixels. `~astropy.units.Quantity` objects must be in pixel or
             angular units.
+        product : str
+            The product type to make the cutouts from.
+            Can either be 'SPOC' or 'TICA'.
         target_pixel_file : str
             Optional. The name for the output target pixel file. 
             If no name is supplied, the file will be named: 
