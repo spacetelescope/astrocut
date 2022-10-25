@@ -149,10 +149,10 @@ def test_cutout_extras(tmpdir, ffi_type):
     # Making the test cube
     if ffi_type == 'SPOC':
         cube_maker = CubeFactory()
-        cutout_maker = CutoutFactory()
     else:
         cube_maker = TicaCubeFactory()
-        cutout_maker = CutoutFactory()
+
+    cutout_maker = CutoutFactory()
     
     img_sz = 10
     num_im = 100
