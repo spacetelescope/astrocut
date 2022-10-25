@@ -649,7 +649,7 @@ class CutoutFactory():
         for key in self.img_kwds:
             # We'll skip these TICA-specific image keywords that are single-FFI specific
             # or just not helpful
-            if (key == 'TIME') | (key == 'EXPTIME') | (key == 'FILTER'):
+            if (key == 'TIME') or (key == 'EXPTIME') or (key == 'FILTER'):
                 continue
             table_header[key] = tuple(self.img_kwds[key])
 
