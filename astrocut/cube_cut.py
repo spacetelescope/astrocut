@@ -116,12 +116,11 @@ class CutoutFactory():
 
             # Making sure we have a row with wcs info.
             wcsaxes_keyword = 'WCSAXES' if product == 'SPOC' else 'WCAX3' 
-            if product == 'SPOC':
-                if table_row[wcsaxes_keyword] != 2:
-                    table_row = None
-                    data_ind += 1
-                    if data_ind == len(table_data):
-                        raise wcs.NoWcsKeywordsFoundError("No FFI rows contain valid WCS keywords.")
+            if table_row[wcsaxes_keyword] != 2:
+                table_row = None
+                data_ind += 1
+                if data_ind == len(table_data):
+                    raise wcs.NoWcsKeywordsFoundError("No FFI rows contain valid WCS keywords.")
 
         if verbose:
             print("Using WCS from row {} out of {}".format(data_ind, len(table_data)))
