@@ -44,49 +44,49 @@ class CutoutFactory():
         Initialization function.
         """
 
-        self.cube_wcs = None # WCS information from the image cube
-        self.cutout_wcs = None # WCS information (linear) for the cutout
+        self.cube_wcs = None  # WCS information from the image cube
+        self.cutout_wcs = None  # WCS information (linear) for the cutout
         self.cutout_wcs_fit = {'WCS_MSEP': [None, "[deg] Max offset between cutout WCS and FFI WCS"],
                                'WCS_SIG': [None, "[deg] Error measurement of cutout WCS fit"]}
         
-        self.cutout_lims = np.zeros((2, 2), dtype=int) # Cutout pixel limits, [[ymin,ymax],[xmin,xmax]]
-        self.center_coord = None # Central skycoord
+        self.cutout_lims = np.zeros((2, 2), dtype=int)  # Cutout pixel limits, [[ymin,ymax],[xmin,xmax]]
+        self.center_coord = None  # Central skycoord
         
         # Extra keywords from the FFI image headers in SPOC.
         # These are applied to both SPOC and TICA cutouts for consistency.
         self.img_kwds = {"BACKAPP": [None, "background is subtracted"],
-                        "CDPP0_5": [None, "RMS CDPP on 0.5-hr time scales"],
-                        "CDPP1_0": [None, "RMS CDPP on 1.0-hr time scales"],
-                        "CDPP2_0": [None, "RMS CDPP on 2.0-hr time scales"],
-                        "CROWDSAP": [None, "Ratio of target flux to total flux in op. ap."],
-                        "DEADAPP": [None, "deadtime applied"], 
-                        "DEADC": [None, "deadtime correction"],
-                        "EXPOSURE": [None, "[d] time on source"],
-                        "FLFRCSAP": [None, "Frac. of target flux w/in the op. aperture"],
-                        "FRAMETIM": [None, "[s] frame time [INT_TIME + READTIME]"],
-                        "FXDOFF": [None, "compression fixed offset"],
-                        "GAINA": [None, "[electrons/count] CCD output A gain"],
-                        "GAINB": [None, "[electrons/count] CCD output B gain"],
-                        "GAINC": [None, "[electrons/count] CCD output C gain"],
-                        "GAIND": [None, "[electrons/count] CCD output D gain"],
-                        "INT_TIME": [None, "[s] photon accumulation time per frame"],
-                        "LIVETIME": [None, "[d] TELAPSE multiplied by DEADC"],
-                        "MEANBLCA": [None, "[count] FSW mean black level CCD output A"],
-                        "MEANBLCB": [None, "[count] FSW mean black level CCD output B"],
-                        "MEANBLCC": [None, "[count] FSW mean black level CCD output C"],
-                        "MEANBLCD": [None, "[count] FSW mean black level CCD output D"],
-                        "NREADOUT": [None, "number of read per cadence"],
-                        "NUM_FRM": [None, "number of frames per time stamp"],
-                        "READNOIA": [None, "[electrons] read noise CCD output A"],
-                        "READNOIB": [None, "[electrons] read noise CCD output B"],
-                        "READNOIC": [None, "[electrons] read noise CCD output C"],
-                        "READNOID": [None, "[electrons] read noise CCD output D"],
-                        "READTIME": [None, "[s] readout time per frame"],
-                        "TIERRELA": [None, "[d] relative time error"],
-                        "TIMEDEL": [None, "[d] time resolution of data"],
-                        "TIMEPIXR": [None, "bin time beginning=0 middle=0.5 end=1"],
-                        "TMOFST11": [None, "(s) readout delay for camera 1 and ccd 1"],
-                        "VIGNAPP": [None, "vignetting or collimator correction applied"]}
+                         "CDPP0_5": [None, "RMS CDPP on 0.5-hr time scales"],
+                         "CDPP1_0": [None, "RMS CDPP on 1.0-hr time scales"],
+                         "CDPP2_0": [None, "RMS CDPP on 2.0-hr time scales"],
+                         "CROWDSAP": [None, "Ratio of target flux to total flux in op. ap."],
+                         "DEADAPP": [None, "deadtime applied"], 
+                         "DEADC": [None, "deadtime correction"],
+                         "EXPOSURE": [None, "[d] time on source"],
+                         "FLFRCSAP": [None, "Frac. of target flux w/in the op. aperture"],
+                         "FRAMETIM": [None, "[s] frame time [INT_TIME + READTIME]"],
+                         "FXDOFF": [None, "compression fixed offset"],
+                         "GAINA": [None, "[electrons/count] CCD output A gain"],
+                         "GAINB": [None, "[electrons/count] CCD output B gain"],
+                         "GAINC": [None, "[electrons/count] CCD output C gain"],
+                         "GAIND": [None, "[electrons/count] CCD output D gain"],
+                         "INT_TIME": [None, "[s] photon accumulation time per frame"],
+                         "LIVETIME": [None, "[d] TELAPSE multiplied by DEADC"],
+                         "MEANBLCA": [None, "[count] FSW mean black level CCD output A"],
+                         "MEANBLCB": [None, "[count] FSW mean black level CCD output B"],
+                         "MEANBLCC": [None, "[count] FSW mean black level CCD output C"],
+                         "MEANBLCD": [None, "[count] FSW mean black level CCD output D"],
+                         "NREADOUT": [None, "number of read per cadence"],
+                         "NUM_FRM": [None, "number of frames per time stamp"],
+                         "READNOIA": [None, "[electrons] read noise CCD output A"],
+                         "READNOIB": [None, "[electrons] read noise CCD output B"],
+                         "READNOIC": [None, "[electrons] read noise CCD output C"],
+                         "READNOID": [None, "[electrons] read noise CCD output D"],
+                         "READTIME": [None, "[s] readout time per frame"],
+                         "TIERRELA": [None, "[d] relative time error"],
+                         "TIMEDEL": [None, "[d] time resolution of data"],
+                         "TIMEPIXR": [None, "bin time beginning=0 middle=0.5 end=1"],
+                         "TMOFST11": [None, "(s) readout delay for camera 1 and ccd 1"],
+                         "VIGNAPP": [None, "vignetting or collimator correction applied"]}
 
         
     def _parse_table_info(self, product, table_data, verbose=False):
