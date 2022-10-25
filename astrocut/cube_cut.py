@@ -31,7 +31,7 @@ class CutoutFactory():
     """
     Class for creating image cutouts.
 
-    This class emcompasses all of the cutout functionality.  
+    This class encompasses all of the cutout functionality.  
     In the current version this means creating cutout target pixel files from both 
     SPOC (Science Processing Operations Center) and TICA (Tess Image CAlibration) 
     full frame image cubes.
