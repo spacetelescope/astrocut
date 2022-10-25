@@ -93,11 +93,11 @@ def test_cube_cutout(tmpdir, ffi_type):
 
     # Making the test cube
     if ffi_type == 'SPOC':
-        cube_maker = CubeFactory()
-        cutout_maker = CutoutFactory()
+        cube_maker = CubeFactory()  
     else:
         cube_maker = TicaCubeFactory()
-        cutout_maker = CutoutFactory()
+
+    cutout_maker = CutoutFactory()
     
     img_sz = 10
     num_im = 100
@@ -283,10 +283,10 @@ def test_exceptions(tmpdir, ffi_type):
     # Making the test cube
     if ffi_type == 'SPOC':
         cube_maker = CubeFactory()
-        cutout_maker = CutoutFactory()
     else:
         cube_maker = TicaCubeFactory()
-        cutout_maker = TicaCutoutFactory()
+
+    cutout_maker = CutoutFactory()
     
     img_sz = 10
     num_im = 100
@@ -367,14 +367,14 @@ def test_inputs(tmpdir, capsys, ffi_type):
     # Making the test cube
     if ffi_type == 'SPOC':
         cube_maker = CubeFactory()
-        cutout_maker = CutoutFactory()
     else:
         cube_maker = TicaCubeFactory()
-        cutout_maker = TicaCutoutFactory()
-    
+
+    cutout_maker = CutoutFactory()
+
     img_sz = 10
     num_im = 100
-    
+
     ffi_files = create_test_ffis(img_sz, num_im)
     cube_file = cube_maker.make_cube(ffi_files, path.join(tmpdir, "test_cube.fits"), verbose=False)
 
@@ -393,7 +393,6 @@ def test_inputs(tmpdir, capsys, ffi_type):
     cutout_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, ffi_type, output_path=tmpdir, verbose=False)
     assert "14x9" in cutout_file
 
-    
     cutout_size = [5, 3, 9]*u.pixel
     with pytest.warns(InputWarning):
         cutout_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, ffi_type, output_path=tmpdir, verbose=False)
