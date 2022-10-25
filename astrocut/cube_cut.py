@@ -92,7 +92,7 @@ class CutoutFactory():
     def _parse_table_info(self, product, table_data, verbose=False):
         """
         Takes the header and the middle entry from the cube table (EXT 2) of image header data,
-        builds a WCS object that encalpsulates the given WCS information,
+        builds a WCS object that encapsulates the given WCS information,
         and collects into a dictionary the other keywords we care about.  
 
         The WCS is stored in ``self.cube_wcs``, and the extra keywords in ``self.img_kwds``
