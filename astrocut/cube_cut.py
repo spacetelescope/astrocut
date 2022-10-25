@@ -115,10 +115,9 @@ class CutoutFactory():
             table_row = table_data[data_ind]
 
             # Making sure we have a row with wcs info.
-            # TODO: Add a check for TICA. 
-            # TICA does not have WCSAXES, but it has WCAX# 
+            wcsaxes_keyword = 'WCSAXES' if product == 'SPOC' else 'WCAX3' 
             if product == 'SPOC':
-                if table_row["WCSAXES"] != 2:
+                if table_row[wcsaxes_keyword] != 2:
                     table_row = None
                     data_ind += 1
                     if data_ind == len(table_data):
