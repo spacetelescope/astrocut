@@ -490,6 +490,12 @@ class CutoutFactory():
         primary_header['BJDREFF'] = (0.00000000, 'fraction of the day in BTJD reference date')    
         primary_header['TIMEUNIT'] = ('d', 'time unit for TIME, TSTART and TSTOP')
 
+        delete_kwds_wildcards = ['SC_*', 'RMS*', 'A_*', 'AP_*', 'B_*', 'BP*', 'GAIN*', 'TESS_*', 'CD*',
+                                 'CT*', 'CRPIX*', 'CRVAL*', 'MJD*']
+        delete_kwds = ['COMMENT', 'FILTER', 'TIME', 'EXPTIME', 'ACS_MODE', 'DEC_TARG', 'FLXWIN', 'RA_TARG',
+                       'CCDNUM', 'CAMNUM', 'WCSGDF', 'UNITS', 'CADENCE', 'SCIPIXS', 'INT_TIME', 'PIX_CAT',
+                       'REQUANT', 'DIFF_HUF', 'PRIM_HUF', 'QUAL_BIT', 'SPM', 'STARTTJD', 'ENDTJD', 'CRM',
+                       'TJD_ZERO', 'CRM_N', 'ORBIT_ID', 'MIDTJD']
         if product == 'TICA':
 
             # Adding some missing kwds not in TICA (but in Ames-produced SPOC ffis)
@@ -517,52 +523,23 @@ class CutoutFactory():
             primary_header['TIMVERSN'] = ('None', 'OGIP memo number for file format')
 
             # Bulk removal with wildcards. Most of these should only live in EXT 1 header.
-            del primary_header['SC_*']  # removes predicted RA, Dec, Roll, etc
-            del primary_header['RMS*']  # removes WCS fit residual 
-            del primary_header['A_*']  # removes some WCS constants and other miscellaneous kwds
-            del primary_header['AP_*']  # removes some WCS constants and other miscellaneous kwds
-            del primary_header['B_*']  # removes some WCS constants and other miscellaneous kwds
-            del primary_header['BP*']  # removes some WCS constants and other miscellaneous kwds
-            del primary_header['GAIN*']  # removes gain for each quadrant 
-            del primary_header['TESS_*']  # removes spacecraft coordinates
-            del primary_header['CD*']  # removes WCS CD matrix components
-            del primary_header['CT*']  # removes ctypes
-            del primary_header['CRPIX*']
-            del primary_header['CRVAL*']
-            del primary_header['MJD*']
-            
+            for kwd in delete_kwds_wildcards:
+                try:
+                    del primary_header[kwd]
+                except KeyError:
+                    continue
+
             # Removal of specific kwds not relevant for cutouts.
             # Most likely these describe a single FFI, and not
             # the whole cube, which is misleading because we are 
-            # working with entire stacks of FFIs.
-            del primary_header['COMMENT']
-            del primary_header['FILTER']
-            del primary_header['TIME']
-            del primary_header['EXPTIME']
-            del primary_header['ACS_MODE']
-            del primary_header['DEC_TARG']
-            del primary_header['FLXWIN']
-            del primary_header['RA_TARG']                             
-            del primary_header['CCDNUM']
-            del primary_header['CAMNUM']
-            del primary_header['WCSGDF']
-            del primary_header['UNITS']
-            del primary_header['CADENCE']
-            del primary_header['SCIPIXS']
-            del primary_header['INT_TIME']
-            del primary_header['PIX_CAT']
-            del primary_header['REQUANT']
-            del primary_header['DIFF_HUF']
-            del primary_header['PRIM_HUF']
-            del primary_header['QUAL_BIT']
-            del primary_header['SPM']
-            del primary_header['STARTTJD']
-            del primary_header['ENDTJD']
-            del primary_header['CRM']
-            del primary_header['TJD_ZERO']
-            del primary_header['CRM_N']
-            del primary_header['ORBIT_ID']
-            del primary_header['MIDTJD']
+            # working with entire stacks of FFIs. Other keywords 
+            # are analogs to ones that have already been added 
+            # to the primary header in the lines above.
+            for kwd in delete_kwds:
+                try:
+                    del primary_header[kwd]
+                except KeyError:
+                    continue
 
         telapse = primary_header.get("TSTOP", 0) - primary_header.get("TSTART", 0)
         primary_header['TELAPSE '] = (telapse, '[d] TSTOP - TSTART')
