@@ -5,6 +5,7 @@ from os import path
 from astropy.io import fits
 from astropy import wcs
 from astropy.coordinates import SkyCoord
+from astropy.time import Time
 import astropy.units as u
 
 from .utils_for_test import create_test_ffis
