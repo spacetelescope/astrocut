@@ -185,6 +185,35 @@ def test_cutout_extras(tmpdir, ffi_type):
     coord = SkyCoord(256.88, 6.38, frame='icrs', unit='deg')
     assert cutout_maker.center_coord.separation(coord) == 0
 
+    ###########################
+    # Test  _parse_table_info #
+    ###########################
+    with fits.open(out_file) as hdulist:
+
+        # Primary header checks
+        primary_header = hdulist[0].header
+        assert primary_header['FFI_TYPE'] == ffi_type
+        assert primary_header['CREATOR'] == 'astrocut'
+        assert primary_header['BJDREFI'] == 2457000
+
+        # Verifying DATE-OBS calculation
+        date_obs = primary_header['DATE-OBS']
+        tstart = Time(date_obs).jd - primary_header['BJDREFI']
+        assert primary_header['TSTART'] == tstart
+
+        # Verifying DATE-END calculation
+        date_end = primary_header['DATE-END']
+        tstop = Time(date_end).jd - primary_header['BJDREFI']
+        assert primary_header['TSTOP'] == tstop
+
+        # Checking for header keyword propagation in EXT 1 and 2
+        ext1_header = hdulist[1].header
+        ext2_header = hdulist[2].header
+        assert ext1_header['FFI_TYPE'] == ext2_header['FFI_TYPE'] == primary_header['FFI_TYPE']
+        assert ext1_header['CREATOR'] == ext2_header['CREATOR'] == primary_header['CREATOR']
+        assert ext1_header['BJDREFI'] == ext2_header['BJDREFI'] == primary_header['BJDREFI']
+
+
     ############################
     # Test  _get_cutout_limits #
     ############################
