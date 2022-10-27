@@ -59,7 +59,7 @@ def test_make_and_update_cube(tmpdir):
     img_sz = 10
     num_im = 100
     
-    ffi_files = create_test_ffis(img_sz, num_im, product='tica', dir_name=tmpdir)
+    ffi_files = create_test_ffis(img_sz, num_im, product='TICA', dir_name=tmpdir)
 
     cube_file = path.join(os.getcwd(), "out_dir", "test_update_cube.fits")
 
