@@ -144,7 +144,8 @@ def test_fits_cut(tmpdir, capsys, ffi_type):
         assert "Cutout contains no data! (Check image footprint.)" in str(e.value)
 
     # test single image and also conflicting sip keywords
-    test_image = create_test_imgs(ffi_type, 50, 1, dir_name=tmpdir, basename="img_badsip_{:04d}.fits", bad_sip_keywords=True)[0]
+    test_image = create_test_imgs(ffi_type, 50, 1, dir_name=tmpdir,
+                                  basename="img_badsip_{:04d}.fits", bad_sip_keywords=True)[0]
 
     center_coord = SkyCoord("150.1163213 2.2007", unit='deg')
     cutout_size = [10, 15]
