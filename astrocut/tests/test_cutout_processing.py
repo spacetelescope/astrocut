@@ -102,6 +102,9 @@ def test_get_args():
     bounds = np.array([[0, 4], [0, 6]])
 
     args = cutout_processing._get_args(bounds, wcs_obj)
+    print(args["coordinates"])
+    print(wcs_obj.pixel_to_world(2, 3))
+    print(args["size"])
     assert args["coordinates"] == wcs_obj.pixel_to_world(2, 3)
     assert args["size"] == (6, 4)
 
@@ -114,7 +117,7 @@ def test_moving_target_focus(tmpdir):
     img_sz = 1000
     num_im = 10
     
-    ffi_files = create_test_ffis(img_sz, num_im, dir_name=tmpdir)
+    ffi_files = create_test_ffis(img_size=img_sz, num_images=num_im, dir_name=tmpdir)
     cube_file = cube_maker.make_cube(ffi_files, os.path.join(tmpdir, "test_cube.fits"), verbose=False)
 
     cutout_file = CutoutFactory().cube_cut(cube_file, "250.3497414839765  2.280925599609063", 100, 
@@ -337,9 +340,10 @@ def test_default_combine():
     assert np.allclose(combine_func([hdu_1, hdu_2]), [[1, np.nan], [1, 1]], equal_nan=True)
 
 
-def test_combiner(tmpdir):
+@pytest.mark.parametrize('ffi_type', ['SPOC', 'TICA'])
+def test_combiner(tmpdir, ffi_type):
 
-    test_images = create_test_imgs(50, 6, dir_name=tmpdir)
+    test_images = create_test_imgs(ffi_type, 50, 6, dir_name=tmpdir)
     center_coord = SkyCoord("150.1163213 2.200973097", unit='deg')
     cutout_size = 2
 
