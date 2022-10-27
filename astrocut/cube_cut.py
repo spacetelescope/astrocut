@@ -474,8 +474,9 @@ class CutoutFactory():
         primary_header['FFI_TYPE'] = (product, 'the FFI type used to make the cutouts')
         # TODO : The name of FIRST_FFI (and LAST_FFI) is too long to be a header kwd value.
         # Find a way to include these in the headers without breaking astropy (maybe abbreviate?).
-        #primary_header['FIRST_FFI'] = (self.first_ffi, 'the FFI used for the primary header keyword values, except TSTOP')
-        #primary_header['LAST_FFI'] = (self.last_ffi, 'the FFI used for the TSTOP keyword value')
+        # primary_header['FIRST_FFI'] = (self.first_ffi, 'the FFI used for the primary header 
+        # keyword values, except TSTOP')
+        # primary_header['LAST_FFI'] = (self.last_ffi, 'the FFI used for the TSTOP keyword value')
 
         primary_header['RA_OBJ'] = (self.center_coord.ra.deg, '[deg] right ascension')
         primary_header['DEC_OBJ'] = (self.center_coord.dec.deg, '[deg] declination')
@@ -701,7 +702,7 @@ class CutoutFactory():
         cols.append(fits.Column(name='TIME', format='D', unit='BJD - 2457000, days', disp='D14.7',
                                 array=(cube_fits[2].columns[start].array + cube_fits[2].columns[stop].array)/2))
 
-        if product=='SPOC':
+        if product == 'SPOC':
             cols.append(fits.Column(name='TIMECORR', format='E', unit='d', disp='E14.7',
                                     array=cube_fits[2].columns['BARYCORR'].array))
 
@@ -716,10 +717,12 @@ class CutoutFactory():
         # Adding flux and flux_err (data we actually have!)
         pixel_unit = 'e-/s' if product == 'SPOC' else 'e-'
         cols.append(fits.Column(name='FLUX', format=tform, dim=dims, unit=pixel_unit, disp='E14.7', array=img_cube))
-        cols.append(fits.Column(name='FLUX_ERR', format=tform, dim=dims, unit=pixel_unit, disp='E14.7', array=uncert_cube)) 
+        cols.append(fits.Column(name='FLUX_ERR', format=tform, dim=dims, unit=pixel_unit, disp='E14.7',
+                                array=uncert_cube)) 
    
         # Adding the background info (zeros b.c we don't have this info)
-        cols.append(fits.Column(name='FLUX_BKG', format=tform, dim=dims, unit=pixel_unit, disp='E14.7', array=empty_arr))
+        cols.append(fits.Column(name='FLUX_BKG', format=tform, dim=dims, unit=pixel_unit, disp='E14.7',
+                                array=empty_arr))
         cols.append(fits.Column(name='FLUX_BKG_ERR', format=tform, dim=dims,
                                 unit=pixel_unit, disp='E14.7', array=empty_arr))
 
