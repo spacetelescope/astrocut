@@ -1,4 +1,5 @@
 from os import path
+from pathlib import Path
 
 import astropy.units as u
 import numpy as np
@@ -448,3 +449,42 @@ def test_inputs(tmpdir, capsys, ffi_type):
         cutout_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, ffi_type, output_path=tmpdir, verbose=False)
     assert "5x3" in cutout_file
     assert "x9" not in cutout_file
+
+
+def test_s3_cube_cut(tmp_path: Path):
+    """Does using an S3-hosted TESS cube yield correct results?
+
+    This test implements a spot check which verifies whether a cutout
+    for Proxima Cen (Sector 38) obtained from an S3-hosted cube
+    file yields results that are identical to those returned
+    by the Tesscut service.
+
+    To speed up the test and avoid adding astroquery as a dependency,
+    the test uses hard-coded reference values which were obtained
+    as follows:
+
+    >>> from astroquery.mast import Tesscut  # doctest: +SKIP
+    >>> crd = SkyCoord(217.42893801, -62.67949189, unit="deg")  # doctest: +SKIP
+    >>> cut = Tesscut.get_cutouts(crd, size=3, sector=38)  # doctest: +SKIP
+    >>> cut[0][1].data.shape  # doctest: +SKIP
+    (3705,)
+    >>> cut[0][1].data['TIME'][0]  # doctest: +SKIP
+    2333.8614060219998
+    >>> cut[0][1].data['FLUX'][100][0, 0]  # doctest: +SKIP
+    2329.8127
+    >>> cut[0][1].data['FLUX_ERR'][200][1, 2]  # doctest: +SKIP
+    1.1239403
+    >>> cut[0][0].header['CAMERA']  # doctest: +SKIP
+    2
+    """
+    # Test case: Proxima Cen in Sector 38 (Camera 2, CCD 2)
+    coord = SkyCoord(217.42893801, -62.67949189, unit="deg", frame="icrs")
+    cube_file = "s3://stpubdata/tess/public/mast/tess-s0038-2-2-cube.fits"
+    cutout_file = CutoutFactory().cube_cut(cube_file, coord, 3, output_path=str(tmp_path))
+    hdulist = fits.open(cutout_file)
+    assert hdulist[1].data.shape == (3705,)
+    assert np.isclose(hdulist[1].data["TIME"][0], 2333.8614060219998)
+    assert np.isclose(hdulist[1].data["FLUX"][100][0, 0], 2329.8127)
+    assert np.isclose(hdulist[1].data["FLUX_ERR"][200][1, 2], 1.1239403)
+    assert hdulist[0].header["CAMERA"] == 2
+    hdulist.close()

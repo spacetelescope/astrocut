@@ -8,7 +8,7 @@ import os
 from astropy.version import version as astropy_version
 
 # For Astropy 3.0 and later, we can use the standalone pytest plugin
-if astropy_version < '3.0':
+if astropy_version < "3.0" and "dev" not in astropy_version:
     from astropy.tests.pytest_plugins import *  # noqa
     del pytest_report_header
     ASTROPY_HEADER = True
