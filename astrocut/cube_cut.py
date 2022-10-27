@@ -496,6 +496,7 @@ class CutoutFactory():
                        'CCDNUM', 'CAMNUM', 'WCSGDF', 'UNITS', 'CADENCE', 'SCIPIXS', 'INT_TIME', 'PIX_CAT',
                        'REQUANT', 'DIFF_HUF', 'PRIM_HUF', 'QUAL_BIT', 'SPM', 'STARTTJD', 'ENDTJD', 'CRM',
                        'TJD_ZERO', 'CRM_N', 'ORBIT_ID', 'MIDTJD']
+
         if product == 'TICA':
 
             # Adding some missing kwds not in TICA (but in Ames-produced SPOC ffis)

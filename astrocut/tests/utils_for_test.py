@@ -70,7 +70,7 @@ def add_tica_keywords(hdu, time_increment):
     hdu.header['QUAL_BIT'] = 0
     hdu.header['CADENCE'] = 151696
     hdu.header['CRM'] = True
-    hdu.header['BJDREFI'] = 2457000
+    hdu.header['DEADC'] = 0.792
 
     # WCS keywords just copied from example
     # hdu.header['RADESYS'] = 'ICRS    '
