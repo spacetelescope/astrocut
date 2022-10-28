@@ -822,11 +822,6 @@ class CutoutFactory():
         warnings.filterwarnings("ignore", category=wcs.FITSFixedWarning)
         with fits.open(cube_file, mode='denywrite', memmap=True) as cube:
 
-            # Get the first FFI file, which is used to generate the 
-            # primary header keyword values 
-            self.first_ffi = cube[2].data['FFI_FILE'][0]
-            self.last_ffi = cube[2].data['FFI_FILE'][-1]
-
             # Get the info we need from the data table
             self._parse_table_info(product, cube[2].data, verbose)
 
