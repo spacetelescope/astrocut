@@ -799,7 +799,7 @@ class CutoutFactory():
             angular units.
         product : str
             The product type to make the cutouts from.
-            Can either be 'SPOC' or 'TICA'.
+            Can either be 'SPOC' or 'TICA' (default is 'SPOC').
         target_pixel_file : str
             Optional. The name for the output target pixel file. 
             If no name is supplied, the file will be named: 
