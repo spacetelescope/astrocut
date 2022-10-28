@@ -508,7 +508,7 @@ class CutoutFactory():
             primary_header['TSTOP'] = (primary_header['ENDTJD'], 'observation stop time in TJD of last FFI')
             primary_header['CAMERA'] = (primary_header['CAMNUM'], 'Camera number')
             primary_header['CCD'] = (primary_header['CCDNUM'], 'CCD chip number')
-            primary_header['ASTATE'] = (None, 'archive state F indicates single orbit processi')
+            primary_header['ASTATE'] = (None, 'archive state F indicates single orbit processing')
             primary_header['CRMITEN'] = (primary_header['CRM'], 'spacecraft cosmic ray mitigation enabled')
             primary_header['CRBLKSZ'] = (None, '[exposures] s/c cosmic ray mitigation block siz')
             primary_header['FFIINDEX'] = (primary_header['CADENCE'], 'number of FFI cadence interval of first FFI')
