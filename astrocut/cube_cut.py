@@ -695,7 +695,6 @@ class CutoutFactory():
         tform = str(img_cube[0].size) + "E"
         dims = str(img_cube[0].shape[::-1])
         empty_arr = np.zeros(img_cube.shape)
-        
         # Adding the Time relates columns
         start = 'TSTART' if product == 'SPOC' else 'STARTTJD'
         stop = 'TSTOP' if product == 'SPOC' else 'ENDTJD'
