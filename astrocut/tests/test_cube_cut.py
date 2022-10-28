@@ -63,7 +63,7 @@ def checkcutout(product, cutfile, pixcrd, world, csize, ecube, eps=1.e-7):
     return 
 
 
-def check1(ffi_type, flux, x1, x2, y1, y2, ecube, label, cutfile):
+def check1(product, flux, x1, x2, y1, y2, ecube, label, cutfile):
     """ Checking to make sure the right corresponding pixels 
     are replaced by NaNs when cutout goes off the TESS camera.
     Test one of flux or error
