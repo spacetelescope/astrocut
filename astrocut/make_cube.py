@@ -748,7 +748,7 @@ class TicaCubeFactory():
                 print(os.path.basename(file))
 
             if os.path.basename(file) not in in_cube:
-                 filtered_file_list.append(file)
+                filtered_file_list.append(file)
 
         noffis_err_msg = 'No new FFIs found for the given sector.'
         assert len(filtered_file_list) > 0, noffis_err_msg
