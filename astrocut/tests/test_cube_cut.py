@@ -5,15 +5,16 @@ from os import path
 from astropy.io import fits
 from astropy import wcs
 from astropy.coordinates import SkyCoord
+from astropy.time import Time
 import astropy.units as u
 
 from .utils_for_test import create_test_ffis
-from ..make_cube import CubeFactory
+from ..make_cube import CubeFactory, TicaCubeFactory
 from ..cube_cut import CutoutFactory
 from ..exceptions import InvalidQueryError, InputWarning
 
 
-def checkcutout(cutfile, pixcrd, world, csize, ecube, eps=1.e-7):
+def checkcutout(product, cutfile, pixcrd, world, csize, ecube, eps=1.e-7):
     """Check FITS cutout for correctness
     
     Checks RA_OBJ/DEC_OBJ in primary header, and TIME, FLUX, and
@@ -49,8 +50,12 @@ def checkcutout(cutfile, pixcrd, world, csize, ecube, eps=1.e-7):
     assert len(tab) == ntimes, "{} expected {} entries, found {}".format(cutfile, ntimes, len(tab))
     assert (tab['TIME'] == (np.arange(ntimes)+0.5)).all(), "{} some time values are incorrect".format(cutfile)
 
-    check1(tab['FLUX'], x1, x2, y1, y2, ecube[:, :, :, 0], 'FLUX', cutfile)
-    check1(tab['FLUX_ERR'], x1, x2, y1, y2, ecube[:, :, :, 1], 'FLUX_ERR', cutfile)
+    if product == 'SPOC':
+        # TODO: Modify check1 to take TICA - adjust for TICA's slightly different WCS 
+        # solutions (TICA will usually be ~1 pixel off from SPOC for the same cutout)
+        check1(tab['FLUX'], x1, x2, y1, y2, ecube[:, :, :, 0], 'FLUX', cutfile)
+        # Only SPOC propagates errors, so TICA will always have an empty error array
+        check1(tab['FLUX_ERR'], x1, x2, y1, y2, ecube[:, :, :, 1], 'FLUX_ERR', cutfile)
     
     # Regression test for PR #6
     assert hdulist[2].data.dtype.type == np.int32
@@ -59,9 +64,14 @@ def checkcutout(cutfile, pixcrd, world, csize, ecube, eps=1.e-7):
 
 
 def check1(flux, x1, x2, y1, y2, ecube, label, cutfile):
-    """Test one of flux or error"""
+    """ Checking to make sure the right corresponding pixels 
+    are replaced by NaNs when cutout goes off the TESS camera.
+    Test one of flux or error
+    """
+
     cx = ecube.shape[0]
     cy = ecube.shape[1]
+
     if x1 < 0:
         assert np.isnan(flux[:, :-x1, :]).all(), "{} {} x1 NaN failure".format(cutfile, label)
     
@@ -78,29 +88,38 @@ def check1(flux, x1, x2, y1, y2, ecube, label, cutfile):
     y1c = max(y1, 0)
     x2c = min(x2, cx-1)
     y2c = min(y2, cy-1)
+
     scube = ecube[x1c:x2c, y1c:y2c, :]
     sflux = np.moveaxis(flux[:, x1c-x1:x2c-x1, y1c-y1:y2c-y1], 0, -1)
+
     assert (scube == sflux).all(), "{} {} comparison failure".format(cutfile, label)
 
     return
 
 
-def test_cube_cutout(tmpdir):
+@pytest.mark.parametrize('ffi_type', ['SPOC', 'TICA'])
+def test_cube_cutout(tmpdir, ffi_type):
     """
     Testing the cube cutout functionality.
     """
 
     # Making the test cube
-    cube_maker = CubeFactory()
+    if ffi_type == 'SPOC':
+        cube_maker = CubeFactory()  
+    else:
+        cube_maker = TicaCubeFactory()
+
+    cutout_maker = CutoutFactory()
     
     img_sz = 10
     num_im = 100
     
-    ffi_files = create_test_ffis(img_sz, num_im, dir_name=tmpdir)
+    ffi_files = create_test_ffis(img_sz, num_im, product=ffi_type, dir_name=tmpdir)
     cube_file = cube_maker.make_cube(ffi_files, path.join(tmpdir, "test_cube.fits"), verbose=False)
 
     # Read one of the input images to get the WCS
-    img_header = fits.getheader(ffi_files[0], 1)
+    n = 1 if ffi_type == 'SPOC' else 0
+    img_header = fits.getheader(ffi_files[0], n)
     cube_wcs = wcs.WCS(img_header)
 
     # get pixel positions at edges and center of image
@@ -121,8 +140,8 @@ def test_cube_cutout(tmpdir):
     csize[-1] = img_sz+5
     for i, v in enumerate(world_coords):
         coord = SkyCoord(v[0], v[1], frame='icrs', unit='deg')
-        CutoutFactory().cube_cut(cube_file, coord, csize[i], target_pixel_file=cutlist[i],
-                                 output_path=tmpdir, verbose=False)
+        cutout_maker.cube_cut(cube_file, coord, csize[i], ffi_type, target_pixel_file=cutlist[i],
+                              output_path=tmpdir, verbose=False)
 
     # expected values for cube
     ecube = np.zeros((img_sz, img_sz, num_im, 2))
@@ -134,77 +153,116 @@ def test_cube_cutout(tmpdir):
 
     # Doing the actual checking
     for i, cutfile in enumerate(cutlist):
-        checkcutout(cutfile, pixcrd[i], world_coords[i], csize[i], ecube)
-           
-    
-        
-def test_cutout_extras(tmpdir):
+        checkcutout(ffi_type, cutfile, pixcrd[i], world_coords[i], csize[i], ecube)
+
+
+@pytest.mark.parametrize('ffi_type', ['SPOC', 'TICA'])
+def test_cutout_extras(tmpdir, ffi_type):
 
     # Making the test cube
-    cube_maker = CubeFactory()
+    if ffi_type == 'SPOC':
+        cube_maker = CubeFactory()
+    else:
+        cube_maker = TicaCubeFactory()
+
+    cutout_maker = CutoutFactory()
     
     img_sz = 10
     num_im = 100
     
-    ffi_files = create_test_ffis(img_sz, num_im)
+    ffi_files = create_test_ffis(img_sz, num_im, product=ffi_type)
     cube_file = cube_maker.make_cube(ffi_files, path.join(tmpdir, "test_cube.fits"), verbose=False)
 
     # Making the cutout
-    myfactory = CutoutFactory()
     coord = "256.88 6.38"
 
     ###########################
     # Test  _parse_table_info #
     ###########################
     cutout_size = [5, 3]
-    out_file = myfactory.cube_cut(cube_file, coord, cutout_size,
-                                  output_path=path.join(tmpdir, "out_dir"), verbose=False)
+    out_file = cutout_maker.cube_cut(cube_file, 
+                                     coord, 
+                                     cutout_size,
+                                     ffi_type,
+                                     output_path=path.join(tmpdir, "out_dir"), 
+                                     verbose=False)
+                                      
     assert "256.880000_6.380000_5x3_astrocut.fits" in out_file
 
-    assert isinstance(myfactory.cube_wcs, wcs.WCS)
-    ra, dec = myfactory.cube_wcs.wcs.crval
+    assert isinstance(cutout_maker.cube_wcs, wcs.WCS)
+    ra, dec = cutout_maker.cube_wcs.wcs.crval
     assert round(ra, 4) == 250.3497
     assert round(dec, 4) == 2.2809
 
     # checking on the center coordinate too
     coord = SkyCoord(256.88, 6.38, frame='icrs', unit='deg')
-    assert myfactory.center_coord.separation(coord) == 0
+    assert cutout_maker.center_coord.separation(coord) == 0
+
+    ################################
+    # Test header keywords quality #
+    ################################
+    with fits.open(out_file) as hdulist:
+
+        # Primary header checks
+        primary_header = hdulist[0].header
+        assert primary_header['FFI_TYPE'] == ffi_type
+        assert primary_header['CREATOR'] == 'astrocut'
+        assert primary_header['BJDREFI'] == 2457000
+
+        if ffi_type == 'TICA':
+            # Verifying DATE-OBS calculation in TICA
+            date_obs = primary_header['DATE-OBS']
+            tstart = Time(date_obs).jd - primary_header['BJDREFI']
+            assert primary_header['TSTART'] == tstart
+
+            # Verifying DATE-END calculation in TICA
+            date_end = primary_header['DATE-END']
+            tstop = Time(date_end).jd - primary_header['BJDREFI']
+            assert primary_header['TSTOP'] == tstop
+
+        # Checking for header keyword propagation in EXT 1 and 2
+        ext1_header = hdulist[1].header
+        ext2_header = hdulist[2].header
+        assert ext1_header['FFI_TYPE'] == ext2_header['FFI_TYPE'] == primary_header['FFI_TYPE']
+        assert ext1_header['CREATOR'] == ext2_header['CREATOR'] == primary_header['CREATOR']
+        assert ext1_header['BJDREFI'] == ext2_header['BJDREFI'] == primary_header['BJDREFI']
+
 
     ############################
     # Test  _get_cutout_limits #
     ############################
-    xmin, xmax = myfactory.cutout_lims[0]
-    ymin, ymax = myfactory.cutout_lims[1]
+    xmin, xmax = cutout_maker.cutout_lims[0]
+    ymin, ymax = cutout_maker.cutout_lims[1]
     
     assert (xmax-xmin) == cutout_size[0]
     assert (ymax-ymin) == cutout_size[1]
 
     cutout_size = [5*u.pixel, 7*u.pixel]
-    out_file = myfactory.cube_cut(cube_file, coord, cutout_size, verbose=False)
+    out_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, ffi_type, verbose=False)
     assert "256.880000_6.380000_5x7_astrocut.fits" in out_file
     
-    xmin, xmax = myfactory.cutout_lims[0]
-    ymin, ymax = myfactory.cutout_lims[1]
+    xmin, xmax = cutout_maker.cutout_lims[0]
+    ymin, ymax = cutout_maker.cutout_lims[1]
     
     assert (xmax-xmin) == cutout_size[0].value
     assert (ymax-ymin) == cutout_size[1].value
 
     cutout_size = [3*u.arcmin, 5*u.arcmin]
-    out_file = myfactory.cube_cut(cube_file, coord, cutout_size, verbose=False)
+    out_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, ffi_type, verbose=False)
     assert "256.880000_6.380000_8x15_astrocut.fits" in out_file
     
-    xmin, xmax = myfactory.cutout_lims[0]
-    ymin, ymax = myfactory.cutout_lims[1]
+    xmin, xmax = cutout_maker.cutout_lims[0]
+    ymin, ymax = cutout_maker.cutout_lims[1]
     
     assert (xmax-xmin) == 8
     assert (ymax-ymin) == 15
     
     cutout_size = [1*u.arcsec, 5*u.arcsec]
-    out_file = myfactory.cube_cut(cube_file, coord, cutout_size, verbose=False)
+    out_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, ffi_type, verbose=False)
     assert "256.880000_6.380000_1x1_astrocut.fits" in out_file
     
-    xmin, xmax = myfactory.cutout_lims[0]
-    ymin, ymax = myfactory.cutout_lims[1]
+    xmin, xmax = cutout_maker.cutout_lims[0]
+    ymin, ymax = cutout_maker.cutout_lims[1]
     
     assert (xmax-xmin) == 1
     assert (ymax-ymin) == 1
@@ -213,20 +271,20 @@ def test_cutout_extras(tmpdir):
     # Test _get_full_cutout_wcs #
     #############################
     cutout_size = [5, 3]
-    out_file = myfactory.cube_cut(cube_file, coord, cutout_size, verbose=False)
+    out_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, ffi_type, verbose=False)
 
-    cutout_wcs_full = myfactory._get_full_cutout_wcs(fits.getheader(cube_file, 2))
-    assert (cutout_wcs_full.wcs.crpix == [1045 - myfactory.cutout_lims[0, 0],
-                                          1001 - myfactory.cutout_lims[1, 0]]).all()    
+    cutout_wcs_full = cutout_maker._get_full_cutout_wcs(fits.getheader(cube_file, 2))
+    assert (cutout_wcs_full.wcs.crpix == [1045 - cutout_maker.cutout_lims[0, 0],
+                                          1001 - cutout_maker.cutout_lims[1, 0]]).all()    
 
     ########################
     # Test _fit_cutout_wcs #
     ########################
-    max_dist, sigma = myfactory._fit_cutout_wcs(cutout_wcs_full, (3, 5))
+    max_dist, sigma = cutout_maker._fit_cutout_wcs(cutout_wcs_full, (3, 5))
     assert max_dist.deg < 1e-05
     assert sigma < 1e-05
 
-    cry, crx = myfactory.cutout_wcs.wcs.crpix
+    cry, crx = cutout_maker.cutout_wcs.wcs.crpix
     assert round(cry) == 3
     assert round(crx) == 2
     
@@ -242,7 +300,9 @@ def test_cutout_extras(tmpdir):
     assert tpf[0].header["ORIGIN"] == 'STScI/MAST'
 
     tpf_table = tpf[1].data
-    assert len(tpf_table.columns) == 12
+    # SPOC cutouts have one extra column in EXT 1
+    ncols = 12 if ffi_type == 'SPOC' else 11
+    assert len(tpf_table.columns) == ncols
     assert "TIME" in tpf_table.columns.names
     assert "FLUX" in tpf_table.columns.names
     assert "FLUX_ERR" in tpf_table.columns.names
@@ -259,107 +319,120 @@ def test_cutout_extras(tmpdir):
     tpf.close()
 
 
-def test_exceptions(tmpdir):
+@pytest.mark.parametrize('ffi_type', ['SPOC', 'TICA'])
+def test_exceptions(tmpdir, ffi_type):
     """
     Testing various error conditions.
     """
     
     # Making the test cube
-    cube_maker = CubeFactory()
+    if ffi_type == 'SPOC':
+        cube_maker = CubeFactory()
+    else:
+        cube_maker = TicaCubeFactory()
+
+    cutout_maker = CutoutFactory()
     
     img_sz = 10
     num_im = 100
     
-    ffi_files = create_test_ffis(img_sz, num_im)
+    ffi_files = create_test_ffis(img_sz, num_im, product=ffi_type)
     cube_file = cube_maker.make_cube(ffi_files, path.join(tmpdir, "test_cube.fits"), verbose=False)
 
-    # Setting up
-    myfactory = CutoutFactory()
-   
     hdu = fits.open(cube_file)
     cube_table = hdu[2].data
      
     # Testing when none of the FFIs have good wcs info
-    cube_table["WCSAXES"] = 0
+    wcsaxes = 'WCSAXES' if ffi_type == 'SPOC' else 'WCAX3'
+    cube_table[wcsaxes] = 0
     with pytest.raises(Exception, match='No FFI rows contain valid WCS keywords.') as e:
-        myfactory._parse_table_info(cube_table)
+        cutout_maker._parse_table_info(product=ffi_type, table_data=cube_table)
         assert e.type is wcs.NoWcsKeywordsFoundError
-    cube_table["WCSAXES"] = 2
+    cube_table[wcsaxes] = 2
 
     # Testing when nans are present 
-    myfactory._parse_table_info(cube_table)
-    wcs_orig = myfactory.cube_wcs
-    cube_table["BARYCORR"] = np.nan
-    myfactory._parse_table_info(cube_table)
-    assert wcs_orig.to_header_string() == myfactory.cube_wcs.to_header_string()
+    cutout_maker._parse_table_info(product=ffi_type, table_data=cube_table)
+    wcs_orig = cutout_maker.cube_wcs
+    # TICA does not have BARYCORR so we can't use the same 
+    # test column for both product types. 
+    nan_column = 'BARYCORR' if ffi_type == 'SPOC' else 'DEADC'
+    cube_table[nan_column] = np.nan
+    cutout_maker._parse_table_info(product=ffi_type, table_data=cube_table)
+
+    assert wcs_orig.to_header_string() == cutout_maker.cube_wcs.to_header_string()
 
     hdu.close()
 
     # Testing various off the cube inputs
-    myfactory.center_coord = SkyCoord("50.91092264 6.40588255", unit='deg')
+    cutout_maker.center_coord = SkyCoord("50.91092264 6.40588255", unit='deg')
     with pytest.raises(Exception, match='Cutout location is not in cube footprint!') as e:
-        myfactory._get_cutout_limits(np.array([5, 5]))
+        cutout_maker._get_cutout_limits(np.array([5, 5]))
         assert e.type is InvalidQueryError
          
-    myfactory.center_coord = SkyCoord("257.91092264 6.40588255", unit='deg')
+    cutout_maker.center_coord = SkyCoord("257.91092264 6.40588255", unit='deg')
     with pytest.raises(Exception, match='Cutout location is not in cube footprint!') as e:
-        myfactory._get_cutout_limits(np.array([5, 5]))
+        cutout_maker._get_cutout_limits(np.array([5, 5]))
         assert e.type is InvalidQueryError
 
 
     # Testing the WCS fitting function
-    distmax, sigma = myfactory._fit_cutout_wcs(myfactory.cube_wcs, (100, 100))
+    distmax, sigma = cutout_maker._fit_cutout_wcs(cutout_maker.cube_wcs, (100, 100))
     assert distmax.deg < 0.003
     assert sigma < 0.03
 
-    distmax, sigma = myfactory._fit_cutout_wcs(myfactory.cube_wcs, (1, 100))
+    distmax, sigma = cutout_maker._fit_cutout_wcs(cutout_maker.cube_wcs, (1, 100))
     assert distmax.deg < 0.003
     assert sigma < 0.03
 
-    distmax, sigma = myfactory._fit_cutout_wcs(myfactory.cube_wcs, (100, 2))
+    distmax, sigma = cutout_maker._fit_cutout_wcs(cutout_maker.cube_wcs, (100, 2))
     assert distmax.deg < 0.03
     assert sigma < 0.03
 
-    myfactory.center_coord = SkyCoord("256.38994124 4.88986771", unit='deg')
-    myfactory._get_cutout_limits(np.array([5, 500]))
+    cutout_maker.center_coord = SkyCoord("256.38994124 4.88986771", unit='deg')
+    cutout_maker._get_cutout_limits(np.array([5, 500]))
 
     hdu = fits.open(cube_file)
-    cutout_wcs = myfactory._get_full_cutout_wcs(hdu[2].header)
+    cutout_wcs = cutout_maker._get_full_cutout_wcs(hdu[2].header)
     hdu.close()
 
-    distmax, sigma = myfactory._fit_cutout_wcs(cutout_wcs, (200, 200))
+    distmax, sigma = cutout_maker._fit_cutout_wcs(cutout_wcs, (200, 200))
     assert distmax.deg < 0.004
     assert sigma < 0.2
 
-    distmax, sigma = myfactory._fit_cutout_wcs(cutout_wcs, (100, 5))
+    distmax, sigma = cutout_maker._fit_cutout_wcs(cutout_wcs, (100, 5))
     assert distmax.deg < 0.003
     assert sigma < 0.003
 
-    distmax, sigma = myfactory._fit_cutout_wcs(cutout_wcs, (3, 100))
+    distmax, sigma = cutout_maker._fit_cutout_wcs(cutout_wcs, (3, 100))
     assert distmax.deg < 0.003
     assert sigma < 0.003
     
 
-def test_inputs(tmpdir, capsys):
+@pytest.mark.parametrize('ffi_type', ['SPOC', 'TICA'])
+def test_inputs(tmpdir, capsys, ffi_type):
     """
     Testing with different user input types/combos. And verbose.
     """
 
     # Making the test cube
-    cube_maker = CubeFactory()
-    
+    if ffi_type == 'SPOC':
+        cube_maker = CubeFactory()
+    else:
+        cube_maker = TicaCubeFactory()
+
+    cutout_maker = CutoutFactory()
+
     img_sz = 10
     num_im = 100
-    
-    ffi_files = create_test_ffis(img_sz, num_im)
+
+    ffi_files = create_test_ffis(img_sz, num_im, product=ffi_type)
     cube_file = cube_maker.make_cube(ffi_files, path.join(tmpdir, "test_cube.fits"), verbose=False)
 
     # Setting up
-    myfactory = CutoutFactory()
     coord = "256.88 6.38"
 
     cutout_size = [5, 3]*u.pixel
-    cutout_file = myfactory.cube_cut(cube_file, coord, cutout_size, output_path=tmpdir, verbose=True)
+    cutout_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, ffi_type, output_path=tmpdir, verbose=True)
     captured = capsys.readouterr()
     assert "Image cutout cube shape: (100, 3, 5)" in captured.out
     assert "Using WCS from row 50 out of 100" in captured.out
@@ -367,12 +440,11 @@ def test_inputs(tmpdir, capsys):
     assert "5x3" in cutout_file
 
     cutout_size = [5, 3]*u.arcmin
-    cutout_file = myfactory.cube_cut(cube_file, coord, cutout_size, output_path=tmpdir, verbose=False)
+    cutout_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, ffi_type, output_path=tmpdir, verbose=False)
     assert "14x9" in cutout_file
 
-    
     cutout_size = [5, 3, 9]*u.pixel
     with pytest.warns(InputWarning):
-        cutout_file = myfactory.cube_cut(cube_file, coord, cutout_size, output_path=tmpdir, verbose=False)
+        cutout_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, ffi_type, output_path=tmpdir, verbose=False)
     assert "5x3" in cutout_file
     assert "x9" not in cutout_file

@@ -17,6 +17,7 @@ def add_keywords(hdu, extname, time_increment, primary=False):
     hdu.header['date-end'] = '2019-05-11T00:38:26.816Z'
     hdu.header['barycorr'] = 5.0085597E-03
     hdu.header['dquality'] = 0
+    hdu.header['FFIINDEX'] = 151696
 
     if not primary:
         # WCS keywords just copied from example
@@ -67,11 +68,14 @@ def add_tica_keywords(hdu, time_increment):
     hdu.header['STARTTJD'] = float(time_increment)
     hdu.header['ENDTJD'] = float(time_increment+1)
     hdu.header['QUAL_BIT'] = 0
+    hdu.header['CADENCE'] = 151696
+    hdu.header['CRM'] = True
+    hdu.header['DEADC'] = 0.792
 
     # WCS keywords just copied from example
     # hdu.header['RADESYS'] = 'ICRS    '
     hdu.header['EQUINOX'] = 2000.0
-    # hdu.header['WCSAXES'] = 2
+    hdu.header['WCAX3'] = 2
     hdu.header['CTYPE1'] = ('RA---TAN-SIP', "Gnomonic projection + SIP distortions")
     hdu.header['CTYPE2'] = ('DEC--TAN-SIP', "Gnomonic projection + SIP distortions")
     hdu.header['CRVAL1'] = 250.3497414839765200
@@ -106,7 +110,7 @@ def add_tica_keywords(hdu, time_increment):
     hdu.header['B_DMAX'] = 44.62692873032506
 
 
-def create_test_ffis(img_size, num_images, dir_name=".", product='spoc', basename='make_cube-test{:04d}.fits'):
+def create_test_ffis(img_size, num_images, dir_name=".", product='SPOC', basename='make_cube-test{:04d}.fits'):
     """
     Create test fits files
 
@@ -122,17 +126,17 @@ def create_test_ffis(img_size, num_images, dir_name=".", product='spoc', basenam
         
         file_list.append(basename.format(i))
 
-        if product == 'spoc':
+        if product == 'SPOC':
             primary_hdu = fits.PrimaryHDU()
-        elif product == 'tica':
+        elif product == 'TICA':
             primary_hdu = fits.PrimaryHDU(-img)
 
-        if product == 'spoc':
+        if product == 'SPOC':
             add_keywords(primary_hdu, "PRIMARY", i, primary=True)
-        elif product == 'tica':
+        elif product == 'TICA':
             add_tica_keywords(primary_hdu, i)
 
-        if product == 'spoc':   
+        if product == 'SPOC':   
             hdu = fits.ImageHDU(-img)
             add_keywords(hdu, 'CAMERA.CCD 1.1 cal', i)
             
@@ -141,7 +145,7 @@ def create_test_ffis(img_size, num_images, dir_name=".", product='spoc', basenam
             
             hdulist = fits.HDUList([primary_hdu, hdu, ehdu])
 
-        elif product == 'tica':
+        elif product == 'TICA':
             hdulist = fits.HDUList([primary_hdu])   
 
         hdulist.writeto(file_list[-1], overwrite=True, checksum=True)
@@ -151,14 +155,15 @@ def create_test_ffis(img_size, num_images, dir_name=".", product='spoc', basenam
     return file_list
 
 
-def add_wcs_nosip_keywords(hdu, img_size):
+def add_wcs_nosip_keywords(hdu, img_size, product='SPOC'):
     """
     Adds example wcs keywords without sip distortions to the given header.
 
     Center coordinate is: 150.1163213, 2.200973097
     """
 
-    hdu.header.extend([('WCSAXES', 2, 'Number of coordinate axes'),
+    wcsaxes = 'WCSAXES' if product == 'SPOC' else 'WCAX3'
+    hdu.header.extend([(wcsaxes, 2, 'Number of coordinate axes'),
                        ('CRPIX1', img_size/2, 'Pixel coordinate of reference point'),
                        ('CRPIX2', img_size/2, 'Pixel coordinate of reference point'),
                        ('PC1_1', -1.666667e-05, 'Coordinate transformation matrix element'),
@@ -201,7 +206,7 @@ def add_bad_sip_keywords(hdu):
     hdu.header['B_DMAX'] = 44.62692873032506
     
 
-def create_test_imgs(img_size, num_images, bad_sip_keywords=False, dir_name=".", basename='img_{:04d}.fits'):
+def create_test_imgs(product, img_size, num_images, bad_sip_keywords=False, dir_name=".", basename='img_{:04d}.fits'):
     """
     Create test fits image files, single extension.
 
@@ -218,7 +223,7 @@ def create_test_imgs(img_size, num_images, bad_sip_keywords=False, dir_name=".",
         file_list.append(basename.format(i))
 
         primary_hdu = fits.PrimaryHDU(data=img)
-        add_wcs_nosip_keywords(primary_hdu, img_size)
+        add_wcs_nosip_keywords(primary_hdu, img_size, product)
 
         if bad_sip_keywords:
             add_bad_sip_keywords(primary_hdu)

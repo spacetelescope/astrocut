@@ -8,12 +8,13 @@ import warnings
 from time import time
 from itertools import product
 
-import numpy as np
 import astropy.units as u
+import numpy as np
 
-from astropy.io import fits
-from astropy.coordinates import SkyCoord
 from astropy import wcs
+from astropy.coordinates import SkyCoord
+from astropy.io import fits
+from astropy.time import Time
 
 from . import __version__ 
 from .exceptions import InputWarning, InvalidQueryError
@@ -30,14 +31,17 @@ class CutoutFactory():
     """
     Class for creating image cutouts.
 
-    This class emcompasses all of the cutout functionality.  
-    In the current version this means creating cutout target pixel files from TESS full frame image cubes.
+    This class encompasses all of the cutout functionality.  
+    In the current version this means creating cutout target pixel files from both 
+    SPOC (Science Processing Operations Center) and TICA (Tess Image CAlibration) 
+    full frame image cubes.
+
     Future versions will include more generalized cutout functionality.
     """
 
     def __init__(self):
         """
-        Initiazation function.
+        Initialization function.
         """
 
         self.cube_wcs = None  # WCS information from the image cube
@@ -48,7 +52,8 @@ class CutoutFactory():
         self.cutout_lims = np.zeros((2, 2), dtype=int)  # Cutout pixel limits, [[ymin,ymax],[xmin,xmax]]
         self.center_coord = None  # Central skycoord
         
-        # Extra keywords from the FFI image headers (TESS specific)
+        # Extra keywords from the FFI image headers in SPOC.
+        # These are applied to both SPOC and TICA cutouts for consistency.
         self.img_kwds = {"BACKAPP": [None, "background is subtracted"],
                          "CDPP0_5": [None, "RMS CDPP on 0.5-hr time scales"],
                          "CDPP1_0": [None, "RMS CDPP on 1.0-hr time scales"],
@@ -84,27 +89,34 @@ class CutoutFactory():
                          "VIGNAPP": [None, "vignetting or collimator correction applied"]}
 
         
-    def _parse_table_info(self, table_data, verbose=False):
+    def _parse_table_info(self, product, table_data, verbose=False):
         """
-        Takes the header and one entry from the cube table of image header data,
-        builds a WCS object that encalpsulates the given WCS information,
+        Takes the header and the middle entry from the cube table (EXT 2) of image header data,
+        builds a WCS object that encapsulates the given WCS information,
         and collects into a dictionary the other keywords we care about.  
 
         The WCS is stored in ``self.cube_wcs``, and the extra keywords in ``self.img_kwds``
 
         Parameters
         ----------
+        product : str
+            The product type to make the cutouts from.
+            Can either be 'SPOC' or 'TICA'.
         table_data : `~astropy.io.fits.fitsrec.FITS_rec`
             The cube image header data table.
         """
 
-        data_ind = len(table_data)//2  # using the middle file for table info
+        # Populating `table_row` with the primary header keywords 
+        # of the middle FFI
+        data_ind = len(table_data)//2
         table_row = None
 
-        # Making sure we have a row with wcs info
         while table_row is None:
             table_row = table_data[data_ind]
-            if table_row["WCSAXES"] != 2:
+
+            # Making sure we have a row with wcs info.
+            wcsaxes_keyword = 'WCSAXES' if product == 'SPOC' else 'WCAX3' 
+            if table_row[wcsaxes_keyword] != 2:
                 table_row = None
                 data_ind += 1
                 if data_ind == len(table_data):
@@ -129,7 +141,7 @@ class CutoutFactory():
         # Filling the img_kwds dictionary while we are here
         for kwd in self.img_kwds:
             self.img_kwds[kwd][0] = wcs_header.get(kwd)
-        # Adding the info about which FFI we got the 
+        # Adding the info about which FFI we got the WCS info from
         self.img_kwds["WCS_FFI"] = [table_data[data_ind]["FFI_FILE"],
                                     "FFI used for cutout WCS"]
 
@@ -160,7 +172,7 @@ class CutoutFactory():
         lims = np.zeros((2, 2), dtype=int)
 
         for axis, size in enumerate(cutout_size):
-        
+
             if not isinstance(size, u.Quantity):  # assume pixels
                 dim = size / 2
             elif size.unit == u.pixel:  # also pixels
@@ -322,7 +334,6 @@ class CutoutFactory():
 
         cutout_wcs_dict = dict()
 
-        
         ## Cutout array keywords ##
 
         cutout_wcs_dict["WCAX{}"] = [wcs_header['WCSAXES'], "number of WCS axes"]
@@ -440,7 +451,7 @@ class CutoutFactory():
         return img_cutout, uncert_cutout, aperture
 
 
-    def _update_primary_header(self, primary_header):
+    def _update_primary_header(self, product, primary_header):
         """
         Updates the primary header for the cutout target pixel file by filling in 
         the object ra and dec with the central cutout coordinates and filling in
@@ -450,6 +461,9 @@ class CutoutFactory():
 
         Parameters
         ----------
+        product : str
+            The product type to make the cutouts from.
+            Can either be 'SPOC' or 'TICA'.
         primary_header : `~astropy.io.fits.Header`
             The primary header from the cube file that will be modified in place for the cutout.
         """
@@ -457,20 +471,92 @@ class CutoutFactory():
         # Adding cutout specific headers
         primary_header['CREATOR'] = ('astrocut', 'software used to produce this file')
         primary_header['PROCVER'] = (__version__, 'software version')
+        primary_header['FFI_TYPE'] = (product, 'the FFI type used to make the cutouts')
+        # TODO : The name of FIRST_FFI (and LAST_FFI) is too long to be a header kwd value.
+        # Find a way to include these in the headers without breaking astropy (maybe abbreviate?).
+        # primary_header['FIRST_FFI'] = (self.first_ffi, 'the FFI used for the primary header 
+        # keyword values, except TSTOP')
+        # primary_header['LAST_FFI'] = (self.last_ffi, 'the FFI used for the TSTOP keyword value')
 
         primary_header['RA_OBJ'] = (self.center_coord.ra.deg, '[deg] right ascension')
         primary_header['DEC_OBJ'] = (self.center_coord.dec.deg, '[deg] declination')
 
-        primary_header['TIMEREF'] = ('SOLARSYSTEM', 'barycentric correction applied to times')        
-        primary_header['TASSIGN'] = ('SPACECRAFT', 'where time is assigned')                         
+        timeref = 'SOLARSYSTEM' if product == 'SPOC' else None
+        tassign = 'SPACECRAFT' if product == 'SPOC' else None
+        primary_header['TIMEREF'] = (timeref, 'barycentric correction applied to times')        
+        primary_header['TASSIGN'] = (tassign, 'where time is assigned')
         primary_header['TIMESYS'] = ('TDB', 'time system is Barycentric Dynamical Time (TDB)')
+
         primary_header['BJDREFI'] = (2457000, 'integer part of BTJD reference date')           
         primary_header['BJDREFF'] = (0.00000000, 'fraction of the day in BTJD reference date')    
         primary_header['TIMEUNIT'] = ('d', 'time unit for TIME, TSTART and TSTOP')
 
+        delete_kwds_wildcards = ['SC_*', 'RMS*', 'A_*', 'AP_*', 'B_*', 'BP*', 'GAIN*', 'TESS_*', 'CD*',
+                                 'CT*', 'CRPIX*', 'CRVAL*', 'MJD*']
+        delete_kwds = ['COMMENT', 'FILTER', 'TIME', 'EXPTIME', 'ACS_MODE', 'DEC_TARG', 'FLXWIN', 'RA_TARG',
+                       'CCDNUM', 'CAMNUM', 'WCSGDF', 'UNITS', 'CADENCE', 'SCIPIXS', 'INT_TIME', 'PIX_CAT',
+                       'REQUANT', 'DIFF_HUF', 'PRIM_HUF', 'QUAL_BIT', 'SPM', 'STARTTJD', 'ENDTJD', 'CRM',
+                       'TJD_ZERO', 'CRM_N', 'ORBIT_ID', 'MIDTJD']
+
+        if product == 'TICA':
+
+            # Adding some missing kwds not in TICA (but in Ames-produced SPOC ffis)
+            primary_header['EXTVER'] = ('1', 'extension version number (not format version)')
+            primary_header['SIMDATA'] = (False, 'file is based on simulated data')
+            primary_header['NEXTEND'] = ('2', 'number of standard extensions')
+            primary_header['TSTART'] = (primary_header['STARTTJD'], 'observation start time in TJD of first FFI')
+            primary_header['TSTOP'] = (primary_header['ENDTJD'], 'observation stop time in TJD of last FFI')
+            primary_header['CAMERA'] = (primary_header['CAMNUM'], 'Camera number')
+            primary_header['CCD'] = (primary_header['CCDNUM'], 'CCD chip number')
+            primary_header['ASTATE'] = (None, 'archive state F indicates single orbit processing')
+            primary_header['CRMITEN'] = (primary_header['CRM'], 'spacecraft cosmic ray mitigation enabled')
+            primary_header['CRBLKSZ'] = (None, '[exposures] s/c cosmic ray mitigation block siz')
+            primary_header['FFIINDEX'] = (primary_header['CADENCE'], 'number of FFI cadence interval of first FFI')
+            primary_header['DATA_REL'] = (None, 'data release version number')
+
+            date_obs = Time(primary_header['TSTART']+primary_header['BJDREFI'], format='jd').iso
+            date_end = Time(primary_header['TSTOP']+primary_header['BJDREFI'], format='jd').iso
+            primary_header['DATE-OBS'] = (date_obs, 'TSTART as UTC calendar date of first FFI')
+            primary_header['DATE-END'] = (date_end, 'TSTOP as UTC calendar date of last FFI')
+
+            primary_header['FILEVER'] = (None, 'file format version')
+            primary_header['RADESYS'] = (None, 'reference frame of celestial coordinates')
+            primary_header['SCCONFIG'] = (None, 'spacecraft configuration ID')
+            primary_header['TIMVERSN'] = (None, 'OGIP memo number for file format')
+
+            # Bulk removal with wildcards. Most of these should only live in EXT 1 header.
+            for kwd in delete_kwds_wildcards:
+                try:
+                    del primary_header[kwd]
+                except KeyError:
+                    continue
+
+            # Removal of specific kwds not relevant for cutouts.
+            # Most likely these describe a single FFI, and not
+            # the whole cube, which is misleading because we are 
+            # working with entire stacks of FFIs. Other keywords 
+            # are analogs to ones that have already been added 
+            # to the primary header in the lines above.
+            for kwd in delete_kwds:
+                try:
+                    del primary_header[kwd]
+                except KeyError:
+                    continue
+
         telapse = primary_header.get("TSTOP", 0) - primary_header.get("TSTART", 0)
         primary_header['TELAPSE '] = (telapse, '[d] TSTOP - TSTART')
-        
+
+        # Updating card comment to be more explicit
+        primary_header['DATE'] = (primary_header['DATE'], 'FFI cube creation date')
+
+        # Specifying that some of these headers keyword values are inherited from the first FFI
+        if product == 'SPOC':
+            primary_header['TSTART'] = (primary_header['TSTART'], 'observation start time in TJD of first FFI')
+            primary_header['TSTOP'] = (primary_header['TSTOP'], 'observation stop time in TJD of last FFI')
+            primary_header['DATE-OBS'] = (primary_header['DATE-OBS'], 'TSTART as UTC calendar date of first FFI')
+            primary_header['DATE-END'] = (primary_header['DATE-END'], 'TSTOP as UTC calendar date of last FFI')
+            primary_header['FFIINDEX'] = (primary_header['FFIINDEX'], 'number of FFI cadence interval of first FFI')
+
         # These are all the things in the TESS pipeline tpfs about the object that we can't fill
         primary_header['OBJECT'] = ("", 'string version of target id ')
         primary_header['TCID'] = (0, 'unique tess target identifier')
@@ -538,6 +624,10 @@ class CutoutFactory():
         """
 
         for key in self.img_kwds:
+            # We'll skip these TICA-specific image keywords that are single-FFI specific
+            # or just not helpful
+            if (key == 'TIME') or (key == 'EXPTIME') or (key == 'FILTER'):
+                continue
             table_header[key] = tuple(self.img_kwds[key])
 
             
@@ -564,12 +654,15 @@ class CutoutFactory():
                         hdu.header[kwd] = (primary_header[kwd], primary_header.comments[kwd])
             
 
-    def _build_tpf(self, cube_fits, img_cube, uncert_cube, cutout_wcs_dict, aperture, verbose=True):
+    def _build_tpf(self, product, cube_fits, img_cube, uncert_cube, cutout_wcs_dict, aperture):
         """
         Building the cutout target pixel file (TPF) and formatting it to match TESS pipeline TPFs.
 
         Paramters
         ---------
+        product : str
+            The product type to make the cutouts from.
+            Can either be 'SPOC' or 'TICA'.
         cube_fits : `~astropy.io.fits.hdu.hdulist.HDUList`
             The cube hdu list.
         img_cube : `numpy.array`
@@ -594,7 +687,7 @@ class CutoutFactory():
         # The primary hdu is just the main header, which is the same
         # as the one on the cube file
         primary_hdu = cube_fits[0]
-        self._update_primary_header(primary_hdu.header)
+        self._update_primary_header(product, primary_hdu.header)
 
         cols = list()
 
@@ -602,33 +695,40 @@ class CutoutFactory():
         tform = str(img_cube[0].size) + "E"
         dims = str(img_cube[0].shape[::-1])
         empty_arr = np.zeros(img_cube.shape)
-
         # Adding the Time relates columns
+        start = 'TSTART' if product == 'SPOC' else 'STARTTJD'
+        stop = 'TSTOP' if product == 'SPOC' else 'ENDTJD'
         cols.append(fits.Column(name='TIME', format='D', unit='BJD - 2457000, days', disp='D14.7',
-                                array=(cube_fits[2].columns['TSTART'].array + cube_fits[2].columns['TSTOP'].array)/2))
+                                array=(cube_fits[2].columns[start].array + cube_fits[2].columns[stop].array)/2))
 
-        cols.append(fits.Column(name='TIMECORR', format='E', unit='d', disp='E14.7',
-                                array=cube_fits[2].columns['BARYCORR'].array))
+        if product == 'SPOC':
+            cols.append(fits.Column(name='TIMECORR', format='E', unit='d', disp='E14.7',
+                                    array=cube_fits[2].columns['BARYCORR'].array))
 
-        # Adding CADENCENO as zeros b/c we don't have this info
-        cols.append(fits.Column(name='CADENCENO', format='J', disp='I10', array=empty_arr[:, 0, 0]))
+        # Adding CADENCENO as zeros for SPOC b/c we don't have this info
+        cadence_array = empty_arr[:, 0, 0] if product == 'SPOC' else cube_fits[2].columns['CADENCE'].array
+        cols.append(fits.Column(name='CADENCENO', format='J', disp='I10', array=cadence_array))
 
         # Adding counts (-1 b/c we don't have data)
         cols.append(fits.Column(name='RAW_CNTS', format=tform.replace('E', 'J'), unit='count', dim=dims, disp='I8',
                                 array=empty_arr-1, null=-1))
 
         # Adding flux and flux_err (data we actually have!)
-        cols.append(fits.Column(name='FLUX', format=tform, dim=dims, unit='e-/s', disp='E14.7', array=img_cube))
-        cols.append(fits.Column(name='FLUX_ERR', format=tform, dim=dims, unit='e-/s', disp='E14.7', array=uncert_cube)) 
+        pixel_unit = 'e-/s' if product == 'SPOC' else 'e-'
+        cols.append(fits.Column(name='FLUX', format=tform, dim=dims, unit=pixel_unit, disp='E14.7', array=img_cube))
+        cols.append(fits.Column(name='FLUX_ERR', format=tform, dim=dims, unit=pixel_unit, disp='E14.7',
+                                array=uncert_cube)) 
    
         # Adding the background info (zeros b.c we don't have this info)
-        cols.append(fits.Column(name='FLUX_BKG', format=tform, dim=dims, unit='e-/s', disp='E14.7', array=empty_arr))
+        cols.append(fits.Column(name='FLUX_BKG', format=tform, dim=dims, unit=pixel_unit, disp='E14.7',
+                                array=empty_arr))
         cols.append(fits.Column(name='FLUX_BKG_ERR', format=tform, dim=dims,
-                                unit='e-/s', disp='E14.7', array=empty_arr))
+                                unit=pixel_unit, disp='E14.7', array=empty_arr))
 
         # Adding the quality flags
+        data_quality = 'DQUALITY' if product == 'SPOC' else 'QUAL_BIT'
         cols.append(fits.Column(name='QUALITY', format='J', disp='B16.16',
-                                array=cube_fits[2].columns['DQUALITY'].array))
+                                array=cube_fits[2].columns[data_quality].array))
 
         # Adding the position correction info (zeros b.c we don't have this info)
         cols.append(fits.Column(name='POS_CORR1', format='E', unit='pixel', disp='E14.7', array=empty_arr[:, 0, 0]))
@@ -672,9 +772,8 @@ class CutoutFactory():
         return cutout_hdu_list
 
 
-
     def cube_cut(self, cube_file, coordinates, cutout_size,
-                 target_pixel_file=None, output_path=".", verbose=False):
+                 product='SPOC', target_pixel_file=None, output_path=".", verbose=False):
         """
         Takes a cube file (as created by `~astrocut.CubeFactory`), and makes a cutout target pixel 
         file of the given size around the given coordinates. The target pixel file is formatted like
@@ -697,6 +796,9 @@ class CutoutFactory():
             order.  Scalar numbers in ``cutout_size`` are assumed to be in
             units of pixels. `~astropy.units.Quantity` objects must be in pixel or
             angular units.
+        product : str
+            The product type to make the cutouts from.
+            Can either be 'SPOC' or 'TICA' (default is 'SPOC').
         target_pixel_file : str
             Optional. The name for the output target pixel file. 
             If no name is supplied, the file will be named: 
@@ -721,7 +823,7 @@ class CutoutFactory():
         with fits.open(cube_file, mode='denywrite', memmap=True) as cube:
 
             # Get the info we need from the data table
-            self._parse_table_info(cube[2].data, verbose)
+            self._parse_table_info(product, cube[2].data, verbose)
 
             if isinstance(coordinates, SkyCoord):
                 self.center_coord = coordinates
@@ -766,7 +868,7 @@ class CutoutFactory():
             cutout_wcs_dict = self._get_cutout_wcs_dict()
     
             # Build the TPF
-            tpf_object = self._build_tpf(cube, img_cutout, uncert_cutout, cutout_wcs_dict, aperture)
+            tpf_object = self._build_tpf(product, cube, img_cutout, uncert_cutout, cutout_wcs_dict, aperture)
 
             if verbose:
                 write_time = time()
@@ -799,4 +901,3 @@ class CutoutFactory():
             print("Total time: {:.2} sec".format(time()-start_time))
 
         return target_pixel_file
-
