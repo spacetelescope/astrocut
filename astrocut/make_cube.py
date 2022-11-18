@@ -727,12 +727,6 @@ class TicaCubeFactory():
 
         if verbose:
             startTime = time()
-            
-        # Creating an empty cube that will be appended to the existing cube
-        og_cube = fits.getdata(cube_file, 1)
-        dimensions = list(og_cube.shape)
-        dimensions[2] = len(file_list)
-        self.cube_append = np.zeros(dimensions)
 
         # Next locate the existing cube file and assign it a variable
         err_msg = 'Location of the cube file was unsuccessful. Please ensure the correct path was provided.'
@@ -746,15 +740,31 @@ class TicaCubeFactory():
         in_cube = list(fits.getdata(self.cube_file, 2)['FFI_FILE'])
 
         # TO-DO: Add warning message instead of this verbose print stmnt.
-        for file in file_list: 
-            if file in in_cube:
-                if verbose:
-                    print(f'FFI {file} is already in the cube. Removing it from ``file_list``.')
-                file_list.remove(file)
+        filtered_file_list = []
+        for idx, file in enumerate(file_list): 
+
+            if os.path.basename(file) in in_cube:
+                print('File removed from list:')
+                print(os.path.basename(file))
+
+            if os.path.basename(file) not in in_cube:
+                filtered_file_list.append(file)
+
+        noffis_err_msg = 'No new FFIs found for the given sector.'
+        assert len(filtered_file_list) > 0, noffis_err_msg
+
+        if verbose: 
+            print(f'{len(filtered_file_list)} new FFIs found!')
         
+        # Creating an empty cube that will be appended to the existing cube
+        og_cube = fits.getdata(cube_file, 1)
+        dimensions = list(og_cube.shape)
+        dimensions[2] = len(filtered_file_list)
+        self.cube_append = np.zeros(dimensions)
+
         # Set up the basic cube parameters
         sector = (sector, "Observing sector")
-        self._configure_cube(file_list, sector=sector)
+        self._configure_cube(filtered_file_list, sector=sector)
 
         if verbose:
             print(f"FFIs will be appended in {self.num_blocks} blocks of {self.block_size} rows each.")
