@@ -5,16 +5,15 @@ This module implements the functionality to create image cubes for the purposes 
 creating cutout target pixel files.
 """
 
-import numpy as np
 import os
-
-from astropy.io import fits
-from astropy.table import Table, Column
-
-from time import time
-from datetime import date
 from copy import deepcopy
-from sys import version_info, platform
+from datetime import date
+from sys import platform, version_info
+from time import time
+
+import numpy as np
+from astropy.io import fits
+from astropy.table import Column, Table
 
 if (version_info >= (3, 8)) and (platform != "win32"):
     from mmap import MADV_SEQUENTIAL
@@ -711,7 +710,7 @@ class TicaCubeFactory():
             cube_hdus.append(table_hdu)
 
 
-    def update_cube(self, file_list, cube_file, sector=None, verbose=True):
+    def update_cube(self, file_list, cube_file, sector=None, max_memory=50, verbose=True):
         """ Updates an existing cube file if one has already been made and a new delivery is being appended to it. 
         Same functionality as make_cube(...), but working on an already existing file rather than building a new one. 
         This function will: 
@@ -724,6 +723,8 @@ class TicaCubeFactory():
         """
 
         self.update = True  # we're updating!
+
+        self.max_memory = max_memory
 
         if verbose:
             startTime = time()
