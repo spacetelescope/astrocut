@@ -4,23 +4,21 @@
 
 import os
 import warnings
-
-from time import time
 from itertools import product
+from time import time
 
+import astropy
 import astropy.units as u
 import numpy as np
-
 from astropy import wcs
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.time import Time
 
-from . import __version__ 
+from . import __version__
 from .exceptions import InputWarning, InvalidQueryError
 
 # Note: Use the astropy function if available, TODO: fix > 4.3 astropy fitting
-import astropy
 if astropy.utils.minversion(astropy, "4.0.2") and (float(astropy.__version__[:3]) < 4.3):
     from astropy.wcs.utils import fit_wcs_from_points
 else:
@@ -115,8 +113,8 @@ class CutoutFactory():
             table_row = table_data[data_ind]
 
             # Making sure we have a row with wcs info.
-            wcsaxes_keyword = 'WCSAXES' if product == 'SPOC' else 'WCAX3' 
-            if table_row[wcsaxes_keyword] != 2:
+            wcsaxes_keyword = 'CTYPE2'
+            if table_row[wcsaxes_keyword] != 'DEC--TAN-SIP':
                 table_row = None
                 data_ind += 1
                 if data_ind == len(table_data):

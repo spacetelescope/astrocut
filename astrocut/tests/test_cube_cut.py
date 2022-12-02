@@ -1,17 +1,17 @@
-import pytest
-import numpy as np
 from os import path
 
-from astropy.io import fits
+import astropy.units as u
+import numpy as np
+import pytest
 from astropy import wcs
 from astropy.coordinates import SkyCoord
+from astropy.io import fits
 from astropy.time import Time
-import astropy.units as u
 
-from .utils_for_test import create_test_ffis
-from ..make_cube import CubeFactory, TicaCubeFactory
 from ..cube_cut import CutoutFactory
-from ..exceptions import InvalidQueryError, InputWarning
+from ..exceptions import InputWarning, InvalidQueryError
+from ..make_cube import CubeFactory, TicaCubeFactory
+from .utils_for_test import create_test_ffis
 
 
 def checkcutout(product, cutfile, pixcrd, world, csize, ecube, eps=1.e-7):
@@ -343,12 +343,12 @@ def test_exceptions(tmpdir, ffi_type):
     cube_table = hdu[2].data
      
     # Testing when none of the FFIs have good wcs info
-    wcsaxes = 'WCSAXES' if ffi_type == 'SPOC' else 'WCAX3'
-    cube_table[wcsaxes] = 0
+    wcsaxes = 'CTYPE2'
+    cube_table[wcsaxes] = 'N/A'
     with pytest.raises(Exception, match='No FFI rows contain valid WCS keywords.') as e:
         cutout_maker._parse_table_info(product=ffi_type, table_data=cube_table)
         assert e.type is wcs.NoWcsKeywordsFoundError
-    cube_table[wcsaxes] = 2
+    cube_table[wcsaxes] = 'DEC--TAN-SIP'
 
     # Testing when nans are present 
     cutout_maker._parse_table_info(product=ffi_type, table_data=cube_table)
