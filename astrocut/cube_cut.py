@@ -7,7 +7,6 @@ import warnings
 from itertools import product
 from time import time
 
-# Note: Use the astropy function if available, TODO: fix > 4.3 astropy fitting
 import astropy
 import astropy.units as u
 import numpy as np
@@ -19,6 +18,7 @@ from astropy.time import Time
 from . import __version__
 from .exceptions import InputWarning, InvalidQueryError
 
+# Note: Use the astropy function if available, TODO: fix > 4.3 astropy fitting
 if astropy.utils.minversion(astropy, "4.0.2") and (float(astropy.__version__[:3]) < 4.3):
     from astropy.wcs.utils import fit_wcs_from_points
 else:
