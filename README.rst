@@ -21,7 +21,7 @@ Three main areas of functionality are included:
 - General fits file cutouts incuding from single images and sets of images with the shared WCS/pixel scale.
 - Cutout post-processing functionality, including centering cutouts along a path (for moving targets) and combining cutouts.
 
-Documentation is at https://astrocut.readthedocs.io.
+Documentation is at https://astrocut.readthedocs.io. If you'd like to practice working with the tools discussed in this Wiki, we encourage you to work with our [astrocut-for-beginners Jupyter Notebook](https://github.com/spacetelescope/mast_notebooks/tree/main/notebooks/astrocut/making_tess_cubes_and_cutouts), which shows you how to use the tools within make_cube.py and cube_cut.py to generate cutouts from a batch of TESS FFIs retrieved locally via astroquery.mast.
 
 Project Status
 --------------
