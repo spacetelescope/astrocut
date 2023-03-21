@@ -8,22 +8,16 @@ from itertools import product
 from time import time
 from typing import Any, Dict
 
-import astropy
 import astropy.units as u
 import numpy as np
 from astropy import wcs
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.time import Time
+from astropy.wcs.utils import fit_wcs_from_points
 
 from . import __version__
 from .exceptions import InputWarning, InvalidQueryError
-
-# Note: Use the astropy function if available, TODO: fix > 4.3 astropy fitting
-if astropy.utils.minversion(astropy, "4.0.2") and (float(astropy.__version__[:3]) < 4.3):
-    from astropy.wcs.utils import fit_wcs_from_points
-else:
-    from .utils.wcs_fitting import fit_wcs_from_points
 
 
 class CutoutFactory():
