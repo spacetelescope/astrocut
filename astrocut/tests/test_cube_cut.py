@@ -398,18 +398,18 @@ def test_exceptions(cube_file, ffi_type):
     wcsaxes = 'CTYPE2'
     cube_table[wcsaxes] = 'N/A'
     with pytest.raises(Exception, match='No FFI rows contain valid WCS keywords.') as e:
-        cutout_maker._parse_table_info(product=ffi_type, table_data=cube_table)
+        cutout_maker._parse_table_info(table_data=cube_table)
         assert e.type is wcs.NoWcsKeywordsFoundError
     cube_table[wcsaxes] = 'DEC--TAN-SIP'
 
     # Testing when nans are present 
-    cutout_maker._parse_table_info(product=ffi_type, table_data=cube_table)
+    cutout_maker._parse_table_info(table_data=cube_table)
     wcs_orig = cutout_maker.cube_wcs
     # TICA does not have BARYCORR so we can't use the same 
     # test column for both product types. 
     nan_column = 'BARYCORR' if ffi_type == 'SPOC' else 'DEADC'
     cube_table[nan_column] = np.nan
-    cutout_maker._parse_table_info(product=ffi_type, table_data=cube_table)
+    cutout_maker._parse_table_info(table_data=cube_table)
 
     assert wcs_orig.to_header_string() == cutout_maker.cube_wcs.to_header_string()
 
