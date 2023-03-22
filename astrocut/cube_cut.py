@@ -82,19 +82,16 @@ class CutoutFactory():
                          "VIGNAPP": [None, "vignetting or collimator correction applied"]}
 
         
-    def _parse_table_info(self, product, table_data, verbose=False):
+    def _parse_table_info(self, table_data, verbose=False):
         """
         Takes the header and the middle entry from the cube table (EXT 2) of image header data,
         builds a WCS object that encapsulates the given WCS information,
-        and collects into a dictionary the other keywords we care about.  
+        and collects into a dictionary the other keywords we care about.
 
         The WCS is stored in ``self.cube_wcs``, and the extra keywords in ``self.img_kwds``
 
         Parameters
         ----------
-        product : str
-            The product type to make the cutouts from.
-            Can either be 'SPOC' or 'TICA'.
         table_data : `~astropy.io.fits.fitsrec.FITS_rec`
             The cube image header data table.
         """
@@ -824,7 +821,7 @@ class CutoutFactory():
         with fits.open(cube_file, **fits_options) as cube:
 
             # Get the info we need from the data table
-            self._parse_table_info(product, cube[2].data, verbose)
+            self._parse_table_info(cube[2].data, verbose)
 
             if isinstance(coordinates, SkyCoord):
                 self.center_coord = coordinates
