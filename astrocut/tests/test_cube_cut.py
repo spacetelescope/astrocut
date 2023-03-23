@@ -285,8 +285,6 @@ def test_get_cutout_limits(cube_file, ffi_type, tmp_path):
     assert (ymax - ymin) == 15
 
 
-# todo: figure out what this is testing and re-enable
-@pytest.mark.xfail
 @pytest.mark.parametrize("ffi_type", ["SPOC", "TICA"])
 def test_small_cutout(cube_file, ffi_type, tmp_path):
 
@@ -432,14 +430,13 @@ def test_exceptions(cube_file, ffi_type):
     assert distmax.deg < 0.003
     assert sigma < 0.03
 
-    # todo: figure out what these are testing and re-enable
-    # distmax, sigma = cutout_maker._fit_cutout_wcs(cutout_maker.cube_wcs, (1, 100))
-    # assert distmax.deg < 0.003
-    # assert sigma < 0.03
+    distmax, sigma = cutout_maker._fit_cutout_wcs(cutout_maker.cube_wcs, (1, 100))
+    assert distmax.deg < 0.003
+    assert sigma < 0.03
 
-    # distmax, sigma = cutout_maker._fit_cutout_wcs(cutout_maker.cube_wcs, (100, 2))
-    # assert distmax.deg < 0.03
-    # assert sigma < 0.03
+    distmax, sigma = cutout_maker._fit_cutout_wcs(cutout_maker.cube_wcs, (100, 2))
+    assert distmax.deg < 0.03
+    assert sigma < 0.03
 
     cutout_maker.center_coord = SkyCoord("256.38994124 4.88986771", unit='deg')
     cutout_maker._get_cutout_limits(np.array([5, 500]))

@@ -14,10 +14,14 @@ from astropy import wcs
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.time import Time
-from astropy.wcs.utils import fit_wcs_from_points
 
 from . import __version__
 from .exceptions import InputWarning, InvalidQueryError
+from .utils.wcs_fitting import fit_wcs_from_points
+
+# todo: investigate why for small cutouts the astropy version is not working
+# from astropy.wcs.utils import fit_wcs_from_points
+
 
 
 class CutoutFactory():
