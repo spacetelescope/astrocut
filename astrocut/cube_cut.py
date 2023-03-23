@@ -814,14 +814,17 @@ class CutoutFactory():
             start_time = time()
 
         warnings.filterwarnings("ignore", category=wcs.FITSFixedWarning)
-        fits_options: Dict[str, Any] = {"mode": "denywrite"}
+        fits_options: Dict[str, Any] = {"mode": "denywrite", "lazy_load_hdus": True}
         if cube_file.startswith("s3://"):
             fits_options["use_fsspec"] = True
             # block size should be:
             # block_size <= m * hdul[1].section.shape[2] * hdul[1].section.shape[3] * 4 bytes
             fits_options["fsspec_kwargs"] = {"default_block_size": 10_000, "anon": True}
+            # only use .section for remote data
+            cube_data_prop = "section"
         else:
             fits_options["memmap"] = True
+            cube_data_prop = "data"
         with fits.open(cube_file, **fits_options) as cube:
 
             # Get the info we need from the data table
@@ -858,7 +861,7 @@ class CutoutFactory():
                 print("ymin,ymax: {}".format(self.cutout_lims[0]))
 
             # Make the cutout
-            img_cutout, uncert_cutout, aperture = self._get_cutout(cube[1].section, verbose=verbose)
+            img_cutout, uncert_cutout, aperture = self._get_cutout(getattr(cube[1], cube_data_prop), verbose=verbose)
 
             # Get cutout wcs info
             cutout_wcs_full = self._get_full_cutout_wcs(cube[2].header)
