@@ -2,6 +2,7 @@
 ----------------
 
 - Improve file checking prior to cutout creation to avoid errors [#52]
+- Add remote cutout functionality (requires astropy 5.2 or above) [#76]
 
 
 0.9 (2021-08-10)
