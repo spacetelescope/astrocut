@@ -6,8 +6,8 @@ import os
 import warnings
 from itertools import product
 from time import time
+from typing import Any, Dict
 
-import astropy
 import astropy.units as u
 import numpy as np
 from astropy import wcs
@@ -17,12 +17,11 @@ from astropy.time import Time
 
 from . import __version__
 from .exceptions import InputWarning, InvalidQueryError
+from .utils.wcs_fitting import fit_wcs_from_points
 
-# Note: Use the astropy function if available, TODO: fix > 4.3 astropy fitting
-if astropy.utils.minversion(astropy, "4.0.2") and (float(astropy.__version__[:3]) < 4.3):
-    from astropy.wcs.utils import fit_wcs_from_points
-else:
-    from .utils.wcs_fitting import fit_wcs_from_points
+# todo: investigate why for small cutouts the astropy version is not working
+# from astropy.wcs.utils import fit_wcs_from_points
+
 
 
 class CutoutFactory():
@@ -87,19 +86,16 @@ class CutoutFactory():
                          "VIGNAPP": [None, "vignetting or collimator correction applied"]}
 
         
-    def _parse_table_info(self, product, table_data, verbose=False):
+    def _parse_table_info(self, table_data, verbose=False):
         """
         Takes the header and the middle entry from the cube table (EXT 2) of image header data,
         builds a WCS object that encapsulates the given WCS information,
-        and collects into a dictionary the other keywords we care about.  
+        and collects into a dictionary the other keywords we care about.
 
         The WCS is stored in ``self.cube_wcs``, and the extra keywords in ``self.img_kwds``
 
         Parameters
         ----------
-        product : str
-            The product type to make the cutouts from.
-            Can either be 'SPOC' or 'TICA'.
         table_data : `~astropy.io.fits.fitsrec.FITS_rec`
             The cube image header data table.
         """
@@ -818,10 +814,21 @@ class CutoutFactory():
             start_time = time()
 
         warnings.filterwarnings("ignore", category=wcs.FITSFixedWarning)
-        with fits.open(cube_file, mode='denywrite', memmap=True) as cube:
+        fits_options: Dict[str, Any] = {"mode": "denywrite", "lazy_load_hdus": True}
+        if cube_file.startswith("s3://"):
+            fits_options["use_fsspec"] = True
+            # block size should be:
+            # block_size <= m * hdul[1].section.shape[2] * hdul[1].section.shape[3] * 4 bytes
+            fits_options["fsspec_kwargs"] = {"default_block_size": 10_000, "anon": True}
+            # only use .section for remote data
+            cube_data_prop = "section"
+        else:
+            fits_options["memmap"] = True
+            cube_data_prop = "data"
+        with fits.open(cube_file, **fits_options) as cube:
 
             # Get the info we need from the data table
-            self._parse_table_info(product, cube[2].data, verbose)
+            self._parse_table_info(cube[2].data, verbose)
 
             if isinstance(coordinates, SkyCoord):
                 self.center_coord = coordinates
@@ -854,7 +861,7 @@ class CutoutFactory():
                 print("ymin,ymax: {}".format(self.cutout_lims[0]))
 
             # Make the cutout
-            img_cutout, uncert_cutout, aperture = self._get_cutout(cube[1].data, verbose=verbose)
+            img_cutout, uncert_cutout, aperture = self._get_cutout(getattr(cube[1], cube_data_prop), verbose=verbose)
 
             # Get cutout wcs info
             cutout_wcs_full = self._get_full_cutout_wcs(cube[2].header)
