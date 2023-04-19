@@ -821,16 +821,15 @@ class CutoutFactory():
             fits_options["fsspec_kwargs"] = {"default_block_size": 10_000, "anon": True}
             # only use .section for remote data
             cube_data_prop = "section"
-        else:
-            fits_options["memmap"] = True
-            cube_data_prop = "data"
 
-        # block size should be:
-        # block_size <= m * hdul[1].section.shape[2] * hdul[1].section.shape[3] * 4 bytes
-        if cube_file.startswith("s3://"):
+            # block size should be:
+            # block_size <= m * hdul[1].section.shape[2] * hdul[1].section.shape[3] * 4 bytes
             with fits.open(cube_file, **fits_options) as cube:
                 block_size = cube[1].section.shape[1] * cube[1].section.shape[2] * cube[1].section.shape[3] * 4
                 fits_options["fsspec_kwargs"]["default_block_size"] = block_size
+        else:
+            fits_options["memmap"] = True
+            cube_data_prop = "data"
 
         with fits.open(cube_file, **fits_options) as cube:
 
