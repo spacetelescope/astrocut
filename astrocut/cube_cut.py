@@ -123,13 +123,13 @@ class CutoutFactory():
         # to pixels using the pixel scale of 21 arcseconds/pixel for TESS
         if isinstance(size, u.Quantity):
             if size.unit == u.pixel:
-                m = size
+                m = size.value
             else:
-                m = size.to(u.pixel, pixel_scale)
+                m = size.to(u.pixel, pixel_scale).value
 
         # `m` is the num. of columns in the requested cutout size.
         # If input size is 2d, we get the columns (index=1), and repeat above
-        if isinstance(size, (list, np.ndarray)):
+        if (isinstance(size, (list, np.ndarray))) & (not isinstance(size, u.Quantity)):
             m_quant = size[1]
 
             if np.isscalar(m_quant):
@@ -137,9 +137,9 @@ class CutoutFactory():
 
             if isinstance(m_quant, u.Quantity):
                 if m_quant.unit == u.pixel:
-                    m = m_quant
+                    m = m_quant.value
                 else:
-                    m = m_quant.to(u.pixel, pixel_scale)
+                    m = m_quant.to(u.pixel, pixel_scale).value
 
         return m
 
