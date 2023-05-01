@@ -823,8 +823,8 @@ class CutoutFactory():
         return cutout_hdu_list
 
 
-    def cube_cut(self, cube_file, coordinates, cutout_size, custom_block_size=False,
-                 product='SPOC', target_pixel_file=None, output_path=".", verbose=False):
+    def cube_cut(self, cube_file, coordinates, cutout_size, product='SPOC',
+                 custom_block_size=False, target_pixel_file=None, output_path=".", verbose=False):
         """
         Takes a cube file (as created by `~astrocut.CubeFactory`), and makes a cutout target pixel 
         file of the given size around the given coordinates. The target pixel file is formatted like
