@@ -823,7 +823,7 @@ class CutoutFactory():
         return cutout_hdu_list
 
 
-    def cube_cut(self, cube_file, coordinates, cutout_size,
+    def cube_cut(self, cube_file, coordinates, cutout_size, custom_block_size=False,
                  product='SPOC', target_pixel_file=None, output_path=".", verbose=False):
         """
         Takes a cube file (as created by `~astrocut.CubeFactory`), and makes a cutout target pixel 
@@ -879,12 +879,13 @@ class CutoutFactory():
             # only use .section for remote data
             cube_data_prop = "section"
 
-            # block size should be:
-            # block_size <= m * hdul[1].section.shape[2] * hdul[1].section.shape[3] * 4 bytes
-            m = self._convert_cutout_size(cutout_size)
-            with fits.open(cube_file, **fits_options) as cube:
-                block_size = m * cube[1].section.shape[2] * cube[1].section.shape[3] * 4
-                fits_options["fsspec_kwargs"]["default_block_size"] = block_size
+            if custom_block_size:
+                # block size should be:
+                # block_size <= m * hdul[1].section.shape[2] * hdul[1].section.shape[3] * 4 bytes
+                m = self._convert_cutout_size(cutout_size)
+                with fits.open(cube_file, **fits_options) as cube:
+                    block_size = m * cube[1].section.shape[2] * cube[1].section.shape[3] * 4
+                    fits_options["fsspec_kwargs"]["default_block_size"] = block_size
         else:
             fits_options["memmap"] = True
             cube_data_prop = "data"
