@@ -85,7 +85,64 @@ class CutoutFactory():
                          "TMOFST11": [None, "(s) readout delay for camera 1 and ccd 1"],
                          "VIGNAPP": [None, "vignetting or collimator correction applied"]}
 
-        
+
+    def _convert_cutout_size(self, size):
+        """
+        Take a user input cutout size and convert the number of columns into pixels
+        so that AWS block size can be calculated.
+
+        Parameters
+        ----------
+        size : array-like, `~astropy.units.Quantity`
+            The size of the cutout array. If ``size`` is
+            a scalar `~astropy.units.Quantity`, then a square cutout of ``size``
+            will be created. If ``size`` has two elements, they should be in
+            ``(ny, nx)`` order.  `~astropy.units.Quantity` objects must be in pixel or
+            angular units.
+        Returns
+        -------
+        m : int
+            The number of columns (in pixels) of the requested cutout. This value
+            will be used in the following formula to calculate the AWS block size:
+
+            block_size = m * num_FFIs * 2 * 4
+
+            Where num_FFIs represents the number of FFIs in the cutout, 2 represents
+            the number of axes in a cube (SCI and ERR axes), and 4 represents the number
+            of bytes stored in a single pixel (estimate).
+        """
+
+        # Pixel scale of TESS, based on literature
+        pixel_scale = u.pixel_scale(21 * u.arcsec / u.pixel)
+
+        # If input size is a scalar value, we assume units of pixels
+        if np.isscalar(size):
+            m = size
+
+        # If it's a quantity, we check to see if it's pixels, otherwise we convert
+        # to pixels using the pixel scale of 21 arcseconds/pixel for TESS
+        if isinstance(size, u.Quantity):
+            if size.unit == u.pixel:
+                m = size
+            else:
+                m = size.to(u.pixel, pixel_scale)
+
+        # `m` is the num. of columns in the requested cutout size.
+        # If input size is 2d, we get the columns (index=1), and repeat above
+        if isinstance(size, (list, np.ndarray)):
+            m_quant = size[1]
+
+            if np.isscalar(m_quant):
+                m = m_quant
+
+            if isinstance(m_quant, u.Quantity):
+                if m_quant.unit == u.pixel:
+                    m = m_quant
+                else:
+                    m = m_quant.to(u.pixel, pixel_scale)
+
+        return m
+
     def _parse_table_info(self, table_data, verbose=False):
         """
         Takes the header and the middle entry from the cube table (EXT 2) of image header data,
@@ -824,8 +881,9 @@ class CutoutFactory():
 
             # block size should be:
             # block_size <= m * hdul[1].section.shape[2] * hdul[1].section.shape[3] * 4 bytes
+            m = self._convert_cutout_size(cutout_size)
             with fits.open(cube_file, **fits_options) as cube:
-                block_size = cube[1].section.shape[1] * cube[1].section.shape[2] * cube[1].section.shape[3] * 4
+                block_size = m * cube[1].section.shape[2] * cube[1].section.shape[3] * 4
                 fits_options["fsspec_kwargs"]["default_block_size"] = block_size
         else:
             fits_options["memmap"] = True
