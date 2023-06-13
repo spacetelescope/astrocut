@@ -4,9 +4,10 @@
 
 import os
 import warnings
+from concurrent.futures import ThreadPoolExecutor
 from itertools import product
 from time import time
-from typing import Any, Dict
+from typing import Any, Dict, Union
 
 import astropy.units as u
 import numpy as np
@@ -36,10 +37,22 @@ class CutoutFactory():
     Future versions will include more generalized cutout functionality.
     """
 
-    def __init__(self):
+    def __init__(self, threads: Union[int, None] = None):
         """
         Initialization function.
+
+        Parameters
+        ----------
+        table_data : `~astropy.io.fits.fitsrec.FITS_rec`
+            The cube image header data table.
+
+        threads : int or `None`
+            Number of threads to use when making cutouts.
+            <=1 disables the threadpool, > 1 sets the number of threads,
+            None (default) uses Python's default threads
         """
+
+        self.threads = threads
 
         self.cube_wcs = None  # WCS information from the image cube
         self.cutout_wcs = None  # WCS information (linear) for the cutout
@@ -424,8 +437,14 @@ class CutoutFactory():
             ymax = ymax_cube       
         
         # Doing the cutout
-        cutout = transposed_cube[xmin:xmax, ymin:ymax, :, :]
-    
+        if self.threads is None or self.threads > 1:
+            with ThreadPoolExecutor(max_workers=self.threads) as pool:
+                cutouts = list(pool.map(lambda x: transposed_cube[x, ymin:ymax, :, :], range(xmin, xmax)))
+            # stack the list of cutouts
+            cutout = np.stack(cutouts)
+        else:
+            cutout = transposed_cube[xmin:xmax, ymin:ymax, :, :]
+
         img_cutout = cutout[:, :, :, 0].transpose((2, 0, 1))
         uncert_cutout = cutout[:, :, :, 1].transpose((2, 0, 1))
     
