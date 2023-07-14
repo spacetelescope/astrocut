@@ -37,7 +37,7 @@ class CutoutFactory():
     Future versions will include more generalized cutout functionality.
     """
 
-    def __init__(self, threads: Union[int, None] = None):
+    def __init__(self, threads: Union[int, None] = 1):
         """
         Initialization function.
 
@@ -46,10 +46,10 @@ class CutoutFactory():
         table_data : `~astropy.io.fits.fitsrec.FITS_rec`
             The cube image header data table.
 
-        threads : int or `None`
+        threads : int or `None`, default=1
             Number of threads to use when making cutouts.
-            <=1 disables the threadpool, > 1 sets the number of threads,
-            None (default) uses Python's default threads
+            <=1 disables the threadpool, > 1 sets to the specified number of threads,
+            None uses `ThreadPoolExecutor`'s default: cpu_count + 4, limited to max of 32
         """
 
         self.threads = threads
