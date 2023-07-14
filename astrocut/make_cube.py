@@ -407,12 +407,12 @@ class TicaCubeFactory():
             
             start_times[i] = ffi_data[0].header.get(self.time_keyword)
 
+            error_msg = "One or more SPOC FFIs were input. Please use ``CubeFactory`` to process SPOC FFIs."
             if image_shape is None:  # Only need to fill this once
                 try:
                     image_shape = ffi_data[0].data.shape
                 except AttributeError:
-                    raise ValueError("One or more SPOC FFIs were input. Please use ``CubeFactory``\
-                                     to process SPOC FFIs.")
+                    raise ValueError(error_msg)
             
             if self.template_file is None:  # Only check this if we don't already have it
 
