@@ -88,7 +88,7 @@ class CubeFactory():
         try:
             slice_size = image_shape[1] * len(self.file_list) * 2 * 4  # in bytes (float32)
         except IndexError:
-            raise ValueError("One or more TICA FFIs were input. Please use ``TicaCubeFactory`` class to process TICA FFIs.")
+            raise ValueError("One or more TICA FFIs were input. Please use ``TicaCubeFactory`` to process TICA FFIs.")
         max_block_size = int((self.max_memory * 1e9)//slice_size)
         
         self.num_blocks = int(image_shape[0]/max_block_size + 1)
@@ -408,7 +408,10 @@ class TicaCubeFactory():
             start_times[i] = ffi_data[0].header.get(self.time_keyword)
 
             if image_shape is None:  # Only need to fill this once
-                image_shape = ffi_data[0].data.shape
+                try:
+                    image_shape = ffi_data[0].data.shape
+                except AttributeError:
+                    raise ValueError("One or more SPOC FFIs were input. Please use ``CubeFactory`` to process SPOC FFIs.")
             
             if self.template_file is None:  # Only check this if we don't already have it
 
