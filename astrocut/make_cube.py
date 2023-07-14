@@ -411,7 +411,8 @@ class TicaCubeFactory():
                 try:
                     image_shape = ffi_data[0].data.shape
                 except AttributeError:
-                    raise ValueError("One or more SPOC FFIs were input. Please use ``CubeFactory`` to process SPOC FFIs.")
+                    raise ValueError("One or more SPOC FFIs were input. Please use ``CubeFactory``\
+                                     to process SPOC FFIs.")
             
             if self.template_file is None:  # Only check this if we don't already have it
 
