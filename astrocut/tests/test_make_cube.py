@@ -190,7 +190,7 @@ def test_invalid_inputs(tmpdir, ffi_type):
     # Getting a list of products. Keeping it small so we don't have to download so many.
     products = Observations.get_product_list(observations[0])[:2]
 
-    manifest = Observations.download_products(products, download_dir=tmpdir)
+    manifest = Observations.download_products(products, download_dir=str(tmpdir))
 
     if ffi_type == "TICA":
         cube_maker = CubeFactory()
