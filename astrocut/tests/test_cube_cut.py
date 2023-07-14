@@ -527,3 +527,30 @@ def test_s3_cube_cut(tmp_path: Path):
     assert np.isclose(hdulist[1].data["FLUX_ERR"][200][1, 2], 1.1239403)
     assert hdulist[0].header["CAMERA"] == 2
     hdulist.close()
+
+
+def test_multithreading(tmp_path):
+    tmpdir = str(tmp_path)
+
+    cutout_size = 10
+    coord = SkyCoord(217.42893801, -62.67949189, unit="deg", frame="icrs")
+    cube_file = "s3://stpubdata/tess/public/mast/tess-s0038-2-2-cube.fits"
+
+    # 1 thread condition (no threading) used as verification for the different thread conditions
+    cutf_no_threads = CutoutFactory(threads=1)
+    cutout_no_threads = cutf_no_threads.cube_cut(
+        cube_file, coordinates=coord, output_path=tmpdir, verbose=False, cutout_size=cutout_size
+    )
+    data_no_threads = fits.getdata(cutout_no_threads)
+
+    # when threads=None, # threads is system dependent: cpu_count + 4, limited to max of 32
+    # https://github.com/python/cpython/blob/89ec0e952965b6a1be40e26c3ddc4131599e5ee9/Lib/concurrent/futures/thread.py#L137-L147
+    for threads in (4, None):
+        cutf_threads = CutoutFactory(threads=threads)
+        cutout_threads = cutf_threads.cube_cut(
+            cube_file, coordinates=coord, output_path=tmpdir, verbose=False, cutout_size=cutout_size
+        )
+        data_threads = fits.getdata(cutout_threads)
+
+        for ext_name in ("FLUX", "FLUX_ERR"):
+            assert np.array_equal(data_no_threads[ext_name], data_threads[ext_name])
