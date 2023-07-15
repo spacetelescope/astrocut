@@ -19,7 +19,9 @@ if (version_info >= (3, 8)) and (platform != "win32"):
     from mmap import MADV_SEQUENTIAL
 
 __all__ = ['CubeFactory', 'TicaCubeFactory']
-ERROR_MSG = "One or more incorrect file types were input."
+ERROR_MSG = "One or more incorrect file types were input. Please input TICA FFI files when using\
+                   ``TicaCubeFactory``, and SPOC FFI files when using ``CubeFactory``."
+
 
 class CubeFactory():
     """
