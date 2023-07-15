@@ -19,7 +19,8 @@ if (version_info >= (3, 8)) and (platform != "win32"):
     from mmap import MADV_SEQUENTIAL
 
 __all__ = ['CubeFactory', 'TicaCubeFactory']
-
+ERROR_MSG = "One or more incorrect file types were input. Please input TICA FFI files when using\
+                   ``TicaCubeFactory``, and SPOC FFI files when using ``CubeFactory``."
 
 class CubeFactory():
     """
@@ -88,7 +89,7 @@ class CubeFactory():
         try:
             slice_size = image_shape[1] * len(self.file_list) * 2 * 4  # in bytes (float32)
         except IndexError:
-            raise ValueError("One or more TICA FFIs were input. Please use ``TicaCubeFactory`` to process TICA FFIs.")
+            raise ValueError(ERROR_MSG)
         max_block_size = int((self.max_memory * 1e9)//slice_size)
         
         self.num_blocks = int(image_shape[0]/max_block_size + 1)
@@ -407,12 +408,11 @@ class TicaCubeFactory():
             
             start_times[i] = ffi_data[0].header.get(self.time_keyword)
 
-            error_msg = "One or more SPOC FFIs were input. Please use ``CubeFactory`` to process SPOC FFIs."
             if image_shape is None:  # Only need to fill this once
                 try:
                     image_shape = ffi_data[0].data.shape
                 except AttributeError:
-                    raise ValueError(error_msg)
+                    raise ValueError(ERROR_MSG)
             
             if self.template_file is None:  # Only check this if we don't already have it
 
