@@ -178,8 +178,7 @@ def test_invalid_inputs(tmpdir, ffi_type):
 
     # Assigning some variables
     target_name = "TICA FFI" if ffi_type == "TICA" else "TESS FFI"
-    value_error = "One or more incorrect file types were input. Please input TICA FFI files when using\
-                   ``TicaCubeFactory``, and SPOC FFI files when using ``CubeFactory``."
+    value_error = "One or more incorrect file types were input."
 
     # Getting TESS sector 27 observations for the given coordinate
     observations = Observations.query_criteria(coordinates=coordinates,
