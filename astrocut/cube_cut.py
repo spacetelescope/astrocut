@@ -40,11 +40,6 @@ class CutoutFactory():
     def __init__(self):
         """
         Initialization function.
-
-        Parameters
-        ----------
-        table_data : `~astropy.io.fits.fitsrec.FITS_rec`
-            The cube image header data table.
         """
 
         self.cube_wcs = None  # WCS information from the image cube
