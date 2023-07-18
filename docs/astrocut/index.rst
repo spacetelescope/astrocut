@@ -219,7 +219,7 @@ Making cutout target pixel files
 --------------------------------
 
 To make a cutout, you must already have an image cube to cut out from.
-Assuming that you have a TESS cube file stored locally, you can simply give the central
+Assuming that you have a TESS cube file stored locally, you can give the central
 coordinate and cutout size (in either pixels or angular `~astropy.Quantity`)
 to the `~astrocut.CutoutFactory.cube_cut` function.
 
