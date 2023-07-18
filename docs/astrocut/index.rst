@@ -219,7 +219,7 @@ Making cutout target pixel files
 --------------------------------
 
 To make a cutout, you must already have an image cube to cut out from.
-Assuming that there is a cube file stored locally, you simply give the central
+Assuming that you have a TESS cube file stored locally, you can simply give the central
 coordinate and cutout size (in either pixels or angular `~astropy.Quantity`)
 to the `~astrocut.CutoutFactory.cube_cut` function.
 
@@ -256,10 +256,11 @@ The cutout target pixel file format is decribed `here <file_formats.html#target-
                 1  PIXELS        1 BinTableHDU    222   144R x 12C   [D, E, J, 25J, 25E, 25E, 25E, 25E, J, E, E, 38A]   
                 2  APERTURE      1 ImageHDU        45   (5, 5)   float64  
 
-You can also create cutouts out of cube files stored on MAST's open data bucket on AWS.
+You can also create cutout target pixel files out of TESS cube files stored on MAST's AWS open data bucket.
 Using cube files stored on the cloud allows you the option to implement multiprocessing to improve cutout generation
-speed. To use multiprocessing, set the ``threads`` argument in ``cube_cut`` to an integer greater than 1, or set ``threads``
-to ``"auto"``, which will set the number of threads based on the CPU count of your machine.
+speed. To use multiprocessing, set the ``threads`` argument in ``cube_cut`` to an integer greater than 1. Alternatively, you
+can set set ``threads`` to ``"auto"``, which will set the number of threads based on the CPU count of your machine.
+Note that ``Total Time`` results may vary from machine to machine.
 
 .. code-block:: python
 
@@ -287,7 +288,8 @@ to ``"auto"``, which will set the number of threads based on the CPU count of yo
                 Write time: 0.54 sec
                 Total time: 4.3 sec
 
-The same call made with no multithreading enabled will result in a longer processing time, depending on the cutout size:
+The same call made with no multithreading enabled will result in a longer processing time, depending on the cutout size.
+By default multithreading is disabled, but you can also disable it by setting ``threads`` to a value <= 1.
 
 .. code-block:: python
 
