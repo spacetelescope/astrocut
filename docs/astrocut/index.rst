@@ -272,7 +272,8 @@ Note that ``Total Time`` results may vary from machine to machine.
                 >>> cutout_size = 30
                 >>> cube_file = "s3://stpubdata/tess/public/mast/tess-s0038-2-2-cube.fits"
 
-                >>> cut_factory.cube_cut(cube_file, coordinates=coord, cutout_size=cutout_size, verbose=True, threads="auto") #doctest: +SKIP
+                >>> cut_factory.cube_cut(cube_file, coordinates=coord, cutout_size=cutout_size,
+                ...                      verbose=True, threads="auto") #doctest: +SKIP
                 Using WCS from row 1852 out of 3705
                 Cutout center coordinate: 217.42893801,-62.67949189
                 xmin,xmax: [1572 1602]
@@ -293,7 +294,8 @@ By default multithreading is disabled, but you can also disable it by setting ``
 
 .. code-block:: python
 
-                >>> cut_factory.cube_cut(cube_file, coordinates=coord, cutout_size=cutout_size, verbose=True, threads=1) #doctest: +SKIP
+                >>> cut_factory.cube_cut(cube_file, coordinates=coord, cutout_size=cutout_size, 
+                ...                      verbose=True, threads=1) #doctest: +SKIP
                 Using WCS from row 1852 out of 3705
                 Cutout center coordinate: 217.42893801,-62.67949189
                 xmin,xmax: [1572 1602]
