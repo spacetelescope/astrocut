@@ -261,6 +261,31 @@ which will allow you the option to implement multiprocessing to improve cutout g
 speed. To use multiprocessing, set the ``threads`` argument in ``cube_cut`` to be greater than 1, or set ``threads``
 to ``"auto"``, which will set the number of threads based on the CPU count of your machine.
 
+.. code-block:: python
+
+                >>> from astrocut import CutoutFactory
+                >>> from astropy.coordinates import SkyCoord
+
+                >>> my_cutter = CutoutFactory()
+                >>> coord = SkyCoord(217.42893801, -62.67949189, unit="deg", frame="icrs")
+                >>> cutout_size = 30
+                >>> cube_file = "s3://stpubdata/tess/public/mast/tess-s0038-2-2-cube.fits"
+
+                >>> cut_factory.cube_cut(cube_file, coordinates=coord, cutout_size=cutout_size, verbose=True, threads="auto") #doctest: +SKIP
+                Using WCS from row 1852 out of 3705
+                Cutout center coordinate: 217.42893801,-62.67949189
+                xmin,xmax: [1572 1602]
+                ymin,ymax: [852 882]
+                Image cutout cube shape: (3705, 30, 30)
+                Uncertainty cutout cube shape: (3705, 30, 30)
+                Maximum distance between approximate and true location: 3.6009402965268847e-05 deg
+                Error in approximate WCS (sigma): 0.0003207242331953156
+                Target pixel file: ./tess-s0038-2-2_217.428938_-62.679492_30x30_astrocut.fits
+
+                WARNING: VerifyWarning: Card is too long, comment will be truncated. [astropy.io.fits.card]
+
+                Write time: 0.54 sec
+                Total time: 4.3 sec
   
 Additional Cutout Processing
 ============================
