@@ -258,7 +258,7 @@ The cutout target pixel file format is decribed `here <file_formats.html#target-
 
 You can also create cutout target pixel files out of TESS cube files stored on MAST's AWS open data bucket.
 Using cube files stored on the cloud allows you the option to implement multiprocessing to improve cutout generation
-speed. To use multiprocessing, set the ``threads`` argument in ``cube_cut`` to an integer greater than 1. Alternatively, you
+speed. To use multiprocessing, set the ``threads`` argument in ``cube_cut`` to the number of threads you want to use. Alternatively, you
 can set set ``threads`` to ``"auto"``, which will set the number of threads based on the CPU count of your machine.
 Note that ``Total Time`` results may vary from machine to machine.
 
