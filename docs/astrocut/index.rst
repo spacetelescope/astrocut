@@ -287,7 +287,25 @@ to ``"auto"``, which will set the number of threads based on the CPU count of yo
                 Write time: 0.54 sec
                 Total time: 4.3 sec
 
-The same call made but with no multithreading enabled will result in a much longer processing time:
+The same call made with no multithreading enabled will result in a longer processing time, depending on the cutout size:
+
+.. code-block:: python
+
+                >>> cut_factory.cube_cut(cube_file, coordinates=coord, cutout_size=cutout_size, verbose=True, threads=1) #doctest: +SKIP
+                Using WCS from row 1852 out of 3705
+                Cutout center coordinate: 217.42893801,-62.67949189
+                xmin,xmax: [1572 1602]
+                ymin,ymax: [852 882]
+                Image cutout cube shape: (3705, 30, 30)
+                Uncertainty cutout cube shape: (3705, 30, 30)
+                Maximum distance between approximate and true location: 3.6009402965268847e-05 deg
+                Error in approximate WCS (sigma): 0.0003207242331953156
+                Target pixel file: ./tess-s0038-2-2_217.428938_-62.679492_30x30_astrocut.fits
+
+                WARNING: VerifyWarning: Card is too long, comment will be truncated. [astropy.io.fits.card]
+
+                Write time: 0.56 sec
+                Total time: 7.8 sec
 
 
 Additional Cutout Processing
