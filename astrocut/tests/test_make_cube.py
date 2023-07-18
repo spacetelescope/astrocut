@@ -1,8 +1,11 @@
 import numpy as np
 import os
+import pytest
 
+from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.table import Table
+from astroquery.mast import Observations
 from re import findall
 from os import path
 
@@ -167,7 +170,37 @@ def test_iteration(tmpdir, capsys):
 
     assert np.alltrue(cube_1 == ecube), "Cube values do not match expected values"
 
+
+@pytest.mark.parametrize("ffi_type", ["TICA", "SPOC"])
+def test_invalid_inputs(tmpdir, ffi_type):
+
+    coordinates = SkyCoord(289.0979, -29.3370, unit="deg")
+
+    # Assigning some variables
+    target_name = "TICA FFI" if ffi_type == "TICA" else "TESS FFI"
+    value_error = "One or more incorrect file types were input. Please input TICA FFI files when using\
+                   ``TicaCubeFactory``, and SPOC FFI files when using ``CubeFactory``."
+
+    # Getting TESS sector 27 observations for the given coordinate
+    observations = Observations.query_criteria(coordinates=coordinates,
+                                               target_name=target_name,
+                                               dataproduct_type="image",
+                                               sequence_number=27)
     
+    # Getting a list of products. Keeping it small so we don't have to download so many.
+    products = Observations.get_product_list(observations[0])[:2]
+
+    manifest = Observations.download_products(products, download_dir=str(tmpdir))
+
+    if ffi_type == "TICA":
+        cube_maker = CubeFactory()
+    elif ffi_type == "SPOC":
+        cube_maker = TicaCubeFactory()
+
+    with pytest.raises(ValueError) as error_msg:
+        cube_maker.make_cube(manifest["Local Path"])
+    assert value_error in str(error_msg.value)
+
     
 
     
