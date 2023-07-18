@@ -290,12 +290,12 @@ Note that ``Total Time`` results may vary from machine to machine.
                 Total time: 4.3 sec
 
 The same call made with no multithreading enabled will result in a longer processing time, depending on the cutout size.
-By default multithreading is disabled, but you can also disable it by setting ``threads`` to a value <= 1.
+Note that multithreading is disabled by default.
 
 .. code-block:: python
 
                 >>> cut_factory.cube_cut(cube_file, coordinates=coord, cutout_size=cutout_size, 
-                ...                      verbose=True, threads=1) #doctest: +SKIP
+                ...                      verbose=True) #doctest: +SKIP
                 Using WCS from row 1852 out of 3705
                 Cutout center coordinate: 217.42893801,-62.67949189
                 xmin,xmax: [1572 1602]
