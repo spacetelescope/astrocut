@@ -4,9 +4,10 @@
 
 import os
 import warnings
+from concurrent.futures import ThreadPoolExecutor
 from itertools import product
 from time import time
-from typing import Any, Dict
+from typing import Any, Dict, Literal, Union
 
 import astropy.units as u
 import numpy as np
@@ -43,49 +44,52 @@ class CutoutFactory():
 
         self.cube_wcs = None  # WCS information from the image cube
         self.cutout_wcs = None  # WCS information (linear) for the cutout
-        self.cutout_wcs_fit = {'WCS_MSEP': [None, "[deg] Max offset between cutout WCS and FFI WCS"],
-                               'WCS_SIG': [None, "[deg] Error measurement of cutout WCS fit"]}
-        
+        self.cutout_wcs_fit = {
+            "WCS_MSEP": [None, "[deg] Max offset between cutout WCS and FFI WCS"],
+            "WCS_SIG": [None, "[deg] Error measurement of cutout WCS fit"],
+        }
+
         self.cutout_lims = np.zeros((2, 2), dtype=int)  # Cutout pixel limits, [[ymin,ymax],[xmin,xmax]]
         self.center_coord = None  # Central skycoord
-        
+
         # Extra keywords from the FFI image headers in SPOC.
         # These are applied to both SPOC and TICA cutouts for consistency.
-        self.img_kwds = {"BACKAPP": [None, "background is subtracted"],
-                         "CDPP0_5": [None, "RMS CDPP on 0.5-hr time scales"],
-                         "CDPP1_0": [None, "RMS CDPP on 1.0-hr time scales"],
-                         "CDPP2_0": [None, "RMS CDPP on 2.0-hr time scales"],
-                         "CROWDSAP": [None, "Ratio of target flux to total flux in op. ap."],
-                         "DEADAPP": [None, "deadtime applied"], 
-                         "DEADC": [None, "deadtime correction"],
-                         "EXPOSURE": [None, "[d] time on source"],
-                         "FLFRCSAP": [None, "Frac. of target flux w/in the op. aperture"],
-                         "FRAMETIM": [None, "[s] frame time [INT_TIME + READTIME]"],
-                         "FXDOFF": [None, "compression fixed offset"],
-                         "GAINA": [None, "[electrons/count] CCD output A gain"],
-                         "GAINB": [None, "[electrons/count] CCD output B gain"],
-                         "GAINC": [None, "[electrons/count] CCD output C gain"],
-                         "GAIND": [None, "[electrons/count] CCD output D gain"],
-                         "INT_TIME": [None, "[s] photon accumulation time per frame"],
-                         "LIVETIME": [None, "[d] TELAPSE multiplied by DEADC"],
-                         "MEANBLCA": [None, "[count] FSW mean black level CCD output A"],
-                         "MEANBLCB": [None, "[count] FSW mean black level CCD output B"],
-                         "MEANBLCC": [None, "[count] FSW mean black level CCD output C"],
-                         "MEANBLCD": [None, "[count] FSW mean black level CCD output D"],
-                         "NREADOUT": [None, "number of read per cadence"],
-                         "NUM_FRM": [None, "number of frames per time stamp"],
-                         "READNOIA": [None, "[electrons] read noise CCD output A"],
-                         "READNOIB": [None, "[electrons] read noise CCD output B"],
-                         "READNOIC": [None, "[electrons] read noise CCD output C"],
-                         "READNOID": [None, "[electrons] read noise CCD output D"],
-                         "READTIME": [None, "[s] readout time per frame"],
-                         "TIERRELA": [None, "[d] relative time error"],
-                         "TIMEDEL": [None, "[d] time resolution of data"],
-                         "TIMEPIXR": [None, "bin time beginning=0 middle=0.5 end=1"],
-                         "TMOFST11": [None, "(s) readout delay for camera 1 and ccd 1"],
-                         "VIGNAPP": [None, "vignetting or collimator correction applied"]}
+        self.img_kwds = {
+            "BACKAPP": [None, "background is subtracted"],
+            "CDPP0_5": [None, "RMS CDPP on 0.5-hr time scales"],
+            "CDPP1_0": [None, "RMS CDPP on 1.0-hr time scales"],
+            "CDPP2_0": [None, "RMS CDPP on 2.0-hr time scales"],
+            "CROWDSAP": [None, "Ratio of target flux to total flux in op. ap."],
+            "DEADAPP": [None, "deadtime applied"],
+            "DEADC": [None, "deadtime correction"],
+            "EXPOSURE": [None, "[d] time on source"],
+            "FLFRCSAP": [None, "Frac. of target flux w/in the op. aperture"],
+            "FRAMETIM": [None, "[s] frame time [INT_TIME + READTIME]"],
+            "FXDOFF": [None, "compression fixed offset"],
+            "GAINA": [None, "[electrons/count] CCD output A gain"],
+            "GAINB": [None, "[electrons/count] CCD output B gain"],
+            "GAINC": [None, "[electrons/count] CCD output C gain"],
+            "GAIND": [None, "[electrons/count] CCD output D gain"],
+            "INT_TIME": [None, "[s] photon accumulation time per frame"],
+            "LIVETIME": [None, "[d] TELAPSE multiplied by DEADC"],
+            "MEANBLCA": [None, "[count] FSW mean black level CCD output A"],
+            "MEANBLCB": [None, "[count] FSW mean black level CCD output B"],
+            "MEANBLCC": [None, "[count] FSW mean black level CCD output C"],
+            "MEANBLCD": [None, "[count] FSW mean black level CCD output D"],
+            "NREADOUT": [None, "number of read per cadence"],
+            "NUM_FRM": [None, "number of frames per time stamp"],
+            "READNOIA": [None, "[electrons] read noise CCD output A"],
+            "READNOIB": [None, "[electrons] read noise CCD output B"],
+            "READNOIC": [None, "[electrons] read noise CCD output C"],
+            "READNOID": [None, "[electrons] read noise CCD output D"],
+            "READTIME": [None, "[s] readout time per frame"],
+            "TIERRELA": [None, "[d] relative time error"],
+            "TIMEDEL": [None, "[d] time resolution of data"],
+            "TIMEPIXR": [None, "bin time beginning=0 middle=0.5 end=1"],
+            "TMOFST11": [None, "(s) readout delay for camera 1 and ccd 1"],
+            "VIGNAPP": [None, "vignetting or collimator correction applied"],
+        }
 
-        
     def _parse_table_info(self, table_data, verbose=False):
         """
         Takes the header and the middle entry from the cube table (EXT 2) of image header data,
@@ -379,25 +383,28 @@ class CutoutFactory():
 
         return cutout_wcs_dict
 
-
-    def _get_cutout(self, transposed_cube, verbose=True):
+    def _get_cutout(self, transposed_cube, threads: Union[int, Literal["auto"]] = 1, verbose=True):
         """
-        Making a cutout from an image/uncertainty cube that has been transposed 
+        Making a cutout from an image/uncertainty cube that has been transposed
         to have time on the longest axis.
-        
+
         Parameters
         ----------
         transposed_cube : `numpy.array`
             Transposed image/uncertainty array.
+        threads : int, "auto", default=1
+            Number of threads to use when making remote (e.g. s3) cutouts, will not use threads for local access
+            <=1 disables the threadpool, >1 sets threadpool to the specified number of threads,
+            "auto" uses `concurrent.futures.ThreadPoolExecutor`'s default: cpu_count + 4, limit to max of 32
         verbose :  bool
-            Optional. If true intermediate information is printed. 
+            Optional. If true intermediate information is printed.
 
         Returns
         -------
         response :  `numpy.array`, `numpy.array`, `numpy.array`
             The untransposed image cutout array,
             the untransposeduncertainty cutout array,
-            and the aperture array (an array the size of a single cutout 
+            and the aperture array (an array the size of a single cutout
             that is 1 where there is image data and 0 where there isn't)
         """
 
@@ -424,8 +431,21 @@ class CutoutFactory():
             ymax = ymax_cube       
         
         # Doing the cutout
-        cutout = transposed_cube[xmin:xmax, ymin:ymax, :, :]
-    
+        if threads == "auto" or threads > 1:
+            max_workers = None if threads == "auto" else threads
+            with ThreadPoolExecutor(max_workers=max_workers) as pool:
+                # increase download performance by making remote cutouts inside of a threadpool
+                # astropy.io.fits Section class executes a list comprehension, generating a sequence of http range
+                # requests (through fsspec) one per our slowest moving dimension (x).
+                # https://github.com/astropy/astropy/blob/0a71105fbaa71439206d496a44df11abc0e3ac96/astropy/io/fits/hdu/image.py#L1059
+                # By running inside a threadpool, these requests instead execute concurrently which increases cutout
+                # throughput. Extremely small cutouts (< 4px in x dim) are not likely to see an improvement
+                cutouts = list(pool.map(lambda x: transposed_cube[x, ymin:ymax, :, :], range(xmin, xmax)))
+            # stack the list of cutouts
+            cutout = np.stack(cutouts)
+        else:
+            cutout = transposed_cube[xmin:xmax, ymin:ymax, :, :]
+
         img_cutout = cutout[:, :, :, 0].transpose((2, 0, 1))
         uncert_cutout = cutout[:, :, :, 1].transpose((2, 0, 1))
     
@@ -765,22 +785,30 @@ class CutoutFactory():
 
         return cutout_hdu_list
 
-
-    def cube_cut(self, cube_file, coordinates, cutout_size,
-                 product='SPOC', target_pixel_file=None, output_path=".", verbose=False):
+    def cube_cut(
+        self,
+        cube_file,
+        coordinates,
+        cutout_size,
+        product="SPOC",
+        target_pixel_file=None,
+        output_path=".",
+        threads: Union[int, Literal["auto"]] = 1,
+        verbose=False,
+    ):
         """
-        Takes a cube file (as created by `~astrocut.CubeFactory`), and makes a cutout target pixel 
+        Takes a cube file (as created by `~astrocut.CubeFactory`), and makes a cutout target pixel
         file of the given size around the given coordinates. The target pixel file is formatted like
         a TESS pipeline target pixel file.
 
         Parameters
         ----------
         cube_file : str
-            The cube file containing all the images to be cutout.  
+            The cube file containing all the images to be cutout.
             Must be in the format returned by ~astrocut.make_cube.
         coordinates : str or `astropy.coordinates.SkyCoord` object
-            The position around which to cutout. 
-            It may be specified as a string ("ra dec" in degrees) 
+            The position around which to cutout.
+            It may be specified as a string ("ra dec" in degrees)
             or as the appropriate `~astropy.coordinates.SkyCoord` object.
         cutout_size : int, array-like, `~astropy.units.Quantity`
             The size of the cutout array. If ``cutout_size``
@@ -794,19 +822,23 @@ class CutoutFactory():
             The product type to make the cutouts from.
             Can either be 'SPOC' or 'TICA' (default is 'SPOC').
         target_pixel_file : str
-            Optional. The name for the output target pixel file. 
-            If no name is supplied, the file will be named: 
+            Optional. The name for the output target pixel file.
+            If no name is supplied, the file will be named:
             ``<cube_file_base>_<ra>_<dec>_<cutout_size>_astrocut.fits``
         output_path : str
-            Optional. The path where the output file is saved. 
+            Optional. The path where the output file is saved.
             The current directory is default.
+        threads : int, "auto", default=1
+            Number of threads to use when making remote (e.g. s3) cutouts, will not use threads for local access
+            <=1 disables the threadpool, >1 sets threadpool to the specified number of threads,
+            "auto" uses `concurrent.futures.ThreadPoolExecutor`'s default: cpu_count + 4, limit to max of 32
         verbose : bool
-            Optional. If true intermediate information is printed. 
+            Optional. If true intermediate information is printed.
 
         Returns
         -------
         response: string or None
-            If successfull, returns the path to the target pixel file, 
+            If successfull, returns the path to the target pixel file,
             if unsuccessful returns None.
         """
 
@@ -825,6 +857,8 @@ class CutoutFactory():
         else:
             fits_options["memmap"] = True
             cube_data_prop = "data"
+            # disable threading for local storage access
+            threads = 1
         with fits.open(cube_file, **fits_options) as cube:
 
             # Get the info we need from the data table
@@ -861,7 +895,9 @@ class CutoutFactory():
                 print("ymin,ymax: {}".format(self.cutout_lims[0]))
 
             # Make the cutout
-            img_cutout, uncert_cutout, aperture = self._get_cutout(getattr(cube[1], cube_data_prop), verbose=verbose)
+            img_cutout, uncert_cutout, aperture = self._get_cutout(
+                getattr(cube[1], cube_data_prop), threads=threads, verbose=verbose
+            )
 
             # Get cutout wcs info
             cutout_wcs_full = self._get_full_cutout_wcs(cube[2].header)
