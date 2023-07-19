@@ -219,7 +219,7 @@ Making cutout target pixel files
 --------------------------------
 
 To make a cutout, you must already have an image cube to cut out from.
-Assuming that that step has been completed, you simply give the central
+Assuming that you have a TESS cube file stored locally, you can give the central
 coordinate and cutout size (in either pixels or angular `~astropy.Quantity`)
 to the `~astrocut.CutoutFactory.cube_cut` function.
 
@@ -256,7 +256,71 @@ The cutout target pixel file format is decribed `here <file_formats.html#target-
                 1  PIXELS        1 BinTableHDU    222   144R x 12C   [D, E, J, 25J, 25E, 25E, 25E, 25E, J, E, E, 38A]   
                 2  APERTURE      1 ImageHDU        45   (5, 5)   float64  
 
-  
+
+Cloud-based Cutouts
+-------------------
+
+You can also create cutout target pixel files out of TESS cube files stored on MAST's AWS open data bucket.
+Using cube files stored on the cloud allows you the option to implement multithreading to improve cutout generation
+speed.
+
+Multithreading
+---------------
+
+To use multithreading for cloud-based cutouts, set the ``threads`` argument in ``cube_cut`` to the number of threads you want to use. Alternatively, you
+can set set ``threads`` to ``"auto"``, which will set the number of threads based on the CPU count of your machine.
+Note that ``Total Time`` results may vary from machine to machine.
+
+.. code-block:: python
+
+                >>> from astrocut import CutoutFactory
+                >>> from astropy.coordinates import SkyCoord
+
+                >>> my_cutter = CutoutFactory()
+                >>> coord = SkyCoord(217.42893801, -62.67949189, unit="deg", frame="icrs")
+                >>> cutout_size = 30
+                >>> cube_file = "s3://stpubdata/tess/public/mast/tess-s0038-2-2-cube.fits"
+
+                >>> cut_factory.cube_cut(cube_file, coordinates=coord, cutout_size=cutout_size,
+                ...                      verbose=True, threads="auto") #doctest: +SKIP
+                Using WCS from row 1852 out of 3705
+                Cutout center coordinate: 217.42893801,-62.67949189
+                xmin,xmax: [1572 1602]
+                ymin,ymax: [852 882]
+                Image cutout cube shape: (3705, 30, 30)
+                Uncertainty cutout cube shape: (3705, 30, 30)
+                Maximum distance between approximate and true location: 3.6009402965268847e-05 deg
+                Error in approximate WCS (sigma): 0.0003207242331953156
+                Target pixel file: ./tess-s0038-2-2_217.428938_-62.679492_30x30_astrocut.fits
+
+                WARNING: VerifyWarning: Card is too long, comment will be truncated. [astropy.io.fits.card]
+
+                Write time: 0.54 sec
+                Total time: 4.3 sec
+
+The same call made with no multithreading enabled will result in a longer processing time, depending on the cutout size.
+Note that multithreading is disabled by default.
+
+.. code-block:: python
+
+                >>> cut_factory.cube_cut(cube_file, coordinates=coord, cutout_size=cutout_size, 
+                ...                      verbose=True) #doctest: +SKIP
+                Using WCS from row 1852 out of 3705
+                Cutout center coordinate: 217.42893801,-62.67949189
+                xmin,xmax: [1572 1602]
+                ymin,ymax: [852 882]
+                Image cutout cube shape: (3705, 30, 30)
+                Uncertainty cutout cube shape: (3705, 30, 30)
+                Maximum distance between approximate and true location: 3.6009402965268847e-05 deg
+                Error in approximate WCS (sigma): 0.0003207242331953156
+                Target pixel file: ./tess-s0038-2-2_217.428938_-62.679492_30x30_astrocut.fits
+
+                WARNING: VerifyWarning: Card is too long, comment will be truncated. [astropy.io.fits.card]
+
+                Write time: 0.56 sec
+                Total time: 7.8 sec
+
+
 Additional Cutout Processing
 ============================
 
