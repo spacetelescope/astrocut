@@ -261,13 +261,13 @@ Cloud-based Cutouts
 -------------------
 
 You can also create cutout target pixel files out of TESS cube files stored on MAST's AWS open data bucket.
-Using cube files stored on the cloud allows you the option to implement multiprocessing to improve cutout generation
+Using cube files stored on the cloud allows you the option to implement multithreading to improve cutout generation
 speed.
 
-Multiprocessing
+Multithreading
 ---------------
 
-To use multiprocessing for cloud-based cutouts, set the ``threads`` argument in ``cube_cut`` to the number of threads you want to use. Alternatively, you
+To use multithreading for cloud-based cutouts, set the ``threads`` argument in ``cube_cut`` to the number of threads you want to use. Alternatively, you
 can set set ``threads`` to ``"auto"``, which will set the number of threads based on the CPU count of your machine.
 Note that ``Total Time`` results may vary from machine to machine.
 
