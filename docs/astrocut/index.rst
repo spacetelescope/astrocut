@@ -256,6 +256,10 @@ The cutout target pixel file format is decribed `here <file_formats.html#target-
                 1  PIXELS        1 BinTableHDU    222   144R x 12C   [D, E, J, 25J, 25E, 25E, 25E, 25E, J, E, E, 38A]   
                 2  APERTURE      1 ImageHDU        45   (5, 5)   float64  
 
+
+Cloud-based Cutouts
+-------------------
+
 You can also create cutout target pixel files out of TESS cube files stored on MAST's AWS open data bucket.
 Using cube files stored on the cloud allows you the option to implement multiprocessing to improve cutout generation
 speed. To use multiprocessing, set the ``threads`` argument in ``cube_cut`` to the number of threads you want to use. Alternatively, you
