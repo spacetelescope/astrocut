@@ -74,7 +74,7 @@ def test_make_and_update_cube(tmpdir):
     cube = hdu[1].data
 
     # expected values for cube before update_cube
-    ecube = np.zeros((img_sz, img_sz, num_im // 2, 2))
+    ecube = np.zeros((img_sz, img_sz, num_im // 2, 1))
     plane = np.arange(img_sz*img_sz, dtype=np.float32).reshape((img_sz, img_sz))
 
     assert cube.shape == ecube.shape, "Mismatch between cube shape and expected shape"
@@ -98,7 +98,7 @@ def test_make_and_update_cube(tmpdir):
     cube = hdu[1].data
     
     # expected values for cube after update_cube
-    ecube = np.zeros((img_sz, img_sz, num_im, 2))
+    ecube = np.zeros((img_sz, img_sz, num_im, 1))
     plane = np.arange(img_sz*img_sz, dtype=np.float32).reshape((img_sz, img_sz))
 
     assert cube.shape == ecube.shape, "Mismatch between cube shape and expected shape"
