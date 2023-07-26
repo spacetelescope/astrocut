@@ -702,8 +702,6 @@ class CutoutFactory():
         # The primary hdu is just the main header, which is the same
         # as the one on the cube file
         primary_hdu = cube_fits[0]
-        print(cube_fits)
-        print(primary_hdu.header)
         self._update_primary_header(primary_hdu.header)
 
         cols = list()
@@ -849,6 +847,7 @@ class CutoutFactory():
         if verbose:
             start_time = time()
 
+        # Declare the product type being used to make the cutouts
         self.product = product
 
         warnings.filterwarnings("ignore", category=wcs.FITSFixedWarning)
