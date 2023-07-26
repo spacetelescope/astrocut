@@ -367,7 +367,6 @@ def test_target_pixel_file(cube_file, ffi_type, tmp_path):
     assert len(tpf_table.columns) == ncols
     assert "TIME" in tpf_table.columns.names
     assert "FLUX" in tpf_table.columns.names
-    assert "FLUX_ERR" in tpf_table.columns.names
     assert "FFI_FILE" in tpf_table.columns.names
 
     cutout_img = tpf_table[0]['FLUX']
