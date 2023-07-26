@@ -448,7 +448,8 @@ class CutoutFactory():
             cutout = transposed_cube[xmin:xmax, ymin:ymax, :, :]
 
         img_cutout = cutout[:, :, :, 0].transpose((2, 0, 1))
-        uncert_cutout = cutout[:, :, :, 1].transpose((2, 0, 1))
+        if self.product == "SPOC":
+            uncert_cutout = cutout[:, :, :, 1].transpose((2, 0, 1))
     
         # Making the aperture array
         aperture = np.ones((xmax-xmin, ymax-ymin), dtype=np.int32)
@@ -456,14 +457,19 @@ class CutoutFactory():
         # Adding padding to the cutouts so that it's the expected size
         if padding.any():  # only do if we need to pad
             img_cutout = np.pad(img_cutout, padding, 'constant', constant_values=np.nan)
-            uncert_cutout = np.pad(uncert_cutout, padding, 'constant', constant_values=np.nan)
+            if self.product == "SPOC":
+                uncert_cutout = np.pad(uncert_cutout, padding, 'constant', constant_values=np.nan)
             aperture = np.pad(aperture, padding[1:], 'constant', constant_values=0)
 
         if verbose:
             print("Image cutout cube shape: {}".format(img_cutout.shape))
-            print("Uncertainty cutout cube shape: {}".format(uncert_cutout.shape))
+            if self.product == "SPOC":
+                print("Uncertainty cutout cube shape: {}".format(uncert_cutout.shape))
     
-        return img_cutout, uncert_cutout, aperture
+        if self.product == "SPOC":
+            return img_cutout, uncert_cutout, aperture
+        else:
+            return img_cutout, aperture
 
 
     def _update_primary_header(self, primary_header):
