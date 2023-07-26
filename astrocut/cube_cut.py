@@ -731,7 +731,7 @@ class CutoutFactory():
         # Adding flux and flux_err (data we actually have!)
         pixel_unit = 'e-/s' if self.product == 'SPOC' else 'e-'
         cols.append(fits.Column(name='FLUX', format=tform, dim=dims, unit=pixel_unit, disp='E14.7', array=img_cube))
-        if uncert_cube:
+        if uncert_cube is not None:
             cols.append(fits.Column(name='FLUX_ERR', format=tform, dim=dims, unit=pixel_unit, disp='E14.7',
                                     array=uncert_cube)) 
    

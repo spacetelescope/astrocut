@@ -344,7 +344,7 @@ def test_fit_cutout_wcs(cube_file, ffi_type, tmp_path):
 
 
 @pytest.mark.parametrize("ffi_type", ["SPOC", "TICA"])
-def test_taget_pixel_file(cube_file, ffi_type, tmp_path):
+def test_target_pixel_file(cube_file, ffi_type, tmp_path):
     """Test target pixel file"""
     
     tmpdir = str(tmp_path)
@@ -362,8 +362,8 @@ def test_taget_pixel_file(cube_file, ffi_type, tmp_path):
     assert tpf[0].header["ORIGIN"] == 'STScI/MAST'
 
     tpf_table = tpf[1].data
-    # SPOC cutouts have one extra column in EXT 1
-    ncols = 12 if ffi_type == 'SPOC' else 11
+    # SPOC cutouts have 2 extra columns in EXT 1
+    ncols = 12 if ffi_type == 'SPOC' else 10
     assert len(tpf_table.columns) == ncols
     assert "TIME" in tpf_table.columns.names
     assert "FLUX" in tpf_table.columns.names
