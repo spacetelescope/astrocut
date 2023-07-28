@@ -846,7 +846,7 @@ class CutoutFactory():
             start_time = time()
 
         # Declare the product type being used to make the cutouts
-        self.product = product
+        self.product = product.upper()
 
         warnings.filterwarnings("ignore", category=wcs.FITSFixedWarning)
         fits_options: Dict[str, Any] = {"mode": "denywrite", "lazy_load_hdus": True}
