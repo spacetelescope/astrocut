@@ -681,7 +681,8 @@ class CutoutFactory():
         img_cube : `numpy.array`
             The untransposed image cutout array
         uncert_cube : `numpy.array`
-            The untransposed uncertainty cutout array
+            The untransposed uncertainty cutout array.
+            This value is set to `None` by default for TICA cutouts.
         cutout_wcs_dict : dict
             Dictionary of wcs keyword/value pairs to be added to each array 
             column in the cutout table header.
