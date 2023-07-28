@@ -404,7 +404,7 @@ class CutoutFactory():
         -------
         response :  `numpy.array`, `numpy.array`, `numpy.array`
             The untransposed image cutout array,
-            the untransposeduncertainty cutout array,
+            the untransposed uncertainty cutout array (if `self.product` is SPOC, otherwise returns `None`),
             and the aperture array (an array the size of a single cutout
             that is 1 where there is image data and 0 where there isn't)
         """
