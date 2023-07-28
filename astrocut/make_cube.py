@@ -438,7 +438,8 @@ class TicaCubeFactory():
         self.block_size = int(image_shape[0]/self.num_blocks + 1)
         
         # Determining cube shape: 
-        # If it's a new cube, the shape is (nRows, nCols, nImages, 2)
+        # If it's a new TICA cube, the shape is (nRows, nCols, nImages, 1).
+        # Axis 4 is `1` instead of `2` because we do not work with error arrays for TICA.
         if not self.update:
             self.cube_shape = (image_shape[0], image_shape[1], len(self.file_list), 1)
             
