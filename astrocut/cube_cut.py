@@ -450,7 +450,8 @@ class CutoutFactory():
         img_cutout = cutout[:, :, :, 0].transpose((2, 0, 1))
         if self.product == "SPOC":
             uncert_cutout = cutout[:, :, :, 1].transpose((2, 0, 1))
-    
+        else:
+            uncert_cutout = None
         # Making the aperture array
         aperture = np.ones((xmax-xmin, ymax-ymin), dtype=np.int32)
 
@@ -466,10 +467,7 @@ class CutoutFactory():
             if self.product == "SPOC":
                 print("Uncertainty cutout cube shape: {}".format(uncert_cutout.shape))
     
-        if self.product == "SPOC":
-            return img_cutout, uncert_cutout, aperture
-        else:
-            return img_cutout, aperture
+        return img_cutout, uncert_cutout, aperture
 
 
     def _update_primary_header(self, primary_header):
@@ -672,7 +670,7 @@ class CutoutFactory():
                         hdu.header[kwd] = (primary_header[kwd], primary_header.comments[kwd])
             
 
-    def _build_tpf(self, cube_fits, img_cube, cutout_wcs_dict, aperture, uncert_cube=None):
+    def _build_tpf(self, cube_fits, img_cube, uncert_cube, cutout_wcs_dict, aperture):
         """
         Building the cutout target pixel file (TPF) and formatting it to match TESS pipeline TPFs.
 
@@ -900,14 +898,8 @@ class CutoutFactory():
                 print("ymin,ymax: {}".format(self.cutout_lims[0]))
 
             # Make the cutout
-            results = self._get_cutout(
-                getattr(cube[1], cube_data_prop), threads=threads, verbose=verbose
-            )
-            
-            if len(results) == 3:
-                img_cutout, uncert_cutout, aperture = results[0], results[1], results[2]
-            elif len(results) == 2:
-                img_cutout, aperture = results[0], results[1]
+            img_cutout, uncert_cutout, aperture = self._get_cutout(getattr(cube[1], cube_data_prop), threads=threads,
+                                                                   verbose=verbose)
 
             # Get cutout wcs info
             cutout_wcs_full = self._get_full_cutout_wcs(cube[2].header)
@@ -919,10 +911,7 @@ class CutoutFactory():
             cutout_wcs_dict = self._get_cutout_wcs_dict()
     
             # Build the TPF
-            if self.product == "SPOC":
-                tpf_object = self._build_tpf(cube, img_cutout, cutout_wcs_dict, aperture, uncert_cutout)
-            else:
-                tpf_object = self._build_tpf(cube, img_cutout, cutout_wcs_dict, aperture)
+            tpf_object = self._build_tpf(cube, img_cutout, uncert_cutout, cutout_wcs_dict, aperture)
 
             if verbose:
                 write_time = time()
