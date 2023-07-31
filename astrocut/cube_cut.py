@@ -402,7 +402,7 @@ class CutoutFactory():
 
         Returns
         -------
-        response :  `numpy.array`, `numpy.array`, `numpy.array`
+        response :  `numpy.array`, `numpy.array` (or `None`), `numpy.array`
             The untransposed image cutout array,
             the untransposed uncertainty cutout array (if `self.product` is SPOC, otherwise returns `None`),
             and the aperture array (an array the size of a single cutout
