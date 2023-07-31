@@ -138,9 +138,9 @@ class CubeFactory():
             # set up the image info table
             cols = []
             for kwd, val, cmt in secondary_header.cards: 
-                if type(val) == str:
+                if isinstance(val, str):
                     tpe = "S" + str(len(val))  # TODO: Maybe switch to U?
-                elif type(val) == int:
+                elif isinstance(val, int):
                     tpe = np.int32
                 else:
                     tpe = np.float64
@@ -500,9 +500,9 @@ class TicaCubeFactory():
             cols = []
             length = len(self.file_list)
             for kwd, val, cmt in primary_header.cards: 
-                if type(val) == str:  
+                if isinstance(val, str):  
                     tpe = "S" + str(len(val))  # TODO: Maybe switch to U?
-                elif type(val) == int:
+                elif isinstance(val, int):
                     tpe = np.int32
                 else:
                     tpe = np.float64
@@ -652,9 +652,9 @@ class TicaCubeFactory():
             # set up the image info table
             cols = []
             for kwd, val, cmt in primary_header.cards: 
-                if type(val) == str:
+                if isinstance(val, str):
                     tpe = "S" + str(len(val))  # TODO: Maybe switch to U?
-                elif type(val) == int:
+                elif isinstance(val, int):
                     tpe = np.int32
                 else:
                     tpe = np.float64
