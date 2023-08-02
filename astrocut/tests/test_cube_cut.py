@@ -82,7 +82,7 @@ def checkcutout(product, cutfile, pixcrd, world, csize, ecube, eps=1.e-7):
     assert (tab['TIME'] == (np.arange(ntimes)+0.5)).all(), "{} some time values are incorrect".format(cutfile)
 
     if product == 'SPOC':
-        # TODO: Modify check1 to take TICA - adjust for TICA's slightly different WCS 
+        # TODO: Modify check1 to take TICA - adjust for TICA's slightly different WCS
         # solutions (TICA will usually be ~1 pixel off from SPOC for the same cutout)
         check1(tab['FLUX'], x1, x2, y1, y2, ecube[:, :, :, 0], 'FLUX', cutfile)
         # Only SPOC propagates errors, so TICA will always have an empty error array
@@ -362,21 +362,27 @@ def test_target_pixel_file(cube_file, ffi_type, tmp_path):
     assert tpf[0].header["ORIGIN"] == 'STScI/MAST'
 
     tpf_table = tpf[1].data
-    # SPOC cutouts have 2 extra columns in EXT 1
-    ncols = 12 if ffi_type == 'SPOC' else 10
+    # SPOC cutouts have 1 extra columns in EXT 1
+    ncols = 12 if ffi_type == 'SPOC' else 11
     assert len(tpf_table.columns) == ncols
     assert "TIME" in tpf_table.columns.names
     assert "FLUX" in tpf_table.columns.names
-    if ffi_type == "SPOC":
-        assert "FLUX_ERR" in tpf_table.columns.names
-    else:
-        assert "FLUX_ERR" not in tpf_table.columns.names
+    assert "FLUX_ERR" in tpf_table.columns.names
     assert "FFI_FILE" in tpf_table.columns.names
 
+    # Check img cutout shape and data type
     cutout_img = tpf_table[0]['FLUX']
     assert cutout_img.shape == (3, 5)
     assert cutout_img.dtype.name == 'float32'
 
+    # Check error cutout shape, contents, and data type
+    cutout_err = tpf_table[0]['FLUX_ERR']
+    assert cutout_err.shape == (3, 5)
+    if ffi_type == "TICA":
+        assert np.mean(cutout_err) == 0
+    assert cutout_err.dtype.name == 'float32'
+
+    # Check aperture shape and data type
     aperture = tpf[2].data
     assert aperture.shape == (3, 5)
     assert aperture.dtype.name == 'int32'
