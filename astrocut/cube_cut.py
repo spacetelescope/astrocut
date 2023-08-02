@@ -729,10 +729,10 @@ class CutoutFactory():
 
         # Adding flux and flux_err (data we actually have!)
         pixel_unit = 'e-/s' if self.product == 'SPOC' else 'e-'
+        flux_err_array = uncert_cube if self.product == 'SPOC' else empty_arr
         cols.append(fits.Column(name='FLUX', format=tform, dim=dims, unit=pixel_unit, disp='E14.7', array=img_cube))
-        if uncert_cube is not None:
-            cols.append(fits.Column(name='FLUX_ERR', format=tform, dim=dims, unit=pixel_unit, disp='E14.7',
-                                    array=uncert_cube)) 
+        cols.append(fits.Column(name='FLUX_ERR', format=tform, dim=dims, unit=pixel_unit, disp='E14.7',
+                                array=flux_err_array)) 
    
         # Adding the background info (zeros b.c we don't have this info)
         cols.append(fits.Column(name='FLUX_BKG', format=tform, dim=dims, unit=pixel_unit, disp='E14.7',
