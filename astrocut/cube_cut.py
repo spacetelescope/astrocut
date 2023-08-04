@@ -720,7 +720,8 @@ class CutoutFactory():
                                     array=cube_fits[2].columns['BARYCORR'].array))
 
         # Adding CADENCENO as zeros for SPOC b/c we don't have this info
-        cadence_array = empty_arr[:, 0, 0] if self.product == 'SPOC' else cube_fits[2].columns['CADENCE'].array
+        cadence_array = np.zeros(img_cube.shape)[:, 0, 0] if self.product == 'SPOC'\
+                        else cube_fits[2].columns['CADENCE'].array
         cols.append(fits.Column(name='CADENCENO', format='J', disp='I10', array=cadence_array))
 
         # Adding counts (-1 b/c we don't have data)
