@@ -6,8 +6,8 @@ build:
     python: "3.11"
 
 python:
-  install:
-    - requirements: docs
+  extra_requirements:
+    - docs
 
 formats: []
 
