@@ -2,14 +2,13 @@ version: 2
 
 build:
   image: latest
+  os: macos-latest
+  tools:
+    python: "3.11"
 
 python:
-  version: 3.11
   install:
-    - method: pip
-      path: .
-      extra_requirements:
-        - docs
+    - requirements: docs
 
 formats: []
 
