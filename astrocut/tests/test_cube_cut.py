@@ -224,6 +224,18 @@ def test_header_keywords_quality(cube_file, ffi_type, tmp_path):
         assert primary_header['CREATOR'] == 'astrocut'
         assert primary_header['BJDREFI'] == 2457000
 
+        # Get units from BinTableHDU
+        cols = hdulist[1].columns.info('name, unit', output=False)
+        cols_dict = dict(zip(*cols.values()))
+
+        ncols = 12 if ffi_type == 'SPOC' else 11
+        assert len(cols_dict) == ncols
+
+        if ffi_type == 'SPOC':
+            assert hdulist[0].header['TIMEREF'] == 'SOLARSYSTEM', 'TIMEREF keyword does not match expected'
+            assert hdulist[0].header['TASSIGN']== 'SPACECRAFT', 'TASSIGN keyword does not match expected'
+            assert cols_dict['FLUX'] == 'e-/s', f'Expected `FLUX` units of "e-/s", got units of "{cols_dict["FLUX"]}"'
+
         if ffi_type == 'TICA':
             # Verifying DATE-OBS calculation in TICA
             date_obs = primary_header['DATE-OBS']
@@ -234,6 +246,10 @@ def test_header_keywords_quality(cube_file, ffi_type, tmp_path):
             date_end = primary_header['DATE-END']
             tstop = Time(date_end).jd - primary_header['BJDREFI']
             assert primary_header['TSTOP'] == tstop
+
+            assert primary_header['TIMEREF'] == None, 'TIMEREF keyword does not match expected'
+            assert primary_header['TASSIGN']== None, 'TASSIGN keyword does not match expected'
+            assert cols_dict['FLUX'] == 'e-', f'Expected `FLUX` units of "e-", got units of "{cols_dict["FLUX"]}"'
 
         # Checking for header keyword propagation in EXT 1 and 2
         ext1_header = hdulist[1].header
