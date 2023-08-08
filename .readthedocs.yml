@@ -4,8 +4,8 @@ build:
   os: ubuntu-22.04
   tools:
     python: "3.11"
-    extra_requirements:
-    - docs
+      extra_requirements:
+        - docs
 
 formats: []
 
