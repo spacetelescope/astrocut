@@ -244,7 +244,7 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
         start_time = time()
             
     # Making sure we have an array of images
-    if type(input_files) == str:
+    if isinstance(input_files, str):
         input_files = [input_files]
 
     # If a single extension is given, make it a list
@@ -512,7 +512,7 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
         start_time = time()
             
     # Making sure we have an array of images
-    if type(input_files) == str:
+    if isinstance(input_files, str):
         input_files = [input_files]
             
     if not isinstance(coordinates, SkyCoord):

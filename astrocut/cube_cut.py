@@ -42,6 +42,7 @@ class CutoutFactory():
         Initialization function.
         """
 
+        self.product = None
         self.cube_wcs = None  # WCS information from the image cube
         self.cutout_wcs = None  # WCS information (linear) for the cutout
         self.cutout_wcs_fit = {
@@ -401,9 +402,9 @@ class CutoutFactory():
 
         Returns
         -------
-        response :  `numpy.array`, `numpy.array`, `numpy.array`
+        response :  `numpy.array`, `numpy.array` (or `None`), `numpy.array`
             The untransposed image cutout array,
-            the untransposeduncertainty cutout array,
+            the untransposed uncertainty cutout array (if `self.product` is SPOC, otherwise returns `None`),
             and the aperture array (an array the size of a single cutout
             that is 1 where there is image data and 0 where there isn't)
         """
@@ -447,25 +448,29 @@ class CutoutFactory():
             cutout = transposed_cube[xmin:xmax, ymin:ymax, :, :]
 
         img_cutout = cutout[:, :, :, 0].transpose((2, 0, 1))
-        uncert_cutout = cutout[:, :, :, 1].transpose((2, 0, 1))
-    
+        if self.product == "SPOC":
+            uncert_cutout = cutout[:, :, :, 1].transpose((2, 0, 1))
+        else:
+            uncert_cutout = None
         # Making the aperture array
         aperture = np.ones((xmax-xmin, ymax-ymin), dtype=np.int32)
 
         # Adding padding to the cutouts so that it's the expected size
         if padding.any():  # only do if we need to pad
             img_cutout = np.pad(img_cutout, padding, 'constant', constant_values=np.nan)
-            uncert_cutout = np.pad(uncert_cutout, padding, 'constant', constant_values=np.nan)
+            if self.product == "SPOC":
+                uncert_cutout = np.pad(uncert_cutout, padding, 'constant', constant_values=np.nan)
             aperture = np.pad(aperture, padding[1:], 'constant', constant_values=0)
 
         if verbose:
             print("Image cutout cube shape: {}".format(img_cutout.shape))
-            print("Uncertainty cutout cube shape: {}".format(uncert_cutout.shape))
+            if self.product == "SPOC":
+                print("Uncertainty cutout cube shape: {}".format(uncert_cutout.shape))
     
         return img_cutout, uncert_cutout, aperture
 
 
-    def _update_primary_header(self, product, primary_header):
+    def _update_primary_header(self, primary_header):
         """
         Updates the primary header for the cutout target pixel file by filling in 
         the object ra and dec with the central cutout coordinates and filling in
@@ -473,11 +478,8 @@ class CutoutFactory():
         as we do not have access to this information.
         This is a TESS-specific function.
 
-        Parameters
+        Parameter(s)
         ----------
-        product : str
-            The product type to make the cutouts from.
-            Can either be 'SPOC' or 'TICA'.
         primary_header : `~astropy.io.fits.Header`
             The primary header from the cube file that will be modified in place for the cutout.
         """
@@ -485,7 +487,7 @@ class CutoutFactory():
         # Adding cutout specific headers
         primary_header['CREATOR'] = ('astrocut', 'software used to produce this file')
         primary_header['PROCVER'] = (__version__, 'software version')
-        primary_header['FFI_TYPE'] = (product, 'the FFI type used to make the cutouts')
+        primary_header['FFI_TYPE'] = (self.product, 'the FFI type used to make the cutouts')
         # TODO : The name of FIRST_FFI (and LAST_FFI) is too long to be a header kwd value.
         # Find a way to include these in the headers without breaking astropy (maybe abbreviate?).
         # primary_header['FIRST_FFI'] = (self.first_ffi, 'the FFI used for the primary header 
@@ -495,8 +497,8 @@ class CutoutFactory():
         primary_header['RA_OBJ'] = (self.center_coord.ra.deg, '[deg] right ascension')
         primary_header['DEC_OBJ'] = (self.center_coord.dec.deg, '[deg] declination')
 
-        timeref = 'SOLARSYSTEM' if product == 'SPOC' else None
-        tassign = 'SPACECRAFT' if product == 'SPOC' else None
+        timeref = 'SOLARSYSTEM' if self.product == 'SPOC' else None
+        tassign = 'SPACECRAFT' if self.product == 'SPOC' else None
         primary_header['TIMEREF'] = (timeref, 'barycentric correction applied to times')        
         primary_header['TASSIGN'] = (tassign, 'where time is assigned')
         primary_header['TIMESYS'] = ('TDB', 'time system is Barycentric Dynamical Time (TDB)')
@@ -512,7 +514,7 @@ class CutoutFactory():
                        'REQUANT', 'DIFF_HUF', 'PRIM_HUF', 'QUAL_BIT', 'SPM', 'STARTTJD', 'ENDTJD', 'CRM',
                        'TJD_ZERO', 'CRM_N', 'ORBIT_ID', 'MIDTJD']
 
-        if product == 'TICA':
+        if self.product == 'TICA':
 
             # Adding some missing kwds not in TICA (but in Ames-produced SPOC ffis)
             primary_header['EXTVER'] = ('1', 'extension version number (not format version)')
@@ -564,7 +566,7 @@ class CutoutFactory():
         primary_header['DATE'] = (primary_header['DATE'], 'FFI cube creation date')
 
         # Specifying that some of these headers keyword values are inherited from the first FFI
-        if product == 'SPOC':
+        if self.product == 'SPOC':
             primary_header['TSTART'] = (primary_header['TSTART'], 'observation start time in TJD of first FFI')
             primary_header['TSTOP'] = (primary_header['TSTOP'], 'observation stop time in TJD of last FFI')
             primary_header['DATE-OBS'] = (primary_header['DATE-OBS'], 'TSTART as UTC calendar date of first FFI')
@@ -668,21 +670,19 @@ class CutoutFactory():
                         hdu.header[kwd] = (primary_header[kwd], primary_header.comments[kwd])
             
 
-    def _build_tpf(self, product, cube_fits, img_cube, uncert_cube, cutout_wcs_dict, aperture):
+    def _build_tpf(self, cube_fits, img_cube, uncert_cube, cutout_wcs_dict, aperture):
         """
         Building the cutout target pixel file (TPF) and formatting it to match TESS pipeline TPFs.
 
         Paramters
         ---------
-        product : str
-            The product type to make the cutouts from.
-            Can either be 'SPOC' or 'TICA'.
         cube_fits : `~astropy.io.fits.hdu.hdulist.HDUList`
             The cube hdu list.
         img_cube : `numpy.array`
             The untransposed image cutout array
         uncert_cube : `numpy.array`
-            The untransposed uncertainty cutout array
+            The untransposed uncertainty cutout array.
+            This value is set to `None` by default for TICA cutouts.
         cutout_wcs_dict : dict
             Dictionary of wcs keyword/value pairs to be added to each array 
             column in the cutout table header.
@@ -701,7 +701,7 @@ class CutoutFactory():
         # The primary hdu is just the main header, which is the same
         # as the one on the cube file
         primary_hdu = cube_fits[0]
-        self._update_primary_header(product, primary_hdu.header)
+        self._update_primary_header(primary_hdu.header)
 
         cols = list()
 
@@ -710,17 +710,18 @@ class CutoutFactory():
         dims = str(img_cube[0].shape[::-1])
         empty_arr = np.zeros(img_cube.shape)
         # Adding the Time relates columns
-        start = 'TSTART' if product == 'SPOC' else 'STARTTJD'
-        stop = 'TSTOP' if product == 'SPOC' else 'ENDTJD'
+        start = 'TSTART' if self.product == 'SPOC' else 'STARTTJD'
+        stop = 'TSTOP' if self.product == 'SPOC' else 'ENDTJD'
         cols.append(fits.Column(name='TIME', format='D', unit='BJD - 2457000, days', disp='D14.7',
                                 array=(cube_fits[2].columns[start].array + cube_fits[2].columns[stop].array)/2))
 
-        if product == 'SPOC':
+        if self.product == 'SPOC':
             cols.append(fits.Column(name='TIMECORR', format='E', unit='d', disp='E14.7',
                                     array=cube_fits[2].columns['BARYCORR'].array))
 
         # Adding CADENCENO as zeros for SPOC b/c we don't have this info
-        cadence_array = empty_arr[:, 0, 0] if product == 'SPOC' else cube_fits[2].columns['CADENCE'].array
+        cadence_array = np.zeros(img_cube.shape)[:, 0, 0] if self.product == 'SPOC'\
+            else cube_fits[2].columns['CADENCE'].array
         cols.append(fits.Column(name='CADENCENO', format='J', disp='I10', array=cadence_array))
 
         # Adding counts (-1 b/c we don't have data)
@@ -728,10 +729,11 @@ class CutoutFactory():
                                 array=empty_arr-1, null=-1))
 
         # Adding flux and flux_err (data we actually have!)
-        pixel_unit = 'e-/s' if product == 'SPOC' else 'e-'
+        pixel_unit = 'e-/s' if self.product == 'SPOC' else 'e-'
+        flux_err_array = uncert_cube if self.product == 'SPOC' else empty_arr
         cols.append(fits.Column(name='FLUX', format=tform, dim=dims, unit=pixel_unit, disp='E14.7', array=img_cube))
         cols.append(fits.Column(name='FLUX_ERR', format=tform, dim=dims, unit=pixel_unit, disp='E14.7',
-                                array=uncert_cube)) 
+                                array=flux_err_array)) 
    
         # Adding the background info (zeros b.c we don't have this info)
         cols.append(fits.Column(name='FLUX_BKG', format=tform, dim=dims, unit=pixel_unit, disp='E14.7',
@@ -740,7 +742,7 @@ class CutoutFactory():
                                 unit=pixel_unit, disp='E14.7', array=empty_arr))
 
         # Adding the quality flags
-        data_quality = 'DQUALITY' if product == 'SPOC' else 'QUAL_BIT'
+        data_quality = 'DQUALITY' if self.product == 'SPOC' else 'QUAL_BIT'
         cols.append(fits.Column(name='QUALITY', format='J', disp='B16.16',
                                 array=cube_fits[2].columns[data_quality].array))
 
@@ -845,6 +847,9 @@ class CutoutFactory():
         if verbose:
             start_time = time()
 
+        # Declare the product type being used to make the cutouts
+        self.product = product.upper()
+
         warnings.filterwarnings("ignore", category=wcs.FITSFixedWarning)
         fits_options: Dict[str, Any] = {"mode": "denywrite", "lazy_load_hdus": True}
         if cube_file.startswith("s3://"):
@@ -895,9 +900,8 @@ class CutoutFactory():
                 print("ymin,ymax: {}".format(self.cutout_lims[0]))
 
             # Make the cutout
-            img_cutout, uncert_cutout, aperture = self._get_cutout(
-                getattr(cube[1], cube_data_prop), threads=threads, verbose=verbose
-            )
+            img_cutout, uncert_cutout, aperture = self._get_cutout(getattr(cube[1], cube_data_prop), threads=threads,
+                                                                   verbose=verbose)
 
             # Get cutout wcs info
             cutout_wcs_full = self._get_full_cutout_wcs(cube[2].header)
@@ -909,7 +913,7 @@ class CutoutFactory():
             cutout_wcs_dict = self._get_cutout_wcs_dict()
     
             # Build the TPF
-            tpf_object = self._build_tpf(product, cube, img_cutout, uncert_cutout, cutout_wcs_dict, aperture)
+            tpf_object = self._build_tpf(cube, img_cutout, uncert_cutout, cutout_wcs_dict, aperture)
 
             if verbose:
                 write_time = time()
