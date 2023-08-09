@@ -224,18 +224,6 @@ def test_header_keywords_quality(cube_file, ffi_type, tmp_path):
         assert primary_header['CREATOR'] == 'astrocut'
         assert primary_header['BJDREFI'] == 2457000
 
-        # Get units from BinTableHDU
-        cols = hdulist[1].columns.info('name, unit', output=False)
-        cols_dict = dict(zip(*cols.values()))
-
-        ncols = 12 if ffi_type == 'SPOC' else 11
-        assert len(cols_dict) == ncols
-
-        if ffi_type == 'SPOC':
-            assert hdulist[0].header['TIMEREF'] == 'SOLARSYSTEM', 'TIMEREF keyword does not match expected'
-            assert hdulist[0].header['TASSIGN']== 'SPACECRAFT', 'TASSIGN keyword does not match expected'
-            assert cols_dict['FLUX'] == 'e-/s', f'Expected `FLUX` units of "e-/s", got units of "{cols_dict["FLUX"]}"'
-
         if ffi_type == 'TICA':
             # Verifying DATE-OBS calculation in TICA
             date_obs = primary_header['DATE-OBS']
@@ -247,16 +235,48 @@ def test_header_keywords_quality(cube_file, ffi_type, tmp_path):
             tstop = Time(date_end).jd - primary_header['BJDREFI']
             assert primary_header['TSTOP'] == tstop
 
-            assert primary_header['TIMEREF'] == None, 'TIMEREF keyword does not match expected'
-            assert primary_header['TASSIGN']== None, 'TASSIGN keyword does not match expected'
-            assert cols_dict['FLUX'] == 'e-', f'Expected `FLUX` units of "e-", got units of "{cols_dict["FLUX"]}"'
-
         # Checking for header keyword propagation in EXT 1 and 2
         ext1_header = hdulist[1].header
         ext2_header = hdulist[2].header
         assert ext1_header['FFI_TYPE'] == ext2_header['FFI_TYPE'] == primary_header['FFI_TYPE']
         assert ext1_header['CREATOR'] == ext2_header['CREATOR'] == primary_header['CREATOR']
         assert ext1_header['BJDREFI'] == ext2_header['BJDREFI'] == primary_header['BJDREFI']
+
+
+@pytest.mark.parametrize("ffi_type", ["SPOC", "TICA"])
+def test_header_keywords_diffs(cube_file, ffi_type, tmp_path):
+    """Test known header keywords differences"""
+
+    tmpdir = str(tmp_path)
+
+    cutout_maker = CutoutFactory()
+    coord = "256.88 6.38"
+    cutout_size = [5, 3]
+    out_file = cutout_maker.cube_cut(
+        cube_file, coord, cutout_size, ffi_type, output_path=path.join(tmpdir, "out_dir"), verbose=False
+    )
+
+    with fits.open(out_file) as hdulist:
+
+        # Get units from BinTableHDU
+        cols = hdulist[1].columns.info('name, unit', output=False)
+        cols_dict = dict(zip(*cols.values()))
+
+        ncols = 12 if ffi_type == 'SPOC' else 11
+        assert len(cols_dict) == ncols
+
+        # Checking for known keyword differences
+        if ffi_type == 'SPOC':
+            assert hdulist[0].header['TIMEREF'] == 'SOLARSYSTEM', 'TIMEREF keyword does not match expected'
+            assert hdulist[0].header['TASSIGN']== 'SPACECRAFT', 'TASSIGN keyword does not match expected'
+            assert cols_dict['FLUX'] == 'e-/s', f'Expected `FLUX` units of "e-/s", got units of "{cols_dict["FLUX"]}"'
+            assert np.mean(hdulist[1].data.field('CADENCENO')) == 0.0
+
+        if ffi_type == 'TICA':
+            assert hdulist[0].header['TIMEREF'] == None, 'TIMEREF keyword does not match expected'
+            assert hdulist[0].header['TASSIGN']== None, 'TASSIGN keyword does not match expected'
+            assert cols_dict['FLUX'] == 'e-', f'Expected `FLUX` units of "e-", got units of "{cols_dict["FLUX"]}"'
+            assert np.mean(hdulist[1].data.field('CADENCENO')) != 0.0
 
 
 @pytest.mark.parametrize("ffi_type", ["SPOC", "TICA"])
