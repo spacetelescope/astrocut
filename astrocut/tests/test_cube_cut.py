@@ -426,6 +426,17 @@ def test_target_pixel_file(cube_file, ffi_type, tmp_path):
     tpf.close()
 
 
+def test_tica_cutout_error(tmp_path):
+    """
+    Test cutouts created from existing TICA cubes (i.e., those with error arrays)
+
+    TODO: Write test to check cutouts made from TICA cubes that still have the error array. Needed to verify that CutoutFactory will work on the cubes that have not been remade yet.
+    """
+
+
+    assert True
+
+
 @pytest.mark.parametrize('ffi_type', ['SPOC', 'TICA'])
 def test_exceptions(cube_file, ffi_type):
     """
