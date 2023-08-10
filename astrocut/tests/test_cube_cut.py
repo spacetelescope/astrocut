@@ -268,13 +268,13 @@ def test_header_keywords_diffs(cube_file, ffi_type, tmp_path):
         # Checking for known keyword differences
         if ffi_type == 'SPOC':
             assert hdulist[0].header['TIMEREF'] == 'SOLARSYSTEM', 'TIMEREF keyword does not match expected'
-            assert hdulist[0].header['TASSIGN']== 'SPACECRAFT', 'TASSIGN keyword does not match expected'
+            assert hdulist[0].header['TASSIGN'] == 'SPACECRAFT', 'TASSIGN keyword does not match expected'
             assert cols_dict['FLUX'] == 'e-/s', f'Expected `FLUX` units of "e-/s", got units of "{cols_dict["FLUX"]}"'
             assert np.mean(hdulist[1].data.field('CADENCENO')) == 0.0
 
         if ffi_type == 'TICA':
-            assert hdulist[0].header['TIMEREF'] == None, 'TIMEREF keyword does not match expected'
-            assert hdulist[0].header['TASSIGN']== None, 'TASSIGN keyword does not match expected'
+            assert hdulist[0].header['TIMEREF'] is None, 'TIMEREF keyword does not match expected'
+            assert hdulist[0].header['TASSIGN'] is None, 'TASSIGN keyword does not match expected'
             assert cols_dict['FLUX'] == 'e-', f'Expected `FLUX` units of "e-", got units of "{cols_dict["FLUX"]}"'
             assert np.mean(hdulist[1].data.field('CADENCENO')) != 0.0
 
@@ -428,9 +428,12 @@ def test_target_pixel_file(cube_file, ffi_type, tmp_path):
 
 def test_tica_cutout_error(tmp_path):
     """
-    Test cutouts created from existing TICA cubes (i.e., those with error arrays)
+    Test cutouts created from existing TICA cubes (i.e., those with
+    error arrays)
 
-    TODO: Write test to check cutouts made from TICA cubes that still have the error array. Needed to verify that CutoutFactory will work on the cubes that have not been remade yet.
+    Write test to check cutouts made from TICA cubes that still have
+    the error array. Needed to verify that CutoutFactory will work on
+    the cubes that have not been remade yet.
     """
 
 
