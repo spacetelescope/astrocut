@@ -437,6 +437,35 @@ def test_tica_cutout_error(tmp_path):
     assert True
 
 
+@pytest.mark.parametrize("ffi_type", ["SPOC", "TICA"])
+def test_ffi_cube_header(cube_file, ffi_files, ffi_type):
+    """Test FFI headers versus cube headers"""
+
+    ffi_header_keys = list(fits.getheader(ffi_files[0], 0).keys())
+    cube_header_keys = list(fits.getheader(cube_file, 0).keys())
+
+    # Lists of expected keys for each product type
+    if ffi_type == 'SPOC':
+        # CHECKSUM in FFI header, not in cube header
+        # SECTOR, DATE, ORIGIN in cube header, not in FFI header
+        effi_keys = ['CHECKSUM']
+        ecube_keys = ['SECTOR', 'DATE', 'ORIGIN']
+
+    else:
+        # CHECKSUM, and image dimensions (NAXIS1, NAXIS2) in FFI header, not in cube header
+        # SECTOR, DATE, EXTNAME, ORIGIN in cube header, not in FFI header
+        effi_keys = ['CHECKSUM', 'NAXIS1', 'NAXIS2']
+        ecube_keys = ['SECTOR', 'DATE', 'EXTNAME', 'ORIGIN']
+
+    for k in effi_keys:
+        assert k in ffi_header_keys
+        assert k not in cube_header_keys
+
+    for k in ecube_keys:
+        assert k not in ffi_header_keys
+        assert k in cube_header_keys
+    
+
 @pytest.mark.parametrize('ffi_type', ['SPOC', 'TICA'])
 def test_exceptions(cube_file, ffi_type):
     """
