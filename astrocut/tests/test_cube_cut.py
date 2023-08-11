@@ -436,8 +436,50 @@ def test_tica_cutout_error(tmp_path):
     the cubes that have not been remade yet.
     """
 
+    tmpdir = str(tmp_path)
 
-    assert True
+    img_sz = 10
+    num_im = 100
+
+    # Create a mock TICA cube that still has the error array
+    # Cube with TICA headers to copy to cube with error array
+    spoc_cube_error = CubeFactory() 
+    spoc_ffi_files = create_test_ffis(img_sz, num_im, dir_name=tmpdir)
+    cube_error_file = spoc_cube_error.make_cube(spoc_ffi_files, path.join(tmpdir, "out_dir", "test_error_cube.fits"), verbose=False)
+
+    # Cube with error array
+    tica_cube_no_error = TicaCubeFactory()
+    tica_ffi_files = create_test_ffis(img_sz, num_im, dir_name=tmpdir, product='TICA')
+    tica_cube_no_error_file = tica_cube_no_error.make_cube(tica_ffi_files, path.join(tmpdir, "out_dir", "test_add_error_cube.fits"), verbose=False)
+
+    # Take ImageHDU from the cube with the error array, write into cube with TICA headers
+    with fits.open(tica_cube_no_error_file, mode='update') as hdulist:
+
+        tica_hdr = hdulist[1].header
+        error_hdr = fits.getheader(cube_error_file, 1)
+
+        # Overwrite header keywords
+        for h in error_hdr.keys():
+            tica_hdr[h] = error_hdr[h]
+
+        # Overwrite header data
+        hdulist[1].data = fits.getdata(cube_error_file, 1)
+
+        # Close file, write all changes
+        hdulist.close()
+
+    # Update variable name to reflect addition of error array to TICA cube
+    tica_cube_error_file = tica_cube_no_error_file
+
+    # Verify dimensions of new TICA cube with added error array
+    assert np.shape(fits.getdata(tica_cube_error_file, 1)) == (img_sz, img_sz, num_im, 2)
+
+    ffi_type = 'TICA'
+    # Test cutouts from TICA cube with error array
+    test_cube_cutout(tica_cube_error_file, tica_ffi_files, ffi_type, tmp_path)
+    test_header_keywords_quality(tica_cube_error_file, ffi_type, tmp_path)
+    test_header_keywords_diffs(tica_cube_error_file, ffi_type, tmp_path)
+    test_target_pixel_file(tica_cube_error_file, ffi_type, tmp_path)
 
 
 @pytest.mark.parametrize("ffi_type", ["SPOC", "TICA"])
