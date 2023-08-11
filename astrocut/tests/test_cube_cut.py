@@ -445,12 +445,16 @@ def test_tica_cutout_error(tmp_path):
     # Cube with TICA headers to copy to cube with error array
     spoc_cube_error = CubeFactory() 
     spoc_ffi_files = create_test_ffis(img_sz, num_im, dir_name=tmpdir)
-    cube_error_file = spoc_cube_error.make_cube(spoc_ffi_files, path.join(tmpdir, "out_dir", "test_error_cube.fits"), verbose=False)
+    cube_error_file = spoc_cube_error.make_cube(spoc_ffi_files, 
+                                                path.join(tmpdir, "out_dir", "test_error_cube.fits"), 
+                                                verbose=False)
 
     # Cube with error array
     tica_cube_no_error = TicaCubeFactory()
     tica_ffi_files = create_test_ffis(img_sz, num_im, dir_name=tmpdir, product='TICA')
-    tica_cube_no_error_file = tica_cube_no_error.make_cube(tica_ffi_files, path.join(tmpdir, "out_dir", "test_add_error_cube.fits"), verbose=False)
+    tica_cube_no_error_file = tica_cube_no_error.make_cube(tica_ffi_files, 
+                                                           path.join(tmpdir, "out_dir", "test_add_error_cube.fits"), 
+                                                           verbose=False)
 
     # Take ImageHDU from the cube with the error array, write into cube with TICA headers
     with fits.open(tica_cube_no_error_file, mode='update') as hdulist:
