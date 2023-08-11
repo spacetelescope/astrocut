@@ -941,7 +941,7 @@ class CutoutFactory():
             # Write the TPF
             tpf_object.writeto(target_pixel_file, overwrite=True, checksum=True)
 
-        if fits_options["use_fsspec"]:
+        if fits_options.get("use_fsspec"):
             cube._file._file.fs.clear_instance_cache()
 
         if verbose:
