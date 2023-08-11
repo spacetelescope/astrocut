@@ -10,7 +10,6 @@ from time import time
 from typing import Any, Dict, Literal, Union
 
 import astropy.units as u
-import fsspec
 import numpy as np
 from astropy import wcs
 from astropy.coordinates import SkyCoord
@@ -943,7 +942,7 @@ class CutoutFactory():
             tpf_object.writeto(target_pixel_file, overwrite=True, checksum=True)
 
         if fits_options["use_fsspec"]:
-            fsspec.AbstractFileSystem.clear_instance_cache()
+            cube._file._file.fs.clear_instance_cache()
 
         if verbose:
             print("Write time: {:.2} sec".format(time()-write_time))
