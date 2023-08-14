@@ -663,6 +663,49 @@ def test_s3_cube_cut(tmp_path: Path):
     hdulist.close()
 
 
+@pytest.mark.xfail
+def test_s3_tica_cube_cut(tmp_path: Path):
+    """Does using an S3-hosted TESS cube yield correct results?
+
+    This test implements a spot check which verifies whether a cutout
+    for Sector 27 obtained from an S3-hosted cube
+    file yields results that are identical to those returned
+    by the Tesscut service.
+
+    To speed up the test and avoid adding astroquery as a dependency,
+    the test uses hard-coded reference values which were obtained
+    as follows:
+
+    >>> from astroquery.mast import Tesscut  # doctest: +SKIP
+    >>> crd = SkyCoord(299.27269, -67.14491, unit="deg")  # doctest: +SKIP
+    >>> cut = Tesscut.get_cutouts(coordinates=crd, size=3, sector=27, product='TICA')  # doctest: +SKIP
+    >>> cut[0][1].data.shape  # doctest: +SKIP
+    (3360,)
+    >>> cut[0][1].data['TIME'][0]  # doctest: +SKIP
+    2036.281565948625
+    >>> cut[0][1].data['FLUX'][500][0, 0]  # doctest: +SKIP
+    59313.523
+    >>> np.sum(cut[0][1].data['FLUX_ERR'])  # doctest: +SKIP
+    0.0
+    >>> cut[0][0].header['CAMERA']  # doctest: +SKIP
+    2
+    >>> cut[0][0].header['CCD']  # doctest: +SKIP
+    1
+    """
+    # Test case: RR Lyrae star in Sector 27 (Camera 2, CCD 1)
+    coord = SkyCoord(299.27269, -67.14491, unit="deg", frame="icrs")
+    cube_file = "s3://stpubdata/tess/public/mast/tica/tica-s0027-2-1-cube.fits"
+    cutout_file = CutoutFactory().cube_cut(cube_file, coord, 3, output_path=str(tmp_path))
+    hdulist = fits.open(cutout_file)
+    assert hdulist[1].data.shape == (3360,)
+    assert np.isclose(hdulist[1].data["TIME"][0], 2036.281565948625)
+    assert np.isclose(hdulist[1].data["FLUX"][500][0, 0], 59313.523)
+    assert np.sum(hdulist[1].data["FLUX_ERR"]) == 0.0
+    assert hdulist[0].header["CAMERA"] == 2
+    assert hdulist[0].header["CCD"] == 1
+    hdulist.close()
+
+
 def test_multithreading(tmp_path):
     tmpdir = str(tmp_path)
 
