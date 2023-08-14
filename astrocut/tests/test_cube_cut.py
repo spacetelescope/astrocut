@@ -431,9 +431,11 @@ def test_tica_cutout_error(tmp_path):
     Test cutouts created from existing TICA cubes (i.e., those with
     error arrays)
 
-    Write test to check cutouts made from TICA cubes that still have
-    the error array. Needed to verify that CutoutFactory will work on
-    the cubes that have not been remade yet.
+    Write test to check that cutouts can be made from *both* the TICA
+    cubes that still have the error array, as well as cubes that
+    *have* been updated and no longer have the error array. Needed to
+    verify that CutoutFactory will work on the cubes that have not 
+    been remade yet.
     """
 
     tmpdir = str(tmp_path)
@@ -691,6 +693,8 @@ def test_s3_tica_cube_cut(tmp_path: Path):
     2
     >>> cut[0][0].header['CCD']  # doctest: +SKIP
     1
+
+    TODO: Remove test `test_tica_cutout_error` when this test starts working
     """
     # Test case: RR Lyrae star in Sector 27 (Camera 2, CCD 1)
     coord = SkyCoord(299.27269, -67.14491, unit="deg", frame="icrs")
