@@ -270,13 +270,13 @@ def test_header_keywords_diffs(cube_file, ffi_type, tmp_path):
             assert hdulist[0].header['TIMEREF'] == 'SOLARSYSTEM', 'TIMEREF keyword does not match expected'
             assert hdulist[0].header['TASSIGN'] == 'SPACECRAFT', 'TASSIGN keyword does not match expected'
             assert cols_dict['FLUX'] == 'e-/s', f'Expected `FLUX` units of "e-/s", got units of "{cols_dict["FLUX"]}"'
-            assert np.mean(hdulist[1].data.field('CADENCENO')) == 0.0
+            assert hdulist[1].data.field('CADENCENO').all() == 0.0
 
         if ffi_type == 'TICA':
             assert hdulist[0].header['TIMEREF'] is None, 'TIMEREF keyword does not match expected'
             assert hdulist[0].header['TASSIGN'] is None, 'TASSIGN keyword does not match expected'
             assert cols_dict['FLUX'] == 'e-', f'Expected `FLUX` units of "e-", got units of "{cols_dict["FLUX"]}"'
-            assert np.mean(hdulist[1].data.field('CADENCENO')) != 0.0
+            assert hdulist[1].data.field('CADENCENO').all() != 0.0
 
 
 @pytest.mark.parametrize("ffi_type", ["SPOC", "TICA"])
