@@ -70,16 +70,17 @@ ImageHDU (Extension 1)
 ^^^^^^^^^^^^^^^^^^^^^^
 
 The ImageHDU extension contains the TESS FFI datacube.
-It is 4 diminsional, the two spacial dimensions, time, and data vs.
-error flux values. Pixel valules are 32 bit floats.
+It is 4 dimensional, with two spatial dimensions, time, and data and
+error flux values. Note, error flux values are only included in the 
+cubes generated from SPOC products. Pixel values are 32 bit floats.
 The cube dimensions are ordered in the FITS format as follows:
 
 ========= ===================================================
 Keyword   Value
 ========= ===================================================
 NAXIS     4 (number of array dimensions)                    
-NAXIS1    2 (data value, error value)
-NAXIS2    Total umber of FFis
+NAXIS1    2 (For SPOC products, data value, error value) or 1 (For TICA products, error value only)
+NAXIS2    Total number of FFis
 NAXIS3    Length of first array dimension (NAXIS1 from FFIs)
 NAXIS4    Length of second array dimension (NAXIS2 from FFIs)
 ========= ===================================================
@@ -101,8 +102,8 @@ Target Pixel Files
 
 The Astrocut target pixel file (TPF) format conforms as closely as possible to the
 TESS mission TPFs. See the `TESS Science Data Products Description Document <https://archive.stsci.edu/missions/tess/doc/EXP-TESS-ARC-ICD-TM-0014.pdf#page=23>`__
-for detailed information on the TESS mission target pixel file format, here I
-describe how Astrocut TPFs differ from mission pipeline TPFs.
+for detailed information on the TESS mission target pixel file format, here it is
+described how Astrocut TPFs differ from mission pipeline TPFs.
 
 PRIMARY PrimaryHDU (Extension 0)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -211,8 +212,8 @@ When the `~astrocut.center_on_path` function is used to create cutout target pix
 where the individualimage cutouts move along a path in time and space, the TPF format has to be
 adjusted accordingly. It still conformes as closely as possible to the TESS mission pipeline TPF
 file format, but differs in several cruicial ways. The `~astrocut.center_on_path` function works
-on astrocut TPFs, so that is the baseline file format. I will describe here only the differences
-between path focussed astrocut TPFs and regular astrocut TPFs (see `Target Pixel Files`_ for
+on astrocut TPFs, so that is the baseline file format. Only the differences
+between path focussed astrocut TPFs and regular astrocut TPFs are described here (see `Target Pixel Files`_ for
 regular Astrocut TPF format).
 
 PRIMARY PrimaryHDU (Extension 0)

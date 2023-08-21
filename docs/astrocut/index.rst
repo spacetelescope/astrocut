@@ -11,7 +11,7 @@ Astrocut provides tools for making cutouts from sets of astronomical images with
 
 Three main areas of functionality are included:
 
-- Solving the specific problem of creating image cutouts from sectors of Transiting Exoplanet Survey Satellite (TESS) full-frame images.
+- Solving the specific problem of creating image cutouts from Sectors of Transiting Exoplanet Survey Satellite (TESS) full-frame images, and related High-Level Science Products (e.g, TICA).
 - General fits file cutouts incuding from single images and sets of images with the shared WCS/pixel scale.
 - Cutout post-processing functionality, including centering cutouts along a path (for moving targets) and combining cutouts.
 
@@ -22,7 +22,7 @@ FITS file image cutouts
 
 These functions provide general purpose astronomical cutout functionality on FITS files.
 There are two main cutout functions, `~astrocut.fits_cut` for creating cutout FITS files,
-and `~astrocut.img_cut` for creating cutout jpg or png files. An image normalization
+and `~astrocut.img_cut` for creating cutout JPG or PNG files. An image normalization
 (`~astrocut.normalize_img`) function is also available.
 
 Creating FITS cutouts
@@ -89,7 +89,7 @@ Creating image cutouts
 ----------------------
                   
 The function `~astrocut.img_cut` takes one or more FITS files and performs the same cutout
-on each, returning a single jpg or png file for each cutout.
+on each, returning a single JPG or PNG file for each cutout.
 It is important to remember that while the expectation is that all input images are
 aligned and have the same pixel scale, no checking is done.
 
@@ -142,26 +142,27 @@ treated as the R, G, and B channels respectively.
 TESS Full-Frame Image Cutouts
 =============================
 
-There are two parts of the package involved in this task, the `~astrocut.CubeFactory`
+There are two parts of the package involved in this task. The `~astrocut.CubeFactory`
+(if working with SPOC products, or `~astrocut.TicaCubeFactory` if working with TICA FFI files)
 class allows you to create a large image cube from a list of FFI files.
 This is what allows the cutout operation to be performed efficiently.
 The `~astrocut.CutoutFactory` class performs the actual cutout and builds
-a target pixel file (TPF) that is compatible with TESS pipeline TPFs.
+a target pixel file (TPF) that is similar to the TESS Mission-produced TPFs.
 
-The basic work-flow is to first create an image cube from individual FFI files
-(this is one-time work), and then make individual cutout TPFs from this
-large cube file. If you are doing a small number of cutouts, it may make
-sense for you to use our tesscut web service:
+The basic procedure is to first create an image cube from individual FFI files
+(this only needs to be completed once per set of FFIs), and then make individual cutout TPFs from this
+large cube file. If you are creating a small number of cutouts, it may make
+sense for you to use the TESSCut web service:
 `mast.stsci.edu/tesscut <https://mast.stsci.edu/tesscut/>`_
  
 Making image cubes
 ------------------
 
-Making an image cube is a simple operation, but comes with an important
-time/memory trade-off.
-
 .. important::
    **Time/Memory Trade-off**
+
+   Making an image cube is a simple operation, but comes with an important
+   time/memory trade-off.
 
    The ``max_memory`` argument determines the maximum memory in GB that will be used
    for the image data cube while it is being built. This is *only* for the data cube,
@@ -171,16 +172,20 @@ time/memory trade-off.
    Because of this, it is possible to build cube files with much less memory than will
    hold the final product. However there is a large time trade-off, as the software must
    run through the list of files multiple times instead of just once. The default value
-   of 50 GB was chosen because it comfortably fits a main mission sector of TESS FFIs,
-   with the default setting on a system with 65 GB of memory it takes about 15 min to
-   build a cube file. On a system with enough less memory that 3 passes through the
-   list of files are required this time rises to ~45 min. 
+   of 50 GB was chosen because it fits all of the TESS FFIs from a single Prime Mission 
+   Sector (Sectors 1-26); with the default settings, on a system with 65 GB of memory,
+   it takes about 15 min to build a single cube file. On a system with less memory, 
+   where e.g., 3 passes through the list of files are required, this time increases to 
+   approximately 45 min. 
    
 
-By default `~astrocut.CubeFactory.make_cube` runs in verbose mode and prints out its progress, however setting
-verbose to false will silence all output.
+Assuming that you have set of calibrated TESS (or TICA) FFI files stored locally, you can
+create a cube using the `~astrocut.CubeFactory.make_cube` method (or 
+`~astrocut.TicaCubeFactory.make_cube` for TICA products). By default `~astrocut.CubeFactory.make_cube` 
+runs in verbose mode and prints out its progress; setting `verbose` to false will silence
+all output.
 
-The image cube file format is decribed `here <file_formats.html#cube-files>`__.
+The output image cube file format is decribed `here <file_formats.html#cube-files>`__.
 
 .. code-block:: python
 
@@ -223,10 +228,10 @@ Assuming that you have a TESS cube file stored locally, you can give the central
 coordinate and cutout size (in either pixels or angular `~astropy.Quantity`)
 to the `~astrocut.CutoutFactory.cube_cut` function.
 
-You can either specify a target pixel file name, or it will be built as:
+You can either specify an output TPF name, or the file name will be built as:
 "<cube_file_base>_<ra>_<dec>_<cutout_size>_astrocut.fits". You can optionally
 also specify a output path, the directory in which the target pixel file will
-be saved, if unspecified it defaults to the current directory.
+be saved; if unspecified, this will default to the current directory.
 
 The cutout target pixel file format is decribed `here <file_formats.html#target-pixel-files>`__.
 
@@ -262,13 +267,13 @@ Cloud-based Cutouts
 
 You can also create cutout target pixel files out of TESS cube files stored on MAST's AWS open data bucket.
 Using cube files stored on the cloud allows you the option to implement multithreading to improve cutout generation
-speed.
+speed. See below for an example using the URL for a TESS cube file stored on AWS.
 
 Multithreading
 ---------------
 
 To use multithreading for cloud-based cutouts, set the ``threads`` argument in ``cube_cut`` to the number of threads you want to use. Alternatively, you
-can set set ``threads`` to ``"auto"``, which will set the number of threads based on the CPU count of your machine.
+can set ``threads`` to ``"auto"``, which will set the number of threads based on the CPU count of your machine.
 Note that ``Total Time`` results may vary from machine to machine.
 
 .. code-block:: python
@@ -328,9 +333,8 @@ Path-based cutouts
 ------------------
 
 The `~astrocut.center_on_path` function allows the user to take one or more Astrocut cutout
-target pixel files (TPFs) and combine them into a single cutout that centers on a
-moving target that crosses through the file(s). The user can optionally
-pass in a target object name and FFI WCS object.
+TPFs and combine them into a single cutout centered on a moving target that crosses through
+the file(s). The user can optionally pass in a target object name and FFI WCS object.
 
 The output target pixel file format is decribed `here <file_formats.html#path-focused-target-pixel-files>`__.
 
@@ -408,7 +412,7 @@ Combining cutouts
 The `~astrocut.CutoutsComibner` class allows the user to take one or more Astrocut cutout
 FITS files (as from  `~astrocut.fits_cut`) with a shared WCS object, and combine them into
 a single cutout. In practical terms this means that you should make the same cutout in the
-all of the images you want to combine.
+all of the images you want to combine. [QUESTION: what does this last sentence mean?]
 
 The default is to combine the images with a mean combiner such that every pixel is the mean of all
 pixels that have data at that point. This combiner is made with the `~astrocut.build_default_combine_function`
