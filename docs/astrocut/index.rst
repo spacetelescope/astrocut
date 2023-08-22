@@ -12,7 +12,7 @@ Astrocut provides tools for making cutouts from sets of astronomical images with
 Three main areas of functionality are included:
 
 - Solving the specific problem of creating image cutouts from Sectors of Transiting Exoplanet Survey Satellite (TESS) full-frame images, and related High-Level Science Product images (TICA).
-- General fits file cutouts incuding from single images and sets of images with shared WCS/pixel scale.
+- General FITS file cutouts including from single images and sets of images with shared WCS/pixel scale.
 - Cutout post-processing functionality, including centering cutouts along a path (for moving targets) and combining cutouts.
 
 
@@ -33,7 +33,7 @@ on each, returning the result either in a single FITS file or as one FITS file p
 It is important to remember that while the expectation is that all input images are aligned
 and have the same pixel scale, no checking is done by Astrocut.
 
-The cutout FITS file format is decribed `here <file_formats.html#fits-cutout-files>`__.
+The cutout FITS file format is described `here <file_formats.html#fits-cutout-files>`__.
 
 .. code-block:: python
 
@@ -184,7 +184,7 @@ create a cube using the `~astrocut.CubeFactory.make_cube` method (or
 runs in verbose mode and prints out its progress; setting `verbose` to false will silence
 all output.
 
-The output image cube file format is decribed `here <file_formats.html#cube-files>`__.
+The output image cube file format is described `here <file_formats.html#cube-files>`__.
 
 .. code-block:: python
 
@@ -232,7 +232,7 @@ You can optionally specify an output TPF name; if no output name is provided, th
 also specify an output path, the directory in which the target pixel file will
 be saved; if unspecified, this will default to the current directory.
 
-The cutout target pixel file format is decribed `here <file_formats.html#target-pixel-files>`__.
+The cutout target pixel file format is described `here <file_formats.html#target-pixel-files>`__.
 
 .. code-block:: python
 
@@ -335,7 +335,7 @@ The `~astrocut.center_on_path` function allows the user to take one or more Astr
 TPF(s) and create a single cutout, centered on a moving target that crosses through
 the file(s). The user can optionally pass in a target object name and FFI WCS object.
 
-The output target pixel file format is decribed `here <file_formats.html#path-focused-target-pixel-files>`__.
+The output target pixel file format is described `here <file_formats.html#path-focused-target-pixel-files>`__.
 
 This example starts with a path, and uses several `TESScut services <https://mast.stsci.edu/tesscut/docs/>`__
 to retrieve all of the inputs for the `~astrocut.center_on_path` function. We also use the helper function

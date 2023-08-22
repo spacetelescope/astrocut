@@ -24,7 +24,7 @@ ORIGIN    STScI/MAST
 DATE      File creation date                             
 PROCVER   Software version                      
 RA_OBJ    Center coordinate right ascension (deg)                         
-DEC_OBJ   Center coordinat declination (deg)                             
+DEC_OBJ   Center coordinate declination (deg)                             
 CHECKSUM  HDU checksum
 DATASUM   Data unit checksum
 ========= ===================================================
@@ -50,7 +50,7 @@ for information on the format of the TICA HLSP full-frame images.
 PrimaryHDU (Extension 0)
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-The Primary Header of the TESS cube fits file is the same as that from
+The Primary Header of the TESS Mission, SPOC cube FITS file is the same as that from
 an individual FFI with the following exceptions:
 
 ========= ===================================================
@@ -67,7 +67,7 @@ Keyword   Value
  TSTOP    From the ImageHDU (EXT 1) of the Sector's last FFI
 ========= ===================================================
 
-The Primary Header of the TICA cube fits file is the same as that from
+The Primary Header of the TICA cube FITS file is the same as that from
 an individual TICA FFI with the following exceptions:
 
 ========= ===================================================
@@ -86,7 +86,7 @@ Keyword   Value
 ImageHDU (Extension 1)
 ^^^^^^^^^^^^^^^^^^^^^^
 
-The ImageHDU extension contains the TESS (or TICA) FFI datacube.
+The ImageHDU extension contains the TESS (or TICA) FFI data cube.
 It is 4 dimensional, with two spatial dimensions, time, and data and
 error flux values. Note, error flux values are only included in the 
 cubes generated from SPOC products. Pixel values are 32 bit floats.
@@ -111,7 +111,7 @@ holds all of the Image extension header keywords from the individual FFIs. There
 is one column for each keyword plus one additional column called "FFI_FILE" that 
 contains FFI filename for each row. Each column name keyword also has an entry in
 the extension header, with the value being the keyword comment from the FFI header.
-This last allows the FFI Image extension headers to be reacreated completely if desired.
+This last allows the FFI Image extension headers to be recreated completely if desired.
 
 
 Target Pixel Files
@@ -245,7 +245,7 @@ Path Focused Target Pixel Files
 When the `~astrocut.center_on_path` function is used to create cutout TPFs
 where the individual image cutouts move along a path in time and space, the TPF format has to be
 adjusted accordingly. It still conforms as closely as possible to the TESS Mission pipeline TPF
-file format, but differs in several cruicial ways. The `~astrocut.center_on_path` function works
+file format, but differs in several crucial ways. The `~astrocut.center_on_path` function works
 on Astrocut TPFs, so that is the baseline file format. Only the differences
 between path focused Astrocut TPFs and regular Astrocut TPFs are described here (see `Target Pixel Files`_ for
 regular Astrocut TPF format).
@@ -298,7 +298,7 @@ The APERTURE extension may or may not be present in a path focussed TPF, to be p
 the user must have passed an FFI WCS object into the `~astrocut.center_on_path` function.
 
 The APERTURE ImageHDU extension of path focussed TPFs is very different from other
-TESS TPFs. The aperture image, instead of being the size and shape of an individeual cutout,
+TESS TPFs. The aperture image, instead of being the size and shape of an individual cutout,
 is the size of the full FFI image the cutouts were drawn from. All pixels used in any
 individual cutout are marked with 1, while the rest of the pixels are 0, so the entire
 trajectory of the cutout path is captured. Additionally the WCS information in the header
