@@ -11,8 +11,8 @@ Astrocut provides tools for making cutouts from sets of astronomical images with
 
 Three main areas of functionality are included:
 
-- Solving the specific problem of creating image cutouts from Sectors of Transiting Exoplanet Survey Satellite (TESS) full-frame images, and related High-Level Science Products (e.g, TICA).
-- General fits file cutouts incuding from single images and sets of images with the shared WCS/pixel scale.
+- Solving the specific problem of creating image cutouts from Sectors of Transiting Exoplanet Survey Satellite (TESS) full-frame images, and related High-Level Science Product images (TICA).
+- General fits file cutouts incuding from single images and sets of images with shared WCS/pixel scale.
 - Cutout post-processing functionality, including centering cutouts along a path (for moving targets) and combining cutouts.
 
 
@@ -20,7 +20,7 @@ Three main areas of functionality are included:
 FITS file image cutouts
 =======================
 
-These functions provide general purpose astronomical cutout functionality on FITS files.
+These functions provide general purpose astronomical cutout functionality for FITS files.
 There are two main cutout functions, `~astrocut.fits_cut` for creating cutout FITS files,
 and `~astrocut.img_cut` for creating cutout JPG or PNG files. An image normalization
 (`~astrocut.normalize_img`) function is also available.
@@ -31,7 +31,7 @@ Creating FITS cutouts
 The function `~astrocut.fits_cut` takes one or more FITS files and performs the same cutout
 on each, returning the result either in a single FITS file or as one FITS file per cutout.
 It is important to remember that while the expectation is that all input images are aligned
-and have the same pixel scale, no checking is done.
+and have the same pixel scale, no checking is done by Astrocut.
 
 The cutout FITS file format is decribed `here <file_formats.html#fits-cutout-files>`__.
 
@@ -91,7 +91,7 @@ Creating image cutouts
 The function `~astrocut.img_cut` takes one or more FITS files and performs the same cutout
 on each, returning a single JPG or PNG file for each cutout.
 It is important to remember that while the expectation is that all input images are
-aligned and have the same pixel scale, no checking is done.
+aligned and have the same pixel scale, no checking is done by Astrocut.
 
 .. code-block:: python
 
@@ -113,8 +113,8 @@ aligned and have the same pixel scale, no checking is done.
                 
 .. image:: imgs/png_ex_cutout.png
 
-Color images can also be produced using `~astrocut.img_cut` given three input files, which will be
-treated as the R, G, and B channels respectively.
+Color images can also be produced using `~astrocut.img_cut`, given three input files, which will be
+treated as the R, G, and B channels, respectively.
 
 .. code-block:: python
 
