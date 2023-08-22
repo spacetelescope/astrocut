@@ -142,7 +142,7 @@ treated as the R, G, and B channels, respectively.
 TESS Full-Frame Image Cutouts
 =============================
 
-There are two parts of the package involved in creating cutouts from TESS Full-Frame Images (FFIs).
+There are two parts of the package involved in creating cutouts from TESS full-frame images (FFIs).
 First, the `~astrocut.CubeFactory` (if working with SPOC products, or `~astrocut.TicaCubeFactory` if working
 with TICA FFIs) class allows you to create a large image cube from a list of FFI files.
 This is what allows the cutout operation to be performed efficiently.
