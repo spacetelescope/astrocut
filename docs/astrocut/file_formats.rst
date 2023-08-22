@@ -119,7 +119,7 @@ Target Pixel Files
 
 The Astrocut target pixel file (TPF) format conforms as closely as possible to the
 TESS Mission TPFs. See the `TESS Science Data Products Description Document <https://archive.stsci.edu/missions/tess/doc/EXP-TESS-ARC-ICD-TM-0014.pdf#page=23>`__
-for detailed information on the TESS Mission target pixel file format, here it is
+for detailed information on the TESS Mission TPF format, here it is
 described how Astrocut TPFs differ from Mission pipeline TPFs.
 
 PRIMARY PrimaryHDU (Extension 0)
@@ -178,7 +178,7 @@ The ``TIME`` column is formed by taking the average of the ``TSTART`` and ``TSTO
 from the corresponding FFI for each row. The ``QUALITY`` column is taken from the ``DQUALITY``
 image keyword in the individual SPOC FFI files.
 
-For cutouts created from TICA cubes, the ``TIMECORR`` column have been removed from the
+For cutouts created from TICA cubes, the ``TIMECORR`` column has been removed from the
 PIXELS BinTableHDU. Similar to cutouts made from SPOC cubes, the other columns (aside from
 the ``TIMECORR`` column) present in Mission pipeline TPFs are present in cutouts created
 from TICA cubes, but do not all contain data. The columns that are empty in Astrocut TICA TPFs are:
@@ -227,7 +227,7 @@ APERTURE ImageHDU (Extension 2)
 
 The APERTURE ImageHDU extension is similar to that of Mission pipeline TPFs, but contains
 slightly different data. For Mission pipeline files, the aperture image gives information about
-each pixel, whether it was collected and whether it was used in calculating e.g., the background flux or resulting light curve.
+each pixel, whether it was collected and whether it was used in calculating e.g., the background flux.
 Because Astrocut does not do any of the more complex calculations used in the Mission pipeline, each pixel in the
 aperture image will either be 1 (pixel was collected and contains data in the cutout) or 0
 (pixel is off the edge of the detector and contains no data in the cutout).

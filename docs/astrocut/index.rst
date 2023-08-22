@@ -229,7 +229,7 @@ to the `~astrocut.CutoutFactory.cube_cut` function.
 
 You can optionally specify an output TPF name; if no output name is provided, the file name will be built as:
 "<cube_file_base>_<ra>_<dec>_<cutout_size>_astrocut.fits". You can optionally
-also specify an output path, the directory in which the target pixel file will
+also specify an output path, the directory in which the TPF will
 be saved; if unspecified, this will default to the current directory.
 
 The cutout target pixel file format is described `here <file_formats.html#target-pixel-files>`__.
