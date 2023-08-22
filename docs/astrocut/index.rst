@@ -142,46 +142,45 @@ treated as the R, G, and B channels respectively.
 TESS Full-Frame Image Cutouts
 =============================
 
-There are two parts of the package involved in this task. The `~astrocut.CubeFactory`
-(if working with SPOC products, or `~astrocut.TicaCubeFactory` if working with TICA FFI files)
-class allows you to create a large image cube from a list of FFI files.
+There are two parts of the package involved in creating cutouts from TESS Full-Frame Images (FFIs).
+First, the `~astrocut.CubeFactory` (if working with SPOC products, or `~astrocut.TicaCubeFactory` if working
+with TICA FFIs) class allows you to create a large image cube from a list of FFI files.
 This is what allows the cutout operation to be performed efficiently.
-The `~astrocut.CutoutFactory` class performs the actual cutout and builds
+Next, the `~astrocut.CutoutFactory` class performs the actual cutout and builds
 a target pixel file (TPF) that is similar to the TESS Mission-produced TPFs.
 
 The basic procedure is to first create an image cube from individual FFI files
-(this only needs to be completed once per set of FFIs), and then make individual cutout TPFs from this
-large cube file. If you are creating a small number of cutouts, it may make
-sense for you to use the TESSCut web service:
-`mast.stsci.edu/tesscut <https://mast.stsci.edu/tesscut/>`_
+(this only needs to be completed once per set of FFIs), and to then make individual cutout TPFs from this
+large cube file for targets of interest. If you are creating a small number of cutouts, the TESSCut web service
+may suit your needs: `mast.stsci.edu/tesscut <https://mast.stsci.edu/tesscut/>`_
  
 Making image cubes
 ------------------
 
 .. important::
-   **Time/Memory Trade-off**
+   **Time-Memory Trade-off**
 
    Making an image cube is a simple operation, but comes with an important
-   time/memory trade-off.
+   time-memory trade-off.
 
    The ``max_memory`` argument determines the maximum memory in GB that will be used
-   for the image data cube while it is being built. This is *only* for the data cube,
-   and so is somewhat smaller than the amount of memory needed for the program to run.
-   Never set it to your system's total memory.
+   for the image data cube while it is being built. This is the amount of memory required 
+   *only* for the data cube, so is somewhat smaller than the total amount of memory needed
+   for the program to run. You should never set it to your system's total memory.
 
    Because of this, it is possible to build cube files with much less memory than will
-   hold the final product. However there is a large time trade-off, as the software must
+   hold the final product. However, there is a large time trade-off, as the software must
    run through the list of files multiple times instead of just once. The default value
    of 50 GB was chosen because it fits all of the TESS FFIs from a single Prime Mission 
    Sector (Sectors 1-26); with the default settings, on a system with 65 GB of memory,
    it takes about 15 min to build a single cube file. On a system with less memory, 
    where e.g., 3 passes through the list of files are required, this time increases to 
-   approximately 45 min. 
+   approximately 45 min.
    
 
 Assuming that you have set of calibrated TESS (or TICA) FFI files stored locally, you can
 create a cube using the `~astrocut.CubeFactory.make_cube` method (or 
-`~astrocut.TicaCubeFactory.make_cube` for TICA products). By default `~astrocut.CubeFactory.make_cube` 
+`~astrocut.TicaCubeFactory.make_cube` for TICA products). By default, `~astrocut.CubeFactory.make_cube` 
 runs in verbose mode and prints out its progress; setting `verbose` to false will silence
 all output.
 
@@ -223,14 +222,14 @@ The output image cube file format is decribed `here <file_formats.html#cube-file
 Making cutout target pixel files
 --------------------------------
 
-To make a cutout, you must already have an image cube to cut out from.
+To make a cutout, you must already have an image cube from which to create the cutout.
 Assuming that you have a TESS cube file stored locally, you can give the central
-coordinate and cutout size (in either pixels or angular `~astropy.Quantity`)
+coordinate of your target of interest and cutout size (in either pixels or angular degrees/arcseconds `~astropy.Quantity`)
 to the `~astrocut.CutoutFactory.cube_cut` function.
 
-You can either specify an output TPF name, or the file name will be built as:
+You can optionally specify an output TPF name; if no output name is provided, the file name will be built as:
 "<cube_file_base>_<ra>_<dec>_<cutout_size>_astrocut.fits". You can optionally
-also specify a output path, the directory in which the target pixel file will
+also specify an output path, the directory in which the target pixel file will
 be saved; if unspecified, this will default to the current directory.
 
 The cutout target pixel file format is decribed `here <file_formats.html#target-pixel-files>`__.
@@ -265,9 +264,9 @@ The cutout target pixel file format is decribed `here <file_formats.html#target-
 Cloud-based Cutouts
 -------------------
 
-You can also create cutout target pixel files out of TESS cube files stored on MAST's AWS open data bucket.
+You can also create cutout TPFs out of TESS cube files stored on MAST's AWS open data bucket.
 Using cube files stored on the cloud allows you the option to implement multithreading to improve cutout generation
-speed. See below for an example using the URL for a TESS cube file stored on AWS.
+speed. See below for a multithreaded example, using a TESS cube file stored on AWS.
 
 Multithreading
 ---------------
@@ -303,7 +302,7 @@ Note that ``Total Time`` results may vary from machine to machine.
                 Write time: 0.54 sec
                 Total time: 4.3 sec
 
-The same call made with no multithreading enabled will result in a longer processing time, depending on the cutout size.
+The same call made without multithreading enabled will result in a longer processing time, depending on the cutout size.
 Note that multithreading is disabled by default.
 
 .. code-block:: python
