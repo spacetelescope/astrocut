@@ -333,14 +333,14 @@ Path-based cutouts
 ------------------
 
 The `~astrocut.center_on_path` function allows the user to take one or more Astrocut cutout
-TPFs and combine them into a single cutout centered on a moving target that crosses through
+TPF(s) and create a single cutout, centered on a moving target that crosses through
 the file(s). The user can optionally pass in a target object name and FFI WCS object.
 
 The output target pixel file format is decribed `here <file_formats.html#path-focused-target-pixel-files>`__.
 
 This example starts with a path, and uses several `TESScut services <https://mast.stsci.edu/tesscut/docs/>`__
 to retrieve all of the inputs for the `~astrocut.center_on_path` function. We also use the helper function
-`~astrocut.path_to_footprints` that takes in a path table, cutout size, and WCS object and returns the
+`~astrocut.path_to_footprints` that takes in a path table, cutout size, and WCS object, and returns the
 cutout location/size(s) necesary to cover the entire path.
 
 .. code-block:: python
@@ -409,20 +409,20 @@ cutout location/size(s) necesary to cover the entire path.
 Combining cutouts
 -----------------
 
-The `~astrocut.CutoutsComibner` class allows the user to take one or more Astrocut cutout
+The `~astrocut.CutoutsCombiner` class allows the user to take one or more Astrocut cutout
 FITS files (as from  `~astrocut.fits_cut`) with a shared WCS object, and combine them into
 a single cutout. In practical terms this means that you should make the same cutout in the
-all of the images you want to combine. [QUESTION: what does this last sentence mean?]
+all of the images you want to combine.
 
-The default is to combine the images with a mean combiner such that every pixel is the mean of all
-pixels that have data at that point. This combiner is made with the `~astrocut.build_default_combine_function`
-which takes the input image huds and allows the user to specify a null data value (default is NaN).
+The default setting combines the images with a mean combiner, such that every combined pixel is the mean of all
+pixels that have data at that point. This mean combiner is made with the `~astrocut.build_default_combine_function`,
+which takes the input image HDUs and allows the user to specify a null data value (default is NaN).
 
 Users can write a custom combiner function, either by directly setting the
-`~astrocut.CutoutsComibner.combine_images` function, or by writing a custom combiner function builder
-and passing it to the `~astrocut.CutoutsComibner.build_img_combiner` function. The main reason to
-write a function builder is that the `~astrocut.CutoutsComibner.combine_images` function must work
-*only* on the images being combines=d, any usage of header keywords for example, must be set in that
+`~astrocut.CutoutsCombiner.combine_images` function, or by writing a custom combiner function builder
+and passing it to the `~astrocut.CutoutsCombiner.build_img_combiner` function. The main reason to
+write a function builder is that the `~astrocut.CutoutsCombiner.combine_images` function must work
+*only* on the images being combined; any usage of header keywords, for example, must be set in that
 function. See the `~astrocut.build_default_combine_function` for an example of how this works.
 
 
