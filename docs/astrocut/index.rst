@@ -168,13 +168,15 @@ Making image cubes
    *only* for the data cube, so is somewhat smaller than the total amount of memory needed
    for the program to run. You should never set it to your system's total memory.
 
-   Because of this, it is possible to build cube files with much less memory than will
-   hold the final product. However, there is a large time trade-off, as the software must
-   run through the list of files multiple times instead of just once. The default value
-   of 50 GB was chosen because it fits all of the TESS FFIs from a single Prime Mission 
-   Sector (Sectors 1-26); with the default settings, on a system with 65 GB of memory,
-   it takes about 15 min to build a single cube file. On a system with less memory, 
-   where e.g., 3 passes through the list of files are required, this time increases to 
+   Because of this, cube files do not need to allocate their total size in
+   memory all at once. Instead, a smaller memory allocation can be used while
+   the cube file is constructed; however, this will significantly increase the
+   execution time as bytes are swapped into and out of the memory allocation 
+   being used. The default value of 50 GB was chosen because it fits all of the
+   TESS FFIs from a single Prime Mission Sector (Sectors 1-26); with the
+   default settings, on a system with 65 GB of memory, it takes about 15 min to
+   build a single cube file. On a system with less memory, where e.g., 3
+   passes through the list of files are required, this time increases to 
    approximately 45 min.
    
 
