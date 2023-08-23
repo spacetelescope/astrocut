@@ -97,7 +97,7 @@ Keyword   Value
 ========= ===================================================
 NAXIS     4 (number of array dimensions)                    
 NAXIS1    2 (For SPOC products, data value, error value) or 1 (For TICA products, error value only)
-NAXIS2    Total number of FFis
+NAXIS2    Total number of FFIs
 NAXIS3    Length of first array dimension (NAXIS1 from FFIs)
 NAXIS4    Length of second array dimension (NAXIS2 from FFIs)
 ========= ===================================================
