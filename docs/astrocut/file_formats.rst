@@ -109,9 +109,9 @@ BinTableHDU (Extension 2)
 The BinTableHDU extension, in both the SPOC and TICA cubes, contains a table that 
 holds all of the Image extension header keywords from the individual FFIs. There 
 is one column for each keyword plus one additional column called "FFI_FILE" that 
-contains FFI filename for each row. Each column name keyword also has an entry in
-the extension header, with the value being the keyword comment from the FFI header.
-This last allows the FFI Image extension headers to be recreated completely if desired.
+contains FFI filename for each row. Each column name keyword also has an entry in the 
+Image extension header, with the value being the keyword value from the FFI header.
+This last column allows the FFI Image extension headers to be recreated completely if desired.
 
 
 Target Pixel Files
