@@ -77,17 +77,17 @@ Keyword   Value
  DATE     Date the cube was created
  SECTOR   The TESS observing Sector, passed by the user
  STARTTJD From the PrimaryHDU (EXT 0) of the first TICA FFI in the Sector
- MIDTJD   From the PrimaryHDU (EXT 1) of the middle TICA FFI in the Sector
- ENDTJD   From the PrimaryHDU (EXT 1) of the last TICA FFI in the Sector
- MJD-BEG  From the PrimaryHDU (EXT 1) of the first TICA FFI in the Sector
- MJD-END  From the PrimaryHDU (EXT 1) of the last TICA FFI in the Sector
+ MIDTJD   From the PrimaryHDU (EXT 0) of the middle TICA FFI in the Sector
+ ENDTJD   From the PrimaryHDU (EXT 0) of the last TICA FFI in the Sector
+ MJD-BEG  From the PrimaryHDU (EXT 0) of the first TICA FFI in the Sector
+ MJD-END  From the PrimaryHDU (EXT 0) of the last TICA FFI in the Sector
 ========= ===================================================
 
 ImageHDU (Extension 1)
 ^^^^^^^^^^^^^^^^^^^^^^
 
 The ImageHDU extension contains the TESS (or TICA) FFI data cube.
-It is 4 dimensional, with two spatial dimensions, time, and data and
+It is 4 dimensional, with two spatial dimensions, time, data and
 error flux values. Note, error flux values are only included in the 
 cubes generated from SPOC products. Pixel values are 32 bit floats.
 The cube dimensions are ordered in the FITS format as follows:
@@ -96,7 +96,7 @@ The cube dimensions are ordered in the FITS format as follows:
 Keyword   Value
 ========= ===================================================
 NAXIS     4 (number of array dimensions)                    
-NAXIS1    2 (For SPOC products, data value, error value) or 1 (For TICA products, error value only)
+NAXIS1    2 (For SPOC products, data value, error value) or 1 (For TICA products, data value only)
 NAXIS2    Total number of FFIs
 NAXIS3    Length of first array dimension (NAXIS1 from FFIs)
 NAXIS4    Length of second array dimension (NAXIS2 from FFIs)

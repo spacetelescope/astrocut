@@ -151,7 +151,10 @@ a target pixel file (TPF) that is similar to the TESS Mission-produced TPFs.
 
 The basic procedure is to first create an image cube from individual FFI files
 (this only needs to be completed once per set of FFIs), and to then make individual cutout TPFs from this
-large cube file for targets of interest. If you are creating a small number of cutouts, the TESSCut web service
+large cube file for targets of interest. Note, you can only make cubes from a set of FFIs
+with the same product type (i.e., only SPOC *or* only TICA products) that were observed in 
+the same Sector, camera, and CCD.
+If you are creating a small number of cutouts, the TESSCut web service
 may suit your needs: `mast.stsci.edu/tesscut <https://mast.stsci.edu/tesscut/>`_
  
 Making image cubes
@@ -173,17 +176,21 @@ Making image cubes
    the cube file is constructed; however, this will significantly increase the
    execution time as bytes are swapped into and out of the memory allocation 
    being used. The default value of 50 GB was chosen because it fits all of the
-   TESS FFIs from a single Prime Mission Sector (Sectors 1-26); with the
-   default settings, on a system with 65 GB of memory, it takes about 15 min to
-   build a single cube file. On a system with less memory, where e.g., 3
-   passes through the list of files are required, this time increases to 
-   approximately 45 min.
+   TESS FFIs from a single Prime Mission Sector (Sectors 1-26); however, in the
+   current TESS Extended Mission 2, where 6 times more FFIs are observed per Sector
+   (compared to the number of FFIs observed per Sector in the Prime Mission), 50 GB
+   is not enough space to hold all of the FFIs in memory, and the cubes will be 
+   written in multiple blocks. With the default settings, on a system with 64 GB of
+   memory, it takes about 3 hours to build a single cube file. On a system with less
+   memory or where ``max_memory`` is set to a value less than 50 GB, more passes 
+   through the list of files are required, and the time to create a cube can increase
+   significantly.
    
 
 Assuming that you have set of calibrated TESS (or TICA) FFI files stored locally, you can
 create a cube using the `~astrocut.CubeFactory.make_cube` method (or 
-`~astrocut.TicaCubeFactory.make_cube` for TICA products). By default, `~astrocut.CubeFactory.make_cube` 
-runs in verbose mode and prints out its progress; setting `verbose` to false will silence
+`~astrocut.TicaCubeFactory.make_cube` for TICA products). By default, both `~astrocut.CubeFactory.make_cube` 
+and `~astrocut.CubeFactory.make_cube` run in verbose mode and prints out progress; setting `verbose` to false will silence
 all output.
 
 The output image cube file format is described `here <file_formats.html#cube-files>`__.
@@ -412,8 +419,7 @@ Combining cutouts
 
 The `~astrocut.CutoutsCombiner` class allows the user to take one or more Astrocut cutout
 FITS files (as from  `~astrocut.fits_cut`) with a shared WCS object, and combine them into
-a single cutout. In practical terms this means that you should make the same cutout in the
-all of the images you want to combine.
+a single cutout. This means that you should request the same cutout size in all of the images you want to combine.
 
 The default setting combines the images with a mean combiner, such that every combined pixel is the mean of all
 pixels that have data at that point. This mean combiner is made with the `~astrocut.build_default_combine_function`,
