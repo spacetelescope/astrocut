@@ -190,7 +190,7 @@ Making image cubes
 Assuming that you have set of calibrated TESS (or TICA) FFI files stored locally, you can
 create a cube using the `~astrocut.CubeFactory.make_cube` method (or 
 `~astrocut.TicaCubeFactory.make_cube` for TICA products). By default, both `~astrocut.CubeFactory.make_cube` 
-and `~astrocut.CubeFactory.make_cube` run in verbose mode and prints out progress; setting `verbose` to false will silence
+and `~astrocut.TicaCubeFactory.make_cube` run in verbose mode and prints out progress; setting `verbose` to false will silence
 all output.
 
 The output image cube file format is described `here <file_formats.html#cube-files>`__.
