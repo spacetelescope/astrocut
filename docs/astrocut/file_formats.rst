@@ -24,7 +24,7 @@ ORIGIN    STScI/MAST
 DATE      File creation date                             
 PROCVER   Software version                      
 RA_OBJ    Center coordinate right ascension (deg)                         
-DEC_OBJ   Center coordinat declination (deg)                             
+DEC_OBJ   Center coordinate declination (deg)                             
 CHECKSUM  HDU checksum
 DATASUM   Data unit checksum
 ========= ===================================================
@@ -43,13 +43,14 @@ Cube Files
 ==========
 
 See the `TESS Science Data Products Description Document <https://archive.stsci.edu/missions/tess/doc/EXP-TESS-ARC-ICD-TM-0014.pdf#page=17>`__
-for detailed information on the TESS full-frame image file format.
+for detailed information on the TESS full-frame image file format. See the `TESS Image CAlibrator Full Frame Images page <https://archive.stsci.edu/hlsp/tica>`__
+for information on the format of the TICA HLSP full-frame images.
 
 
 PrimaryHDU (Extension 0)
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-The Primary Header of the TESS cube fits file is the same as that from
+The Primary Header of the TESS Mission, SPOC cube FITS file is the same as that from
 an individual FFI with the following exceptions:
 
 ========= ===================================================
@@ -59,27 +60,44 @@ Keyword   Value
  DATE     Date the cube was created
  CAMERA   From the ImageHDU (EXT 1) of an FFI
  CCD      From the ImageHDU (EXT 1) of an FFI
- Sector   The TESS observing sector, passed by the user
- DATE-OBS From the ImageHDU (EXT 1) of the sector's first FFI
- DATE-END From the ImageHDU (EXT 1) of the sector's last FFI
- TSTART   From the ImageHDU (EXT 1) of the sector's first FFI
- TSTOP    From the ImageHDU (EXT 1) of the sector's last FFI
+ SECTOR   The TESS observing Sector, passed by the user
+ DATE-OBS From the ImageHDU (EXT 1) of the Sector's first FFI
+ DATE-END From the ImageHDU (EXT 1) of the Sector's last FFI
+ TSTART   From the ImageHDU (EXT 1) of the Sector's first FFI
+ TSTOP    From the ImageHDU (EXT 1) of the Sector's last FFI
+========= ===================================================
+
+The Primary Header of the TICA cube FITS file is the same as that from
+an individual TICA FFI with the following exceptions:
+
+========= ===================================================
+Keyword   Value
+========= ===================================================
+ ORIGIN   STScI/MAST
+ DATE     Date the cube was created
+ SECTOR   The TESS observing Sector, passed by the user
+ STARTTJD From the PrimaryHDU (EXT 0) of the first TICA FFI in the Sector
+ MIDTJD   From the PrimaryHDU (EXT 0) of the middle TICA FFI in the Sector
+ ENDTJD   From the PrimaryHDU (EXT 0) of the last TICA FFI in the Sector
+ MJD-BEG  From the PrimaryHDU (EXT 0) of the first TICA FFI in the Sector
+ MJD-END  From the PrimaryHDU (EXT 0) of the last TICA FFI in the Sector
 ========= ===================================================
 
 ImageHDU (Extension 1)
 ^^^^^^^^^^^^^^^^^^^^^^
 
-The ImageHDU extension contains the TESS FFI datacube.
-It is 4 diminsional, the two spacial dimensions, time, and data vs.
-error flux values. Pixel valules are 32 bit floats.
+The ImageHDU extension contains the TESS (or TICA) FFI data cube.
+It is 4 dimensional, with two spatial dimensions, time, data and
+error flux values. Note, error flux values are only included in the 
+cubes generated from SPOC products. Pixel values are 32 bit floats.
 The cube dimensions are ordered in the FITS format as follows:
 
 ========= ===================================================
 Keyword   Value
 ========= ===================================================
 NAXIS     4 (number of array dimensions)                    
-NAXIS1    2 (data value, error value)
-NAXIS2    Total umber of FFis
+NAXIS1    2 (For SPOC products, data value, error value) or 1 (For TICA products, data value only)
+NAXIS2    Total number of FFIs
 NAXIS3    Length of first array dimension (NAXIS1 from FFIs)
 NAXIS4    Length of second array dimension (NAXIS2 from FFIs)
 ========= ===================================================
@@ -88,27 +106,27 @@ NAXIS4    Length of second array dimension (NAXIS2 from FFIs)
 BinTableHDU (Extension 2)
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The BinTableHDU extension contains a table that holds all of the Image extension
-header keywords from the individual FFIs. There is one column for each keyword
-plus one additional column called "FFI_FILE" that contains FFI filename for each
-row. Each column name keyword also has an entry in the extension header, with
-the value being the keyword comment from the FFI header. This last allows the
-FFI Image extension headers to be reacreated completely if desired.
+The BinTableHDU extension, in both the SPOC and TICA cubes, contains a table that 
+holds all of the Image extension header keywords from the individual FFIs. There 
+is one column for each keyword plus one additional column called "FFI_FILE" that 
+contains FFI filename for each row. Each column name keyword also has an entry in the 
+Image extension header, with the value being the keyword value from the FFI header.
+This last column allows the FFI Image extension headers to be recreated completely if desired.
 
 
 Target Pixel Files
 ==================
 
 The Astrocut target pixel file (TPF) format conforms as closely as possible to the
-TESS mission TPFs. See the `TESS Science Data Products Description Document <https://archive.stsci.edu/missions/tess/doc/EXP-TESS-ARC-ICD-TM-0014.pdf#page=23>`__
-for detailed information on the TESS mission target pixel file format, here I
-describe how Astrocut TPFs differ from mission pipeline TPFs.
+TESS Mission TPFs. See the `TESS Science Data Products Description Document <https://archive.stsci.edu/missions/tess/doc/EXP-TESS-ARC-ICD-TM-0014.pdf#page=23>`__
+for detailed information on the TESS Mission TPF format, here it is
+described how Astrocut TPFs differ from Mission pipeline TPFs.
 
 PRIMARY PrimaryHDU (Extension 0)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The Primary Header of an Astrocut TPF is the same as that from
-a mission TPF with the following exceptions:
+a Mission TPF with the following exceptions:
 
 ========= ====================================================
 Keyword   Value
@@ -138,18 +156,18 @@ TICID     None
 PIXELS BinTableHDU (Extension 1)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The Astrocut PIXELS BinTableHDU extension comprises the same columns as that from
-the mission pipeline, with one addition. The extra column is ``FFI_FILE`` and contains
-the name of the FFI file that that row's pixels come from.
+The Astrocut PIXELS BinTableHDU comprises the same columns as those included in
+the Mission pipeline TPFs, with one addition: an extra column, ``FFI_FILE``, contains
+the name of the FFI file that the row's pixels come from.
 
-While all of the columns present in mission pipeline TPFs are present, they do not all
-contain data. The columns that are empty in Astrocut TPFs are:
+While all of the columns present in Mission pipeline TPFs are present in cutouts created
+from SPOC cubes, they do not all contain data. The columns that are empty in Astrocut SPOC TPFs are:
 
 ============ ====================================================
 Column       Value
 ============ ====================================================
 CADENCENO    0 filled array in cutout shape
-RAW_CNTS     -1 filles array in cutout shape
+RAW_CNTS     -1 filled array in cutout shape
 FLUX_BKG     0 filled array in cutout shape
 FLUX_BKG_ERR 0 filled array in cutout shape
 POS_CORR1    0
@@ -158,7 +176,24 @@ POS_CORR2    0
 
 The ``TIME`` column is formed by taking the average of the ``TSTART`` and ``TSTOP`` values
 from the corresponding FFI for each row. The ``QUALITY`` column is taken from the ``DQUALITY``
-image keyword in the individual FFI files.
+image keyword in the individual SPOC FFI files.
+
+For cutouts created from TICA cubes, the ``TIMECORR`` column has been removed from the
+PIXELS BinTableHDU. Similar to cutouts made from SPOC cubes, the other columns (aside from
+the ``TIMECORR`` column) present in Mission pipeline TPFs are present in cutouts created
+from TICA cubes, but do not all contain data. The columns that are empty in Astrocut TICA TPFs are:
+
+============ ====================================================
+Column       Value
+============ ====================================================
+RAW_CNTS     -1 filled array in cutout shape
+FLUX_ERR     0 filled array in cutout shape
+FLUX_BKG     0 filled array in cutout shape
+FLUX_BKG_ERR 0 filled array in cutout shape
+QUALITY      0
+POS_CORR1    0
+POS_CORR2    0
+============ ====================================================
 
 Three keywords have also been added to the PIXELS extension header to give additional information
 about the cutout world coordinate system (WCS). TESS FFIs are large and therefore are described
@@ -176,10 +211,10 @@ for their purpose, and to retrieve the original WCS with distortion coefficients
 | WCS_FFI | | The name of the FFI file used to build the original WCS      |
 |         | | from which the cutout and cutout WCS were calculated.        |
 +---------+----------------------------------------------------------------+
-| WCS_MSEP| | The maximum separation in degrees between the cutout’s       |
-|         | | linear WCS and the FFI’s full WCS.                           |
+| WCS_MSEP| | The maximum separation in degrees between the cutout's       |
+|         | | linear WCS and the FFI's full WCS.                           |
 +---------+----------------------------------------------------------------+
-| WCS_SIG | | The error in the cutout’s linear WCS, calculated as          |
+| WCS_SIG | | The error in the cutout's linear WCS, calculated as          |
 |         | | ``sqrt((dist(Po_ij, Pl_ij)^2)`` where ``dist(Po_ij, Pl_ij)`` |
 |         | | is the angular distance in degrees between the sky position  |
 |         | | of of pixel i,j in the original full WCS and the new linear  |
@@ -190,10 +225,10 @@ for their purpose, and to retrieve the original WCS with distortion coefficients
 APERTURE ImageHDU (Extension 2)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The APERTURE ImageHDU extension is similar to that of mission pipeline TPFs, but contains
-slightly different data. For mission pipeline files, the aperture image gives information about
-each pixel, whether it was collected and what calculations it was used in. Because astrocut does
-not do any of the more complex claculations used in the mission pipeline, each pixel in the
+The APERTURE ImageHDU extension is similar to that of Mission pipeline TPFs, but contains
+slightly different data. For Mission pipeline files, the aperture image gives information about
+each pixel, whether it was collected and whether it was used in calculating e.g., the background flux.
+Because Astrocut does not do any of the more complex calculations used in the Mission pipeline, each pixel in the
 aperture image will either be 1 (pixel was collected and contains data in the cutout) or 0
 (pixel is off the edge of the detector and contains no data in the cutout).
 
@@ -201,18 +236,18 @@ aperture image will either be 1 (pixel was collected and contains data in the cu
 Cosmic Ray Binary Table Extension
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-This extension is not present in Astrocut TPFs, although it is a part of mission pipeline TPFs.
+This extension is not present in Astrocut TPFs, although it is a part of the Mission pipeline TPFs.
 
 
 Path Focused Target Pixel Files
 ===============================
 
-When the `~astrocut.center_on_path` function is used to create cutout target pixel files (TPFs)
-where the individualimage cutouts move along a path in time and space, the TPF format has to be
-adjusted accordingly. It still conformes as closely as possible to the TESS mission pipeline TPF
-file format, but differs in several cruicial ways. The `~astrocut.center_on_path` function works
-on astrocut TPFs, so that is the baseline file format. I will describe here only the differences
-between path focussed astrocut TPFs and regular astrocut TPFs (see `Target Pixel Files`_ for
+When the `~astrocut.center_on_path` function is used to create cutout TPFs
+where the individual image cutouts move along a path in time and space, the TPF format has to be
+adjusted accordingly. It still conforms as closely as possible to the TESS Mission pipeline TPF
+file format, but differs in several crucial ways. The `~astrocut.center_on_path` function works
+on Astrocut TPFs, so that is the baseline file format. Only the differences
+between path focused Astrocut TPFs and regular Astrocut TPFs are described here (see `Target Pixel Files`_ for
 regular Astrocut TPF format).
 
 PRIMARY PrimaryHDU (Extension 0)
@@ -223,7 +258,7 @@ Additional or updated keywords:
 ========= =======================================================
 Keyword   Value
 ========= =======================================================
-DATE      Set the the time the path focussed cutout was performed
+DATE      Set the the time the path focused cutout was performed
 OBJECT    Moving target object name/identifier, only present if
           set by the user
 ========= =======================================================
@@ -263,7 +298,7 @@ The APERTURE extension may or may not be present in a path focussed TPF, to be p
 the user must have passed an FFI WCS object into the `~astrocut.center_on_path` function.
 
 The APERTURE ImageHDU extension of path focussed TPFs is very different from other
-TESS TPFs. The aperture image, instead of being the size and shape of an individeual cutout,
+TESS TPFs. The aperture image, instead of being the size and shape of an individual cutout,
 is the size of the full FFI image the cutouts were drawn from. All pixels used in any
 individual cutout are marked with 1, while the rest of the pixels are 0, so the entire
 trajectory of the cutout path is captured. Additionally the WCS information in the header
