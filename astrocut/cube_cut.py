@@ -896,8 +896,8 @@ class CutoutFactory():
             self._get_cutout_limits(cutout_size)
 
             if verbose:
-                print("xmin,xmax: {}".format(self.cutout_lims[1]))
-                print("ymin,ymax: {}".format(self.cutout_lims[0]))
+                print("xmin,xmax: {}".format(self.cutout_lims[0]))
+                print("ymin,ymax: {}".format(self.cutout_lims[1]))
 
             # Make the cutout
             img_cutout, uncert_cutout, aperture = self._get_cutout(getattr(cube[1], cube_data_prop), threads=threads,
