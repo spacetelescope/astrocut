@@ -409,7 +409,7 @@ class CutoutFactory():
             that is 1 where there is image data and 0 where there isn't)
         """
 
-        # These limits are not guarenteed to be within the image footprint
+        # These limits are not guaranteed to be within the image footprint
         xmin, xmax = self.cutout_lims[1]
         ymin, ymax = self.cutout_lims[0]
 
@@ -429,7 +429,7 @@ class CutoutFactory():
             xmax = xmax_cube
         if ymax > ymax_cube:
             padding[2, 1] = ymax - ymax_cube
-            ymax = ymax_cube       
+            ymax = ymax_cube
         
         # Doing the cutout
         if threads == "auto" or threads > 1:
@@ -896,8 +896,8 @@ class CutoutFactory():
             self._get_cutout_limits(cutout_size)
 
             if verbose:
-                print("xmin,xmax: {}".format(self.cutout_lims[0]))
-                print("ymin,ymax: {}".format(self.cutout_lims[1]))
+                print("xmin,xmax: {}".format(self.cutout_lims[1]))
+                print("ymin,ymax: {}".format(self.cutout_lims[0]))
 
             # Make the cutout
             img_cutout, uncert_cutout, aperture = self._get_cutout(getattr(cube[1], cube_data_prop), threads=threads,
