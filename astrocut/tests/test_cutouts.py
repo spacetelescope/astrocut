@@ -182,6 +182,16 @@ def test_fits_cut(tmpdir, capsys, ffi_type):
     assert "10-x-15" in cutout_file
     assert "x-20" not in cutout_file
 
+    # Test single cloud image
+    test_s3_uri = "s3://stpubdata/hst/public/j8pu/j8pu0y010/j8pu0y010_drc.fits"
+    center_coord = SkyCoord("150.4275416667 2.42155", unit='deg')
+    cutout_size = [10, 15]
+    cutout_file = cutouts.fits_cut(test_s3_uri, center_coord, cutout_size, output_dir=tmpdir)
+    assert isinstance(cutout_file, str)
+    assert "10-x-15" in cutout_file
+    cutout_hdulist = fits.open(cutout_file)
+    assert cutout_hdulist[1].data.shape == (15, 10)
+
 
 def test_normalize_img():
 
