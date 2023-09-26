@@ -640,48 +640,18 @@ class TicaCubeFactory():
 
         del sub_cube
     
-    def _update_info_table(self):
+    def _update_info_table(self, nrows):
         """ Updating an existing info table with newly created
         """
 
         with fits.open(self.template_file, mode='denywrite', memmap=True) as ffi_data:
             
-            # The image specific header information will be saved in a table in the second extension
-            primary_header = ffi_data[0].header
-
-            # set up the image info table
-            cols = []
-            for kwd, val, cmt in primary_header.cards: 
-                if isinstance(val, str):
-                    tpe = "S" + str(len(val))  # TODO: Maybe switch to U?
-                elif isinstance(val, int):
-                    tpe = np.int32
-                else:
-                    tpe = np.float64
-                    
-                # If there's already an info table, this means we are
-                # updating a cube instead of making a new one, so expanding 
-                # the length by the new FFIs (hence +self.file_list)
-
-                with fits.open(self.cube_file, mode='readonly') as hdul:
-
-                    og_table = hdul[2].data
-                    appended_column = np.concatenate((og_table[kwd], self.info_table[kwd]))
-
-                length = len(og_table)+len(self.info_table[kwd])  
-                
-                cols.append(Column(appended_column, name=kwd, dtype=tpe, length=length, meta={"comment": cmt}))
-
-            with fits.open(self.cube_file, mode='readonly') as hdul:
-
-                og_table = hdul[2].data
-                appended_column = np.concatenate((og_table['FFI_FILE'], self.info_table['FFI_FILE']))
-
-                str_length = str(len(os.path.basename(self.template_file)))
-                cols.append(Column(appended_column, name="FFI_FILE", dtype="S" + str_length, length=length))
-    
-            self.info_table = Table(cols)
-
+            # Getting the info table from the original cube FITS file
+            info_table = ffi_data[2].data
+            
+            # Creating a new info table with a number of extra rows, with ``nrows`` being the
+            # number of extra rows to append to the table
+            self.info_table = fits.BinTableHDU.from_columns(info_table.columns, nrows=nrows)
 
     def _write_info_table(self):
         """
@@ -780,7 +750,7 @@ class TicaCubeFactory():
             print(f"FFIs will be appended in {self.num_blocks} blocks of {self.block_size} rows each.")
         
         # Starting a new info table from scratch with new rows
-        self._build_info_table()
+        #self._build_info_table()
 
         # Update the image cube 
         with fits.open(self.cube_file, mode='update', memmap=True) as cube_hdu:
@@ -823,7 +793,7 @@ class TicaCubeFactory():
             hdul[1].data = new_cube
 
         # Appending new info table to original 
-        self._update_info_table()
+        self._update_info_table(nrows=len(filtered_file_list))
         
         # Writing the info table to EXT2 of the FITS file 
         self._write_info_table()
