@@ -84,7 +84,29 @@ The cutout(s) can also be returned in memory as `~astropy.io.fits.HDUList` objec
                   2  CUTOUT        1 ImageHDU        44   (200, 300)   float32
 
                   
-                  
+`~astrocut.fits_cut` also has the ability to take FITS files from the cloud using S3 URIs. 
+
+.. code-block:: python
+
+                >>> from astrocut import fits_cut
+                >>> from astropy.io import fits
+                >>> from astropy.coordinates import SkyCoord
+
+                >>> s3_uri = "s3://stpubdata/hst/public/j8pu/j8pu0y010/j8pu0y010_drz.fits"
+
+                >>> center_coord = SkyCoord("150.42838	2.421421", unit='deg')
+                >>> cutout_size = [100,100]
+                
+                >>> cutout_file = fits_cut(input_files, center_coord, cutout_size,
+                ...                        single_outfile=True, memory_only=True)  #doctest: +SKIP
+                >>> cutout_hdulist = fits.open(cutout_file)  #doctest: +SKIP
+                >>> cutout_hdulist.info() #doctest: +SKIP
+                Filename: ./cutout_150.428380_2.421421_100-x-100_astrocut.fits
+                No.    Name      Ver    Type      Cards   Dimensions   Format
+                  0  PRIMARY       1 PrimaryHDU      11   ()      
+                  1  CUTOUT        1 ImageHDU        97   (100, 100)   float32
+                
+
 Creating image cutouts
 ----------------------
                   

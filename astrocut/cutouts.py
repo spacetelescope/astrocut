@@ -230,6 +230,9 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
         set the number of returned `~astropy.io.fits.HDUList` objects.
     verbose : bool
         Default False. If true intermediate information is printed.
+    fsspec_kwargs : any
+        Default value {"anon": True}. This parameter should be used to provide cloud credentials to
+        access private data buckets (e.g. {"key": "YOUR-SECRET-KEY-ID", "secret": "YOUR-SECRET-KEY"}).
 
     Returns
     -------
@@ -267,12 +270,16 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
     cutout_hdu_dict = {}
     num_empty = 0
     num_cutouts = 0
+    fsspec_kwargs = None
     for in_fle in input_files:
         if verbose:
             print("\nCutting out {}".format(in_fle))
 
+        if "s3://" in in_fle:
+            fsspec_kwargs = {"anon": True}
+
         warnings.filterwarnings("ignore", category=wcs.FITSFixedWarning)
-        with fits.open(in_fle, mode='denywrite', memmap=True) as hdulist:
+        with fits.open(in_fle, mode='denywrite', memmap=True, fsspec_kwargs=fsspec_kwargs) as hdulist:
 
             # Sorting out which extension(s) to cutout
             all_inds = np.where([x.is_image and (x.data is not None) for x in hdulist])[0]
