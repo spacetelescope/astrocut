@@ -184,7 +184,7 @@ def _parse_extensions(infile_exts, infile_name, user_exts):
                     
 def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension=None, 
              single_outfile=True, cutout_prefix="cutout", output_dir='.',
-             memory_only=False, verbose=False, fsspec_kwargs={"anon": True}):
+             memory_only=False, verbose=False):
     """
     Takes one or more fits files with the same WCS/pointing, makes the same cutout in each file,
     and returns the result either in a single FITS file with one cutout per extension or in 
@@ -270,19 +270,16 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
     cutout_hdu_dict = {}
     num_empty = 0
     num_cutouts = 0
+    fsspec_kwargs = None
     for in_fle in input_files:
         if verbose:
             print("\nCutting out {}".format(in_fle))
 
-        u_fsspec = None
-        fsspec_kw = None
-
-        if "s3://" or "gs://" in in_fle:
-            u_fsspec = True
-            fsspec_kw = fsspec_kwargs
+        if "s3://" in in_fle:
+            fsspec_kwargs = {"anon": True}
 
         warnings.filterwarnings("ignore", category=wcs.FITSFixedWarning)
-        with fits.open(in_fle, mode='denywrite', memmap=True, use_fsspec=u_fsspec, fsspec_kwargs=fsspec_kw) as hdulist:
+        with fits.open(in_fle, mode='denywrite', memmap=True, fsspec_kwargs=fsspec_kwargs) as hdulist:
 
             # Sorting out which extension(s) to cutout
             all_inds = np.where([x.is_image and (x.data is not None) for x in hdulist])[0]

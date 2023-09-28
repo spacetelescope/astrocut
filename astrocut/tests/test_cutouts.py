@@ -189,8 +189,9 @@ def test_fits_cut(tmpdir, capsys, ffi_type):
     cutout_file = cutouts.fits_cut(test_s3_uri, center_coord, cutout_size, output_dir=tmpdir)
     assert isinstance(cutout_file, str)
     assert "10-x-15" in cutout_file
-    cutout_hdulist = fits.open(cutout_file)
-    assert cutout_hdulist[1].data.shape == (15, 10)
+    
+    with fits.open(cutout_file) as cutout_hdulist:
+        assert cutout_hdulist[1].data.shape == (15, 10)
 
 
 def test_normalize_img():
