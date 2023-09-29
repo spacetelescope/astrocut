@@ -15,6 +15,9 @@ import numpy as np
 from astropy.io import fits
 from astropy.table import Column, Table
 
+# TODO: delete this after troubleshooting
+from datetime import datetime
+
 if (version_info >= (3, 8)) and (platform != "win32"):
     from mmap import MADV_SEQUENTIAL
 
@@ -596,8 +599,12 @@ class TicaCubeFactory():
                 # Also save the header info in the info table
                 if fill_info_table:
 
+                    # We don't want to replace the existing row values that have
+                    # metadata from the previous FFIs. We want to populate the EMPTY rows.
+                    # So let's update the index number (``i``) accordingly.
                     if self.update:
                         i = self.num_original_files +  i
+
                     # Iterate over every keyword in the TICA FFI primary header
                     for kwd in self.info_table.columns:
                         if self.update:
@@ -648,7 +655,7 @@ class TicaCubeFactory():
 
         del sub_cube
     
-    def _update_info_table(self, nrows):
+    def _update_info_table(self):
         """ Updating an existing info table with newly created
         """
 
@@ -657,9 +664,10 @@ class TicaCubeFactory():
             # Getting the info table from the original cube FITS file
             info_table = ffi_data[2].data
             
-            # Creating a new info table with a number of extra rows, with ``nrows`` being the
-            # number of extra rows to append to the table
-            n_total_rows = len(info_table) + nrows
+            # Creating a new info table with a larger number of rows, denoted by kwarg ``nrows``.
+            # This new number of rows will accomodate the original num. of FFIS PLUS the new FFIs 
+            # being appended to the cube.
+            n_total_rows = len(info_table) + len(self.filtered_file_list)
             self.info_table = fits.BinTableHDU.from_columns(info_table.columns, nrows=n_total_rows).data
 
     def _write_info_table(self):
@@ -690,8 +698,11 @@ class TicaCubeFactory():
             table_hdu.header[kwd] = self.info_table[kwd].meta.get("comment", "")
 
         # Appending to the cube file
+        start = datetime.now()
         with fits.open(self.cube_file, mode='update', memmap=True) as cube_hdus:
             cube_hdus.append(table_hdu)
+        print("TODO: Time elapsed append info table")
+        print(datetime.now() - start)
 
 
     def update_cube(self, file_list, cube_file, sector=None, max_memory=50, verbose=True):
@@ -739,11 +750,14 @@ class TicaCubeFactory():
         if verbose: 
             print(f'{len(self.filtered_file_list)} new FFIs found!')
         
-        # Creating an empty cube that will be appended to the existing cube
-        og_cube = fits.getdata(cube_file, 1)
-        dimensions = list(og_cube.shape)
+        # This next block of code will create an empty cube that will be appended to the existing cube
+        # Let's get the dimensions of the old cube first.
+        original_cube = fits.getdata(cube_file, 1)
+        dimensions = list(original_cube.shape)
+        # Let's update the 2nd axis dimension (num. of FFIs) with the new number of FFIs
         self.num_original_files = dimensions[2]
         dimensions[2] = len(self.filtered_file_list)
+        # Make an empty cube that will be appended to the original cube once filled
         self.cube_append = np.zeros(dimensions)
 
         # Set up the basic cube parameters
@@ -753,10 +767,8 @@ class TicaCubeFactory():
         if verbose:
             print(f"FFIs will be appended in {self.num_blocks} blocks of {self.block_size} rows each.")
         
-        # Starting a new info table from scratch with new rows
-        #self._build_info_table()
         # Appending new info table to original 
-        self._update_info_table(nrows=len(self.filtered_file_list))
+        self._update_info_table()
 
         # Update the image cube 
         with fits.open(self.cube_file, mode='update', memmap=True) as cube_hdu:
@@ -771,6 +783,7 @@ class TicaCubeFactory():
                 # beginning at start and extending length bytes.""
                 mm.madvise(MADV_SEQUENTIAL)
 
+            start = datetime.now()
             for i in range(self.num_blocks):
                 start_row = i * self.block_size
                 end_row = start_row + self.block_size
@@ -785,26 +798,28 @@ class TicaCubeFactory():
 
                 if verbose:
                     print(f"Completed block {i+1} of {self.num_blocks}")
-       
+
         # Append the new cube to the existing cube
-        new_cube = np.concatenate((og_cube, self.cube_append), axis=2)
+        new_cube = np.concatenate((original_cube, self.cube_append), axis=2)
 
         # Add it to the HDU list 
-        with fits.open(self.cube_file, mode='update') as hdul:
+        with fits.open(self.cube_file, mode="update") as hdul:
             
             if verbose:
-                print(f'Original cube of size: {str(og_cube.shape)}')
+                print(f'Original cube of size: {str(original_cube.shape)}')
                 print(f'will now be replaced with cube of size: {str(new_cube.shape)}')
                 print(f'for file ``{cube_file}``')
             hdul[1].data = new_cube
-        
-        # Writing the info table to EXT2 of the FITS file 
-        with fits.open(self.cube_file, mode='update', memmap=True) as cube_hdus:
-            # If we're updating the cube, get rid of the existing table 
-            # so we can replace it with the new one. 
-            if self.update:
-                cube_hdus.pop(index=2)
-            cube_hdus.append(fits.BinTableHDU(self.info_table))
+
+        # This next block of code will update the existing BinTableHDU in EXT=2
+        # Generate HDUList from existing cube file
+        cube_hdus = fits.hdu.hdulist.HDUList.fromfile(self.cube_file)
+        # Remove existing BinTableHDU that doesn't have the new FFIs' metadata
+        cube_hdus.pop(index=2)
+        # Add new BinTableHDU
+        cube_hdus.append(fits.BinTableHDU(self.info_table))
+        # Overwrite the existing cube file
+        cube_hdus.writeto(self.cube_file, overwrite=True)
 
         if verbose:
             print(f"Total time elapsed: {(time() - startTime)/60:.2f} min")
