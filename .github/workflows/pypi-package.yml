@@ -33,7 +33,7 @@ jobs:
   release-test-pypi:
     name: Publish in-dev package to test.pypi.org
     environment: release-test-pypi
-    if: github.repository_owner == 'spacetelescope' && github.event_name == 'push'
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     needs: build-package
 
