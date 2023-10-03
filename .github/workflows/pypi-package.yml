@@ -1,5 +1,5 @@
 ---
-name: Prep for Astrocut Release on PyPI/TestPyPI
+name: Prep for Astrocut Release on PyPI & TestPyPI
 
 on:
   push:
