@@ -4,7 +4,7 @@ name: Build & maybe upload PyPI package
 on:
   push:
     branches: [main]
-    tags: ["0.9"]
+    tags: ["*"]
   pull_request:
     branches: [main]
   release:
