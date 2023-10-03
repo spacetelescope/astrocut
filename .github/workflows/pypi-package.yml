@@ -1,5 +1,5 @@
 ---
-name: Build & maybe upload PyPI package
+name: Prep for Astrocut Release on PyPI/TestPyPI
 
 on:
   push:
