@@ -67,9 +67,13 @@ VERSION_TEMPLATE = """
 # Note that we need to fall back to the hard-coded version if either
 # setuptools_scm can't be imported or setuptools_scm can't determine the
 # version, so we catch the generic 'Exception'.
+
+# We run ``.split("+")[0]`` to catch cases where a local-version segment
+# (e.g. ``+g40d0d7c``) is found when getting the version number, which 
+# is not compliant with PEP 440 (see more here: https://packaging.python.org/specifications/core-metadata)
 try:
     from setuptools_scm import get_version
-    version = get_version(root='..', relative_to=__file__)
+    version = get_version(root='..', relative_to=__file__).split("+")[0]
 except Exception:
     version = '{version}'
 """.lstrip()
