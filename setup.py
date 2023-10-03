@@ -64,7 +64,7 @@ if 'build_docs' in sys.argv or 'build_sphinx' in sys.argv:
     sys.exit(1)
 
 VERSION_TEMPLATE = """
-# Note that we need to fall back to the hard-coded version if eitherr
+# Note that we need to fall back to the hard-coded version if either
 # setuptools_scm can't be imported or setuptools_scm can't determine the
 # version, so we catch the generic 'Exception'.
 try:
