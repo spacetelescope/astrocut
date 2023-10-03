@@ -4,7 +4,7 @@ name: Prep for Astrocut Release on PyPI & TestPyPI
 on:
   push:
     branches: [gh-actions-publish]
-    tags: ["0.10.0dev"]
+    tags: ["v0.10.0dev"]
   pull_request:
     branches: [main]
   release:
