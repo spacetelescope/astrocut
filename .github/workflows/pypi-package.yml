@@ -2,8 +2,7 @@ name: Building & Publishing
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
     tags: ["*"]
   release:
     types:
