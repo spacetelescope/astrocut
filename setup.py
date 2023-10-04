@@ -83,4 +83,4 @@ def read_file(*parts):
 setup(use_scm_version={'write_to': os.path.join('astrocut', 'version.py'),
                        'write_to_template': VERSION_TEMPLATE},
      long_description=read_file('README.rst'),
-     long_description_content_type='text/markdown')
+     long_description_content_type='text/x-rst')
