@@ -24,12 +24,10 @@ jobs:
     steps:
       - name: Git checkout
         uses: actions/checkout@v3
-        with:
-          fetch-depth: '0'
       - name: Make the test.pypi release tag
         run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
+          git config user.name github-actions
+          git config user.email github-actions@github.com
           TAG=$(date +'%Y%m%d%H%M%S')
           echo "new tag made! $TAG"
       - name: Push the tag
