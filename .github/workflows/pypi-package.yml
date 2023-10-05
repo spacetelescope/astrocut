@@ -39,7 +39,7 @@ jobs:
 
   # Release to Test PyPI
   publish-to-test-pypi:
-    uses: OpenAstronomy/github-actions-workflows/.github/workflows/publish.yml@v1
+    uses: OpenAstronomy/github-actions-workflows/.github/workflows/publish_pure_python.yml@v1
     name: Publish to Test PyPI
     needs: make_and_push_tag
 
@@ -64,7 +64,7 @@ jobs:
 
   # Release to PyPI after a RELEASE gets PUBLISHED in @spacetelescope/astrocut/main
   publish-to-pypi:
-    uses: OpenAstronomy/github-actions-workflows/.github/workflows/publish.yml@v1
+    uses: OpenAstronomy/github-actions-workflows/.github/workflows/publish_pure_python.yml@v1
     name: Publish to PyPI
 
     # We only want to upload to PyPI after a new release has been published on the @spacetelescope/astrocut repo
