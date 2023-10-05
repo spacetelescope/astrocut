@@ -57,16 +57,10 @@ jobs:
     # ...even if it fails
     if: always()
     steps:
-      - name: Git checkout
-        uses: actions/checkout@v3
+      - uses: ClementTsang/delete-tag-and-release@v0.3.1
         with:
-          fetch-depth: 5
-      - name: Remove the test.pypi release tag
-        run: |
-          git config user.name github-actions
-          git config user.email github-actions@github.com
-          git fetch --tags
-          git push origin --delete $TAG
+          delete_release: false
+          tag_name: $TAG
 
   # Release to PyPI after a RELEASE gets PUBLISHED in @spacetelescope/astrocut/main
   publish-to-pypi:
