@@ -14,31 +14,51 @@ permissions:
 
 jobs:
 
-  # TODO: Make it so that this only executes when publish-to-test-pypi executes
-  # TODO: Make it so that the tag gets deleted after publish-to-test-pypi finishes executing
-  make_tag:
+  make_and_push_tag:
     runs-on: ubuntu-latest
 
+    # We want a new tag to be made ONLY if we are ready to release to Test PyPI.
+    # I.e. A MERGE has been made into @spacetelescope/astrocut/main
+    if: github.repository_owner == 'spacetelescope' && github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
-    - name: Make a release tag
-      run: echo "test"
+      - name: Make the test.pypi release tag
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          TAG=$(date +'%Y%m%d%H%M%S')
+      - name: Push the tag
+        run: git push origin $TAG
 
-  # Release to Test PyPI after every MERGE into @spacetelescope/astrocut/main    
+  # Release to Test PyPI
   publish-to-test-pypi:
     uses: OpenAstronomy/github-actions-workflows/.github/workflows/publish.yml@v1
     name: Publish to Test PyPI
-    needs: make_tag
+    needs: make_and_push_tag
 
-    if: github.repository_owner == 'spacetelescope' && github.event_name == 'push' && github.ref == 'refs/heads/main'
     with:
       # We DON'T want to upload to the official PyPI for this job
       repository_url: https://test.pypi.org/legacy/
+      # Let's use the tag we generated wtih make_and_push_tag
+      upload_to_pypi: $TAG
+
+  # Remove the tag and push that deletion to main
+  delete_tag:
+    runs-on: ubuntu-latest
+    # This should only run after push-to-test-pypi successfully executed
+    needs: publish-to-test-pypi
+
+    steps:
+      - name: Remove the test.pypi release tag
+        run: |
+          git tag -d $TAG
+          git push origin --delete $TAG
 
   # Release to PyPI after a RELEASE gets PUBLISHED in @spacetelescope/astrocut/main
   publish-to-pypi:
     uses: OpenAstronomy/github-actions-workflows/.github/workflows/publish.yml@v1
     name: Publish to PyPI
 
+    # We only want to upload to PyPI after a new release has been published on the @spacetelescope/astrocut repo
     if: github.repository_owner == 'spacetelescope' && github.event.action == 'published'
     with:
       repository_url: https://pypi.org/legacy/
