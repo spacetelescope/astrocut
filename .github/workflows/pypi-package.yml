@@ -65,6 +65,7 @@ jobs:
         run: |
           git config user.name github-actions
           git config user.email github-actions@github.com
+          git fetch --tags
           git push origin --delete $TAG
 
   # Release to PyPI after a RELEASE gets PUBLISHED in @spacetelescope/astrocut/main
