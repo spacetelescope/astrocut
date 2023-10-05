@@ -21,7 +21,6 @@ jobs:
 
     # We want a new tag to be made ONLY if we are ready to release to Test PyPI.
     # I.e. A MERGE has been made into @spacetelescope/astrocut/main
-    #if: github.repository_owner == 'spacetelescope' && github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - name: Make the test.pypi release tag
         run: |
