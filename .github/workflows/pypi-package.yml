@@ -61,6 +61,8 @@ jobs:
         with:
           delete_release: false
           tag_name: $TAG
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # Release to PyPI after a RELEASE gets PUBLISHED in @spacetelescope/astrocut/main
   publish-to-pypi:
