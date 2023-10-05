@@ -62,9 +62,7 @@ jobs:
         with:
           fetch-depth: 5
       - name: Remove the test.pypi release tag
-        run: |
-          git tag -d $TAG
-          git push origin --delete $TAG
+        run: git push origin --delete $TAG
 
   # Release to PyPI after a RELEASE gets PUBLISHED in @spacetelescope/astrocut/main
   publish-to-pypi:
