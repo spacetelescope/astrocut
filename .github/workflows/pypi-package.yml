@@ -52,11 +52,15 @@ jobs:
   # Remove the tag and push that deletion to main
   delete_tag:
     runs-on: ubuntu-latest
-    # This should only run after push-to-test-pypi successfully executed
+    # Runs the job consecutively after publish-to-test-pypi...
     needs: publish-to-test-pypi
-    # Runs the job consecutively after publish-to-test-pypi, even if it fails
+    # ...even if it fails
     if: always()
     steps:
+      - name: Git checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 5
       - name: Remove the test.pypi release tag
         run: |
           git tag -d $TAG
