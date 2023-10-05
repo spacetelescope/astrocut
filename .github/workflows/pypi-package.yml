@@ -30,8 +30,7 @@ jobs:
           git config user.email github-actions@github.com
           TAG=$(date +'%Y%m%d%H%M%S')
           echo "new tag made! $TAG"
-      - name: Push the tag
-        run: git push origin $TAG
+          git push origin $TAG
 
   # Release to Test PyPI
   publish-to-test-pypi:
