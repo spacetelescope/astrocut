@@ -73,4 +73,3 @@ jobs:
     if: github.repository_owner == 'spacetelescope' && github.event.action == 'published'
     with:
       repository_url: https://pypi.org/legacy/
-      upload_to_pypi: /refs/tags/v
