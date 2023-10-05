@@ -21,7 +21,7 @@ jobs:
 
     steps:
     - name: Make a release tag
-      run: git tag -a v0.10.0dev -m "dev release"
+      run: echo "test"
 
   # Release to Test PyPI after every MERGE into @spacetelescope/astrocut/main    
   publish-to-test-pypi:
