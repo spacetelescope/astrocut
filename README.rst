@@ -38,7 +38,7 @@ Developer Documentation
 -----------------------
 
 Installation
-^^^^^^^^^^^^
+============
 
 .. code-block:: bash
 
@@ -53,7 +53,7 @@ For active developement intall in develop mode
     $ pip install -e .
     
 Testing
-^^^^^^^
+=======
 Testing is now run with `tox <https://tox.readthedocs.io>`_ (``pip install tox``).
 Tests can be found in ``astrocut/tests/``.
 
@@ -69,7 +69,7 @@ Tests can also be run directly with pytest:
     $ pytest
     
 Documentation
-^^^^^^^^^^^^^
+=============
 Documentation files are found in ``docs/``.
 
 We now build the documentation with `tox <https://tox.readthedocs.io>`_ (``pip install tox``):
@@ -90,9 +90,19 @@ The built docs will be in ``docs/_build/html/``, to view them go to ``file:///pa
     
 
 Release Protocol
-^^^^^^^^^^^^^^^^
+================
 
-Follow the `Astropy template release instructions <https://docs.astropy.org/en/latest/development/astropy-package-template.html>`_. 
+GitHub Action Releases
+^^^^^^^^^^^^^^^^^^
+
+The `pypi-package.yml` GitHub workflow is built to make a package release off the latest commit hash in `main`. The job in this workflow is triggered when a
+release tag is generated and pushed to `main`, and uses `OpenAstronomy`'s `GitHub action workflow <https://github.com/OpenAstronomy/github-actions-workflows>`_
+for publishing pure Python packages (`see here <https://github-actions-workflows.openastronomy.org/en/stable/publish_pure_python.html>`_ for documentation).
+
+Manual Releases
+^^^^^^^^^^^^^^^
+
+For making releases manually, follow the `Astropy template release instructions <https://docs.astropy.org/en/latest/development/astropy-package-template.html>`_. 
 
 *Requirements:*
 
