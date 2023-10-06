@@ -95,8 +95,7 @@ Release Protocol
 GitHub Action Releases
 ^^^^^^^^^^^^^^^^^^
 
-The `pypi-package.yml` GitHub workflow is built to make a package release off the latest commit hash in `main`. The job in this workflow is triggered when a
-release tag is generated and pushed to `main`, and uses `OpenAstronomy`'s `GitHub action workflow <https://github.com/OpenAstronomy/github-actions-workflows>`_
+The `pypi-package.yml <.github/workflows/pypi-package.yml>`_ GitHub workflow creates a PyPI release. The job in this workflow is triggered when a tag is pushed or a GH release (+tag) is created, and uses `OpenAstronomy`'s `GitHub action workflow <https://github.com/OpenAstronomy/github-actions-workflows>`_
 for publishing pure Python packages (`see here <https://github-actions-workflows.openastronomy.org/en/stable/publish_pure_python.html>`_ for documentation).
 
 Manual Releases
