@@ -21,4 +21,4 @@ jobs:
       test_extras: test
       test_command: pytest --pyargs astrocut
     secrets:
-      pypi_token: ${{ secrets.PYPI_PASSWORD_STSCI_MAINTAINER }}
+      pypi_token: ${{ secrets.PYPI_TOKEN }}
