@@ -3,7 +3,7 @@ name: Building & Publishing
 on:
   push:
     branches: [main]
-    tags: ["*"]
+    tags: ["v*"]
 
 permissions:
   contents: read
