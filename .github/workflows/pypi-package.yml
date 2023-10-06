@@ -19,6 +19,6 @@ jobs:
     if: github.repository_owner == 'spacetelescope' && github.event_name == 'push'
     with:
       test_extras: test
-      test_command: pytest astrocut
+      test_command: pytest --pyargs astrocut
     secrets:
       pypi_token: ${{ secrets.PYPI_PASSWORD_STSCI_MAINTAINER }}
