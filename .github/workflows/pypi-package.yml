@@ -23,4 +23,4 @@ jobs:
     if: github.repository_owner == 'spacetelescope' && github.event_name == 'push'
     with:
       test_extras: test
-      test_command: pytest -p no:warngings astrocut/tests/test*.py
+      test_command: pytest astrocut/tests/test*.py
