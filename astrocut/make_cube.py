@@ -719,7 +719,7 @@ class TicaCubeFactory():
             cube_hdus.append(table_hdu)
 
 
-    def update_cube(self, file_list, cube_file, sector=None, max_memory=50, verbose=True):
+    def _update_cube(self, file_list, cube_file, sector=None, max_memory=50, verbose=True):
         """ Updates an existing cube file if one has already been made and a new delivery is being appended to it. 
         Same functionality as make_cube(...), but working on an already existing file rather than building a new one. 
         This function will: 
