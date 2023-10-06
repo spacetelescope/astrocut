@@ -1,0 +1,24 @@
+name: Building & Publishing
+
+on:
+  push:
+    tags: 
+    - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+
+  # Release to PyPI after a RELEASE gets PUBLISHED in @spacetelescope/astrocut/main
+  publish-to-pypi:
+    uses: OpenAstronomy/github-actions-workflows/.github/workflows/publish_pure_python.yml@v1
+    name: Publish to PyPI
+
+    # We only want to upload to PyPI after a new release has been published on the @spacetelescope/astrocut repo
+    if: github.repository_owner == 'spacetelescope' && github.event_name == 'push'
+    with:
+      test_extras: test
+      test_command: pytest --pyargs astrocut
+    secrets:
+      pypi_token: ${{ secrets.PYPI_TOKEN }}
