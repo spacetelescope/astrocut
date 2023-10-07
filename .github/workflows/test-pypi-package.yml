@@ -23,7 +23,7 @@ jobs:
               run: |
                   git config user.name github-actions
                   git config user.email github-actions@github.com
-                  TAG=$(date + '%Y%m%d%H%M%S' + '.dev')
+                  TAG=$(date + '%Y%m%d%H%M%S')
                   git tag $TAG
 
     # Release to Test PyPI
