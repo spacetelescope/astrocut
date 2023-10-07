@@ -3,60 +3,37 @@ name: Building & Publishing to Test PyPI
     
 on:
     push:
-      branches: [main]
-      tags: ["*"]
+      branches: ["*"]
 
 permissions:
   contents: read
-  id-token: write
-  pull-requests: write
 
 jobs:
-    make_and_push_tag:
-    runs-on: ubuntu-latest
-
-    # We want a new tag to be made ONLY if we are ready to release to Test PyPI.
-    # I.e. A MERGE has been made into @spacetelescope/astrocut/main
-    if: github.repository_owner == 'spacetelescope' && github.event_name == 'push' && github.ref == 'refs/heads/main'
-    steps:
-        - name: Git checkout
-        uses: actions/checkout@v3
-        with:
-            fetch-depth: 5
-        - name: Make the test.pypi release tag
-        run: |
-            git config user.name github-actions
-            git config user.email github-actions@github.com
-            TAG=$(date + '%Y%m%d%H%M%S' + '.dev')
-            git tag $TAG
-            echo "New tag made! $TAG"
-            git push origin $TAG
-            echo "Github ref:"
-            echo ${{ github.ref }}
+    make_tag:
+        runs-on: ubuntu-latest
+    
+        # We want a new tag to be made ONLY if we are ready to release to Test PyPI.
+        # I.e. A MERGE has been made into @spacetelescope/astrocut/main
+        steps:
+            - name: Git checkout
+              uses: actions/checkout@v3
+              with:
+                  fetch-depth: 0
+            - name: Make the test.pypi release tag
+              run: |
+                  git config user.name github-actions
+                  git config user.email github-actions@github.com
+                  TAG=$(date + '%Y%m%d%H%M%S' + '.dev')
+                  git tag $TAG
 
     # Release to Test PyPI
     publish-to-test-pypi:
-    uses: OpenAstronomy/github-actions-workflows/.github/workflows/publish_pure_python.yml@v1
-    name: Publish to Test PyPI
-    needs: make_and_push_tag
-
-    with:
-        # We DON'T want to upload to the official PyPI for this job
-        repository_url: https://test.pypi.org/legacy/
-        # Let's use the tag we generated wtih make_and_push_tag
-        upload_to_pypi: 'refs/tags/$TAG'
-
-    # Remove the tag and push that deletion to main
-    delete_tag:
-    runs-on: ubuntu-latest
-    # Runs the job consecutively after publish-to-test-pypi...
-    needs: publish-to-test-pypi
-    # ...even if it fails
-    if: always()
-    steps:
-        - uses: ClementTsang/delete-tag-and-release@v0.3.1
+        uses: OpenAstronomy/github-actions-workflows/.github/workflows/publish_pure_python.yml@v1
+        name: Publish to Test PyPI
+        needs: make_tag
+    
         with:
-            delete_release: false
-            tag_name: $TAG
-        env:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            # We DON'T want to upload to the official PyPI for this job
+            repository_url: https://test.pypi.org/legacy/
+        secrets:
+            pypi_token: ${{ secrets.TEST_PYPI_TOKEN }}
