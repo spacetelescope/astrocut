@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: read
-  id-token: read
 
 jobs:
     make_tag:
@@ -24,8 +23,7 @@ jobs:
               run: |
                   git config user.name github-actions
                   git config user.email github-actions@github.com
-                  TAG=$(date + '%Y%m%d%H%M%S')
-                  git tag $TAG
+                  git tag v0.10.0.dev2
 
     # Release to Test PyPI
     publish-to-test-pypi:
