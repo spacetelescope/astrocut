@@ -3,7 +3,9 @@ name: Building & Publishing to Test PyPI
     
 on:
     push:
-      branches: ["*"]
+      branches: "main"
+    pull_request:
+      types: labeled
 
 permissions:
   contents: read
@@ -14,6 +16,7 @@ jobs:
     
         # We want a new tag to be made ONLY if we are ready to release to Test PyPI.
         # I.e. A MERGE has been made into @spacetelescope/astrocut/main
+        if: ${{ (github.event.label.name == 'publish-to-test') || (github.repository_owner == 'spacetelescope' && github.event_name == 'push'}}
         steps:
             - name: Git checkout
               uses: actions/checkout@v3
