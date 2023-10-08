@@ -26,7 +26,8 @@ jobs:
               run: |
                   git config user.name github-actions
                   git config user.email github-actions@github.com
-                  git tag v0.10.0.dev4
+                  TAG=$(date +v'%Y%m%d.%H%M%S'.dev)
+                  git tag $TAG
             - uses: actions/setup-python@v2
             - name: Install dependencies
               run: |
