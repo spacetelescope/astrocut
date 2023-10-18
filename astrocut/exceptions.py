@@ -42,3 +42,7 @@ class DataWarning(AstropyWarning):
     Warnings to do with data content.
     """
     pass
+
+
+class ExceededRetries(Exception):
+    """When the number of retries has been exceeded"""

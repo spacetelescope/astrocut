@@ -9,7 +9,9 @@ from itertools import product
 from time import time
 from typing import Any, Dict, Literal, Union
 
+import aiohttp
 import astropy.units as u
+import fsspec
 import numpy as np
 from astropy import wcs
 from astropy.coordinates import SkyCoord
@@ -17,7 +19,7 @@ from astropy.io import fits
 from astropy.time import Time
 
 from . import __version__
-from .exceptions import InputWarning, InvalidQueryError
+from .exceptions import ExceededRetries, InputWarning, InvalidQueryError
 from .utils.wcs_fitting import fit_wcs_from_points
 
 # todo: investigate why for small cutouts the astropy version is not working
@@ -384,6 +386,27 @@ class CutoutFactory():
 
         return cutout_wcs_dict
 
+    def _cutout_remote_slice(self, transposed_cube, x, ymin, ymax):
+        """This makes a cutout of a specific slice (in x)
+
+        When used inside of a threadpool it leads to improved performance compared to making the entire cutout at once
+        since each slice results in a separate range requests to the remote cube
+
+        It also contains some error handling and retry logic when performing remote cutouts
+        """
+
+        delay = 1
+        backoff = 2
+        tries = 3
+        for attempt in range(tries):
+            try:
+                return transposed_cube[x, ymin:ymax, :, :]
+            except (aiohttp.ClientPayloadError, fsspec.exceptions.FSTimeoutError):
+                print(f"Failure creating cutout on attempt {attempt +1}, retrying up to {tries} times")
+            time.sleep(delay)
+            delay *= backoff
+        raise ExceededRetries("Exceeded retries when making cutout")
+
     def _get_cutout(self, transposed_cube, threads: Union[int, Literal["auto"]] = 1, verbose=True):
         """
         Making a cutout from an image/uncertainty cube that has been transposed
@@ -441,7 +464,9 @@ class CutoutFactory():
                 # https://github.com/astropy/astropy/blob/0a71105fbaa71439206d496a44df11abc0e3ac96/astropy/io/fits/hdu/image.py#L1059
                 # By running inside a threadpool, these requests instead execute concurrently which increases cutout
                 # throughput. Extremely small cutouts (< 4px in x dim) are not likely to see an improvement
-                cutouts = list(pool.map(lambda x: transposed_cube[x, ymin:ymax, :, :], range(xmin, xmax)))
+                cutouts = list(
+                    pool.map(lambda x: self._cutout_remote_slice(transposed_cube, x, ymin, ymax), range(xmin, xmax))
+                )
             # stack the list of cutouts
             cutout = np.stack(cutouts)
         else:
