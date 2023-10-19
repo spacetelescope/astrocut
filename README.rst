@@ -113,7 +113,7 @@ For making releases manually, follow the `Astropy template release instructions 
 - Astrocut uses setuptools_scm to manage version numbers.
 - Astrocut does have a pyproject.toml file
 - If the given twine command doesn't work you likely need ``python -m twine upload dist/*``
-- You shouldn't have trigger a readthedocs build manually, it should run on its own in ~20 min.
+- You shouldn't have to trigger a readthedocs build manually, it should run on its own in ~20 min.
 
 
 Contributing
