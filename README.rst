@@ -18,7 +18,7 @@ Astrocut provides tools for making cutouts from sets of astronomical images with
 Three main areas of functionality are included:
 
 - Solving the specific problem of creating image cutouts from sectors of Transiting Exoplanet Survey Satellite (TESS) full-frame images.
-- General fits file cutouts incuding from single images and sets of images with the shared WCS/pixel scale.
+- General fits file cutouts including from single images and sets of images with the shared WCS/pixel scale.
 - Cutout post-processing functionality, including centering cutouts along a path (for moving targets) and combining cutouts.
 
 Documentation is at https://astrocut.readthedocs.io.
@@ -46,7 +46,7 @@ Installation
     $ cd astrocut
     $ pip install .
     
-For active developement intall in develop mode
+For active development install in develop mode
 
 .. code-block:: bash
 
@@ -113,7 +113,7 @@ For making releases manually, follow the `Astropy template release instructions 
 - Astrocut uses setuptools_scm to manage version numbers.
 - Astrocut does have a pyproject.toml file
 - If the given twine command doesn't work you likely need ``python -m twine upload dist/*``
-- You shouldn't have trigger a readthedocs build manually, it should run on it's own in ~20 min.
+- You shouldn't have to trigger a readthedocs build manually, it should run on its own in ~20 min.
 
 
 Contributing
@@ -155,7 +155,6 @@ License
 This project is Copyright (c) MAST Archive Developers and licensed under
 the terms of the BSD 3-Clause license. This package is based upon
 the `Astropy package template <https://github.com/astropy/package-template>`_
-which is licensed under the BSD 3-clause licence. See the licenses folder for
+which is licensed under the BSD 3-clause license. See the licenses folder for
 more information.
-
 
