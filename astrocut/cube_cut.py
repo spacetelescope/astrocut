@@ -3,10 +3,10 @@
 """This module implements the cutout functionality."""
 
 import os
+import time
 import warnings
 from concurrent.futures import ThreadPoolExecutor
 from itertools import product
-from time import time
 from typing import Any, Dict, Literal, Union
 
 import aiohttp
@@ -386,7 +386,7 @@ class CutoutFactory():
 
         return cutout_wcs_dict
 
-    def _cutout_remote_slice(self, transposed_cube, x, ymin, ymax):
+    def _cutout_remote_slice(self, transposed_cube, x, ymin, ymax, verbose=True):
         """This makes a cutout of a specific slice (in x)
 
         When used inside of a threadpool it leads to improved performance compared to making the entire cutout at once
@@ -402,7 +402,8 @@ class CutoutFactory():
             try:
                 return transposed_cube[x, ymin:ymax, :, :]
             except (aiohttp.ClientPayloadError, fsspec.exceptions.FSTimeoutError):
-                print(f"Failure creating cutout on attempt {attempt +1}, retrying up to {tries} times")
+                if verbose:
+                    print(f"Failure creating cutout on attempt {attempt +1}, retrying up to {tries} times")
             time.sleep(delay)
             delay *= backoff
         raise ExceededRetries("Exceeded retries when making cutout")
@@ -465,7 +466,10 @@ class CutoutFactory():
                 # By running inside a threadpool, these requests instead execute concurrently which increases cutout
                 # throughput. Extremely small cutouts (< 4px in x dim) are not likely to see an improvement
                 cutouts = list(
-                    pool.map(lambda x: self._cutout_remote_slice(transposed_cube, x, ymin, ymax), range(xmin, xmax))
+                    pool.map(
+                        lambda x: self._cutout_remote_slice(transposed_cube, x, ymin, ymax, verbose=verbose),
+                        range(xmin, xmax),
+                    )
                 )
             # stack the list of cutouts
             cutout = np.stack(cutouts)
@@ -870,7 +874,7 @@ class CutoutFactory():
         """
 
         if verbose:
-            start_time = time()
+            start_time = time.monotonic()
 
         # Declare the product type being used to make the cutouts
         self.product = product.upper()
@@ -941,7 +945,7 @@ class CutoutFactory():
             tpf_object = self._build_tpf(cube, img_cutout, uncert_cutout, cutout_wcs_dict, aperture)
 
             if verbose:
-                write_time = time()
+                write_time = time.monotonic()
 
             if not target_pixel_file:
                 _, flename = os.path.split(cube_file)
@@ -967,7 +971,7 @@ class CutoutFactory():
             tpf_object.writeto(target_pixel_file, overwrite=True, checksum=True)
 
         if verbose:
-            print("Write time: {:.2} sec".format(time()-write_time))
-            print("Total time: {:.2} sec".format(time()-start_time))
+            print("Write time: {:.2} sec".format(time.monotonic() - write_time))
+            print("Total time: {:.2} sec".format(time.monotonic() - start_time))
 
         return target_pixel_file
