@@ -6,7 +6,7 @@ import asdf
 import astropy
 
 def get_center_pixel(file, ra, dec):
-    
+
     # Get the roman 2D science image
     f = asdf.open(file)
     data = f['roman']['data']
@@ -24,13 +24,13 @@ def get_center_pixel(file, ra, dec):
     
     # New WCS object with updated header
     wcs_updated = astropy.wcs.WCS(header)
-    
+
     # Turn input RA, Dec into a SkyCoord object
     coordinates = astropy.coordinates.SkyCoord(ra, dec, unit='deg')
 
     # Map the coordinates to a pixel's location on the Roman 2d array (row, col)
     row, col = astropy.wcs.utils.skycoord_to_pixel(coords=coordinates, wcs=wcs_updated)
-    
+
     return (row, col), wcs_updated
 
 
