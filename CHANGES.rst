@@ -2,7 +2,7 @@
 -----------------
 
 
-0.10 (2023-10-23)
+0.10.0 (2023-10-23)
 -----------------
 
 - Improve file checking prior to cutout creation to avoid errors [#52]
