@@ -14,7 +14,7 @@
 - Fixed bug not catching duplicate ffis [#69]
 - max_memory arg added to update_cube [#71]
 - Hotfix for cube_cut checking for valid WCS info [#70]
-- Add remote cutout functionality [requires astropy 5.2 or above] [#76]
+- Add remote cutout functionality (requires astropy 5.2 or above) [#76]
 - Fixup github ci [#80]
 - Error handling for CubeFactory and TicaCubeFactory [#85]
 - Cutout in threadpool [#84]
