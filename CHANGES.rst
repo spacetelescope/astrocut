@@ -1,8 +1,35 @@
-0.10 (unreleased)
-----------------
+0.10.1 (unreleased)
+-----------------
+
+
+0.10 (2023-10-23)
+-----------------
 
 - Improve file checking prior to cutout creation to avoid errors [#52]
-- Add remote cutout functionality (requires astropy 5.2 or above) [#76]
+- Fixing broken tests from GitHub Actions CI run [#56]
+- Fixing error resulting from forward slash in target name [#55]
+- MNT: Update codecov-action version to v2 [#53]
+- Make cubes out of TICA FFIs [#59]
+- Make cutouts out of TICA cubes [#60]
+- Fixed bug not catching duplicate ffis [#69]
+- max_memory arg added to update_cube [#71]
+- Hotfix for cube_cut checking for valid WCS info [#70]
+- Add remote cutout functionality [requires astropy 5.2 or above] [#76]
+- Fixup github ci [#80]
+- Error handling for CubeFactory and TicaCubeFactory [#85]
+- Cutout in threadpool [#84]
+- Documenting multithreading enhancement [#86]
+- Removing error array dimension from TicaCubeFactory [#87]
+- Adapting CutoutFactory to account for error-less TICA Cubes [#88]
+- Updating .readthedocs.yml with Python3.11 [#89]
+- Update cube and cutout unittests [#90]
+- Update docs to reflect changes in TICA cube format [#93]
+- Cloud functionality for astrocut.fits_cut() [#95]
+- Decommissioning update_cube for now [#100]
+- Use GitHub Actions for publishing new releases to PyPI [#97]
+- Updating deprecated license_file kwd [#103]
+- Updating syntax in README.rst [#104]
+- Updated README [#108]
 
 
 0.9 (2021-08-10)
