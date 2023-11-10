@@ -9,7 +9,6 @@ def get_center_pixel(file, ra, dec):
 
     # Get the roman 2D science image
     f = asdf.open(file)
-    data = f['roman']['data']
 
     # Get the WCS
     wcs = f['roman']['meta']['wcs']
