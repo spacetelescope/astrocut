@@ -42,10 +42,10 @@ def get_cutout(file, coords, wcs, size=20, outfile="example_roman_cutout.fits"):
     coordinates = coords
     cutout = astropy.nddata.Cutout2D(data, position=coordinates, wcs=wcs, size=(size, size))
 
-    astropy.io.fits.writeto(outfile, data=cutout.data.value, header=cutout.wcs.to_header(), overwrite=False)
+    astropy.io.fits.writeto(outfile, data=cutout.data.value, header=cutout.wcs.to_header(), overwrite=True)
 
 
-def asdf_cut(input_file, ra, dec, cutout_size):
+def asdf_cut(input_file, ra, dec, *, cutout_size=20, output_file="example_roman_cutout.fits"):
     """ Preliminary proof-of-concept functionality.
     Takes a single ASDF input file (``input_file``) and generates a cutout of designated size ``cutout_size``
     around the given coordinates (``coordinates``).
@@ -53,5 +53,5 @@ def asdf_cut(input_file, ra, dec, cutout_size):
 
     pixel_coordinates, wcs = get_center_pixel(input_file, ra, dec)
 
-    get_cutout(input_file, pixel_coordinates, wcs)
+    get_cutout(input_file, pixel_coordinates, wcs, size=cutout_size, outfile=output_file)
     
