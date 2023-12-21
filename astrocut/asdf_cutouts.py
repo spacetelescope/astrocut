@@ -14,12 +14,12 @@ def get_center_pixel(file, ra, dec):
 
         # Get the WCS header
         header = wcs.to_fits_sip()
-    
+
     # Update WCS header with some keywords that it's missing.
     # Otherwise, it won't work with astropy.wcs tools (TODO: Figure out why. What are these keywords for?)
     for k in ['cpdis1', 'cpdis2', 'det2im1', 'det2im2', 'sip']:
         header[k] = 'na'
-    
+
     # New WCS object with updated header
     wcs_updated = astropy.wcs.WCS(header)
 
@@ -33,13 +33,12 @@ def get_center_pixel(file, ra, dec):
 
 
 def get_cutout(file, coords, wcs, size=20, outfile="example_roman_cutout.fits"):
-    
+
     # Get the 2D science image
     with asdf.open(file) as f:
         data = f['roman']['data']
 
-        coordinates = coords
-        cutout = astropy.nddata.Cutout2D(data, position=coordinates, wcs=wcs, size=(size, size))
+        cutout = astropy.nddata.Cutout2D(data, position=coords, wcs=wcs, size=(size, size))
 
         astropy.io.fits.writeto(outfile, data=cutout.data.value, header=cutout.wcs.to_header(), overwrite=True)
 
@@ -53,4 +52,3 @@ def asdf_cut(input_file, ra, dec, *, cutout_size=20, output_file="example_roman_
     pixel_coordinates, wcs = get_center_pixel(input_file, ra, dec)
 
     get_cutout(input_file, pixel_coordinates, wcs, size=cutout_size, outfile=output_file)
-    
