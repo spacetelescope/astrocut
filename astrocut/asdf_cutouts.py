@@ -8,13 +8,12 @@ import astropy
 def get_center_pixel(file, ra, dec):
 
     # Get the roman 2D science image
-    f = asdf.open(file)
+    with asdf.open(file) as f:
+        # Get the WCS
+        wcs = f['roman']['meta']['wcs']
 
-    # Get the WCS
-    wcs = f['roman']['meta']['wcs']
-    
-    # Get the WCS header
-    header = wcs.to_fits_sip()
+        # Get the WCS header
+        header = wcs.to_fits_sip()
     
     # Update WCS header with some keywords that it's missing.
     # Otherwise, it won't work with astropy.wcs tools (TODO: Figure out why. What are these keywords for?)
