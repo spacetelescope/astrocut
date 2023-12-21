@@ -35,13 +35,13 @@ def get_center_pixel(file, ra, dec):
 def get_cutout(file, coords, wcs, size=20, outfile="example_roman_cutout.fits"):
     
     # Get the 2D science image
-    f = asdf.open(file)
-    data = f['roman']['data']
+    with asdf.open(file) as f:
+        data = f['roman']['data']
 
-    coordinates = coords
-    cutout = astropy.nddata.Cutout2D(data, position=coordinates, wcs=wcs, size=(size, size))
+        coordinates = coords
+        cutout = astropy.nddata.Cutout2D(data, position=coordinates, wcs=wcs, size=(size, size))
 
-    astropy.io.fits.writeto(outfile, data=cutout.data.value, header=cutout.wcs.to_header(), overwrite=True)
+        astropy.io.fits.writeto(outfile, data=cutout.data.value, header=cutout.wcs.to_header(), overwrite=True)
 
 
 def asdf_cut(input_file, ra, dec, *, cutout_size=20, output_file="example_roman_cutout.fits"):
