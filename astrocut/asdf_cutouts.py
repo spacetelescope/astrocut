@@ -5,7 +5,9 @@
 import asdf
 import astropy
 
+
 def get_center_pixel(file, ra, dec):
+    """ Get the center pixel from a roman 2d science image """
 
     # Get the roman 2D science image
     with asdf.open(file) as f:
@@ -33,6 +35,7 @@ def get_center_pixel(file, ra, dec):
 
 
 def get_cutout(file, coords, wcs, size=20, outfile="example_roman_cutout.fits"):
+    """ Get a roman image cutout """
 
     # Get the 2D science image
     with asdf.open(file) as f:
