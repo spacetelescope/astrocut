@@ -16,10 +16,10 @@ jobs:
       fail-fast: true
       matrix:
         include:
-          - name: Python 3.8 with minimal dependencies
+          - name: Python 3.9 with minimal dependencies
             os: ubuntu-latest
-            python: 3.8
-            toxenv: py38-test
+            python: 3.9
+            toxenv: py39-test
 
           - name: Python 3.9 with all optional dependencies
             os: ubuntu-latest
