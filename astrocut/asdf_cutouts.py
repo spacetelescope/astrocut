@@ -90,7 +90,8 @@ def get_cutout(data: asdf.tags.core.ndarray.NDArrayType, coords: Union[tuple, Sk
     astropy.io.fits.writeto(outfile, data=cutout.data, header=cutout.wcs.to_header(), overwrite=True)
 
 
-def asdf_cut(input_file: str, ra: float, dec: float, cutout_size: int = 20, output_file: str = "example_roman_cutout.fits"):
+def asdf_cut(input_file: str, ra: float, dec: float, cutout_size: int = 20,
+             output_file: str = "example_roman_cutout.fits"):
     """ Preliminary proof-of-concept functionality.
 
     Takes a single ASDF input file (``input_file``) and generates a cutout of designated size ``cutout_size``
