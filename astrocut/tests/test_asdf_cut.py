@@ -73,9 +73,12 @@ def make_file(tmp_path, fakedata):
     yield filename
 
 
-def test_get_center_pixel(make_file):
+def test_get_center_pixel(fakedata):
     """ test we can get the correct center pixel """
-    pixel_coordinates, wcs = get_center_pixel(make_file, 30., 45.)
+    # get the fake data
+    __, gwcs = fakedata
+
+    pixel_coordinates, wcs = get_center_pixel(gwcs, 30., 45.)
     assert np.allclose(pixel_coordinates, (np.array(50.), np.array(50.)))
     assert np.allclose(wcs.celestial.wcs.crval, np.array([30., 45.]))
 
@@ -90,16 +93,16 @@ def output_file(tmp_path):
     yield output_file
 
 
-def test_get_cutout(make_file, output_file, fakedata):
+def test_get_cutout(output_file, fakedata):
     """ test we can create a cutout """
 
     # get the input wcs
-    __, ww = fakedata
-    skycoord = ww(25, 25, with_units=True)
-    wcs = WCS(ww.to_fits_sip())
+    data, gwcs = fakedata
+    skycoord = gwcs(25, 25, with_units=True)
+    wcs = WCS(gwcs.to_fits_sip())
 
     # create cutout
-    get_cutout(make_file, skycoord, wcs, size=10, outfile=output_file)
+    get_cutout(data, skycoord, wcs, size=10, outfile=output_file)
 
     # test output
     with fits.open(output_file) as hdulist:
