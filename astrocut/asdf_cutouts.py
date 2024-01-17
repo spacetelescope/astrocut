@@ -86,8 +86,14 @@ def get_cutout(data: asdf.tags.core.ndarray.NDArrayType, coords: Union[tuple, Sk
     # create the cutout
     cutout = astropy.nddata.Cutout2D(data, position=coords, wcs=wcs, size=(size, size))
 
+    # check if the data is a quantity and get the array data
+    if isinstance(cutout.data, astropy.units.Quantity):
+        data = cutout.data.value
+    else:
+        data = cutout.data
+
     # write the cutout to the output file
-    astropy.io.fits.writeto(outfile, data=cutout.data, header=cutout.wcs.to_header(), overwrite=True)
+    astropy.io.fits.writeto(outfile, data=data, header=cutout.wcs.to_header(), overwrite=True)
 
 
 def asdf_cut(input_file: str, ra: float, dec: float, cutout_size: int = 20,
