@@ -1,4 +1,5 @@
 
+import pathlib
 import numpy as np
 import pytest
 
@@ -127,4 +128,15 @@ def test_asdf_cutout(make_file, output_file):
         data = hdulist[0].data
         assert data.shape == (10, 10)
         assert data[5, 5] == 2526
+
+
+def test_cutout_nofile(make_file, output_file):
+    """ test we can make a cutout with no file output """
+    # make cutout
+    ra, dec = (29.99901792, 44.99930555)
+    cutout = asdf_cut(make_file, ra, dec, cutout_size=10, output_file=output_file, write_file=False)
+
+    assert not pathlib.Path(output_file).exists()
+    assert cutout.shape == (10, 10)
+
 

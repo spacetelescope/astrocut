@@ -53,7 +53,8 @@ def get_center_pixel(gwcs: gwcs.wcs.WCS, ra: float, dec: float) -> tuple:
 
 
 def get_cutout(data: asdf.tags.core.ndarray.NDArrayType, coords: Union[tuple, SkyCoord],
-               wcs: astropy.wcs.wcs.WCS = None, size: int = 20, outfile: str = "example_roman_cutout.fits"):
+               wcs: astropy.wcs.wcs.WCS = None, size: int = 20, outfile: str = "example_roman_cutout.fits",
+               write_file: bool = True) -> astropy.nddata.Cutout2D:
     """ Get a Roman image cutout
 
     Cut out a square section from the input image data array.  The ``coords`` can either be a tuple of x, y
@@ -72,6 +73,13 @@ def get_cutout(data: asdf.tags.core.ndarray.NDArrayType, coords: Union[tuple, Sk
         the image cutout pizel size, by default 20
     outfile : str, optional
         the name of the output cutout file, by default "example_roman_cutout.fits"
+    write_file : bool, by default True
+        Flag to write the cutout to a file or not
+
+    Returns
+    -------
+    astropy.nddata.Cutout2D:
+        an image cutout object
 
     Raises
     ------
@@ -93,11 +101,15 @@ def get_cutout(data: asdf.tags.core.ndarray.NDArrayType, coords: Union[tuple, Sk
         data = cutout.data
 
     # write the cutout to the output file
-    astropy.io.fits.writeto(outfile, data=data, header=cutout.wcs.to_header(), overwrite=True)
+    if write_file:
+        astropy.io.fits.writeto(outfile, data=data, header=cutout.wcs.to_header(), overwrite=True)
+
+    return cutout
 
 
 def asdf_cut(input_file: str, ra: float, dec: float, cutout_size: int = 20,
-             output_file: str = "example_roman_cutout.fits"):
+             output_file: str = "example_roman_cutout.fits",
+             write_file: bool = True) -> astropy.nddata.Cutout2D:
     """ Preliminary proof-of-concept functionality.
 
     Takes a single ASDF input file (``input_file``) and generates a cutout of designated size ``cutout_size``
@@ -115,6 +127,13 @@ def asdf_cut(input_file: str, ra: float, dec: float, cutout_size: int = 20,
         the image cutout pixel size, by default 20
     output_file : str, optional
         the name of the output cutout file, by default "example_roman_cutout.fits"
+    write_file : bool, by default True
+        Flag to write the cutout to a file or not
+
+    Returns
+    -------
+    astropy.nddata.Cutout2D:
+        an image cutout object
     """
 
     # get the 2d image data
@@ -126,4 +145,5 @@ def asdf_cut(input_file: str, ra: float, dec: float, cutout_size: int = 20,
         pixel_coordinates, wcs = get_center_pixel(gwcs, ra, dec)
 
         # create the 2d image cutout
-        get_cutout(data, pixel_coordinates, wcs, size=cutout_size, outfile=output_file)
+        return get_cutout(data, pixel_coordinates, wcs, size=cutout_size, outfile=output_file,
+                          write_file=write_file)
