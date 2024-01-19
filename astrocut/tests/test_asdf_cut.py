@@ -1,4 +1,5 @@
 
+import pathlib
 import numpy as np
 import pytest
 
@@ -47,7 +48,7 @@ def fakedata():
     wcsobj.bounding_box = ((0, nx), (0, ny))
 
     # create the data
-    data = np.arange(size).reshape(nx, ny)
+    data = np.arange(size).reshape(nx, ny) * (u.electron / u.second)
 
     yield data, wcsobj
 
@@ -93,13 +94,18 @@ def output_file(tmp_path):
     yield output_file
 
 
-def test_get_cutout(output_file, fakedata):
+@pytest.mark.parametrize('quantity', [True, False], ids=['quantity', 'array'])
+def test_get_cutout(output_file, fakedata, quantity):
     """ test we can create a cutout """
 
     # get the input wcs
     data, gwcs = fakedata
     skycoord = gwcs(25, 25, with_units=True)
     wcs = WCS(gwcs.to_fits_sip())
+
+    # convert quanity data back to array
+    if not quantity:
+        data = data.value
 
     # create cutout
     get_cutout(data, skycoord, wcs, size=10, outfile=output_file)
@@ -122,4 +128,15 @@ def test_asdf_cutout(make_file, output_file):
         data = hdulist[0].data
         assert data.shape == (10, 10)
         assert data[5, 5] == 2526
+
+
+def test_cutout_nofile(make_file, output_file):
+    """ test we can make a cutout with no file output """
+    # make cutout
+    ra, dec = (29.99901792, 44.99930555)
+    cutout = asdf_cut(make_file, ra, dec, cutout_size=10, output_file=output_file, write_file=False)
+
+    assert not pathlib.Path(output_file).exists()
+    assert cutout.shape == (10, 10)
+
 
