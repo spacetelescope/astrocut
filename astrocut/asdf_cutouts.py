@@ -11,7 +11,7 @@ import numpy as np
 from astropy.coordinates import SkyCoord
 
 
-def get_center_pixel(gwcs: gwcs.wcs.WCS, ra: float, dec: float) -> tuple:
+def get_center_pixel(gwcsobj: gwcs.wcs.WCS, ra: float, dec: float) -> tuple:
     """ Get the center pixel from a roman 2d science image
 
     For an input RA, Dec sky coordinate, get the closest pixel location
@@ -19,7 +19,7 @@ def get_center_pixel(gwcs: gwcs.wcs.WCS, ra: float, dec: float) -> tuple:
 
     Parameters
     ----------
-    gwcs : gwcs.wcs.WCS
+    gwcsobj : gwcs.wcs.WCS
         the Roman GWCS object
     ra : float
         the input Right Ascension
@@ -33,7 +33,7 @@ def get_center_pixel(gwcs: gwcs.wcs.WCS, ra: float, dec: float) -> tuple:
     """
 
     # Convert the gwcs object to an astropy FITS WCS header
-    header = gwcs.to_fits_sip()
+    header = gwcsobj.to_fits_sip()
 
     # Update WCS header with some keywords that it's missing.
     # Otherwise, it won't work with astropy.wcs tools (TODO: Figure out why. What are these keywords for?)
@@ -48,14 +48,14 @@ def get_center_pixel(gwcs: gwcs.wcs.WCS, ra: float, dec: float) -> tuple:
     coordinates = SkyCoord(ra, dec, unit='deg')
 
     # Map the coordinates to a pixel's location on the Roman 2d array (row, col)
-    row, col = gwcs.invert(coordinates)
+    row, col = gwcsobj.invert(coordinates)
 
     return (row, col), wcs_updated
 
 
 def get_cutout(data: asdf.tags.core.ndarray.NDArrayType, coords: Union[tuple, SkyCoord],
                wcs: astropy.wcs.wcs.WCS = None, size: int = 20, outfile: str = "example_roman_cutout.fits",
-               write_file: bool = True, fill_value: int = np.nan) -> astropy.nddata.Cutout2D:
+               write_file: bool = True, fill_value: Union[int, float] = np.nan) -> astropy.nddata.Cutout2D:
     """ Get a Roman image cutout
 
     Cut out a square section from the input image data array.  The ``coords`` can either be a tuple of x, y
@@ -119,7 +119,7 @@ def get_cutout(data: asdf.tags.core.ndarray.NDArrayType, coords: Union[tuple, Sk
 
 def asdf_cut(input_file: str, ra: float, dec: float, cutout_size: int = 20,
              output_file: str = "example_roman_cutout.fits",
-             write_file: bool = True, fill_value: int = np.nan) -> astropy.nddata.Cutout2D:
+             write_file: bool = True, fill_value: Union[int, float] = np.nan) -> astropy.nddata.Cutout2D:
     """ Preliminary proof-of-concept functionality.
 
     Takes a single ASDF input file (``input_file``) and generates a cutout of designated size ``cutout_size``
@@ -151,10 +151,10 @@ def asdf_cut(input_file: str, ra: float, dec: float, cutout_size: int = 20,
     # get the 2d image data
     with asdf.open(input_file) as f:
         data = f['roman']['data']
-        gwcs = f['roman']['meta']['wcs']
+        gwcsobj = f['roman']['meta']['wcs']
 
         # get the center pixel
-        pixel_coordinates, wcs = get_center_pixel(gwcs, ra, dec)
+        pixel_coordinates, wcs = get_center_pixel(gwcsobj, ra, dec)
 
         # create the 2d image cutout
         return get_cutout(data, pixel_coordinates, wcs, size=cutout_size, outfile=output_file,
