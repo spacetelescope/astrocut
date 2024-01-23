@@ -51,7 +51,7 @@ def makefake():
         if zero:
             data = np.zeros([nx, ny])
         else:
-            size = nx *  ny
+            size = nx * ny
             data = np.arange(size).reshape(nx, ny)
 
         # make a quantity

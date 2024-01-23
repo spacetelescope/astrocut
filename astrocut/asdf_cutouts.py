@@ -101,7 +101,8 @@ def get_cutout(data: asdf.tags.core.ndarray.NDArrayType, coords: Union[tuple, Sk
         cutout = astropy.nddata.Cutout2D(data, position=coords, wcs=wcs, size=(size, size), mode='partial',
                                          fill_value=fill_value)
     except astropy.nddata.utils.NoOverlapError as e:
-        raise RuntimeError('Could not create 2d cutout.  The requested cutout does not overlap with the original image.') from e
+        raise RuntimeError('Could not create 2d cutout.  The requested cutout does not overlap with the '
+                           'original image.') from e
 
     # check if the data is a quantity and get the array data
     if isinstance(cutout.data, astropy.units.Quantity):
