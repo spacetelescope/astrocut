@@ -47,7 +47,7 @@ def get_center_pixel(gwcs: gwcs.wcs.WCS, ra: float, dec: float) -> tuple:
     coordinates = SkyCoord(ra, dec, unit='deg')
 
     # Map the coordinates to a pixel's location on the Roman 2d array (row, col)
-    row, col = astropy.wcs.utils.skycoord_to_pixel(coords=coordinates, wcs=wcs_updated)
+    row, col = gwcs.invert(coordinates)
 
     return (row, col), wcs_updated
 
@@ -85,6 +85,8 @@ def get_cutout(data: asdf.tags.core.ndarray.NDArrayType, coords: Union[tuple, Sk
     ------
     ValueError:
         when a wcs is not present when coords is a SkyCoord object
+    RuntimeError:
+        when the requested cutout does not overlap with the original image
     """
 
     # check for correct inputs
@@ -92,7 +94,10 @@ def get_cutout(data: asdf.tags.core.ndarray.NDArrayType, coords: Union[tuple, Sk
         raise ValueError('wcs must be input if coords is a SkyCoord.')
 
     # create the cutout
-    cutout = astropy.nddata.Cutout2D(data, position=coords, wcs=wcs, size=(size, size))
+    try:
+        cutout = astropy.nddata.Cutout2D(data, position=coords, wcs=wcs, size=(size, size), mode='partial')
+    except astropy.nddata.utils.NoOverlapError as e:
+        raise RuntimeError('Could not create 2d cutout.  The requested cutout does not overlap with the original image.') from e
 
     # check if the data is a quantity and get the array data
     if isinstance(cutout.data, astropy.units.Quantity):
