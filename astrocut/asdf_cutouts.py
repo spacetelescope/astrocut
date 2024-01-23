@@ -6,6 +6,7 @@ from typing import Union
 import asdf
 import astropy
 import gwcs
+import numpy as np
 
 from astropy.coordinates import SkyCoord
 
@@ -54,7 +55,7 @@ def get_center_pixel(gwcs: gwcs.wcs.WCS, ra: float, dec: float) -> tuple:
 
 def get_cutout(data: asdf.tags.core.ndarray.NDArrayType, coords: Union[tuple, SkyCoord],
                wcs: astropy.wcs.wcs.WCS = None, size: int = 20, outfile: str = "example_roman_cutout.fits",
-               write_file: bool = True) -> astropy.nddata.Cutout2D:
+               write_file: bool = True, fill_value: int = np.nan) -> astropy.nddata.Cutout2D:
     """ Get a Roman image cutout
 
     Cut out a square section from the input image data array.  The ``coords`` can either be a tuple of x, y
@@ -75,6 +76,8 @@ def get_cutout(data: asdf.tags.core.ndarray.NDArrayType, coords: Union[tuple, Sk
         the name of the output cutout file, by default "example_roman_cutout.fits"
     write_file : bool, by default True
         Flag to write the cutout to a file or not
+    fill_value: int, by default np.nan
+        The fill value for pixels outside the original image.
 
     Returns
     -------
@@ -95,7 +98,8 @@ def get_cutout(data: asdf.tags.core.ndarray.NDArrayType, coords: Union[tuple, Sk
 
     # create the cutout
     try:
-        cutout = astropy.nddata.Cutout2D(data, position=coords, wcs=wcs, size=(size, size), mode='partial')
+        cutout = astropy.nddata.Cutout2D(data, position=coords, wcs=wcs, size=(size, size), mode='partial',
+                                         fill_value=fill_value)
     except astropy.nddata.utils.NoOverlapError as e:
         raise RuntimeError('Could not create 2d cutout.  The requested cutout does not overlap with the original image.') from e
 
@@ -114,7 +118,7 @@ def get_cutout(data: asdf.tags.core.ndarray.NDArrayType, coords: Union[tuple, Sk
 
 def asdf_cut(input_file: str, ra: float, dec: float, cutout_size: int = 20,
              output_file: str = "example_roman_cutout.fits",
-             write_file: bool = True) -> astropy.nddata.Cutout2D:
+             write_file: bool = True, fill_value: int = np.nan) -> astropy.nddata.Cutout2D:
     """ Preliminary proof-of-concept functionality.
 
     Takes a single ASDF input file (``input_file``) and generates a cutout of designated size ``cutout_size``
@@ -134,6 +138,8 @@ def asdf_cut(input_file: str, ra: float, dec: float, cutout_size: int = 20,
         the name of the output cutout file, by default "example_roman_cutout.fits"
     write_file : bool, by default True
         Flag to write the cutout to a file or not
+    fill_value: int, by default np.nan
+        The fill value for pixels outside the original image.
 
     Returns
     -------
@@ -151,4 +157,4 @@ def asdf_cut(input_file: str, ra: float, dec: float, cutout_size: int = 20,
 
         # create the 2d image cutout
         return get_cutout(data, pixel_coordinates, wcs, size=cutout_size, outfile=output_file,
-                          write_file=write_file)
+                          write_file=write_file, fill_value=fill_value)

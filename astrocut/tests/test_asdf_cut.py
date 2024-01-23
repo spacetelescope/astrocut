@@ -42,7 +42,7 @@ def make_wcs(xsize, ysize, ra=30., dec=45.):
 def makefake():
     """ fixture factory to make a fake gwcs and dataset """
 
-    def _make_fake(nx, ny, ra, dec, zero=False):
+    def _make_fake(nx, ny, ra, dec, zero=False, asint=False):
         # create the wcs
         wcsobj = make_wcs(nx/2, ny/2, ra=ra, dec=dec)
         wcsobj.bounding_box = ((0, nx), (0, ny))
@@ -53,7 +53,13 @@ def makefake():
         else:
             size = nx *  ny
             data = np.arange(size).reshape(nx, ny)
+
+        # make a quantity
         data *= (u.electron / u.second)
+
+        # make integer array
+        if asint:
+            data = data.astype(int)
 
         return data, wcsobj
 
@@ -203,6 +209,32 @@ def assert_same_coord(x, y, cutout, wcs):
     ox, oy = cutout.to_original_position((x, y))
     orig_coord = pixel_to_skycoord(ox, oy, wcs)
     assert cutout_coord == orig_coord
+
+
+@pytest.mark.parametrize('asint, fill', [(False, None), (True, -9999)], ids=['fillfloat', 'fillint'])
+def test_partial_cutout(makefake, asint, fill):
+    """ test we get a partial cutout with nans or fill value """
+    ra, dec = 30.0, 45.0
+    data, gwcs = makefake(100, 100, ra, dec, asint=asint)
+
+    wcs = WCS(gwcs.to_fits_sip())
+    cc = coord.SkyCoord(29.999, 44.998, unit=u.degree)
+    cutout = get_cutout(data, cc, wcs, size=50, write_file=False, fill_value=fill)
+    assert cutout.shape == (50, 50)
+    if asint:
+        assert -9999 in cutout.data
+    else:
+        assert np.isnan(cutout.data).any()
+
+
+def test_bad_fill(makefake):
+    """ test error is raised on bad fill value """
+    ra, dec = 30.0, 45.0
+    data, gwcs = makefake(100, 100, ra, dec, asint=True)
+    wcs = WCS(gwcs.to_fits_sip())
+    cc = coord.SkyCoord(29.999, 44.998, unit=u.degree)
+    with pytest.raises(ValueError, match='fill_value is inconsistent with the data type of the input array'):
+        get_cutout(data, cc, wcs, size=50, write_file=False)
 
 
 
