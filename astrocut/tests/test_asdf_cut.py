@@ -9,6 +9,7 @@ from astropy import coordinates as coord
 from astropy import units as u
 from astropy.io import fits
 from astropy.wcs import WCS
+from astropy.wcs.utils import pixel_to_skycoord
 from gwcs import wcs
 from gwcs import coordinate_frames as cf
 from astrocut.asdf_cutouts import get_center_pixel, get_cutout, asdf_cut
@@ -19,38 +20,62 @@ def make_wcs(xsize, ysize, ra=30., dec=45.):
     # todo - refine this to better reflect roman wcs
 
     # create transformations
+    # - shift coords so array center is at 0, 0 ; reference pixel
+    # - scale pixels to correct angular scale
+    # - project coords onto sky with TAN projection
+    # - transform center pixel to the input celestial coordinate
     pixelshift = models.Shift(-xsize) & models.Shift(-ysize)
     pixelscale = models.Scale(0.1 / 3600.) & models.Scale(0.1 / 3600.)  # 0.1 arcsec/pixel
     tangent_projection = models.Pix2Sky_TAN()
     celestial_rotation = models.RotateNative2Celestial(ra, dec, 180.)
 
-    # transform pixels to sky
+    # net transforms pixels to sky
     det2sky = pixelshift | pixelscale | tangent_projection | celestial_rotation
 
     # define the wcs object
     detector_frame = cf.Frame2D(name="detector", axes_names=("x", "y"), unit=(u.pix, u.pix))
-    sky_frame = cf.CelestialFrame(reference_frame=coord.ICRS(), name='icrs', unit=(u.deg, u.deg))
+    sky_frame = cf.CelestialFrame(reference_frame=coord.ICRS(), name='world', unit=(u.deg, u.deg))
     return wcs.WCS([(detector_frame, det2sky), (sky_frame, None)])
 
 
 @pytest.fixture()
-def fakedata():
+def makefake():
+    """ fixture factory to make a fake gwcs and dataset """
+
+    def _make_fake(nx, ny, ra, dec, zero=False, asint=False):
+        # create the wcs
+        wcsobj = make_wcs(nx/2, ny/2, ra=ra, dec=dec)
+        wcsobj.bounding_box = ((0, nx), (0, ny))
+
+        # create the data
+        if zero:
+            data = np.zeros([nx, ny])
+        else:
+            size = nx * ny
+            data = np.arange(size).reshape(nx, ny)
+
+        # make a quantity
+        data *= (u.electron / u.second)
+
+        # make integer array
+        if asint:
+            data = data.astype(int)
+
+        return data, wcsobj
+
+    yield _make_fake
+
+
+@pytest.fixture()
+def fakedata(makefake):
     """ fixture to create fake data and wcs """
     # set up initial parameters
     nx = 100
     ny = 100
-    size = nx * ny
     ra = 30.
     dec = 45.
 
-    # create the wcs
-    wcsobj = make_wcs(nx/2, ny/2, ra=ra, dec=dec)
-    wcsobj.bounding_box = ((0, nx), (0, ny))
-
-    # create the data
-    data = np.arange(size).reshape(nx, ny) * (u.electron / u.second)
-
-    yield data, wcsobj
+    yield makefake(nx, ny, ra, dec)
 
 
 @pytest.fixture()
@@ -108,7 +133,9 @@ def test_get_cutout(output_file, fakedata, quantity):
         data = data.value
 
     # create cutout
-    get_cutout(data, skycoord, wcs, size=10, outfile=output_file)
+    cutout = get_cutout(data, skycoord, wcs, size=10, outfile=output_file)
+
+    assert_same_coord(5, 10, cutout, wcs)
 
     # test output
     with fits.open(output_file) as hdulist:
@@ -138,5 +165,78 @@ def test_cutout_nofile(make_file, output_file):
 
     assert not pathlib.Path(output_file).exists()
     assert cutout.shape == (10, 10)
+
+
+def test_cutout_poles(makefake):
+    """ test we can make cutouts around poles """
+    # make fake zero data around the pole
+    ra, dec = 315.0, 89.995
+    data, gwcs = makefake(1000, 1000, ra, dec, zero=True)
+
+    # add some values (5x5 array)
+    data.value[245:250, 245:250] = 1
+
+    # check central pixel is correct
+    ss = gwcs(500, 500)
+    assert ss == (ra, dec)
+
+    # set input cutout coord
+    cc = coord.SkyCoord(284.702, 89.986, unit=u.degree)
+    wcs = WCS(gwcs.to_fits_sip())
+
+    # get cutout
+    cutout = get_cutout(data, cc, wcs, size=50, write_file=False)
+    assert_same_coord(5, 10, cutout, wcs)
+
+    # check cutout contains all data
+    assert len(np.where(cutout.data.value == 1)[0]) == 25
+
+
+def test_fail_cutout_outside(fakedata):
+    """ test we fail when cutout completely outside range """
+    data, gwcs = fakedata
+    wcs = WCS(gwcs.to_fits_sip())
+    cc = coord.SkyCoord(200.0, 50.0, unit=u.degree)
+
+    with pytest.raises(RuntimeError, match='Could not create 2d cutout.  The requested '
+                       'cutout does not overlap with the original image'):
+        get_cutout(data, cc, wcs, size=50, write_file=False)
+
+
+def assert_same_coord(x, y, cutout, wcs):
+    """ assert we get the same sky coordinate from cutout and original wcs """
+    cutout_coord = pixel_to_skycoord(x, y, cutout.wcs)
+    ox, oy = cutout.to_original_position((x, y))
+    orig_coord = pixel_to_skycoord(ox, oy, wcs)
+    assert cutout_coord == orig_coord
+
+
+@pytest.mark.parametrize('asint, fill', [(False, None), (True, -9999)], ids=['fillfloat', 'fillint'])
+def test_partial_cutout(makefake, asint, fill):
+    """ test we get a partial cutout with nans or fill value """
+    ra, dec = 30.0, 45.0
+    data, gwcs = makefake(100, 100, ra, dec, asint=asint)
+
+    wcs = WCS(gwcs.to_fits_sip())
+    cc = coord.SkyCoord(29.999, 44.998, unit=u.degree)
+    cutout = get_cutout(data, cc, wcs, size=50, write_file=False, fill_value=fill)
+    assert cutout.shape == (50, 50)
+    if asint:
+        assert -9999 in cutout.data
+    else:
+        assert np.isnan(cutout.data).any()
+
+
+def test_bad_fill(makefake):
+    """ test error is raised on bad fill value """
+    ra, dec = 30.0, 45.0
+    data, gwcs = makefake(100, 100, ra, dec, asint=True)
+    wcs = WCS(gwcs.to_fits_sip())
+    cc = coord.SkyCoord(29.999, 44.998, unit=u.degree)
+    with pytest.raises(ValueError, match='fill_value is inconsistent with the data type of the input array'):
+        get_cutout(data, cc, wcs, size=50, write_file=False)
+
+
+
 
 
