@@ -76,7 +76,7 @@ def get_cutout(data: asdf.tags.core.ndarray.NDArrayType, coords: Union[tuple, Sk
         the name of the output cutout file, by default "example_roman_cutout.fits"
     write_file : bool, by default True
         Flag to write the cutout to a file or not
-    fill_value: int, by default np.nan
+    fill_value: int | float, by default np.nan
         The fill value for pixels outside the original image.
 
     Returns
@@ -139,7 +139,7 @@ def asdf_cut(input_file: str, ra: float, dec: float, cutout_size: int = 20,
         the name of the output cutout file, by default "example_roman_cutout.fits"
     write_file : bool, by default True
         Flag to write the cutout to a file or not
-    fill_value: int, by default np.nan
+    fill_value: int | float, by default np.nan
         The fill value for pixels outside the original image.
 
     Returns
