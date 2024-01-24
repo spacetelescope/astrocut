@@ -27,7 +27,7 @@ def make_wcs(xsize, ysize, ra=30., dec=45.):
     pixelshift = models.Shift(-xsize) & models.Shift(-ysize)
     pixelscale = models.Scale(0.1 / 3600.) & models.Scale(0.1 / 3600.)  # 0.1 arcsec/pixel
     tangent_projection = models.Pix2Sky_TAN()
-    celestial_rotation = models.RotateNative2Celestial(ra, dec, 180.)  #
+    celestial_rotation = models.RotateNative2Celestial(ra, dec, 180.)
 
     # net transforms pixels to sky
     det2sky = pixelshift | pixelscale | tangent_projection | celestial_rotation
