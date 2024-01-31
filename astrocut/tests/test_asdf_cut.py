@@ -237,6 +237,26 @@ def test_bad_fill(makefake):
         get_cutout(data, cc, wcs, size=50, write_file=False)
 
 
+def test_cutout_raedge(makefake):
+    """ test we can make cutouts around ra=0 """
+    # make fake zero data around the ra edge
+    ra, dec = 0.0, 10.0
+    data, gg = makefake(2000, 2000, ra, dec, zero=True)
 
+    # check central pixel is correct
+    ss = gg(1001, 1001)
+    assert pytest.approx(ss, abs=1e-3) == (ra, dec)
 
+    # set input cutout coord
+    cc = coord.SkyCoord(0.001, 9.999, unit=u.degree)
+    wcs = WCS(gg.to_fits_sip())
+
+    # get cutout
+    cutout = get_cutout(data, cc, wcs, size=100, write_file=False)
+    assert_same_coord(5, 10, cutout, wcs)
+
+    # assert the RA cutout bounds are > 359 and < 0
+    bounds = gg(*cutout.bbox_original, with_units=True)
+    assert bounds[0].ra.value > 359
+    assert bounds[1].ra.value < 0.1
 
