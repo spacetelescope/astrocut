@@ -1,6 +1,7 @@
 # Licensed under a 3-clause BSD style license - see LICENSE.rst
 
 """This module implements cutout functionality similar to fitscut, but for the ASDF file format."""
+import pathlib
 from typing import Union
 
 import asdf
@@ -112,9 +113,36 @@ def get_cutout(data: asdf.tags.core.ndarray.NDArrayType, coords: Union[tuple, Sk
 
     # write the cutout to the output file
     if write_file:
-        astropy.io.fits.writeto(outfile, data=data, header=cutout.wcs.to_header(), overwrite=True)
+        # check the output file type
+        out = pathlib.Path(outfile)
+        write_as = out.suffix or '.fits'
+        outfile = outfile if out.suffix else str(out) + write_as
+
+        # write out the file
+        if write_as == '.fits':
+            _write_fits(cutout, outfile)
+        elif write_as == '.asdf':
+            _write_asdf(cutout, outfile)
 
     return cutout
+
+
+def _write_fits(cutout, outfile="example_roman_cutout.fits"):
+    # check if the data is a quantity and get the array data
+    if isinstance(cutout.data, astropy.units.Quantity):
+        data = cutout.data.value
+    else:
+        data = cutout.data
+
+    astropy.io.fits.writeto(outfile, data=data, header=cutout.wcs.to_header(relax=True), overwrite=True)
+
+
+def _write_asdf(cutout, outfile="example_roman_cutout.asdf"):
+    tree = {'roman': {'meta': {'wcs': dict(cutout.wcs.to_header(relax=True))}, 'data': cutout.data}}
+    af = asdf.AsdfFile(tree)
+
+    # Write the data to a new file
+    af.write_to(outfile)
 
 
 def asdf_cut(input_file: str, ra: float, dec: float, cutout_size: int = 20,

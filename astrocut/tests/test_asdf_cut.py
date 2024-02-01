@@ -110,18 +110,21 @@ def test_get_center_pixel(fakedata):
 
 
 @pytest.fixture()
-def output_file(tmp_path):
+def output(tmp_path):
     """ fixture to create the output path """
-    # create output fits path
-    out = tmp_path / "roman"
-    out.mkdir(exist_ok=True, parents=True)
-    output_file = out / "test_output_cutout.fits"
-    yield output_file
+    def _output_file(ext='fits'):
+        # create output fits path
+        out = tmp_path / "roman"
+        out.mkdir(exist_ok=True, parents=True)
+        output_file = out / f"test_output_cutout.{ext}" if ext else "test_output_cutout"
+        return output_file
+    yield _output_file
 
 
 @pytest.mark.parametrize('quantity', [True, False], ids=['quantity', 'array'])
-def test_get_cutout(output_file, fakedata, quantity):
+def test_get_cutout(output, fakedata, quantity):
     """ test we can create a cutout """
+    output_file = output('fits')
 
     # get the input wcs
     data, gwcs = fakedata
@@ -144,8 +147,9 @@ def test_get_cutout(output_file, fakedata, quantity):
         assert data[5, 5] == 2525
 
 
-def test_asdf_cutout(make_file, output_file):
+def test_asdf_cutout(make_file, output):
     """ test we can make a cutout """
+    output_file = output('fits')
     # make cutout
     ra, dec = (29.99901792, 44.99930555)
     asdf_cut(make_file, ra, dec, cutout_size=10, output_file=output_file)
@@ -157,8 +161,25 @@ def test_asdf_cutout(make_file, output_file):
         assert data[5, 5] == 2526
 
 
-def test_cutout_nofile(make_file, output_file):
+@pytest.mark.parametrize('suffix', ['fits', 'asdf', None])
+def test_write_file(make_file, suffix, output):
+    """ test we can write an different file types """
+    output_file = output(suffix)
+
+    # make cutout
+    ra, dec = (29.99901792, 44.99930555)
+    asdf_cut(make_file, ra, dec, cutout_size=10, output_file=output_file)
+
+    # if no suffix provided, check that the default output is fits
+    if not suffix:
+        output_file += ".fits"
+
+    assert pathlib.Path(output_file).exists()
+
+
+def test_cutout_nofile(make_file, output):
     """ test we can make a cutout with no file output """
+    output_file = output()
     # make cutout
     ra, dec = (29.99901792, 44.99930555)
     cutout = asdf_cut(make_file, ra, dec, cutout_size=10, output_file=output_file, write_file=False)
