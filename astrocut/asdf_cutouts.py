@@ -209,7 +209,7 @@ def _write_asdf(cutout: astropy.nddata.Cutout2D, gwcsobj: gwcs.wcs.WCS, outfile:
     sliced_gwcs = _slice_gwcs(gwcsobj, cutout.slices_original)
 
     # create the asdf tree
-    tree = {'roman': {'meta': {'wcs': sliced_gwcs, 'data': cutout.data}}}
+    tree = {'roman': {'meta': {'wcs': sliced_gwcs}, 'data': cutout.data}}
     af = asdf.AsdfFile(tree)
 
     # Write the data to a new file
