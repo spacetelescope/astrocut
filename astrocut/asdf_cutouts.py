@@ -1,7 +1,9 @@
 # Licensed under a 3-clause BSD style license - see LICENSE.rst
 
 """This module implements cutout functionality similar to fitscut, but for the ASDF file format."""
-from typing import Union
+import copy
+import pathlib
+from typing import Union, Tuple
 
 import asdf
 import astropy
@@ -9,6 +11,7 @@ import gwcs
 import numpy as np
 
 from astropy.coordinates import SkyCoord
+from astropy.modeling import models
 
 
 def get_center_pixel(gwcsobj: gwcs.wcs.WCS, ra: float, dec: float) -> tuple:
@@ -55,7 +58,8 @@ def get_center_pixel(gwcsobj: gwcs.wcs.WCS, ra: float, dec: float) -> tuple:
 
 def get_cutout(data: asdf.tags.core.ndarray.NDArrayType, coords: Union[tuple, SkyCoord],
                wcs: astropy.wcs.wcs.WCS = None, size: int = 20, outfile: str = "example_roman_cutout.fits",
-               write_file: bool = True, fill_value: Union[int, float] = np.nan) -> astropy.nddata.Cutout2D:
+               write_file: bool = True, fill_value: Union[int, float] = np.nan,
+               gwcsobj: gwcs.wcs.WCS = None) -> astropy.nddata.Cutout2D:
     """ Get a Roman image cutout
 
     Cut out a square section from the input image data array.  The ``coords`` can either be a tuple of x, y
@@ -78,6 +82,8 @@ def get_cutout(data: asdf.tags.core.ndarray.NDArrayType, coords: Union[tuple, Sk
         Flag to write the cutout to a file or not
     fill_value: int | float, by default np.nan
         The fill value for pixels outside the original image.
+    gwcsobj : gwcs.wcs.WCS, Optional
+        the original gwcs object for the full image, needed only when writing cutout as asdf file
 
     Returns
     -------
@@ -90,6 +96,8 @@ def get_cutout(data: asdf.tags.core.ndarray.NDArrayType, coords: Union[tuple, Sk
         when a wcs is not present when coords is a SkyCoord object
     RuntimeError:
         when the requested cutout does not overlap with the original image
+    ValueError:
+        when no gwcs object is provided when writing to an asdf file
     """
 
     # check for correct inputs
@@ -112,9 +120,100 @@ def get_cutout(data: asdf.tags.core.ndarray.NDArrayType, coords: Union[tuple, Sk
 
     # write the cutout to the output file
     if write_file:
-        astropy.io.fits.writeto(outfile, data=data, header=cutout.wcs.to_header(), overwrite=True)
+        # check the output file type
+        out = pathlib.Path(outfile)
+        write_as = out.suffix or '.fits'
+        outfile = outfile if out.suffix else str(out) + write_as
+
+        # write out the file
+        if write_as == '.fits':
+            _write_fits(cutout, outfile)
+        elif write_as == '.asdf':
+            if not gwcsobj:
+                raise ValueError('The original gwcs object is needed when writing to asdf file.')
+            _write_asdf(cutout, gwcsobj, outfile)
 
     return cutout
+
+
+def _write_fits(cutout: astropy.nddata.Cutout2D, outfile: str = "example_roman_cutout.fits"):
+    """ Write cutout as FITS file
+
+    Parameters
+    ----------
+    cutout : astropy.nddata.Cutout2D
+        the 2d cutout
+    outfile : str, optional
+        the name of the output cutout file, by default "example_roman_cutout.fits"
+    """
+    # check if the data is a quantity and get the array data
+    if isinstance(cutout.data, astropy.units.Quantity):
+        data = cutout.data.value
+    else:
+        data = cutout.data
+
+    astropy.io.fits.writeto(outfile, data=data, header=cutout.wcs.to_header(relax=True), overwrite=True)
+
+
+def _slice_gwcs(gwcsobj: gwcs.wcs.WCS, slices: Tuple[slice, slice]) -> gwcs.wcs.WCS:
+    """ Slice the original gwcs object
+
+    "Slices" the original gwcs object down to the cutout shape.  This is a hack
+    until proper gwcs slicing is in place a la fits WCS slicing.  The ``slices``
+    keyword input is a tuple with the x, y cutout boundaries in the original image
+    array, e.g. ``cutout.slices_original``.  Astropy Cutout2D slices are in the form
+    ((ymin, ymax, None), (xmin, xmax, None))
+
+    Parameters
+    ----------
+    gwcsobj : gwcs.wcs.WCS
+        the original gwcs from the input image
+    slices : Tuple[slice, slice]
+        the cutout x, y slices as ((ymin, ymax), (xmin, xmax))
+
+    Returns
+    -------
+    gwcs.wcs.WCS
+        The sliced gwcs object
+    """
+    tmp = copy.deepcopy(gwcsobj)
+
+    # get the cutout array bounds and create a new shift transform to the cutout
+    # add the new transform to the gwcs
+    xmin, xmax = slices[1].start, slices[1].stop
+    ymin, ymax = slices[0].start, slices[0].stop
+    shape = (ymax - ymin, xmax - xmin)
+    offsets = models.Shift(xmin, name='cutout_offset1') & models.Shift(ymin, name='cutout_offset2')
+    tmp.insert_transform('detector', offsets, after=True)
+
+    # modify the gwcs bounding box to the cutout shape
+    tmp.bounding_box = ((0, shape[0] - 1), (0, shape[1] - 1))
+    tmp.pixel_shape = shape[::-1]
+    tmp.array_shape = shape
+    return tmp
+
+
+def _write_asdf(cutout: astropy.nddata.Cutout2D, gwcsobj: gwcs.wcs.WCS, outfile: str = "example_roman_cutout.asdf"):
+    """ Write cutout as ASDF file
+
+    Parameters
+    ----------
+    cutout : astropy.nddata.Cutout2D
+        the 2d cutout
+    gwcsobj : gwcs.wcs.WCS
+        the original gwcs object for the full image
+    outfile : str, optional
+        the name of the output cutout file, by default "example_roman_cutout.asdf"
+    """
+    # slice the origial gwcs to the cutout
+    sliced_gwcs = _slice_gwcs(gwcsobj, cutout.slices_original)
+
+    # create the asdf tree
+    tree = {'roman': {'meta': {'wcs': sliced_gwcs}, 'data': cutout.data}}
+    af = asdf.AsdfFile(tree)
+
+    # Write the data to a new file
+    af.write_to(outfile)
 
 
 def asdf_cut(input_file: str, ra: float, dec: float, cutout_size: int = 20,
@@ -158,4 +257,4 @@ def asdf_cut(input_file: str, ra: float, dec: float, cutout_size: int = 20,
 
         # create the 2d image cutout
         return get_cutout(data, pixel_coordinates, wcs, size=cutout_size, outfile=output_file,
-                          write_file=write_file, fill_value=fill_value)
+                          write_file=write_file, fill_value=fill_value, gwcsobj=gwcsobj)

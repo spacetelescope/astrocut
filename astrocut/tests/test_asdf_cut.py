@@ -12,7 +12,7 @@ from astropy.wcs import WCS
 from astropy.wcs.utils import pixel_to_skycoord
 from gwcs import wcs
 from gwcs import coordinate_frames as cf
-from astrocut.asdf_cutouts import get_center_pixel, get_cutout, asdf_cut
+from astrocut.asdf_cutouts import get_center_pixel, get_cutout, asdf_cut, _slice_gwcs
 
 
 def make_wcs(xsize, ysize, ra=30., dec=45.):
@@ -70,8 +70,8 @@ def makefake():
 def fakedata(makefake):
     """ fixture to create fake data and wcs """
     # set up initial parameters
-    nx = 100
-    ny = 100
+    nx = 1000
+    ny = 1000
     ra = 30.
     dec = 45.
 
@@ -105,23 +105,26 @@ def test_get_center_pixel(fakedata):
     __, gwcs = fakedata
 
     pixel_coordinates, wcs = get_center_pixel(gwcs, 30., 45.)
-    assert np.allclose(pixel_coordinates, (np.array(50.), np.array(50.)))
+    assert np.allclose(pixel_coordinates, (np.array(500.), np.array(500.)))
     assert np.allclose(wcs.celestial.wcs.crval, np.array([30., 45.]))
 
 
 @pytest.fixture()
-def output_file(tmp_path):
+def output(tmp_path):
     """ fixture to create the output path """
-    # create output fits path
-    out = tmp_path / "roman"
-    out.mkdir(exist_ok=True, parents=True)
-    output_file = out / "test_output_cutout.fits"
-    yield output_file
+    def _output_file(ext='fits'):
+        # create output fits path
+        out = tmp_path / "roman"
+        out.mkdir(exist_ok=True, parents=True)
+        output_file = out / f"test_output_cutout.{ext}" if ext else "test_output_cutout"
+        return output_file
+    yield _output_file
 
 
 @pytest.mark.parametrize('quantity', [True, False], ids=['quantity', 'array'])
-def test_get_cutout(output_file, fakedata, quantity):
+def test_get_cutout(output, fakedata, quantity):
     """ test we can create a cutout """
+    output_file = output('fits')
 
     # get the input wcs
     data, gwcs = fakedata
@@ -141,11 +144,12 @@ def test_get_cutout(output_file, fakedata, quantity):
     with fits.open(output_file) as hdulist:
         data = hdulist[0].data
         assert data.shape == (10, 10)
-        assert data[5, 5] == 2525
+        assert data[5, 5] == 25025
 
 
-def test_asdf_cutout(make_file, output_file):
+def test_asdf_cutout(make_file, output):
     """ test we can make a cutout """
+    output_file = output('fits')
     # make cutout
     ra, dec = (29.99901792, 44.99930555)
     asdf_cut(make_file, ra, dec, cutout_size=10, output_file=output_file)
@@ -154,11 +158,38 @@ def test_asdf_cutout(make_file, output_file):
     with fits.open(output_file) as hdulist:
         data = hdulist[0].data
         assert data.shape == (10, 10)
-        assert data[5, 5] == 2526
+        assert data[5, 5] == 475476
 
 
-def test_cutout_nofile(make_file, output_file):
+@pytest.mark.parametrize('suffix', ['fits', 'asdf', None])
+def test_write_file(make_file, suffix, output):
+    """ test we can write an different file types """
+    output_file = output(suffix)
+
+    # make cutout
+    ra, dec = (29.99901792, 44.99930555)
+    asdf_cut(make_file, ra, dec, cutout_size=10, output_file=output_file)
+
+    # if no suffix provided, check that the default output is fits
+    if not suffix:
+        output_file += ".fits"
+
+    assert pathlib.Path(output_file).exists()
+
+
+def test_fail_write_asdf(fakedata, output):
+    """ test we fail to write an asdf if no gwcs given """
+    with pytest.raises(ValueError, match='The original gwcs object is needed when writing to asdf file.'):
+        output_file = output('asdf')
+        data, gwcs = fakedata
+        skycoord = gwcs(25, 25, with_units=True)
+        wcs = WCS(gwcs.to_fits_sip())
+        get_cutout(data, skycoord, wcs, size=10, outfile=output_file)
+
+
+def test_cutout_nofile(make_file, output):
     """ test we can make a cutout with no file output """
+    output_file = output()
     # make cutout
     ra, dec = (29.99901792, 44.99930555)
     cutout = asdf_cut(make_file, ra, dec, cutout_size=10, output_file=output_file, write_file=False)
@@ -237,6 +268,47 @@ def test_bad_fill(makefake):
         get_cutout(data, cc, wcs, size=50, write_file=False)
 
 
+def test_cutout_raedge(makefake):
+    """ test we can make cutouts around ra=0 """
+    # make fake zero data around the ra edge
+    ra, dec = 0.0, 10.0
+    data, gg = makefake(2000, 2000, ra, dec, zero=True)
+
+    # check central pixel is correct
+    ss = gg(1001, 1001)
+    assert pytest.approx(ss, abs=1e-3) == (ra, dec)
+
+    # set input cutout coord
+    cc = coord.SkyCoord(0.001, 9.999, unit=u.degree)
+    wcs = WCS(gg.to_fits_sip())
+
+    # get cutout
+    cutout = get_cutout(data, cc, wcs, size=100, write_file=False)
+    assert_same_coord(5, 10, cutout, wcs)
+
+    # assert the RA cutout bounds are > 359 and < 0
+    bounds = gg(*cutout.bbox_original, with_units=True)
+    assert bounds[0].ra.value > 359
+    assert bounds[1].ra.value < 0.1
 
 
+def test_slice_gwcs(fakedata):
+    """ test we can slice a gwcs object """
+    data, gwcsobj = fakedata
+    skycoord = gwcsobj(250, 250)
+    wcs = WCS(gwcsobj.to_fits_sip())
+
+    cutout = get_cutout(data, skycoord, wcs, size=50, write_file=False)
+
+    sliced = _slice_gwcs(gwcsobj, cutout.slices_original)
+
+    # check coords between slice and original gwcs
+    assert cutout.center_cutout == (24.5, 24.5)
+    assert sliced.array_shape == (50, 50)
+    assert sliced(*cutout.input_position_cutout) == gwcsobj(*cutout.input_position_original)
+    assert gwcsobj(*cutout.center_original) == sliced(*cutout.center_cutout)
+
+    # assert same sky footprint between slice and original
+    # gwcs footprint/bounding_box expects ((x0, x1), (y0, y1)) but cutout.bbox is in ((y0, y1), (x0, x1))
+    assert (gwcsobj.footprint(bounding_box=tuple(reversed(cutout.bbox_original))) == sliced.footprint()).all()
 
