@@ -9,6 +9,7 @@ import asdf
 import astropy
 import gwcs
 import numpy as np
+import s3fs
 
 from astropy.coordinates import SkyCoord
 from astropy.modeling import models
@@ -247,8 +248,15 @@ def asdf_cut(input_file: str, ra: float, dec: float, cutout_size: int = 20,
         an image cutout object
     """
 
+    # if file comes from AWS cloud bucket, get URL
+    file = input_file
+    if input_file.startswith('s3://'):
+        fs = s3fs.S3FileSystem()
+        with fs.open(input_file, 'rb') as f:
+            file = f.url()
+
     # get the 2d image data
-    with asdf.open(input_file) as f:
+    with asdf.open(file) as f:
         data = f['roman']['data']
         gwcsobj = f['roman']['meta']['wcs']
 
