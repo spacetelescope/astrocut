@@ -332,3 +332,4 @@ def test_get_cloud_http(mock_s3fs):
     mock_s3fs.assert_called_once_with(anon=True)
     mock_fs.open.assert_called_once_with(s3_uri, 'rb')
     mock_file.url.assert_called_once()
+    
