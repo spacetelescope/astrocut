@@ -38,14 +38,14 @@ def test_make_cube(tmpdir):
         ecube[:, :, i, 0] = -plane
         ecube[:, :, i, 1] = plane
         plane += img_sz*img_sz
-    assert np.alltrue(cube == ecube), "Cube values do not match expected values"
+    assert np.all(cube == ecube), "Cube values do not match expected values"
     
     tab = Table(hdu[2].data)
-    assert np.alltrue(tab['TSTART'] == np.arange(num_im)), "TSTART mismatch in table"
-    assert np.alltrue(tab['TSTOP'] == np.arange(num_im)+1), "TSTOP mismatch in table"
+    assert np.all(tab['TSTART'] == np.arange(num_im)), "TSTART mismatch in table"
+    assert np.all(tab['TSTOP'] == np.arange(num_im)+1), "TSTOP mismatch in table"
 
     filenames = np.array([path.split(x)[1] for x in ffi_files])
-    assert np.alltrue(tab['FFI_FILE'] == np.array(filenames)), "FFI_FILE mismatch in table"
+    assert np.all(tab['FFI_FILE'] == np.array(filenames)), "FFI_FILE mismatch in table"
 
     hdu.close()
     
@@ -86,7 +86,7 @@ def test_make_and_update_cube(tmpdir):
         # ecube[:, :, i, 1] = plane
         plane += img_sz*img_sz
 
-    assert np.alltrue(cube == ecube), "Cube values do not match expected values"
+    assert np.all(cube == ecube), "Cube values do not match expected values"
 
     hdu.close()
 
@@ -110,14 +110,14 @@ def test_make_and_update_cube(tmpdir):
         # ecube[:, :, i, 1] = plane
         plane += img_sz*img_sz
 
-    assert np.alltrue(cube == ecube), "Cube values do not match expected values"
+    assert np.all(cube == ecube), "Cube values do not match expected values"
 
     tab = Table(hdu[2].data)
-    assert np.alltrue(tab['STARTTJD'] == np.arange(num_im)), "STARTTJD mismatch in table"
-    assert np.alltrue(tab['ENDTJD'] == np.arange(num_im)+1), "ENDTJD mismatch in table"
+    assert np.all(tab['STARTTJD'] == np.arange(num_im)), "STARTTJD mismatch in table"
+    assert np.all(tab['ENDTJD'] == np.arange(num_im)+1), "ENDTJD mismatch in table"
 
     filenames = np.array([path.split(x)[1] for x in ffi_files])
-    assert np.alltrue(tab['FFI_FILE'] == np.array(filenames)), "FFI_FILE mismatch in table"
+    assert np.all(tab['FFI_FILE'] == np.array(filenames)), "FFI_FILE mismatch in table"
 
     hdu.close()
 
@@ -156,7 +156,7 @@ def test_iteration(tmpdir, capsys):
     cube_2 = hdu_2[1].data
 
     assert cube_1.shape == cube_2.shape, "Mismatch between cube shape for 1 vs 2 iterations"
-    assert np.alltrue(cube_1 == cube_2), "Cubes made in 1 vs 2 iterations do not match"
+    assert np.all(cube_1 == cube_2), "Cubes made in 1 vs 2 iterations do not match"
 
     # expected values for cube
     ecube = np.zeros((img_sz, img_sz, num_im, 2))
@@ -168,7 +168,7 @@ def test_iteration(tmpdir, capsys):
         ecube[:, :, i, 1] = plane
         plane += img_sz*img_sz
 
-    assert np.alltrue(cube_1 == ecube), "Cube values do not match expected values"
+    assert np.all(cube_1 == ecube), "Cube values do not match expected values"
 
 
 @pytest.mark.parametrize("ffi_type", ["TICA", "SPOC"])
