@@ -1,5 +1,6 @@
 
 import pathlib
+from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
@@ -12,7 +13,7 @@ from astropy.wcs import WCS
 from astropy.wcs.utils import pixel_to_skycoord
 from gwcs import wcs
 from gwcs import coordinate_frames as cf
-from astrocut.asdf_cutouts import get_center_pixel, get_cutout, asdf_cut, _slice_gwcs
+from astrocut.asdf_cutouts import get_center_pixel, get_cutout, asdf_cut, _slice_gwcs, _get_cloud_http
 
 
 def make_wcs(xsize, ysize, ra=30., dec=45.):
@@ -99,16 +100,6 @@ def make_file(tmp_path, fakedata):
     yield filename
 
 
-def test_get_center_pixel(fakedata):
-    """ test we can get the correct center pixel """
-    # get the fake data
-    __, gwcs = fakedata
-
-    pixel_coordinates, wcs = get_center_pixel(gwcs, 30., 45.)
-    assert np.allclose(pixel_coordinates, (np.array(500.), np.array(500.)))
-    assert np.allclose(wcs.celestial.wcs.crval, np.array([30., 45.]))
-
-
 @pytest.fixture()
 def output(tmp_path):
     """ fixture to create the output path """
@@ -119,6 +110,16 @@ def output(tmp_path):
         output_file = out / f"test_output_cutout.{ext}" if ext else "test_output_cutout"
         return output_file
     yield _output_file
+
+
+def test_get_center_pixel(fakedata):
+    """ test we can get the correct center pixel """
+    # get the fake data
+    __, gwcs = fakedata
+
+    pixel_coordinates, wcs = get_center_pixel(gwcs, 30., 45.)
+    assert np.allclose(pixel_coordinates, (np.array(500.), np.array(500.)))
+    assert np.allclose(wcs.celestial.wcs.crval, np.array([30., 45.]))
 
 
 @pytest.mark.parametrize('quantity', [True, False], ids=['quantity', 'array'])
@@ -312,3 +313,22 @@ def test_slice_gwcs(fakedata):
     # gwcs footprint/bounding_box expects ((x0, x1), (y0, y1)) but cutout.bbox is in ((y0, y1), (x0, x1))
     assert (gwcsobj.footprint(bounding_box=tuple(reversed(cutout.bbox_original))) == sliced.footprint()).all()
 
+
+@patch('s3fs.S3FileSystem')
+def test_get_cloud_http(mock_s3fs):
+    """ test we can get HTTP URI of cloud resource """
+    # mock s3 file system operations
+    HTTP_URI = "http_test"
+    mock_file = MagicMock()
+    mock_fs = MagicMock()
+    mock_file.url.return_value = HTTP_URI
+    mock_fs.open.return_value.__enter__.return_value = mock_file
+    mock_s3fs.return_value = mock_fs
+
+    s3_uri = "s3://test_bucket/test_file.asdf"
+    http_uri = _get_cloud_http(s3_uri)
+
+    assert http_uri == HTTP_URI
+    mock_s3fs.assert_called_once_with(anon=True)
+    mock_fs.open.assert_called_once_with(s3_uri, 'rb')
+    mock_file.url.assert_called_once()

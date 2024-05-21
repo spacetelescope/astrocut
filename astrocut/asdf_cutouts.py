@@ -15,6 +15,22 @@ from astropy.coordinates import SkyCoord
 from astropy.modeling import models
 
 
+def _get_cloud_http(s3_uri: str) -> str:
+    """ Get the HTTP URI of a cloud resource from an S3 URI
+
+    Parameters
+    ----------
+    s3_uri : string
+        the S3 URI of the cloud resource
+    """
+    # create file system
+    fs = s3fs.S3FileSystem(anon=True)
+
+    # open resource and get URL
+    with fs.open(s3_uri, 'rb') as f:
+        return f.url()
+
+
 def get_center_pixel(gwcsobj: gwcs.wcs.WCS, ra: float, dec: float) -> tuple:
     """ Get the center pixel from a roman 2d science image
 
@@ -248,12 +264,10 @@ def asdf_cut(input_file: str, ra: float, dec: float, cutout_size: int = 20,
         an image cutout object
     """
 
-    # if file comes from AWS cloud bucket, get URL
+    # if file comes from AWS cloud bucket, get HTTP URL to open with asdf
     file = input_file
     if isinstance(input_file, str) and input_file.startswith('s3://'):
-        fs = s3fs.S3FileSystem()
-        with fs.open(input_file, 'rb') as f:
-            file = f.url()
+        file = _get_cloud_http(input_file)
 
     # get the 2d image data
     with asdf.open(file) as f:
