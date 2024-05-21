@@ -1,35 +1,39 @@
-0.10.1 (unreleased)
+0.11.0 (2024-5-21)
 -----------------
+
+- Add functionality for creating cutouts from the ASDF file format [#105]
+- Update ASDF cutout function to support an `astropy.Quantity` object as input data [#114]
+- Return an `astropy.nddata.Cutout2D` object from ASDF cutout function [#114]
+- Preserve original cutout shape when requesting an ASDF cutout that is partially outside of image bounds [#115]
+- Output ASDF cutout as either a FITS file or an ASDF file [#116]
+- Support S3 URI strings as input to ASDF cutout function [#117]
+- Drop support for Python 3.8 [#112]
 
 
 0.10.0 (2023-10-23)
 -----------------
 
 - Improve file checking prior to cutout creation to avoid errors [#52]
-- Fixing broken tests from GitHub Actions CI run [#56]
-- Fixing error resulting from forward slash in target name [#55]
+- Fix broken tests from GitHub Actions CI run [#56]
+- Fix error resulting from forward slash in target name [#55]
 - MNT: Update codecov-action version to v2 [#53]
 - Make cubes out of TICA FFIs [#59]
 - Make cutouts out of TICA cubes [#60]
-- Fixed bug not catching duplicate ffis [#69]
-- max_memory arg added to update_cube [#71]
+- Fix bug for not catching duplicate ffis [#69]
+- Add max_memory arg to update_cube [#71]
 - Hotfix for cube_cut checking for valid WCS info [#70]
 - Add remote cutout functionality (requires astropy 5.2 or above) [#76]
-- Fixup github ci [#80]
 - Error handling for CubeFactory and TicaCubeFactory [#85]
 - Cutout in threadpool [#84]
-- Documenting multithreading enhancement [#86]
-- Removing error array dimension from TicaCubeFactory [#87]
-- Adapting CutoutFactory to account for error-less TICA Cubes [#88]
-- Updating .readthedocs.yml with Python3.11 [#89]
-- Update cube and cutout unittests [#90]
+- Document multithreading enhancement [#86]
+- Remove error array dimension from TicaCubeFactory [#87]
+- Adapt CutoutFactory to account for error-less TICA Cubes [#88]
+- Update .readthedocs.yml with Python 3.11 [#89]
+- Update cube and cutout unit tests [#90]
 - Update docs to reflect changes in TICA cube format [#93]
 - Cloud functionality for astrocut.fits_cut() [#95]
-- Decommissioning update_cube for now [#100]
 - Use GitHub Actions for publishing new releases to PyPI [#97]
-- Updating deprecated license_file kwd [#103]
-- Updating syntax in README.rst [#104]
-- Updated README [#108]
+- Update deprecated license_file kwd [#103]
 
 
 0.9 (2021-08-10)
