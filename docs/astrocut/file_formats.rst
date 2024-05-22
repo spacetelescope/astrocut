@@ -39,6 +39,26 @@ it contains the name of the file the cutout comes from.
 
 
 
+ASDF Cutout Files
+==================
+
+ASDF files output by `asdf_cut` are a minimal tree structure that mirrors the format of the original Roman image file.
+
+.. code-block:: python
+
+    asdf_cutout = {
+        "roman": {
+            "meta": {
+                "wcs" - the gwcs of the cutout
+            },
+            "data" - the cutout data
+        }
+    }
+
+`wcs` is the original `gwcs` object from the input ASDF file that has been sliced into the shape of the cutout.
+
+
+
 Cube Files
 ==========
 

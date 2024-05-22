@@ -17,7 +17,7 @@ Three main areas of functionality are included:
 
 
 
-FITS file image cutouts
+FITS File Image Cutouts
 =======================
 
 These functions provide general purpose astronomical cutout functionality for FITS files.
@@ -25,7 +25,7 @@ There are two main cutout functions, `~astrocut.fits_cut` for creating cutout FI
 and `~astrocut.img_cut` for creating cutout JPG or PNG files. An image normalization
 (`~astrocut.normalize_img`) function is also available.
 
-Creating FITS cutouts
+Creating FITS Cutouts
 ---------------------
 
 The function `~astrocut.fits_cut` takes one or more FITS files and performs the same cutout
@@ -107,7 +107,7 @@ The cutout(s) can also be returned in memory as `~astropy.io.fits.HDUList` objec
                   1  CUTOUT        1 ImageHDU        97   (100, 100)   float32
                 
 
-Creating image cutouts
+Creating Image Cutouts
 ----------------------
                   
 The function `~astrocut.img_cut` takes one or more FITS files and performs the same cutout
@@ -179,7 +179,7 @@ the same Sector, camera, and CCD.
 If you are creating a small number of cutouts, the TESSCut web service
 may suit your needs: `mast.stsci.edu/tesscut <https://mast.stsci.edu/tesscut/>`_
  
-Making image cubes
+Making Image Cubes
 ------------------
 
 .. important::
@@ -250,7 +250,7 @@ The output image cube file format is described `here <file_formats.html#cube-fil
                 2                1 BinTableHDU    302   144R x 147C   [24A, J, J, J, J, J, J, D, 24A, J, 24A, 24A, J, J, D, 24A, 24A, 24A, J, D, 24A, D, D, D, D, 24A, 24A, D, D, D, D, D, 24A, D, D, D, D, J, D, D, D, D, D, D, D, D, D, D, D, D, J, J, D, J, J, J, J, J, J, J, J, J, J, D, J, J, J, J, J, J, D, J, J, J, J, J, J, D, J, J, J, J, J, J, D, J, J, J, J, J, J, J, J, 24A, D, J, 24A, 24A, D, D, D, D, D, D, D, D, J, J, D, D, D, D, D, D, J, J, D, D, D, D, D, D, D, D, D, D, D, D, 24A, J, 24A, 24A, J, J, D, 24A, 24A, J, J, D, D, D, D, J, 24A, 24A, 24A]  
 
 
-Making cutout target pixel files
+Making Cutout Target Pixel Files
 --------------------------------
 
 To make a cutout, you must already have an image cube from which to create the cutout.
@@ -356,10 +356,55 @@ Note that multithreading is disabled by default.
                 Total time: 7.8 sec
 
 
+
+ASDF File Cutouts
+===================
+
+The Nancy Grace Roman Space Telescope will store its data using the Advanced Scientific Data Format (ASDF). With the `asdf_cut` function, users can create cutouts of Roman mission products.
+
+Creating ASDF Cutouts
+----------------------
+
+The function `asdf_cut` performs a cutout of an ASDF file and returns the result in either a FITS file or an ASDF file. The cutout ASDF file format is described `here <file_formats.html#asdf-cutout-files>`__.
+
+.. code-block:: python
+
+                >>> from astrocut import asdf_cut
+                >>> from astropy.coordinates import SkyCoord
+                
+                >>> input_file = # Path to local ASDF file or HTTP URL
+
+                >>> center_coord = SkyCoord("80.15189743 29.74561219", unit='deg')
+                
+                >>> cutout_file = asdf_cut(input_file, center_coord.ra, center_coord.dec, cutout_size=200, output_file="roman-demo.fits")  #doctest: +SKIP
+
+                >>> cutout_hdulist = fits.open(cutout_file)  #doctest: +SKIP
+                >>> cutout_hdulist.info() #doctest: +SKIP
+                Filename: ./cutout_150.094500_2.386810_200-x-300_astrocut.fits
+                No.    Name      Ver    Type      Cards   Dimensions   Format
+                  0  PRIMARY       1 PrimaryHDU      25   (200, 200)   float32 
+
+When requesting a cutout that is partially outside of image bounds, the `fill_value` parameter is used to preserve the cutout shape and fill outside pixels.
+
+`asdf_cut` also has the ability to take ASDF files from the cloud using S3 URIs.
+
+.. code-block:: python
+
+                >>> from astrocut import asdf_cut
+                >>> from astropy.coordinates import SkyCoord
+                
+                >>> s3_uri = "s3://..." # Complete URI
+
+                >>> center_coord = SkyCoord("80.15189743 29.74561219", unit='deg')
+                
+                >>> cutout_file = asdf_cut(s3_uri, center_coord.ra, center_coord.dec, cutout_size=200, output_file="roman-demo.fits")  #doctest: +SKIP
+
+
+
 Additional Cutout Processing
 ============================
 
-Path-based cutouts
+Path-based Cutouts
 ------------------
 
 The `~astrocut.center_on_path` function allows the user to take one or more Astrocut cutout
@@ -436,7 +481,7 @@ cutout location/size(s) necesary to cover the entire path.
                   2  APERTURE      1 ImageHDU        97   (2136, 2078)   int32  
 
 
-Combining cutouts
+Combining Cutouts
 -----------------
 
 The `~astrocut.CutoutsCombiner` class allows the user to take one or more Astrocut cutout

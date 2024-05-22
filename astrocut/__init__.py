@@ -27,3 +27,4 @@ if not _ASTROPY_SETUP_:  # noqa
     from .cutouts import fits_cut, img_cut, normalize_img  # noqa
     from .cutout_processing import (path_to_footprints, center_on_path,  # noqa
                                     CutoutsCombiner, build_default_combine_function)  # noqa
+    from .asdf_cutouts import asdf_cut, get_center_pixel
