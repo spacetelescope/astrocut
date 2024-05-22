@@ -329,6 +329,6 @@ def test_get_cloud_http(mock_s3fs):
     http_uri = _get_cloud_http(s3_uri)
 
     assert http_uri == HTTP_URI
-    mock_s3fs.assert_called_once_with(anon=True)
+    mock_s3fs.assert_called_once_with()
     mock_fs.open.assert_called_once_with(s3_uri, 'rb')
     mock_file.url.assert_called_once()
