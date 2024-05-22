@@ -365,14 +365,15 @@ The Nancy Grace Roman Space Telescope will store its data using the Advanced Sci
 Creating ASDF Cutouts
 ----------------------
 
-The function `asdf_cut` performs a cutout of an ASDF file and returns the result in either a FITS file or an ASDF file. The cutout ASDF file format is described `here <file_formats.html#asdf-cutout-files>`__.
+The function `asdf_cut` performs a cutout of an ASDF file and returns the result as either a FITS file or an ASDF file. The cutout ASDF file format is described `here <file_formats.html#asdf-cutout-files>`__.
 
 .. code-block:: python
 
                 >>> from astrocut import asdf_cut
                 >>> from astropy.coordinates import SkyCoord
+                >>> from astropy.io import fits
                 
-                >>> input_file = # Path to local ASDF file or HTTP URL
+                >>> input_file = # Path to local ASDF file or URI
 
                 >>> center_coord = SkyCoord("80.15189743 29.74561219", unit='deg')
                 
@@ -380,7 +381,7 @@ The function `asdf_cut` performs a cutout of an ASDF file and returns the result
 
                 >>> cutout_hdulist = fits.open(cutout_file)  #doctest: +SKIP
                 >>> cutout_hdulist.info() #doctest: +SKIP
-                Filename: ./cutout_150.094500_2.386810_200-x-300_astrocut.fits
+                Filename: roman-demo.fits
                 No.    Name      Ver    Type      Cards   Dimensions   Format
                   0  PRIMARY       1 PrimaryHDU      25   (200, 200)   float32 
 
