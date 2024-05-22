@@ -76,9 +76,9 @@ def get_center_pixel(gwcsobj: gwcs.wcs.WCS, ra: float, dec: float) -> tuple:
 
 
 def _get_cutout(data: asdf.tags.core.ndarray.NDArrayType, coords: Union[tuple, SkyCoord],
-               wcs: astropy.wcs.wcs.WCS = None, size: int = 20, outfile: str = "example_roman_cutout.fits",
-               write_file: bool = True, fill_value: Union[int, float] = np.nan,
-               gwcsobj: gwcs.wcs.WCS = None) -> astropy.nddata.Cutout2D:
+                wcs: astropy.wcs.wcs.WCS = None, size: int = 20, outfile: str = "example_roman_cutout.fits",
+                write_file: bool = True, fill_value: Union[int, float] = np.nan,
+                gwcsobj: gwcs.wcs.WCS = None) -> astropy.nddata.Cutout2D:
     """ 
     Get a Roman image cutout.
 
@@ -286,4 +286,4 @@ def asdf_cut(input_file: str, ra: float, dec: float, cutout_size: int = 20,
 
         # create the 2d image cutout
         return _get_cutout(data, pixel_coordinates, wcs, size=cutout_size, outfile=output_file,
-                          write_file=write_file, fill_value=fill_value, gwcsobj=gwcsobj)
+                           write_file=write_file, fill_value=fill_value, gwcsobj=gwcsobj)

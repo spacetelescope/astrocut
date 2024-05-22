@@ -373,7 +373,7 @@ The function `asdf_cut` performs a cutout of an ASDF file and returns the result
                 >>> from astropy.coordinates import SkyCoord
                 >>> from astropy.io import fits
                 
-                >>> input_file = # Path to local ASDF file or URI
+                >>> input_file = ""  # Path to local ASDF file or URI
 
                 >>> center_coord = SkyCoord("80.15189743 29.74561219", unit='deg')
                 
