@@ -1,5 +1,5 @@
-0.11.0 (2024-5-21)
------------------
+0.11.0 (Unreleased)
+--------------------
 
 - Add functionality for creating cutouts from the ASDF file format [#105]
 - Update ASDF cutout function to support an `astropy.Quantity` object as input data [#114]
@@ -11,7 +11,7 @@
 
 
 0.10.0 (2023-10-23)
------------------
+--------------------
 
 - Improve file checking prior to cutout creation to avoid errors [#52]
 - Fix broken tests from GitHub Actions CI run [#56]
