@@ -13,7 +13,7 @@ from astropy.wcs import WCS
 from astropy.wcs.utils import pixel_to_skycoord
 from gwcs import wcs
 from gwcs import coordinate_frames as cf
-from astrocut.asdf_cutouts import get_center_pixel, get_cutout, asdf_cut, _slice_gwcs, _get_cloud_http
+from astrocut.asdf_cutouts import get_center_pixel, asdf_cut, _get_cutout, _slice_gwcs, _get_cloud_http
 
 
 def make_wcs(xsize, ysize, ra=30., dec=45.):
@@ -137,7 +137,7 @@ def test_get_cutout(output, fakedata, quantity):
         data = data.value
 
     # create cutout
-    cutout = get_cutout(data, skycoord, wcs, size=10, outfile=output_file)
+    cutout = _get_cutout(data, skycoord, wcs, size=10, outfile=output_file)
 
     assert_same_coord(5, 10, cutout, wcs)
 
@@ -185,7 +185,7 @@ def test_fail_write_asdf(fakedata, output):
         data, gwcs = fakedata
         skycoord = gwcs(25, 25, with_units=True)
         wcs = WCS(gwcs.to_fits_sip())
-        get_cutout(data, skycoord, wcs, size=10, outfile=output_file)
+        _get_cutout(data, skycoord, wcs, size=10, outfile=output_file)
 
 
 def test_cutout_nofile(make_file, output):
@@ -217,7 +217,7 @@ def test_cutout_poles(makefake):
     wcs = WCS(gwcs.to_fits_sip())
 
     # get cutout
-    cutout = get_cutout(data, cc, wcs, size=50, write_file=False)
+    cutout = _get_cutout(data, cc, wcs, size=50, write_file=False)
     assert_same_coord(5, 10, cutout, wcs)
 
     # check cutout contains all data
@@ -232,7 +232,7 @@ def test_fail_cutout_outside(fakedata):
 
     with pytest.raises(RuntimeError, match='Could not create 2d cutout.  The requested '
                        'cutout does not overlap with the original image'):
-        get_cutout(data, cc, wcs, size=50, write_file=False)
+        _get_cutout(data, cc, wcs, size=50, write_file=False)
 
 
 def assert_same_coord(x, y, cutout, wcs):
@@ -251,7 +251,7 @@ def test_partial_cutout(makefake, asint, fill):
 
     wcs = WCS(gwcs.to_fits_sip())
     cc = coord.SkyCoord(29.999, 44.998, unit=u.degree)
-    cutout = get_cutout(data, cc, wcs, size=50, write_file=False, fill_value=fill)
+    cutout = _get_cutout(data, cc, wcs, size=50, write_file=False, fill_value=fill)
     assert cutout.shape == (50, 50)
     if asint:
         assert -9999 in cutout.data
@@ -266,7 +266,7 @@ def test_bad_fill(makefake):
     wcs = WCS(gwcs.to_fits_sip())
     cc = coord.SkyCoord(29.999, 44.998, unit=u.degree)
     with pytest.raises(ValueError, match='fill_value is inconsistent with the data type of the input array'):
-        get_cutout(data, cc, wcs, size=50, write_file=False)
+        _get_cutout(data, cc, wcs, size=50, write_file=False)
 
 
 def test_cutout_raedge(makefake):
@@ -284,7 +284,7 @@ def test_cutout_raedge(makefake):
     wcs = WCS(gg.to_fits_sip())
 
     # get cutout
-    cutout = get_cutout(data, cc, wcs, size=100, write_file=False)
+    cutout = _get_cutout(data, cc, wcs, size=100, write_file=False)
     assert_same_coord(5, 10, cutout, wcs)
 
     # assert the RA cutout bounds are > 359 and < 0
@@ -299,7 +299,7 @@ def test_slice_gwcs(fakedata):
     skycoord = gwcsobj(250, 250)
     wcs = WCS(gwcsobj.to_fits_sip())
 
-    cutout = get_cutout(data, skycoord, wcs, size=50, write_file=False)
+    cutout = _get_cutout(data, skycoord, wcs, size=50, write_file=False)
 
     sliced = _slice_gwcs(gwcsobj, cutout.slices_original)
 
@@ -329,6 +329,6 @@ def test_get_cloud_http(mock_s3fs):
     http_uri = _get_cloud_http(s3_uri)
 
     assert http_uri == HTTP_URI
-    mock_s3fs.assert_called_once_with(anon=True)
+    mock_s3fs.assert_called_once_with()
     mock_fs.open.assert_called_once_with(s3_uri, 'rb')
     mock_file.url.assert_called_once()
