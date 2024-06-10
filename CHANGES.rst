@@ -1,4 +1,9 @@
-0.11.0 (Unreleased)
+0.12.0 (Unreleased)
+--------------------
+
+- asdf_cut() function now accepts pathlib.Path and s3path.S3Path objects as an input file [#119]
+
+0.11.0 (2024-05-28)
 --------------------
 
 - Add functionality for creating cutouts from the ASDF file format [#105]

@@ -10,18 +10,19 @@ import astropy
 import gwcs
 import numpy as np
 import s3fs
+from s3path import S3Path
 
 from astropy.coordinates import SkyCoord
 from astropy.modeling import models
 
 
-def _get_cloud_http(s3_uri: str) -> str:
+def _get_cloud_http(s3_uri: str | S3Path) -> str:
     """ 
     Get the HTTP URI of a cloud resource from an S3 URI.
 
     Parameters
     ----------
-    s3_uri : string
+    s3_uri : string or S3Path
         the S3 URI of the cloud resource
     """
     # create file system
@@ -239,8 +240,8 @@ def _write_asdf(cutout: astropy.nddata.Cutout2D, gwcsobj: gwcs.wcs.WCS, outfile:
     af.write_to(outfile)
 
 
-def asdf_cut(input_file: str, ra: float, dec: float, cutout_size: int = 20,
-             output_file: str = "example_roman_cutout.fits",
+def asdf_cut(input_file: str | pathlib.Path | S3Path, ra: float, dec: float, cutout_size: int = 20,
+             output_file: str | pathlib.Path = "example_roman_cutout.fits",
              write_file: bool = True, fill_value: Union[int, float] = np.nan) -> astropy.nddata.Cutout2D:
     """ 
     Takes a single ASDF input file (`input_file`) and generates a cutout of designated size `cutout_size`
@@ -250,7 +251,7 @@ def asdf_cut(input_file: str, ra: float, dec: float, cutout_size: int = 20,
 
     Parameters
     ----------
-    input_file : str
+    input_file : str or Path or S3Path
         The input ASDF file.
     ra : float
         The right ascension of the central cutout.
@@ -258,7 +259,7 @@ def asdf_cut(input_file: str, ra: float, dec: float, cutout_size: int = 20,
         The declination of the central cutout.
     cutout_size : int
         Optional, default 20. The image cutout pixel size.
-    output_file : str
+    output_file : str or Path or S3Path
         Optional, default "example_roman_cutout.fits". The name of the output cutout file.
     write_file : bool
         Optional, default True. Flag to write the cutout to a file or not.
@@ -273,7 +274,7 @@ def asdf_cut(input_file: str, ra: float, dec: float, cutout_size: int = 20,
 
     # if file comes from AWS cloud bucket, get HTTP URL to open with asdf
     file = input_file
-    if isinstance(input_file, str) and input_file.startswith('s3://'):
+    if (isinstance(input_file, str) and input_file.startswith('s3://')) or isinstance(input_file, S3Path):
         file = _get_cloud_http(input_file)
 
     # get the 2d image data
