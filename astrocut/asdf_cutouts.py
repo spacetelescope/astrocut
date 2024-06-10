@@ -16,13 +16,13 @@ from astropy.coordinates import SkyCoord
 from astropy.modeling import models
 
 
-def _get_cloud_http(s3_uri: str | S3Path) -> str:
+def _get_cloud_http(s3_uri: Union[str, S3Path]) -> str:
     """ 
     Get the HTTP URI of a cloud resource from an S3 URI.
 
     Parameters
     ----------
-    s3_uri : string or S3Path
+    s3_uri : string | S3Path
         the S3 URI of the cloud resource
     """
     # create file system
@@ -240,8 +240,8 @@ def _write_asdf(cutout: astropy.nddata.Cutout2D, gwcsobj: gwcs.wcs.WCS, outfile:
     af.write_to(outfile)
 
 
-def asdf_cut(input_file: str | pathlib.Path | S3Path, ra: float, dec: float, cutout_size: int = 20,
-             output_file: str | pathlib.Path = "example_roman_cutout.fits",
+def asdf_cut(input_file: Union[str, pathlib.Path, S3Path], ra: float, dec: float, cutout_size: int = 20,
+             output_file: Union[str, pathlib.Path] = "example_roman_cutout.fits",
              write_file: bool = True, fill_value: Union[int, float] = np.nan) -> astropy.nddata.Cutout2D:
     """ 
     Takes a single ASDF input file (`input_file`) and generates a cutout of designated size `cutout_size`
@@ -251,7 +251,7 @@ def asdf_cut(input_file: str | pathlib.Path | S3Path, ra: float, dec: float, cut
 
     Parameters
     ----------
-    input_file : str or Path or S3Path
+    input_file : str | Path | S3Path
         The input ASDF file.
     ra : float
         The right ascension of the central cutout.
@@ -259,7 +259,7 @@ def asdf_cut(input_file: str | pathlib.Path | S3Path, ra: float, dec: float, cut
         The declination of the central cutout.
     cutout_size : int
         Optional, default 20. The image cutout pixel size.
-    output_file : str or Path
+    output_file : str | Path
         Optional, default "example_roman_cutout.fits". The name of the output cutout file.
     write_file : bool
         Optional, default True. Flag to write the cutout to a file or not.

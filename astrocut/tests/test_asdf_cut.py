@@ -339,3 +339,4 @@ def test_get_cloud_http(mock_s3fs):
     http_uri_path = _get_cloud_http(s3_uri_path)
     assert http_uri_path == HTTP_URI
     mock_fs.open.assert_called_with(s3_uri_path, 'rb')
+    
