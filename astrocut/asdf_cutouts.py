@@ -259,7 +259,7 @@ def asdf_cut(input_file: str | pathlib.Path | S3Path, ra: float, dec: float, cut
         The declination of the central cutout.
     cutout_size : int
         Optional, default 20. The image cutout pixel size.
-    output_file : str or Path or S3Path
+    output_file : str or Path
         Optional, default "example_roman_cutout.fits". The name of the output cutout file.
     write_file : bool
         Optional, default True. Flag to write the cutout to a file or not.
