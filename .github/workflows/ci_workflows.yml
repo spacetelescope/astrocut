@@ -37,6 +37,11 @@ jobs:
             python: "3.10"
             toxenv: py310-test-alldeps
 
+          -  name: Python 3.10 with numpy 2
+            os: ubuntu-latest
+            python: "3.10"
+            toxenv: py310-test-alldeps-numpy2
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
