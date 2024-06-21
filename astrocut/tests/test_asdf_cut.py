@@ -13,6 +13,7 @@ from astropy.wcs import WCS
 from astropy.wcs.utils import pixel_to_skycoord
 from gwcs import wcs
 from gwcs import coordinate_frames as cf
+from s3path import S3Path
 from astrocut.asdf_cutouts import get_center_pixel, asdf_cut, _get_cutout, _slice_gwcs, _get_cloud_http
 
 
@@ -325,10 +326,16 @@ def test_get_cloud_http(mock_s3fs):
     mock_fs.open.return_value.__enter__.return_value = mock_file
     mock_s3fs.return_value = mock_fs
 
+    # test function with string input
     s3_uri = "s3://test_bucket/test_file.asdf"
     http_uri = _get_cloud_http(s3_uri)
-
     assert http_uri == HTTP_URI
     mock_s3fs.assert_called_once_with()
     mock_fs.open.assert_called_once_with(s3_uri, 'rb')
     mock_file.url.assert_called_once()
+
+    # test function with S3Path input
+    s3_uri_path = S3Path("test_bucket/test_file_2.asdf")
+    http_uri_path = _get_cloud_http(s3_uri_path)
+    assert http_uri_path == HTTP_URI
+    mock_fs.open.assert_called_with(s3_uri_path, 'rb')
