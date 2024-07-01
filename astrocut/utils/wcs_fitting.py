@@ -15,6 +15,7 @@
 
 # flake8: noqa
 
+import copy
 import numpy as np
 
 from astropy import units as u

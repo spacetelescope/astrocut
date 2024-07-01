@@ -127,7 +127,7 @@ aligned and have the same pixel scale, no checking is done by Astrocut.
                 >>> center_coord = SkyCoord("150.0945 2.38681", unit='deg')
                 >>> cutout_size = [200,300]
                 
-                >>> png_files = img_cut(input_files, center_coord, cutout_size, img_format='png', drop_after="")    #doctest: +SKIP
+                >>> png_files = img_cut(input_files, center_coord, cutout_size, img_format='png')    #doctest: +SKIP
                 >>> print(png_files[0])    #doctest: +SKIP
                 ./hlsp_candels_hst_acs_cos-tot-sect23_f606w_v1.0_drz_150.094500_2.386810_200-x-300_astrocut.png
 
