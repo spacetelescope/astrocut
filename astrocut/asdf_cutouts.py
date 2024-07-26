@@ -32,7 +32,7 @@ def _get_cloud_http(s3_uri: Union[str, S3Path], verbose: bool = False) -> str:
     # check if public or private by sending an HTTP request
     s3_path = S3Path.from_uri(s3_uri) if isinstance(s3_uri, str) else s3_uri
     url = f'https://{s3_path.bucket}.s3.amazonaws.com/{s3_path.key}'
-    resp = requests.head(url)
+    resp = requests.head(url, timeout=10)
     is_anon = False if resp.status_code == 403 else True
     if verbose and not is_anon:
         print(f'Attempting to access private S3 bucket: {s3_path.bucket}')
