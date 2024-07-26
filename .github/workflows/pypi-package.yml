@@ -16,6 +16,8 @@ jobs:
   publish-to-pypi:
     uses: OpenAstronomy/github-actions-workflows/.github/workflows/publish_pure_python.yml@v1
     name: Publish to PyPI
+    permissions:
+      id-token: write
 
     # We only want to upload to PyPI after a new release has been published on the @spacetelescope/astrocut repo
     if: github.repository_owner == 'spacetelescope' && github.event_name == 'push'
