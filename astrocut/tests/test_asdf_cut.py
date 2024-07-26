@@ -315,27 +315,37 @@ def test_slice_gwcs(fakedata):
     assert (gwcsobj.footprint(bounding_box=tuple(reversed(cutout.bbox_original))) == sliced.footprint()).all()
 
 
+@patch('requests.head')
 @patch('s3fs.S3FileSystem')
-def test_get_cloud_http(mock_s3fs):
+def test_get_cloud_http(mock_s3fs, mock_requests):
     """ test we can get HTTP URI of cloud resource """
+    # mock HTTP response
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200  # public bucket
+    mock_requests.return_value = mock_resp
+
     # mock s3 file system operations
     HTTP_URI = "http_test"
+    mock_fs = mock_s3fs.return_value
     mock_file = MagicMock()
-    mock_fs = MagicMock()
     mock_file.url.return_value = HTTP_URI
     mock_fs.open.return_value.__enter__.return_value = mock_file
-    mock_s3fs.return_value = mock_fs
 
     # test function with string input
     s3_uri = "s3://test_bucket/test_file.asdf"
     http_uri = _get_cloud_http(s3_uri)
     assert http_uri == HTTP_URI
-    mock_s3fs.assert_called_once_with()
+    mock_s3fs.assert_called_with(anon=True)
     mock_fs.open.assert_called_once_with(s3_uri, 'rb')
     mock_file.url.assert_called_once()
 
     # test function with S3Path input
-    s3_uri_path = S3Path("test_bucket/test_file_2.asdf")
+    s3_uri_path = S3Path("/test_bucket/test_file_2.asdf")
     http_uri_path = _get_cloud_http(s3_uri_path)
     assert http_uri_path == HTTP_URI
     mock_fs.open.assert_called_with(s3_uri_path, 'rb')
+
+    # test function with private bucket
+    mock_resp.status_code = 403
+    http_uri = _get_cloud_http(s3_uri)
+    mock_s3fs.assert_called_with(anon=False)
