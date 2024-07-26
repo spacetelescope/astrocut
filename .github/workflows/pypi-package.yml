@@ -2,6 +2,8 @@ name: Building & Publishing
 
 on:
   push:
+    branches:
+    - pypi-publish-workflow
     tags: 
     - "v*"
 
