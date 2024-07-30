@@ -17,7 +17,8 @@ from astropy.coordinates import SkyCoord
 from astropy.modeling import models
 
 
-def _get_cloud_http(s3_uri: Union[str, S3Path], verbose: bool = False) -> str:
+def _get_cloud_http(s3_uri: Union[str, S3Path], key: str = None, secret: str = None,
+                    token: str = None, verbose: bool = False) -> str:
     """ 
     Get the HTTP URI of a cloud resource from an S3 URI.
 
@@ -25,6 +26,12 @@ def _get_cloud_http(s3_uri: Union[str, S3Path], verbose: bool = False) -> str:
     ----------
     s3_uri : string | S3Path
         the S3 URI of the cloud resource
+    key : string
+        Default None. Access key ID for S3 file system.
+    secret : string
+        Default None. Secret access key for S3 file system.
+    token : string
+        Default None. Security token for S3 file system.
     verbose : bool
         Default False. If true intermediate information is printed.
     """
@@ -38,7 +45,7 @@ def _get_cloud_http(s3_uri: Union[str, S3Path], verbose: bool = False) -> str:
         print(f'Attempting to access private S3 bucket: {s3_path.bucket}')
 
     # create file system and get URL of file
-    fs = s3fs.S3FileSystem(anon=is_anon)
+    fs = s3fs.S3FileSystem(anon=is_anon, key=key, secret=secret, token=token)
     with fs.open(s3_uri, 'rb') as f:
         return f.url()
 
@@ -252,8 +259,8 @@ def _write_asdf(cutout: astropy.nddata.Cutout2D, gwcsobj: gwcs.wcs.WCS, outfile:
 
 def asdf_cut(input_file: Union[str, pathlib.Path, S3Path], ra: float, dec: float, cutout_size: int = 20,
              output_file: Union[str, pathlib.Path] = "example_roman_cutout.fits",
-             write_file: bool = True, fill_value: Union[int, float] = np.nan,
-             verbose: bool = False) -> astropy.nddata.Cutout2D:
+             write_file: bool = True, fill_value: Union[int, float] = np.nan, key: str = None,
+             secret: str = None, token: str = None, verbose: bool = False) -> astropy.nddata.Cutout2D:
     """ 
     Takes a single ASDF input file (`input_file`) and generates a cutout of designated size `cutout_size`
     around the given coordinates (`coordinates`).
@@ -276,8 +283,17 @@ def asdf_cut(input_file: Union[str, pathlib.Path, S3Path], ra: float, dec: float
         Optional, default True. Flag to write the cutout to a file or not.
     fill_value: int | float
         Optional, default `np.nan`. The fill value for pixels outside the original image.
+    key : string
+        Default None. Access key ID for S3 file system. Only applicable if `input_file` is a
+        cloud resource.
+    secret : string
+        Default None. Secret access key for S3 file system. Only applicable if `input_file` is a
+        cloud resource.
+    token : string
+        Default None. Security token for S3 file system. Only applicable if `input_file` is a
+        cloud resource.
     verbose : bool
-        Default False. If true intermediate information is printed.
+        Default False. If True, intermediate information is printed.
 
     Returns
     -------
@@ -288,7 +304,7 @@ def asdf_cut(input_file: Union[str, pathlib.Path, S3Path], ra: float, dec: float
     # if file comes from AWS cloud bucket, get HTTP URL to open with asdf
     file = input_file
     if (isinstance(input_file, str) and input_file.startswith('s3://')) or isinstance(input_file, S3Path):
-        file = _get_cloud_http(input_file, verbose)
+        file = _get_cloud_http(input_file, key, secret, token, verbose)
 
     # get the 2d image data
     with asdf.open(file) as f:

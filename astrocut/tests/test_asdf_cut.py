@@ -335,7 +335,7 @@ def test_get_cloud_http(mock_s3fs, mock_requests):
     s3_uri = "s3://test_bucket/test_file.asdf"
     http_uri = _get_cloud_http(s3_uri)
     assert http_uri == HTTP_URI
-    mock_s3fs.assert_called_with(anon=True)
+    mock_s3fs.assert_called_with(anon=True, key=None, secret=None, token=None)
     mock_fs.open.assert_called_once_with(s3_uri, 'rb')
     mock_file.url.assert_called_once()
 
@@ -347,5 +347,5 @@ def test_get_cloud_http(mock_s3fs, mock_requests):
 
     # test function with private bucket
     mock_resp.status_code = 403
-    http_uri = _get_cloud_http(s3_uri)
-    mock_s3fs.assert_called_with(anon=False)
+    http_uri = _get_cloud_http(s3_uri, key="access")
+    mock_s3fs.assert_called_with(anon=False, key="access", secret=None, token=None)
