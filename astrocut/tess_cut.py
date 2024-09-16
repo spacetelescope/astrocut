@@ -6,10 +6,12 @@ import json
 import re
 import os
 from typing import Union
+import warnings
 
 from astropy.coordinates import SkyCoord
 from astropy.table import Table, Column
 import astropy.units as u
+from astropy.utils.exceptions import AstropyWarning
 import numpy as np
 import s3fs
 from spherical_geometry.polygon import SphericalPolygon
@@ -35,20 +37,18 @@ def _s_region_to_polygon(s_region: Column):
 
     def ind_sregion_to_polygon(s_reg):
         sr_list = s_reg.strip().split()
-        reg_type = sr_list[0]
+        reg_type = sr_list[0].upper()
 
-        if reg_type.upper() == "POLYGON":
-            ras = np.array(sr_list[1::2]).astype(float)
+        if reg_type == "POLYGON":
+            ras = np.array(sr_list[1::2], dtype=float)
             ras[ras < 0] = ras[ras < 0] + 360
-            decs = np.array(sr_list[2::2]).astype(float)
-            poly = SphericalPolygon.from_radec(ras, decs)
-        elif reg_type.upper() == "CIRCLE":
-            ra, dec, rad = np.array(sr_list[-3:]).astype(float)
-            poly = SphericalPolygon.from_cone(ra, dec, rad)
+            decs = np.array(sr_list[2::2], dtype=float)
+            return SphericalPolygon.from_radec(ras, decs)
+        elif reg_type == "CIRCLE":
+            ra, dec, rad = np.array(sr_list[-3:], dtype=float)
+            return SphericalPolygon.from_cone(ra, dec, rad)
         else:
             raise ValueError("unsupported S_Region type.")
-
-        return poly
 
     return np.vectorize(ind_sregion_to_polygon)(s_region)
 
@@ -251,12 +251,13 @@ def tess_cut(coordinates: Union[str, SkyCoord], cutout_size, sector: Union[int, 
         os.makedirs(output_dir)
 
     # Make a cutout from each cube file
+    cutout_files = []
     for file in cube_files_mapping:
         try:
             factory = CutoutFactory()
             file_path = _get_cube_file_path(product, file['cube'])
             output_path = os.path.join(output_dir, file['sectorName'])
-            factory.cube_cut(
+            cutout = factory.cube_cut(
                 file_path,
                 coordinates,
                 cutout_size=cutout_size,
@@ -265,15 +266,14 @@ def tess_cut(coordinates: Union[str, SkyCoord], cutout_size, sector: Union[int, 
                 threads='auto',
                 verbose=verbose
             )
-        except OSError as error_os:
-            print('OS Error')
-        except InvalidQueryError as error_query:
-            print('Invalid query error')
-        except (ValueError, IndexError) as error:
-            print('Other error')
+            cutout_files.append(cutout)
+        except Exception as e:
+            warnings.warn(f'Unable to generate cutout from {file_path}: {e}', AstropyWarning)
+
+    return cutout_files
 
 
 # Area limit?
-# Should function return a manifest?
 # Weird things happens when cutout size is set to 0
 # Ben and I talked about a use case for setting size to 0, what was it again?
+# What is the best way to handle exceptions?
