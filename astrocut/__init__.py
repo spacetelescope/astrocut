@@ -28,4 +28,4 @@ if not _ASTROPY_SETUP_:  # noqa
     from .cutout_processing import (path_to_footprints, center_on_path,  # noqa
                                     CutoutsCombiner, build_default_combine_function)  # noqa
     from .asdf_cutouts import asdf_cut, get_center_pixel  # noqa
-    from .tess_cut import tess_cut  # noqa
+    from .cube_cut_from_footprint import cube_cut_from_footprint  # noqa
