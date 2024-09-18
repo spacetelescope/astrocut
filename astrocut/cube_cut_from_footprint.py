@@ -89,10 +89,7 @@ def _ffi_intersect(ffi_list: Table, polygon: SphericalPolygon):
 
 
 def _ra_dec_crossmatch(all_ffis: Table, coord: SkyCoord, cutout_size, arcsec_per_px: int):
-    """Determine which sector/camera/ccd(s) contain the given ra/dec.
-
-    raises a 400 HTTPException if ra, dec, or radius are not convertible to floats
-    """    
+    """Determine which sector/camera/ccd(s) contain the given ra/dec."""    
     ra, dec = coord.ra, coord.dec
 
     # Performing the crossmatch
