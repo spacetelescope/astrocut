@@ -54,7 +54,7 @@ def _s_region_to_polygon(s_region: Column):
     return np.vectorize(ind_sregion_to_polygon)(s_region)
 
 
-def _get_s3_ffis(s3_uri, as_table: bool = False, load_polys: bool = False) -> Table | dict:
+def _get_s3_ffis(s3_uri, as_table: bool = False, load_polys: bool = False):
     """
     Fetch the S3 footprint file containing a dict of all FFIs and a polygon column
     that holds the s_regions as polygon points and vectors.
@@ -66,7 +66,8 @@ def _get_s3_ffis(s3_uri, as_table: bool = False, load_polys: bool = False) -> Ta
     # Open footprint file with fsspec
     # Use caching to help performance, but check that remote UID matches the local
     # Expiry time is 1 week by default
-    with fsspec.open('filecache::' + s3_uri, s3={'anon': True}, filecache={'cache_storage':'s3_cache', 'check_files': True}) as f:
+    with fsspec.open('filecache::' + s3_uri, s3={'anon': True}, 
+                     filecache={'cache_storage': 's3_cache', 'check_files': True}) as f:
         ffis = json.loads(f.read())
 
     if load_polys:
@@ -175,8 +176,9 @@ def _get_cube_files_from_sequence_obs(sequences: list):
     return cube_files
 
 
-def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size, sequences: Union[int, List[int], None] = None, 
-                            product: str = 'SPOC', output_dir: str = '.', threads: Union[int, Literal['auto']] = 1,
+def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size, 
+                            sequences: Union[int, List[int], None] = None, product: str = 'SPOC', 
+                            output_dir: str = '.', threads: Union[int, Literal['auto']] = 1,
                             verbose: bool = False):
     """
     Parameters
@@ -241,7 +243,8 @@ def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size, sequ
         all_ffis = all_ffis[np.isin(all_ffis['sequence_number'], sequences)]
 
         if len(all_ffis) == 0:
-            raise InvalidQueryError(f'No FFI cube files were found for sequences: {", ".join(str(s) for s in sequences)}')
+            raise InvalidQueryError(f'No FFI cube files were found for sequences: \
+                                    {", ".join(str(s) for s in sequences)}')
         
         if verbose:
             print(f'Filtered to {len(all_ffis)} footprints for sequences: {", ".join(str(s) for s in sequences)}')
@@ -301,7 +304,7 @@ def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size, sequ
     else:
         # Sequential Processing
         if verbose:
-            print(f'Generating cutouts in sequence.')
+            print('Generating cutouts in sequence.')
         cutout_files = [process_file(file) for file in cube_files_mapping]
 
     return cutout_files
