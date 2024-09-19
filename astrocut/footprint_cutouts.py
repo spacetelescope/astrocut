@@ -68,7 +68,7 @@ def _get_s3_ffis(s3_uri, as_table: bool = False, load_polys: bool = False):
     # Expiry time is 1 week by default
     with fsspec.open('filecache::' + s3_uri, s3={'anon': True}, 
                      filecache={'cache_storage': 's3_cache', 'check_files': True}) as f:
-        ffis = json.loads(f.read())
+        ffis = json.load(f)
 
     if load_polys:
         ffis['polygon'] = _s_region_to_polygon(ffis['s_region'])
@@ -177,7 +177,7 @@ def _get_cube_files_from_sequence_obs(sequences: list):
 
 
 def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size, 
-                            sequences: Union[int, List[int], None] = None, product: str = 'SPOC', 
+                            sequence: Union[int, List[int], None] = None, product: str = 'SPOC', 
                             output_dir: str = '.', threads: Union[int, Literal['auto']] = 1,
                             verbose: bool = False):
     """
@@ -195,10 +195,11 @@ def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size,
         order.  Scalar numbers in ``cutout_size`` are assumed to be in
         units of pixels. `~astropy.units.Quantity` objects must be in pixel or
         angular units.
-    sequences : int, List[int], optional
+    sequence : int, List[int], optional
         Default None. Sequence(s) from which to generate cutouts. Can provide a single
         sequence number as an int or a list of sequence numbers. If not specified, 
         cutouts will be generated from all sequences that contain the cutout.
+        For the TESS mission, this parameter corresponds to sectors.
     product : str, optional
         Default 'SPOC'. The product type to make the cutouts from.
     output_dir : str, optional
@@ -215,6 +216,19 @@ def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size,
     -------
     cutout_files : list
         List of paths to cutout files.
+
+    Example
+    -------
+    >>> from astrocut.footprint_cutouts import cube_cut_from_footprint
+    >>> cube_cut_from_footprint(
+                coordinates='83.40630967798376 -62.48977125108528',
+                cutout_size=64,
+                sequence=[1, 2],  # TESS sectors
+                product='SPOC',
+                output_dir='./cutouts'
+        )
+    ['./cutouts/tess-s0001-4-4/tess-s0001-4-4_83.406310_-62.489771_64x64_astrocut.fits',
+     './cutouts/tess-s0002-4-1/tess-s0002-4-1_83.406310_-62.489771_64x64_astrocut.fits']
     """
     
     # Convert to SkyCoord
@@ -236,18 +250,18 @@ def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size,
         print(f'Found {len(all_ffis)} footprint files.')
 
     # Filter FFIs by provided sectors
-    if sequences and product:
+    if sequence and product:
         # Convert to list
-        if isinstance(sequences, int):
-            sequences = [sequences]
-        all_ffis = all_ffis[np.isin(all_ffis['sequence_number'], sequences)]
+        if isinstance(sequence, int):
+            sequence = [sequence]
+        all_ffis = all_ffis[np.isin(all_ffis['sequence_number'], sequence)]
 
         if len(all_ffis) == 0:
             raise InvalidQueryError(f'No FFI cube files were found for sequences: \
-                                    {", ".join(str(s) for s in sequences)}')
+                                    {", ".join(str(s) for s in sequence)}')
         
         if verbose:
-            print(f'Filtered to {len(all_ffis)} footprints for sequences: {", ".join(str(s) for s in sequences)}')
+            print(f'Filtered to {len(all_ffis)} footprints for sequences: {", ".join(str(s) for s in sequence)}')
 
     # Get sector names and cube files that contain the cutout
     cone_results = _ra_dec_crossmatch(all_ffis, coordinates, cutout_size, TESS_ARCSEC_PER_PX)
@@ -276,7 +290,7 @@ def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size,
                 cutout_size=cutout_size,
                 product=product,
                 output_path=output_path,
-                threads='auto',
+                threads=8,
                 verbose=verbose
             )
             return cutout
