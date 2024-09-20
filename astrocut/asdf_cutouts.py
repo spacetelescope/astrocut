@@ -257,15 +257,13 @@ def _write_asdf(cutout: astropy.nddata.Cutout2D, gwcsobj: gwcs.wcs.WCS, outfile:
     af.write_to(outfile)
 
 
-def asdf_cut(input_file: Union[str, pathlib.Path, S3Path], ra: float, dec: float, cutout_size: int = 20,
+def asdf_cut(input_file: Union[str, pathlib.Path, S3Path], ra: float, dec: float, cutout_size: int = 25,
              output_file: Union[str, pathlib.Path] = "example_roman_cutout.fits",
              write_file: bool = True, fill_value: Union[int, float] = np.nan, key: str = None,
              secret: str = None, token: str = None, verbose: bool = False) -> astropy.nddata.Cutout2D:
     """ 
     Takes a single ASDF input file (`input_file`) and generates a cutout of designated size `cutout_size`
     around the given coordinates (`coordinates`).
-
-    Preliminary proof-of-concept functionality.
 
     Parameters
     ----------
@@ -276,7 +274,10 @@ def asdf_cut(input_file: Union[str, pathlib.Path, S3Path], ra: float, dec: float
     dec : float
         The declination of the central cutout.
     cutout_size : int
-        Optional, default 20. The image cutout pixel size.
+        Optional, default 25. The image cutout pixel size.
+        Note: Odd values for `cutout_size` generally result in a cutout that is more accurately 
+        centered on the target coordinates compared to even values, due to the symmetry of the 
+        pixel grid. 
     output_file : str | Path
         Optional, default "example_roman_cutout.fits". The name of the output cutout file.
     write_file : bool
