@@ -388,7 +388,7 @@ The cutout FITS file format is described `here <file_formats.html#fits-cutout-fi
                 No.    Name      Ver    Type      Cards   Dimensions   Format
                   0  PRIMARY       1 PrimaryHDU      25   (205, 205)   float32 
 
-.. note::
+.. warning::
   Due to the symmetry of the pixel grid, odd values for ``cutout_size`` generally produce
   cutouts that are more accurately centered on the target coordinates than even values
   for ``cutout_size``.
