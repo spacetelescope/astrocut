@@ -365,8 +365,8 @@ The Nancy Grace Roman Space Telescope will store its data using the Advanced Sci
 Creating ASDF Cutouts
 ----------------------
 
-The function `asdf_cut` performs a cutout of an ASDF file and returns the result as either a FITS file or an ASDF file. 
-The format of the cutout is determined by the filename extension of the `output_file` parameter. In the below example, a cutout is written as a FITS file. 
+The function `~astrocut.asdf_cut` performs a cutout of an ASDF file and returns the result as either a FITS file or an ASDF file. 
+The format of the cutout is determined by the filename extension of the ``output_file`` parameter. In the below example, a cutout is written as a FITS file. 
 The cutout FITS file format is described `here <file_formats.html#fits-cutout-files>`__.
 
 .. code-block:: python
@@ -379,16 +379,21 @@ The cutout FITS file format is described `here <file_formats.html#fits-cutout-fi
 
                 >>> center_coord = SkyCoord("80.15189743 29.74561219", unit='deg')
                 
-                >>> cutout_file = asdf_cut(input_file, center_coord.ra, center_coord.dec, cutout_size=200, 
+                >>> cutout_file = asdf_cut(input_file, center_coord.ra, center_coord.dec, cutout_size=205, 
                 ...                        output_file="roman-demo.fits") #doctest: +SKIP
 
                 >>> cutout_hdulist = fits.open(cutout_file)  #doctest: +SKIP
                 >>> cutout_hdulist.info() #doctest: +SKIP
                 Filename: roman-demo.fits
                 No.    Name      Ver    Type      Cards   Dimensions   Format
-                  0  PRIMARY       1 PrimaryHDU      25   (200, 200)   float32 
+                  0  PRIMARY       1 PrimaryHDU      25   (205, 205)   float32 
 
-`asdf_cut` accepts S3 URIs to perform cutouts on ASDF files from the cloud.
+.. warning::
+  Due to the symmetry of the pixel grid, odd values for ``cutout_size`` generally produce
+  cutouts that are more accurately centered on the target coordinates than even values
+  for ``cutout_size``.
+
+`~astrocut.asdf_cut` also accepts S3 URIs to perform cutouts on ASDF files from the cloud.
 In this example, a cutout is performed on a cloud file and written as an ASDF file. The cutout ASDF file format is described `here <file_formats.html#asdf-cutout-files>`__.
 
 .. code-block:: python
@@ -400,10 +405,10 @@ In this example, a cutout is performed on a cloud file and written as an ASDF fi
 
                 >>> center_coord = SkyCoord("80.15189743 29.74561219", unit='deg')
                 
-                >>> cutout_file = asdf_cut(s3_uri, center_coord.ra, center_coord.dec, cutout_size=200, 
+                >>> cutout_file = asdf_cut(s3_uri, center_coord.ra, center_coord.dec, cutout_size=205, 
                 ...                        output_file="roman-demo.asdf") #doctest: +SKIP
 
-When requesting a cutout that is partially outside of image bounds, the `fill_value` parameter is used to preserve the cutout shape and fill outside pixels.
+When requesting a cutout that is partially outside of image bounds, the ``fill_value`` parameter is used to preserve the cutout shape and fill outside pixels.
 
 
 
