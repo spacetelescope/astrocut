@@ -190,5 +190,5 @@ def test_invalid_inputs(tmpdir, ffi_type):
 
     # Should raise a Value Error due to incorrect file type
     with pytest.raises(ValueError) as error_msg:
-        cube_maker.make_cube(ffi_files[0:num_images // 2])
+        cube_maker.make_cube(ffi_files)
     assert value_error in str(error_msg.value)
