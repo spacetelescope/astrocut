@@ -19,8 +19,8 @@ if (version_info >= (3, 8)) and (platform != "win32"):
     from mmap import MADV_SEQUENTIAL
 
 __all__ = ['CubeFactory', 'TicaCubeFactory']
-ERROR_MSG = "One or more incorrect file types were input. Please input TICA FFI files when using\
-                   ``TicaCubeFactory``, and SPOC FFI files when using ``CubeFactory``."
+ERROR_MSG = ("One or more incorrect file types were input. Please input TICA FFI files when using "
+             "``TicaCubeFactory``, and SPOC FFI files when using ``CubeFactory``.")
 
 
 class CubeFactory():
@@ -66,7 +66,10 @@ class CubeFactory():
 
             ffi_data = fits.open(ffi, mode='denywrite', memmap=True)
             
-            start_times[i] = ffi_data[1].header.get(self.time_keyword)
+            try:
+                start_times[i] = ffi_data[1].header.get(self.time_keyword)
+            except IndexError:
+                raise ValueError(ERROR_MSG)
 
             if image_shape is None:  # Only need to fill this once
                 image_shape = ffi_data[1].data.shape

@@ -2,10 +2,8 @@ import numpy as np
 import os
 import pytest
 
-from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.table import Table
-from astroquery.mast import Observations
 from re import findall
 from os import path
 
@@ -173,36 +171,24 @@ def test_iteration(tmpdir, capsys):
 
 @pytest.mark.parametrize("ffi_type", ["TICA", "SPOC"])
 def test_invalid_inputs(tmpdir, ffi_type):
-
-    coordinates = SkyCoord(289.0979, -29.3370, unit="deg")
-
+    """
+    Test that an error is raised when users attempt to make cubes with an invalid file type.
+    """
     # Assigning some variables
-    target_name = "TICA FFI" if ffi_type == "TICA" else "TESS FFI"
-    value_error = "One or more incorrect file types were input. Please input TICA FFI files when using\
-                   ``TicaCubeFactory``, and SPOC FFI files when using ``CubeFactory``."
-
-    # Getting TESS sector 27 observations for the given coordinate
-    observations = Observations.query_criteria(coordinates=coordinates,
-                                               target_name=target_name,
-                                               dataproduct_type="image",
-                                               sequence_number=27)
+    product = "TICA" if ffi_type == "TICA" else "SPOC"
+    value_error = ("One or more incorrect file types were input. Please input TICA FFI files when using "
+                   "``TicaCubeFactory``, and SPOC FFI files when using ``CubeFactory``.")
     
-    # Getting a list of products. Keeping it small so we don't have to download so many.
-    products = Observations.get_product_list(observations[0])[:2]
+    # Create test FFI files
+    num_images = 100
+    ffi_files = create_test_ffis(img_size=10, 
+                                 num_images=num_images,
+                                 dir_name=tmpdir, 
+                                 product=product)
+    
+    cube_maker = CubeFactory() if ffi_type == "TICA" else TicaCubeFactory()
 
-    manifest = Observations.download_products(products, download_dir=str(tmpdir))
-
-    if ffi_type == "TICA":
-        cube_maker = CubeFactory()
-    elif ffi_type == "SPOC":
-        cube_maker = TicaCubeFactory()
-
+    # Should raise a Value Error due to incorrect file type
     with pytest.raises(ValueError) as error_msg:
-        cube_maker.make_cube(manifest["Local Path"])
+        cube_maker.make_cube(ffi_files[0:num_images // 2])
     assert value_error in str(error_msg.value)
-
-    
-
-    
-
-    
