@@ -90,10 +90,7 @@ class CubeFactory():
 
         # Working out the block size and number of blocks needed for writing the cube
         # without using too much memory
-        try:
-            slice_size = image_shape[1] * len(self.file_list) * 2 * 4  # in bytes (float32)
-        except IndexError:
-            raise ValueError(ERROR_MSG)
+        slice_size = image_shape[1] * len(self.file_list) * 2 * 4  # in bytes (float32)
         max_block_size = int((self.max_memory * 1e9)//slice_size)
         
         self.num_blocks = int(image_shape[0]/max_block_size + 1)
