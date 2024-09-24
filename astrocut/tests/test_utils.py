@@ -5,6 +5,9 @@ from astropy import wcs
 from astropy.coordinates import SkyCoord
 from astropy import units as u
 from astropy.utils.data import get_pkg_data_filename
+import pytest
+
+from astrocut.exceptions import InputWarning, InvalidQueryError
 
 from ..utils import utils
 
@@ -13,7 +16,51 @@ from ..utils import utils
 with open(get_pkg_data_filename('data/ex_ffi_wcs.txt'), "r") as FLE:
     WCS_STR = FLE.read()
 
+
+def test_parse_size_input():
+    """Test that different types of input are accurately parsed into cutout sizes"""
+    # With scalar as input
+    cutout_size = utils.parse_size_input(5)
+    assert np.array_equal(cutout_size, np.array((5, 5)))
+
+    # With astropy quantity as input
+    cutout_size = utils.parse_size_input(10 * u.pix)
+    assert np.array_equal(cutout_size, np.array((10, 10)) * u.pix)
+
+    # With tuple as input
+    cutout_size = utils.parse_size_input((5, 10))
+    assert np.array_equal(cutout_size, np.array((5, 10)))
+
+    # With list as input
+    cutout_size = utils.parse_size_input([10, 5])
+    assert np.array_equal(cutout_size, np.array((10, 5)))
+
+    # With array as input
+    cutout_size = utils.parse_size_input(np.array((5, 10)))
+    assert np.array_equal(cutout_size, np.array((5, 10)))
+
+
+def test_parse_size_input_dimension_warning():
+    """Test that a warning is output when input has too many dimensions"""
+    warning = "Too many dimensions in cutout size, only the first two will be used."
+    with pytest.warns(InputWarning, match=warning):
+        cutout_size = utils.parse_size_input((5, 5, 10))
+        assert np.array_equal(cutout_size, np.array((5, 5)))
+
+
+def test_parse_size_input_invalid():
+    """Test that an error is raised when one of the size dimensions is not positive"""
+    err = ('Cutout size dimensions must be greater than zero.')
+    with pytest.raises(InvalidQueryError, match=err):
+        utils.parse_size_input(0)
+
+    with pytest.raises(InvalidQueryError, match=err):
+        utils.parse_size_input((0, 5))
+
+    with pytest.raises(InvalidQueryError, match=err):
+        utils.parse_size_input((0, 5))
     
+
 def test_get_cutout_limits():
 
     test_img_wcs_kwds = fits.Header(cards=[('NAXIS', 2, 'number of array dimensions'),

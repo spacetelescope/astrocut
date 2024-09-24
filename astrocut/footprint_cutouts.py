@@ -16,7 +16,6 @@ from astropy.utils.exceptions import AstropyWarning
 import numpy as np
 import fsspec
 from spherical_geometry.polygon import SphericalPolygon
-from spherical_geometry.vector import radec_to_vector
 
 from astrocut.exceptions import InvalidQueryError
 from astrocut.cube_cut import CutoutFactory
@@ -40,16 +39,13 @@ def _s_region_to_polygon(s_region: Column):
         sr_list = s_reg.strip().split()
         reg_type = sr_list[0].upper()
 
-        if reg_type == "POLYGON":
+        if reg_type == 'POLYGON':
             ras = np.array(sr_list[1::2], dtype=float)
             ras[ras < 0] = ras[ras < 0] + 360
             decs = np.array(sr_list[2::2], dtype=float)
             return SphericalPolygon.from_radec(ras, decs)
-        elif reg_type == "CIRCLE":
-            ra, dec, rad = np.array(sr_list[-3:], dtype=float)
-            return SphericalPolygon.from_cone(ra, dec, rad)
         else:
-            raise ValueError("Unsupported S_Region type.")
+            raise ValueError('Unsupported S_Region type.')
 
     return np.vectorize(ind_sregion_to_polygon)(s_region)
 
@@ -90,37 +86,26 @@ def _ffi_intersect(ffi_list: Table, polygon: SphericalPolygon):
 
 
 def _ra_dec_crossmatch(all_ffis: Table, coord: SkyCoord, cutout_size, arcsec_per_px: int):
-    """Determine which sector/camera/ccd(s) contain the given ra/dec."""    
+    """Determine which sequences contain the given ra/dec."""    
     ra, dec = coord.ra, coord.dec
-
-    # Performing the crossmatch
     ffi_inds = []
-    if (cutout_size == 0).all():
-        vector_coord = radec_to_vector(ra, dec)
-        for sequence in np.unique(all_ffis["sequence_number"]):
-            # np returns a 2-long array where the first element is indexes and the 2nd element is empty
-            seq_ffi_inds = np.where(all_ffis["sequence_number"] == sequence)[0]
 
-            for ind in seq_ffi_inds:
-                if all_ffis[ind]["polygon"].contains_point(vector_coord):
-                    ffi_inds.append(ind)
-                    break  # the ra/dec will only be on one ccd per sector
-    else:
-        # Create polygon for intersection
-        # Convert dimensions from pixels to arcseconds and divide by 2 to get offset from center
-        ra_offset = ((cutout_size[0] * arcsec_per_px) / 2) * u.arcsec
-        dec_offset = ((cutout_size[1] * arcsec_per_px) / 2) * u.arcsec
+    # Create polygon for intersection
+    # Convert dimensions from pixels to arcseconds and divide by 2 to get offset from center
+    ra_offset = ((cutout_size[0] * arcsec_per_px) / 2) * u.arcsec
+    dec_offset = ((cutout_size[1] * arcsec_per_px) / 2) * u.arcsec
 
-        # Calculate RA and Dec boundaries
-        ra_bounds = [ra - ra_offset, ra + ra_offset]
-        dec_bounds = [dec - dec_offset, dec + dec_offset]
+    # Calculate RA and Dec boundaries
+    ra_bounds = [ra - ra_offset, ra + ra_offset]
+    dec_bounds = [dec - dec_offset, dec + dec_offset]
 
-        # Get RA and Dec for four corners of rectangle
-        ras = [ra_bounds[0].value, ra_bounds[1].value, ra_bounds[1].value, ra_bounds[0].value]
-        decs = [dec_bounds[0].value, dec_bounds[0].value, dec_bounds[1].value, dec_bounds[1].value]
+    # Get RA and Dec for four corners of rectangle
+    ras = [ra_bounds[0].value, ra_bounds[1].value, ra_bounds[1].value, ra_bounds[0].value]
+    decs = [dec_bounds[0].value, dec_bounds[0].value, dec_bounds[1].value, dec_bounds[1].value]
 
-        cutout_fp = SphericalPolygon.from_radec(ras, decs, center=(ra, dec))
-        ffi_inds = _ffi_intersect(all_ffis, cutout_fp)
+    # Create SphericalPolygon for comparison
+    cutout_fp = SphericalPolygon.from_radec(ras, decs, center=(ra, dec))
+    ffi_inds = _ffi_intersect(all_ffis, cutout_fp)
 
     return all_ffis[ffi_inds]
 
@@ -178,7 +163,7 @@ def _get_cube_files_from_sequence_obs(sequences: list):
 
 def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size, 
                             sequence: Union[int, List[int], None] = None, product: str = 'SPOC', 
-                            output_dir: str = '.', threads: Union[int, Literal['auto']] = 1,
+                            output_dir: str = '.', threads: Union[int, Literal['auto']] = 8,
                             verbose: bool = False):
     """
     Parameters
@@ -206,7 +191,7 @@ def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size,
         Default '.'. The path to which output files are saved.
         The current directory is default.
     threads : int, 'auto', optional
-        Default 1. Number of threads to use when generating cutouts. Setting <=1 disables the threadpool, 
+        Default 8. Number of threads to use when generating cutouts. Setting <=1 disables the threadpool, 
         >1 sets threadpool to the specified number of threads, and "auto" uses `concurrent.futures.ThreadPoolExecutor`'s
         default: cpu_count + 4, limit to max of 32
     verbose : bool, optional
@@ -250,15 +235,15 @@ def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size,
         print(f'Found {len(all_ffis)} footprint files.')
 
     # Filter FFIs by provided sectors
-    if sequence and product:
+    if sequence:
         # Convert to list
         if isinstance(sequence, int):
             sequence = [sequence]
         all_ffis = all_ffis[np.isin(all_ffis['sequence_number'], sequence)]
 
         if len(all_ffis) == 0:
-            raise InvalidQueryError(f'No FFI cube files were found for sequences: \
-                                    {", ".join(str(s) for s in sequence)}')
+            raise InvalidQueryError('No FFI cube files were found for sequences: ' +
+                                    ', '.join(str(s) for s in sequence))
         
         if verbose:
             print(f'Filtered to {len(all_ffis)} footprints for sequences: {", ".join(str(s) for s in sequence)}')
@@ -266,7 +251,7 @@ def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size,
     # Get sector names and cube files that contain the cutout
     cone_results = _ra_dec_crossmatch(all_ffis, coordinates, cutout_size, TESS_ARCSEC_PER_PX)
     if not cone_results:
-        raise InvalidQueryError('The given coordinates were not found within the specified sector.')
+        raise InvalidQueryError('The given coordinates were not found within the specified sequence(s).')
     seq_list = _create_sequence_list(cone_results, product)
     cube_files_mapping = _get_cube_files_from_sequence_obs(seq_list)
     if verbose:
