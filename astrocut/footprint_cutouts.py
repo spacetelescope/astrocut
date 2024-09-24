@@ -205,13 +205,12 @@ def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size,
     Example
     -------
     >>> from astrocut.footprint_cutouts import cube_cut_from_footprint
-    >>> cube_cut_from_footprint(
-                coordinates='83.40630967798376 -62.48977125108528',
-                cutout_size=64,
-                sequence=[1, 2],  # TESS sectors
-                product='SPOC',
-                output_dir='./cutouts'
-        )
+    >>> cube_cut_from_footprint(  # doctest: +SKIP
+    ...         coordinates='83.40630967798376 -62.48977125108528',
+    ...         cutout_size=64,
+    ...         sequence=[1, 2],  # TESS sectors
+    ...         product='SPOC',
+    ...         output_dir='./cutouts')
     ['./cutouts/tess-s0001-4-4/tess-s0001-4-4_83.406310_-62.489771_64x64_astrocut.fits',
      './cutouts/tess-s0002-4-1/tess-s0002-4-1_83.406310_-62.489771_64x64_astrocut.fits']
     """
