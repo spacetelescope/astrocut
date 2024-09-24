@@ -189,6 +189,5 @@ def test_invalid_inputs(tmpdir, ffi_type):
     cube_maker = CubeFactory() if ffi_type == "TICA" else TicaCubeFactory()
 
     # Should raise a Value Error due to incorrect file type
-    with pytest.raises(ValueError) as error_msg:
+    with pytest.raises(ValueError, match=value_error):
         cube_maker.make_cube(ffi_files)
-    assert value_error in str(error_msg.value)
