@@ -15,7 +15,7 @@ from spherical_geometry.polygon import SphericalPolygon
 
 
 @pytest.fixture(autouse=True)
-def mock_fsspec_tess():
+def mock_fsspec_open():
     """Mock operation to open footprint files from S3 bucket"""
     original_fsspec_open = fsspec.open  # Store the original fsspec.open
 
@@ -33,7 +33,6 @@ def mock_fsspec_tess():
             mock_footprints = f.read()
         mock_fs = mock_open(read_data=mock_footprints).return_value
         return mock_fs
-
 
     with patch('fsspec.open', side_effect=side_effect):
         yield
