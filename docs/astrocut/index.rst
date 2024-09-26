@@ -164,18 +164,14 @@ treated as the R, G, and B channels, respectively.
 TESS Full-Frame Image Cutouts
 =============================
 
-There are two parts of the package involved in creating cutouts from TESS full-frame images (FFIs).
+Astrocut can be used to create cutouts from TESS full-frame images (FFIs).
 First, the `~astrocut.CubeFactory` (if working with SPOC products, or `~astrocut.TicaCubeFactory` if working
 with TICA FFIs) class allows you to create a large image cube from a list of FFI files.
 This is what allows the cutout operation to be performed efficiently.
 Next, the `~astrocut.CutoutFactory` class performs the actual cutout and builds
-a target pixel file (TPF) that is similar to the TESS Mission-produced TPFs.
+a target pixel file (TPF) that is similar to the TESS Mission-produced TPFs. Finally, the `~astrocut.cube_cut_from_footprint`
+function generates cutouts from image cube files stored in MAST's AWS Open Data Bucket.
 
-The basic procedure is to first create an image cube from individual FFI files
-(this only needs to be completed once per set of FFIs), and to then make individual cutout TPFs from this
-large cube file for targets of interest. Note, you can only make cubes from a set of FFIs
-with the same product type (i.e., only SPOC *or* only TICA products) that were observed in 
-the same Sector, camera, and CCD.
 If you are creating a small number of cutouts, the TESSCut web service
 may suit your needs: `mast.stsci.edu/tesscut <https://mast.stsci.edu/tesscut/>`_
  
@@ -215,6 +211,9 @@ create a cube using the `~astrocut.CubeFactory.make_cube` method (or
 and `~astrocut.TicaCubeFactory.make_cube` run in verbose mode and prints out progress; setting `verbose` to false will silence
 all output.
 
+Note, you can only make cubes from a set of FFIs with the same product type (i.e., only SPOC *or* 
+only TICA products) that were observed in the same sector, camera, and CCD.
+
 The output image cube file format is described `here <file_formats.html#cube-files>`__.
 
 .. code-block:: python
@@ -253,7 +252,6 @@ The output image cube file format is described `here <file_formats.html#cube-fil
 Making Cutout Target Pixel Files
 --------------------------------
 
-To make a cutout, you must already have an image cube from which to create the cutout.
 Assuming that you have a TESS cube file stored locally, you can give the central
 coordinate of your target of interest and cutout size (in either pixels or angular degrees/arcseconds `~astropy.Quantity`)
 to the `~astrocut.CutoutFactory.cube_cut` function.
@@ -295,15 +293,34 @@ The cutout target pixel file format is described `here <file_formats.html#target
 Cloud-based Cutouts
 -------------------
 
-You can also create cutout TPFs out of TESS cube files stored on MAST's AWS open data bucket.
-Using cube files stored on the cloud allows you the option to implement multithreading to improve cutout generation
-speed. See below for a multithreaded example, using a TESS cube file stored on AWS.
+You can generate cutout Target Pixel Files (TPFs) from TESS cube files stored in MAST's AWS Open Data Bucket using the 
+`~astrocut.cube_cut_from_footprint` function. Simply provide the target coordinates and cutout size, and the function will 
+match the cutout's footprint to the footprints of available cube files on the cloud. A cutout will be generated for each matching 
+cube file. To restrict the cutouts to specific sectors, use the ``sequence`` parameter with a sector number or a list of sector numbers. 
+If ``sequence`` is set to None, cutouts will be returned for all matching cube files.
+
+.. code-block:: python
+
+                >>> from astrocut import cube_cut_from_footprint
+
+                >>> cube_cut_from_footprint(  #doctest: +SKIP
+                ...         coordinates='83.40630967798376 -62.48977125108528',
+                ...         cutout_size=10,
+                ...         sequence=[1, 2],  # TESS sectors
+                ...         product='SPOC')
+                ['./cutouts/tess-s0001-4-4/tess-s0001-4-4_83.406310_-62.489771_10x10_astrocut.fits',
+                './cutouts/tess-s0002-4-1/tess-s0002-4-1_83.406310_-62.489771_10x10_astrocut.fits']
+
+Alternatively, you can provide the S3 URI for a cube file directly to the `~astrocut.cube_cut` function.
 
 Multithreading
 ---------------
 
-To use multithreading for cloud-based cutouts, set the ``threads`` argument in ``cube_cut`` to the number of threads you want to use. Alternatively, you
-can set ``threads`` to ``"auto"``, which will set the number of threads based on the CPU count of your machine.
+Using cube files stored on the cloud allows you the option to implement multithreading to improve cutout generation
+speed. See below for a multithreaded example, using a TESS cube file stored on AWS.
+
+To use multithreading for cloud-based cutouts, set the ``threads`` argument in ``cube_cut`` to the number of threads you want to use. 
+Alternatively, you can set ``threads`` to ``"auto"``, which will set the number of threads based on the CPU count of your machine.
 Note that ``Total Time`` results may vary from machine to machine.
 
 .. code-block:: python
@@ -354,6 +371,10 @@ Note that multithreading is disabled by default.
 
                 Write time: 0.56 sec
                 Total time: 7.8 sec
+
+You can also use the ``threads`` argument in the `~astrocut.cube_cut_from_footprint` function to control parallel processing. 
+If set to a value greater than 1, cutouts will be generated in parallel, significantly speeding up execution time. 
+The default value for ``threads`` is 8.
 
 
 

@@ -62,8 +62,9 @@ def _get_s3_ffis(s3_uri, as_table: bool = False, load_polys: bool = False):
     # Open footprint file with fsspec
     # Use caching to help performance, but check that remote UID matches the local
     # Expiry time is 1 week by default
-    with fsspec.open('filecache::' + s3_uri, s3={'anon': True}, 
-                     filecache={'cache_storage': 's3_cache', 'check_files': True}) as f:
+    s3_cache = os.path.join(os.path.dirname(os.path.abspath(__file__)), 's3_cache')
+    with fsspec.open('filecache::' + s3_uri, s3={'anon': True},
+                     filecache={'cache_storage': s3_cache, 'check_files': True}) as f:
         ffis = json.load(f)
 
     if load_polys:
@@ -166,6 +167,8 @@ def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size,
                             output_dir: str = '.', threads: Union[int, Literal['auto']] = 8,
                             verbose: bool = False):
     """
+    Generates cutouts around `coordinates` of size `cutout_size` from image cube files hosted on the S3 cloud.
+
     Parameters
     ----------
     coordinates : str or `astropy.coordinates.SkyCoord` object
@@ -202,10 +205,10 @@ def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size,
     cutout_files : list
         List of paths to cutout files.
 
-    Example
-    -------
+    Examples
+    --------
     >>> from astrocut.footprint_cutouts import cube_cut_from_footprint
-    >>> cube_cut_from_footprint(  # doctest: +SKIP
+    >>> cube_cut_from_footprint(  #doctest: +SKIP
     ...         coordinates='83.40630967798376 -62.48977125108528',
     ...         cutout_size=64,
     ...         sequence=[1, 2],  # TESS sectors
