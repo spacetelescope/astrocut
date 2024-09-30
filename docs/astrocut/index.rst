@@ -372,10 +372,6 @@ Note that multithreading is disabled by default.
                 Write time: 0.56 sec
                 Total time: 7.8 sec
 
-You can also use the ``threads`` argument in the `~astrocut.cube_cut_from_footprint` function to control parallel processing. 
-If set to a value greater than 1, cutouts will be generated in parallel, significantly speeding up execution time. 
-The default value for ``threads`` is 8.
-
 
 
 ASDF File Cutouts

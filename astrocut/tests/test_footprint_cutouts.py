@@ -125,29 +125,12 @@ def test_cube_cut_from_footprint(tmpdir, capsys, ffi_type):
     # Assert that messages were printed
     captured = capsys.readouterr()
     output = captured.out
-    assert 'Coordinates: ' in output
-    assert 'Cutout size:  [5 5]' in output
+    assert 'Coordinates:' in output
+    assert 'Cutout size: [5 5]' in output
     assert re.search(r'Found \d+ footprint files.', output)
     assert re.search(r'Filtered to \d+ footprints for sequences: 44', output)
     assert re.search(r'Found \d+ matching cube files.', output)
-    assert 'Generating cutouts in parallel with max threads: 8' in output
-    check_output_file(cutout[0], ffi_type, [44])
-
-
-@pytest.mark.parametrize('ffi_type', ['SPOC', 'TICA'])
-def test_cube_cut_from_footprint_sequential(tmpdir, capsys, ffi_type):
-    """Test that data cube is cut from FFI file using sequential processing"""
-    cutout = cube_cut_from_footprint(coordinates='130 30', 
-                                     cutout_size=5,
-                                     product=ffi_type,
-                                     output_dir=tmpdir,
-                                     sequence=44,
-                                     threads=1,
-                                     verbose=True)
-    
-    # Assert that relevant message was printed
-    captured = capsys.readouterr()
-    assert 'Generating cutouts in sequence.' in captured.out
+    assert 'Generating cutouts...' in output
     check_output_file(cutout[0], ffi_type, [44])
 
 

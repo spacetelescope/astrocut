@@ -5,14 +5,15 @@
 import json
 import re
 import os
-from typing import List, Literal, Union
+from typing import List, Union
 import warnings
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from threading import Lock
 
 from astropy.coordinates import SkyCoord
 from astropy.table import Table, Column
 import astropy.units as u
 from astropy.utils.exceptions import AstropyWarning
+from cachetools import TTLCache, cached
 import numpy as np
 import fsspec
 from spherical_geometry.polygon import SphericalPolygon
@@ -22,7 +23,9 @@ from astrocut.cube_cut import CutoutFactory
 
 from .utils.utils import parse_size_input
 
-TESS_ARCSEC_PER_PX = 21
+TESS_ARCSEC_PER_PX = 21  # Number of arcseconds per pixel in a TESS image
+FFI_TTLCACHE = TTLCache(maxsize=10, ttl=900)  # Cache for FFI footprint files
+CUBE_CUT_THREADS = 8  # Number of threads to use in `cube_cut` function
 
 
 def _s_region_to_polygon(s_region: Column):
@@ -50,6 +53,7 @@ def _s_region_to_polygon(s_region: Column):
     return np.vectorize(ind_sregion_to_polygon)(s_region)
 
 
+@cached(cache=FFI_TTLCACHE, lock=Lock())
 def _get_s3_ffis(s3_uri, as_table: bool = False, load_polys: bool = False):
     """
     Fetch the S3 footprint file containing a dict of all FFIs and a polygon column
@@ -60,11 +64,7 @@ def _get_s3_ffis(s3_uri, as_table: bool = False, load_polys: bool = False):
         load_polys: Convert the s_region column to an array of SphericalPolygon objects
     """
     # Open footprint file with fsspec
-    # Use caching to help performance, but check that remote UID matches the local
-    # Expiry time is 1 week by default
-    s3_cache = os.path.join(os.path.dirname(os.path.abspath(__file__)), 's3_cache')
-    with fsspec.open('filecache::' + s3_uri, s3={'anon': True},
-                     filecache={'cache_storage': s3_cache, 'check_files': True}) as f:
+    with fsspec.open(s3_uri, s3={'anon': True}) as f:
         ffis = json.load(f)
 
     if load_polys:
@@ -164,8 +164,7 @@ def _get_cube_files_from_sequence_obs(sequences: list):
 
 def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size, 
                             sequence: Union[int, List[int], None] = None, product: str = 'SPOC', 
-                            output_dir: str = '.', threads: Union[int, Literal['auto']] = 8,
-                            verbose: bool = False):
+                            output_dir: str = '.', verbose: bool = False):
     """
     Generates cutouts around `coordinates` of size `cutout_size` from image cube files hosted on the S3 cloud.
 
@@ -193,10 +192,6 @@ def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size,
     output_dir : str, optional
         Default '.'. The path to which output files are saved.
         The current directory is default.
-    threads : int, 'auto', optional
-        Default 8. Number of threads to use when generating cutouts. Setting <=1 disables the threadpool, 
-        >1 sets threadpool to the specified number of threads, and "auto" uses `concurrent.futures.ThreadPoolExecutor`'s
-        default: cpu_count + 4, limit to max of 32
     verbose : bool, optional
         Default False. If True, intermediate information is printed.
 
@@ -222,12 +217,12 @@ def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size,
     if not isinstance(coordinates, SkyCoord):
         coordinates = SkyCoord(coordinates, unit='deg')
     if verbose:
-        print('Coordinates: ', coordinates)
+        print('Coordinates:', coordinates)
 
     # Parse cutout size
     cutout_size = parse_size_input(cutout_size)
     if verbose:
-        print('Cutout size: ', cutout_size)
+        print('Cutout size:', cutout_size)
 
     # Get FFI footprints from the cloud
     s3_uri = 's3://tesscut-ops-footprints/tess_ffi_footprint_cache.json' if product == 'SPOC' \
@@ -277,7 +272,7 @@ def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size,
                 cutout_size=cutout_size,
                 product=product,
                 output_path=output_path,
-                threads=8,
+                threads=CUBE_CUT_THREADS,
                 verbose=verbose
             )
             return cutout
@@ -286,26 +281,8 @@ def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size,
             return None
         
     # Generate cutout from each cube file
-    cutout_files = []
-    if threads == 'auto' or threads > 1:
-        # Parallel processing
-        if verbose:
-            print(f'Generating cutouts in parallel with max threads: {threads}')
-
-        # Use ThreadPoolExecutor for parallelization
-        max_workers = None if threads == "auto" else threads
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = [executor.submit(process_file, file) for file in cube_files_mapping]
-
-            # Collect results as they are completed
-            for future in as_completed(futures):
-                result = future.result()
-                if result is not None:
-                    cutout_files.append(result)
-    else:
-        # Sequential Processing
-        if verbose:
-            print('Generating cutouts in sequence.')
-        cutout_files = [process_file(file) for file in cube_files_mapping]
+    if verbose:
+        print('Generating cutouts...')
+    cutout_files = [process_file(file) for file in cube_files_mapping]
 
     return cutout_files
