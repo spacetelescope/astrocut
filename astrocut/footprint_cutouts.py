@@ -3,8 +3,8 @@
 """This module creates cutouts from data cubes found in the cloud."""
 
 import json
-import re
 import os
+import re
 from typing import List, Union
 import warnings
 from threading import Lock
@@ -14,8 +14,9 @@ from astropy.table import Table, Column
 import astropy.units as u
 from astropy.utils.exceptions import AstropyWarning
 from cachetools import TTLCache, cached
-import numpy as np
 import fsspec
+import numpy as np
+import requests
 from spherical_geometry.polygon import SphericalPolygon
 
 from astrocut.exceptions import InvalidQueryError
@@ -54,6 +55,41 @@ def _s_region_to_polygon(s_region: Column):
 
 
 @cached(cache=FFI_TTLCACHE, lock=Lock())
+def _get_caom_ffis(product: str):
+    """
+    Using vo-tap, fetch the footprint file from CAOM containing a dict of all FFIs and a 
+    polygon column that holds the s_regions as polygon points and vectors.
+
+    This is a temporary work-around until the footprint files are publicly accessible
+    on the cloud.
+    """
+    # Define the URL and parameters for the query
+    obs_collection = 'TESS' if product == 'SPOC' else 'HLSP'
+    target_name = 'TESS FFI' if product == 'SPOC' else 'TICA FFI'
+    url = 'https://mast.stsci.edu/vo-tap/api/v0.1/caom/sync'
+    params = {
+        'FORMAT': 'csv',
+        'LANG': 'ADQL',
+        'QUERY': 'SELECT obs_id, t_min, t_max, s_region, target_name, sequence_number '
+                'FROM dbo.ObsPointing '
+                f"WHERE obs_collection='{obs_collection}' AND dataproduct_type='image' AND target_name='{target_name}'"
+    }
+
+    # Send the GET request
+    response = requests.get(url, params=params)
+    response.raise_for_status()  # Raise HTTPError if response is not 200
+
+    # Load CSV data into a Table
+    all_ffis = Table.read(response.text, format='csv')
+    all_ffis.sort('obs_id')
+
+    # Convert regions to polygons
+    all_ffis['polygon'] = _s_region_to_polygon(all_ffis['s_region'])
+
+    return all_ffis
+
+
+@cached(cache=FFI_TTLCACHE, lock=Lock())
 def _get_s3_ffis(s3_uri, as_table: bool = False, load_polys: bool = False):
     """
     Fetch the S3 footprint file containing a dict of all FFIs and a polygon column
@@ -83,7 +119,7 @@ def _ffi_intersect(ffi_list: Table, polygon: SphericalPolygon):
     def single_intersect(ffi, polygon):
         return ffi.intersects_poly(polygon)
 
-    return np.vectorize(single_intersect)(ffi_list["polygon"], polygon)
+    return np.vectorize(single_intersect)(ffi_list['polygon'], polygon)
 
 
 def _ra_dec_crossmatch(all_ffis: Table, coord: SkyCoord, cutout_size, arcsec_per_px: int):
@@ -225,9 +261,10 @@ def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size,
         print('Cutout size:', cutout_size)
 
     # Get FFI footprints from the cloud
-    s3_uri = 's3://tesscut-ops-footprints/tess_ffi_footprint_cache.json' if product == 'SPOC' \
-        else 's3://tesscut-ops-footprints/tica_ffi_footprint_cache.json'
-    all_ffis = _get_s3_ffis(s3_uri=s3_uri, as_table=True, load_polys=True)
+    # s3_uri = 's3://tesscut-ops-footprints/tess_ffi_footprint_cache.json' if product == 'SPOC' \
+    #     else 's3://tesscut-ops-footprints/tica_ffi_footprint_cache.json'
+    # all_ffis = _get_s3_ffis(s3_uri=s3_uri, as_table=True, load_polys=True)
+    all_ffis = _get_caom_ffis(product)
     if verbose:
         print(f'Found {len(all_ffis)} footprint files.')
 
