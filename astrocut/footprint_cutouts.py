@@ -2,7 +2,6 @@
 
 """This module creates cutouts from data cubes found in the cloud."""
 
-import json
 import os
 import re
 from typing import List, Union
@@ -14,7 +13,6 @@ from astropy.table import Table, Column
 import astropy.units as u
 from astropy.utils.exceptions import AstropyWarning
 from cachetools import TTLCache, cached
-import fsspec
 import numpy as np
 import requests
 from spherical_geometry.polygon import SphericalPolygon
@@ -31,8 +29,7 @@ CUBE_CUT_THREADS = 8  # Number of threads to use in `cube_cut` function
 
 def _s_region_to_polygon(s_region: Column):
     """
-    Takes in a s_region string of type POLYGON or CIRCLE and returns it as
-    a spherical_region Polygon.
+    Takes in a s_region string of type POLYGON and returns it as a spherical_region Polygon.
 
     Example inputs:
     'POLYGON 229.80771900 -75.17048500 241.67788000 -63.95992300 269.94872000 -64.39276400 277.87862300 -75.57754400'
@@ -55,13 +52,21 @@ def _s_region_to_polygon(s_region: Column):
 
 
 @cached(cache=FFI_TTLCACHE, lock=Lock())
-def _get_caom_ffis(product: str):
+def get_caom_ffis(product: str = 'SPOC'):
     """
-    Using vo-tap, fetch the footprint file from CAOM containing a dict of all FFIs and a 
-    polygon column that holds the s_regions as polygon points and vectors.
+    Fetches footprints for Full Frame Images (FFIs) from the Common Archive Observation Model. The resulting
+    table contains each (FFI) and a 'polygon' column that describes the image's footprints as polygon points
+    and vectors.
 
-    This is a temporary work-around until the footprint files are publicly accessible
-    on the cloud.
+    Parameters
+    ----------
+    product : str, optional
+        Default 'SPOC'. The product type for which to fetch footprints.
+
+    Returns
+    -------
+    all_ffis : `~astropy.table.Table`
+        Table containing information about FFIs and their footprints.
     """
     # Define the URL and parameters for the query
     obs_collection = 'TESS' if product == 'SPOC' else 'HLSP'
@@ -89,29 +94,6 @@ def _get_caom_ffis(product: str):
     return all_ffis
 
 
-@cached(cache=FFI_TTLCACHE, lock=Lock())
-def _get_s3_ffis(s3_uri, as_table: bool = False, load_polys: bool = False):
-    """
-    Fetch the S3 footprint file containing a dict of all FFIs and a polygon column
-    that holds the s_regions as polygon points and vectors.
-
-    Optional Parameters:
-        as_table: Return the footprint file as an Astropy Table
-        load_polys: Convert the s_region column to an array of SphericalPolygon objects
-    """
-    # Open footprint file with fsspec
-    with fsspec.open(s3_uri, s3={'anon': True}) as f:
-        ffis = json.load(f)
-
-    if load_polys:
-        ffis['polygon'] = _s_region_to_polygon(ffis['s_region'])
-
-    if as_table:
-        ffis = Table(ffis)
-
-    return ffis
-
-
 def _ffi_intersect(ffi_list: Table, polygon: SphericalPolygon):
     """
     Vectorizing the spherical_coordinate intersects_polygon function
@@ -122,9 +104,44 @@ def _ffi_intersect(ffi_list: Table, polygon: SphericalPolygon):
     return np.vectorize(single_intersect)(ffi_list['polygon'], polygon)
 
 
-def _ra_dec_crossmatch(all_ffis: Table, coord: SkyCoord, cutout_size, arcsec_per_px: int):
-    """Determine which sequences contain the given ra/dec."""    
-    ra, dec = coord.ra, coord.dec
+def ra_dec_crossmatch(all_ffis: Table, coordinates: SkyCoord, cutout_size, arcsec_per_px: int = TESS_ARCSEC_PER_PX):
+    """
+    Returns the Full Frame Images (FFIs) whose footprints overlap with a cutout of a given position and size.
+
+    Parameters
+    ----------
+    all_ffis : `~astropy.table.Table`
+        Table of FFIs to crossmatch with the cutout.
+    coordinates : str or `astropy.coordinates.SkyCoord` object
+        The position around which to cutout.
+        It may be specified as a string ("ra dec" in degrees)
+        or as the appropriate `~astropy.coordinates.SkyCoord` object.
+    cutout_size : int, array-like, `~astropy.units.Quantity`
+        The size of the cutout array. If ``cutout_size``
+        is a scalar number or a scalar `~astropy.units.Quantity`,
+        then a square cutout of ``cutout_size`` will be created.  If
+        ``cutout_size`` has two elements, they should be in ``(ny, nx)``
+        order.  Scalar numbers in ``cutout_size`` are assumed to be in
+        units of pixels. `~astropy.units.Quantity` objects must be in pixel or
+        angular units.
+    arcsec_per_px : int, optional
+        Default 21. The number of arcseconds per pixel in an image. Used to determine
+        the footprint of the cutout. Default is the number of arcseconds per pixel in
+        a TESS image.
+
+    Returns
+    -------
+    matching_ffis : `~astropy.table.Table`
+        Table containing information about FFIs whose footprints overlap those of the cutout.
+    """
+    # Convert coordinates to SkyCoord
+    if not isinstance(coordinates, SkyCoord):
+        coordinates = SkyCoord(coordinates, unit='deg')
+
+    # Parse cutout size
+    cutout_size = parse_size_input(cutout_size)
+
+    ra, dec = coordinates.ra, coordinates.dec
     ffi_inds = []
 
     # Create polygon for intersection
@@ -264,7 +281,7 @@ def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size,
     # s3_uri = 's3://tesscut-ops-footprints/tess_ffi_footprint_cache.json' if product == 'SPOC' \
     #     else 's3://tesscut-ops-footprints/tica_ffi_footprint_cache.json'
     # all_ffis = _get_s3_ffis(s3_uri=s3_uri, as_table=True, load_polys=True)
-    all_ffis = _get_caom_ffis(product)
+    all_ffis = get_caom_ffis(product)
     if verbose:
         print(f'Found {len(all_ffis)} footprint files.')
 
@@ -283,7 +300,7 @@ def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size,
             print(f'Filtered to {len(all_ffis)} footprints for sequences: {", ".join(str(s) for s in sequence)}')
 
     # Get sector names and cube files that contain the cutout
-    cone_results = _ra_dec_crossmatch(all_ffis, coordinates, cutout_size, TESS_ARCSEC_PER_PX)
+    cone_results = ra_dec_crossmatch(all_ffis, coordinates, cutout_size, TESS_ARCSEC_PER_PX)
     if not cone_results:
         raise InvalidQueryError('The given coordinates were not found within the specified sequence(s).')
     seq_list = _create_sequence_list(cone_results, product)
