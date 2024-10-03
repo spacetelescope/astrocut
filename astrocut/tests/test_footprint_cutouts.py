@@ -1,41 +1,14 @@
 import re
-from unittest.mock import mock_open, patch
-import fsspec
 import numpy as np
 import pytest
 
 from astrocut.exceptions import InvalidQueryError
 from astrocut.footprint_cutouts import (cube_cut_from_footprint, _extract_sequence_information, _s_region_to_polygon, 
-                                        _get_s3_ffis, _ffi_intersect, _ra_dec_crossmatch, _create_sequence_list)
+                                        _get_caom_ffis, _ffi_intersect, _ra_dec_crossmatch, _create_sequence_list)
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.table import Table
-from astropy.utils.data import get_pkg_data_filename
 from spherical_geometry.polygon import SphericalPolygon
-
-
-@pytest.fixture(autouse=True)
-def mock_fsspec_open():
-    """Mock operation to open footprint files from S3 bucket"""
-    original_fsspec_open = fsspec.open  # Store the original fsspec.open
-
-    def side_effect(path, *args, **kwargs):
-        if 's3://tesscut-ops-footprints/tess_ffi_footprint_cache.json' in path:
-            filename = get_pkg_data_filename('data/tess_ffi_footprints.json')
-        elif 's3://tesscut-ops-footprints/tica_ffi_footprint_cache.json' in path:
-            filename = get_pkg_data_filename('data/tica_ffi_footprints.json')
-        else:
-            # Call the original fsspec.open if neither condition is met
-            return original_fsspec_open(path, *args, **kwargs)
-        
-        # Simulate reading from the relevant footprint file
-        with open(filename, 'r') as f:
-            mock_footprints = f.read()
-        mock_fs = mock_open(read_data=mock_footprints).return_value
-        return mock_fs
-
-    with patch('fsspec.open', side_effect=side_effect):
-        yield
 
 
 def check_output_file(path, ffi_type, sequences=[]):
@@ -160,7 +133,7 @@ def test_cube_cut_from_footprint_all_sequences(tmpdir):
                                       output_dir=tmpdir)
     
     # Crossmatch to get sectors that contain cutout
-    all_ffis = _get_s3_ffis('s3://tesscut-ops-footprints/tess_ffi_footprint_cache.json', as_table=True, load_polys=True)
+    all_ffis = _get_caom_ffis(product)
     cone_results = _ra_dec_crossmatch(all_ffis, coordinates, cutout_size, 21)
     seq_list = _create_sequence_list(cone_results, product)
     sequences = [int(seq['sector']) for seq in seq_list]
