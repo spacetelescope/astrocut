@@ -15,6 +15,10 @@ import numpy as np
 from astropy.io import fits
 from astropy.table import Column, Table
 
+from astrocut.utils.utils import _handle_verbose
+
+from . import log
+
 if (version_info >= (3, 8)) and (platform != "win32"):
     from mmap import MADV_SEQUENTIAL
 
@@ -195,6 +199,7 @@ class CubeFactory():
 
         cube_hdu is am hdulist object opened in update mode
         """
+        _handle_verbose(verbose)
 
         # Initializing the sub-cube
         nrows = (self.cube_shape[0] - start_row) if (end_row is None) else (end_row - start_row)
@@ -202,10 +207,7 @@ class CubeFactory():
         
         # Loop through files
         for i, fle in enumerate(self.file_list):
-
-            if verbose:
-                st = time()
-
+            st = time()
             with fits.open(fle, mode='denywrite', memmap=True) as ffi_data:
 
                 # add the image and info to the arrays
@@ -228,8 +230,7 @@ class CubeFactory():
                                 nulval = ""
                             self.info_table[kwd][i] = ffi_data[1].header.get(kwd, nulval)
 
-            if verbose:
-                print(f"Completed file {i} in {time()-st:.3} sec.")
+            log.debug(f"Completed file {i} in {time()-st:.3} sec.")
 
         # Fill block and flush to disk
         cube_hdu[1].data[start_row:end_row, :, :, :] = sub_cube
@@ -307,9 +308,8 @@ class CubeFactory():
             If successful, returns the path to the cube fits file, 
             if unsuccessful returns None.
         """
-
-        if verbose:
-            startTime = time()
+        _handle_verbose(verbose)
+        startTime = time()
 
         self.max_memory = max_memory
 
@@ -318,9 +318,8 @@ class CubeFactory():
 
         self._configure_cube(file_list, sector=sector)
     
-        if verbose:
-            print("Using {} to initialize the image header table.".format(os.path.basename(self.template_file)))
-            print(f"Cube will be made in {self.num_blocks} blocks of {self.block_size} rows each.")
+        log.debug("Using {} to initialize the image header table.".format(os.path.basename(self.template_file)))
+        log.debug(f"Cube will be made in {self.num_blocks} blocks of {self.block_size} rows each.")
 
         # Set up the table to old the individual image heades
         self._build_info_table()
@@ -345,13 +344,11 @@ class CubeFactory():
                 fill_info_table = True if (i == 0) else False
                 self._write_block(cube_hdu, start_row, end_row, fill_info_table, verbose)
                   
-                if verbose:
-                    print(f"Completed block {i+1} of {self.num_blocks}")
+                log.debug(f"Completed block {i+1} of {self.num_blocks}")
 
         # Add the info table to the cube file
         self._write_info_table()
-        if verbose:
-            print(f"Total time elapsed: {(time() - startTime)/60:.2f} min")
+        log.debug(f"Total time elapsed: {(time() - startTime)/60:.2f} min")
 
         return self.cube_file
 
@@ -566,6 +563,7 @@ class TicaCubeFactory():
 
         cube_hdu is an hdulist object opened in update mode
         """
+        _handle_verbose(verbose)
 
         # Initializing the sub-cube
         nrows = (self.cube_shape[0] - start_row) if (end_row is None) else (end_row - start_row)
@@ -574,8 +572,7 @@ class TicaCubeFactory():
         # Loop through files
         for i, fle in enumerate(self.file_list):
 
-            if verbose:
-                st = time()
+            st = time()
 
             # In this section we will take the SCI data from self.file_list above
             # and "paste" a cutout of the full SCI array into a 4d array called 
@@ -626,8 +623,7 @@ class TicaCubeFactory():
                                 else:
                                     raise
 
-            if verbose:
-                print(f"Completed file {i} in {time()-st:.3} sec.")
+            log.debug(f"Completed file {i} in {time()-st:.3} sec.")
 
         # Fill block and flush to disk
         if not self.update:
@@ -730,21 +726,17 @@ class TicaCubeFactory():
         4. Rename the file accordingly(?)
 
         """
-
+        _handle_verbose(verbose)
+        startTime = time()
         self.update = True  # we're updating!
-
         self.max_memory = max_memory
-
-        if verbose:
-            startTime = time()
 
         # Next locate the existing cube file and assign it a variable
         err_msg = 'Location of the cube file was unsuccessful. Please ensure the correct path was provided.'
         assert os.path.exists(cube_file), err_msg
         self.cube_file = cube_file
 
-        if verbose:
-            print(f'Updating cube file: {cube_file}')
+        log.debug(f'Updating cube file: {cube_file}')
 
         # Ensure that none of the files in file_list are in the cube already, to avoid duplicates
         in_cube = list(fits.getdata(self.cube_file, 2)['FFI_FILE'])
@@ -754,8 +746,8 @@ class TicaCubeFactory():
         for idx, file in enumerate(file_list): 
 
             if os.path.basename(file) in in_cube:
-                print('File removed from list:')
-                print(os.path.basename(file))
+                log.info('File removed from list:')
+                log.info(os.path.basename(file))
 
             if os.path.basename(file) not in in_cube:
                 filtered_file_list.append(file)
@@ -763,8 +755,7 @@ class TicaCubeFactory():
         noffis_err_msg = 'No new FFIs found for the given sector.'
         assert len(filtered_file_list) > 0, noffis_err_msg
 
-        if verbose: 
-            print(f'{len(filtered_file_list)} new FFIs found!')
+        log.debug(f'{len(filtered_file_list)} new FFIs found!')
         
         # Creating an empty cube that will be appended to the existing cube
         og_cube = fits.getdata(cube_file, 1)
@@ -776,8 +767,7 @@ class TicaCubeFactory():
         sector = (sector, "Observing sector")
         self._configure_cube(filtered_file_list, sector=sector)
 
-        if verbose:
-            print(f"FFIs will be appended in {self.num_blocks} blocks of {self.block_size} rows each.")
+        log.debug(f"FFIs will be appended in {self.num_blocks} blocks of {self.block_size} rows each.")
         
         # Starting a new info table from scratch with new rows
         self._build_info_table()
@@ -806,20 +796,16 @@ class TicaCubeFactory():
                 # the info table also gets updated here 
                 fill_info_table = True
                 self._write_block(cube_hdu, start_row, end_row, fill_info_table, verbose)
-
-                if verbose:
-                    print(f"Completed block {i+1} of {self.num_blocks}")
+                log.debug(f"Completed block {i+1} of {self.num_blocks}")
        
         # Append the new cube to the existing cube
         new_cube = np.concatenate((og_cube, self.cube_append), axis=2)
 
         # Add it to the HDU list 
         with fits.open(self.cube_file, mode='update') as hdul:
-            
-            if verbose:
-                print(f'Original cube of size: {str(og_cube.shape)}')
-                print(f'will now be replaced with cube of size: {str(new_cube.shape)}')
-                print(f'for file ``{cube_file}``')
+            log.debug(f'Original cube of size: {str(og_cube.shape)}')
+            log.debug(f'will now be replaced with cube of size: {str(new_cube.shape)}')
+            log.debug(f'for file ``{cube_file}``')
             hdul[1].data = new_cube
 
         # Appending new info table to original 
@@ -827,9 +813,7 @@ class TicaCubeFactory():
         
         # Writing the info table to EXT2 of the FITS file 
         self._write_info_table()
-
-        if verbose:
-            print(f"Total time elapsed: {(time() - startTime)/60:.2f} min")
+        log.debug(f"Total time elapsed: {(time() - startTime)/60:.2f} min")
 
         return self.cube_file
 
@@ -870,19 +854,16 @@ class TicaCubeFactory():
             If successful, returns the path to the cube fits file, 
             if unsuccessful returns None.
         """
-
-        if verbose:
-            startTime = time()
+        _handle_verbose(verbose)
+        startTime = time()
 
         self.max_memory = max_memory
 
         # Set up the basic cube parameters
         sector = (sector, "Observing sector")
         self._configure_cube(file_list, sector=sector)
-
-        if verbose:
-            print("Using {} to initialize the image header table.".format(os.path.basename(self.template_file)))
-            print(f"Cube will be made in {self.num_blocks} blocks of {self.block_size} rows each.")
+        log.debug("Using {} to initialize the image header table.".format(os.path.basename(self.template_file)))
+        log.debug(f"Cube will be made in {self.num_blocks} blocks of {self.block_size} rows each.")
         
         # Set up the table to hold the individual image headers
         self._build_info_table()
@@ -906,14 +887,11 @@ class TicaCubeFactory():
 
                 fill_info_table = True if (i == 0) else False
                 self._write_block(cube_hdu, start_row, end_row, fill_info_table, verbose)
-                  
-                if verbose:
-                    print(f"Completed block {i+1} of {self.num_blocks}")
+                log.debug(f"Completed block {i+1} of {self.num_blocks}")
 
         # Add the info table to the cube file
         self._write_info_table()
-        if verbose:
-            print(f"Total time elapsed: {(time() - startTime)/60:.2f} min")
+        log.debug(f"Total time elapsed: {(time() - startTime)/60:.2f} min")
 
         return self.cube_file
         

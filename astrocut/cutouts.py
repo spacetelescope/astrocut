@@ -8,7 +8,7 @@ import numpy as np
 
 from time import time
 
-from astropy import log
+from astropy import log as astropy_log
 from astropy.io import fits
 from astropy.coordinates import SkyCoord
 from astropy import wcs
@@ -17,7 +17,8 @@ from astropy.visualization import (SqrtStretch, LogStretch, AsinhStretch, SinhSt
 
 from PIL import Image
 
-from .utils.utils import parse_size_input, get_cutout_limits, get_cutout_wcs, get_fits
+from . import log
+from .utils.utils import _handle_verbose, parse_size_input, get_cutout_limits, get_cutout_wcs, get_fits
 from .exceptions import InputWarning, DataWarning, InvalidQueryError, InvalidInputError
 
 
@@ -48,7 +49,7 @@ def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, verbose=False
     response : `~astropy.io.fits.hdu.image.ImageHDU` 
         The cutout image and associated metadata.
     """
-    
+    _handle_verbose(verbose)
     hdu_header = fits.Header(img_hdu.header, copy=True)
 
     # We are going to reroute the logging to a string stream temporarily so we can
@@ -56,13 +57,13 @@ def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, verbose=False
     # INFO message which will indicate that we need to remove existing SIP keywords
     # from a WCS whose CTYPE does not include SIP. In this we are taking the CTYPE to be
     # correct and adjusting the header keywords to match.
-    hdlrs = log.handlers
-    log.handlers = []
-    with log.log_to_list() as log_list:        
+    hdlrs = astropy_log.handlers
+    astropy_log.handlers = []
+    with astropy_log.log_to_list() as log_list:        
         img_wcs = wcs.WCS(hdu_header, relax=True)
 
     for hd in hdlrs:
-        log.addHandler(hd)
+        astropy_log.addHandler(hd)
 
     no_sip = False
     if (len(log_list) > 0):
@@ -74,19 +75,17 @@ def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, verbose=False
             
         else:  # Message(s) we didn't prepare for we want to go ahead and display
             for log_rec in log_list:
-                log.log(log_rec.levelno, log_rec.msg, extra={"origin": log_rec.name})
+                astropy_log.log(log_rec.levelno, log_rec.msg, extra={"origin": log_rec.name})
 
     img_data = img_hdu.data
 
-    if verbose:
-        print("Original image shape: {}".format(img_data.shape))
+    log.debug("Original image shape: {}".format(img_data.shape))
 
     # Get cutout limits
     cutout_lims = get_cutout_limits(img_wcs, center_coord, cutout_size)
 
-    if verbose:
-        print("xmin,xmax: {}".format(cutout_lims[0]))
-        print("ymin,ymax: {}".format(cutout_lims[1]))
+    log.debug("xmin,xmax: {}".format(cutout_lims[0]))
+    log.debug("ymin,ymax: {}".format(cutout_lims[1]))
 
     # These limits are not guarenteed to be within the image footprint
     xmin, xmax = cutout_lims[0]
@@ -119,8 +118,7 @@ def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, verbose=False
     if padding.any():  # only do if we need to pad
         img_cutout = np.pad(img_cutout, padding, 'constant', constant_values=np.nan)
 
-    if verbose:
-        print("Image cutout shape: {}".format(img_cutout.shape))
+    log.debug("Image cutout shape: {}".format(img_cutout.shape))
 
     # Getting the cutout wcs
     cutout_wcs = get_cutout_wcs(img_wcs, cutout_lims)
@@ -242,9 +240,8 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
         If memory_only is True a list of `~astropy.io.fit.HDUList` objects is returned instead of
         file name(s).
     """
-
-    if verbose:
-        start_time = time()
+    _handle_verbose(verbose)
+    start_time = time()
             
     # Making sure we have an array of images
     if isinstance(input_files, str):
@@ -260,11 +257,10 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
     # Turning the cutout size into a 2 member array
     cutout_size = parse_size_input(cutout_size)
 
-    if verbose:
-        print(f"Number of input files: {len(input_files)}")
-        print(f"Cutting out {extension} extension(s)")
-        print(f"Center coordinate: {coordinates.to_string()} deg")
-        print(f"Cutout size: {cutout_size}")
+    log.debug(f"Number of input files: {len(input_files)}")
+    log.debug(f"Cutting out {extension} extension(s)")
+    log.debug(f"Center coordinate: {coordinates.to_string()} deg")
+    log.debug(f"Cutout size: {cutout_size}")
 
     # Making the cutouts
     cutout_hdu_dict = {}
@@ -272,8 +268,7 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
     num_cutouts = 0
     fsspec_kwargs = None
     for in_fle in input_files:
-        if verbose:
-            print("\nCutting out {}".format(in_fle))
+        log.debug("\nCutting out {}".format(in_fle))
 
         if "s3://" in in_fle:
             fsspec_kwargs = {"anon": True}
@@ -321,8 +316,7 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
     cutout_path = None
     if single_outfile:
 
-        if verbose:
-            print("Returning cutout as single FITS")
+        log.debug("Returning cutout as single FITS")
 
         if not memory_only:
             cutout_path = "{}_{:7f}_{:7f}_{}-x-{}_astrocut.fits".format(cutout_prefix,
@@ -331,8 +325,7 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
                                                                         str(cutout_size[0]).replace(' ', ''), 
                                                                         str(cutout_size[1]).replace(' ', ''))
             cutout_path = os.path.join(output_dir, cutout_path)
-            if verbose:
-                print("Cutout fits file: {}".format(cutout_path))
+            log.debug("Cutout fits file: {}".format(cutout_path))
             
         cutout_hdus = [x for fle in cutout_hdu_dict for x in cutout_hdu_dict[fle]]    
         cutout_fits = get_fits(cutout_hdus, coordinates, cutout_path)
@@ -344,15 +337,13 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
 
     else:  # one output file per input file
 
-        if verbose:
-            print("Returning cutouts as individual FITS")
+        log.debug("Returning cutouts as individual FITS")
             
         if memory_only:
             all_hdus = []
         else:
             all_paths = []
-            if verbose:
-                print("Cutout fits files:")
+            log.debug("Cutout fits files:")
             
         for fle in input_files:
             cutout_list = cutout_hdu_dict[fle]
@@ -373,11 +364,9 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
                 all_hdus.append(cutout_fits)
             else:
                 all_paths.append(cutout_path)
-                if verbose:
-                    print(cutout_path)
+                log.debug(cutout_path)
         
-    if verbose:
-        print("Total time: {:.2} sec".format(time()-start_time))
+    log.debug("Total time: {:.2} sec".format(time()-start_time))
 
     if memory_only:
         return all_hdus
@@ -514,9 +503,8 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
         If colorize is True returns the single output filepath. Otherwise returns a list of all 
         the output filepaths.
     """
-        
-    if verbose:
-        start_time = time()
+    _handle_verbose(verbose)
+    start_time = time()
             
     # Making sure we have an array of images
     if isinstance(input_files, str):
@@ -535,8 +523,7 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
     # Making the cutouts
     cutout_hdu_dict = {}
     for in_fle in input_files:
-        if verbose:
-            print("\n{}".format(in_fle))
+        log.debug("\n{}".format(in_fle))
 
 
         warnings.filterwarnings("ignore", category=wcs.FITSFixedWarning)
@@ -621,8 +608,7 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
             
                 Image.fromarray(cutout).save(file_path)
         
-    if verbose:
-        print("Cutout fits file(s): {}".format(cutout_path))
-        print("Total time: {:.2} sec".format(time()-start_time))
+    log.debug("Cutout fits file(s): {}".format(cutout_path))
+    log.debug("Total time: {:.2} sec".format(time()-start_time))
 
     return cutout_path

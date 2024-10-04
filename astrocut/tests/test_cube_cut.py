@@ -595,7 +595,7 @@ def test_exceptions(cube_file, ffi_type):
 
 
 @pytest.mark.parametrize("ffi_type", ["SPOC", "TICA"])
-def test_inputs(cube_file, ffi_type, tmp_path, capsys):
+def test_inputs(cube_file, ffi_type, tmp_path, caplog):
     """
     Testing with different user input types/combos. And verbose.
     """
@@ -609,10 +609,10 @@ def test_inputs(cube_file, ffi_type, tmp_path, capsys):
 
     cutout_size = [5, 3]*u.pixel
     cutout_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, ffi_type, output_path=tmpdir, verbose=True)
-    captured = capsys.readouterr()
-    assert "Image cutout cube shape: (100, 3, 5)" in captured.out
-    assert "Using WCS from row 50 out of 100" in captured.out
-    assert "Cutout center coordinate: 256.88,6.38" in captured.out
+    captured = caplog.text
+    assert "Image cutout cube shape: (100, 3, 5)" in captured
+    assert "Using WCS from row 50 out of 100" in captured
+    assert "Cutout center coordinate: 256.88,6.38" in captured
     assert "5x3" in cutout_file
 
     cutout_size = [5, 3]*u.arcmin

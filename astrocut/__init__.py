@@ -6,9 +6,8 @@
 from ._astropy_init import *  # noqa
 # ----------------------------------------------------------------------------
 
-# Enforce Python version check during package import.
-# This is the same check as the one at the top of setup.py
 import sys
+import logging
 
 __minimum_python_version__ = "3.9"
 
@@ -17,9 +16,14 @@ class UnsupportedPythonError(Exception):
     pass
 
 
+# Enforce Python version check during package import.
 if sys.version_info < tuple((int(val) for val in __minimum_python_version__.split('.'))):
     raise UnsupportedPythonError("astrocut does not support Python < {}".format(__minimum_python_version__))
 
+# Set up logger
+log = logging.getLogger(__name__)
+log.setLevel(logging.INFO)
+log.addHandler(logging.StreamHandler())
 
 if not _ASTROPY_SETUP_:  # noqa
     from .make_cube import CubeFactory, TicaCubeFactory  # noqa
