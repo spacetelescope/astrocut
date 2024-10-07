@@ -31,9 +31,8 @@ def _s_region_to_polygon(s_region: Column):
     """
     Takes in a s_region string of type POLYGON and returns it as a spherical_region Polygon.
 
-    Example inputs:
+    Example input:
     'POLYGON 229.80771900 -75.17048500 241.67788000 -63.95992300 269.94872000 -64.39276400 277.87862300 -75.57754400'
-    'CIRCLE ICRS 244.38324081 -75.86611807 0.625'
     """
 
     def ind_sregion_to_polygon(s_reg):
