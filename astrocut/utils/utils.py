@@ -43,11 +43,18 @@ def parse_size_input(cutout_size):
         cutout_size = np.atleast_1d(cutout_size)
         if len(cutout_size) == 1:
             cutout_size = np.repeat(cutout_size, 2)
+    elif not isinstance(cutout_size, np.ndarray):
+        cutout_size = np.array(cutout_size)
 
     if len(cutout_size) > 2:
         warnings.warn("Too many dimensions in cutout size, only the first two will be used.",
                       InputWarning)
         cutout_size = cutout_size[:2]
+
+    ny, nx = cutout_size
+    if ny == 0 or nx == 0:
+        raise InvalidQueryError('Cutout size dimensions must be greater than zero. '
+                                f'Provided size: ({cutout_size[0]}, {cutout_size[1]})')
 
     return cutout_size
 
