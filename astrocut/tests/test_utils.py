@@ -17,27 +17,17 @@ with open(get_pkg_data_filename('data/ex_ffi_wcs.txt'), "r") as FLE:
     WCS_STR = FLE.read()
 
 
-def test_parse_size_input():
-    """Test that different types of input are accurately parsed into cutout sizes"""
-    # With scalar as input
-    cutout_size = utils.parse_size_input(5)
-    assert np.array_equal(cutout_size, np.array((5, 5)))
-
-    # With astropy quantity as input
-    cutout_size = utils.parse_size_input(10 * u.pix)
-    assert np.array_equal(cutout_size, np.array((10, 10)) * u.pix)
-
-    # With tuple as input
-    cutout_size = utils.parse_size_input((5, 10))
-    assert np.array_equal(cutout_size, np.array((5, 10)))
-
-    # With list as input
-    cutout_size = utils.parse_size_input([10, 5])
-    assert np.array_equal(cutout_size, np.array((10, 5)))
-
-    # With array as input
-    cutout_size = utils.parse_size_input(np.array((5, 10)))
-    assert np.array_equal(cutout_size, np.array((5, 10)))
+@pytest.mark.parametrize("input_value, expected", [
+    (5, np.array((5, 5))),  # scalar
+    (10 * u.pix, np.array((10, 10)) * u.pix),  # Astropy quantity
+    ((5, 10), np.array((5, 10))),  # tuple
+    ([10, 5], np.array((10, 5))),  # list
+    (np.array((5, 10)), np.array((5, 10))),  # array
+])
+def test_parse_size_input(input_value, expected):
+    """Test that different types of input are accurately parsed into cutout sizes."""
+    cutout_size = utils.parse_size_input(input_value)
+    assert np.array_equal(cutout_size, expected)
 
 
 def test_parse_size_input_dimension_warning():

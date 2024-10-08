@@ -1,5 +1,4 @@
 import re
-import numpy as np
 import pytest
 
 from astrocut.exceptions import InvalidQueryError
@@ -37,37 +36,31 @@ def test_s_region_to_polygon_unsupported_region():
         _s_region_to_polygon(s_region)
 
 
-def test_ffi_intersect():
-    """Test that FFI intersection with cutout outputs proper results"""
+@pytest.mark.parametrize("lon, lat, center, expected", [
+    ((345, 355, 355, 345), (-15, -15, -5, -5), (350, -10), True),  # intersecting
+    ((335, 345, 345, 335), (-15, -15, -5, -5), (340, -10), False),  # non-intersecting
+    ((340, 350, 350, 340), (-15, -15, -5, -5), (345, -10), True),  # edge object that intersects
+    ((340, 349, 349, 340), (-15, -15, -5, -5), (345, -10), False),  # edge object that does not intersect
+])
+def test_ffi_intersect(lon, lat, center, expected):
+    """Test that FFI intersection with cutout outputs proper results."""
     # SphericalPolygon object for cutout
     cutout_sp = SphericalPolygon.from_radec(lon=(350, 10, 10, 350),
-                                            lat=(-10, -10, 10, 10), 
+                                            lat=(-10, -10, 10, 10),
                                             center=(0, 0))
 
-    # Intersecting object
-    intersecting = SphericalPolygon.from_radec(lon=(345, 355, 355, 345),
-                                               lat=(-15, -15, -5, -5),
-                                               center=(350, -10))
+    # Create a SphericalPolygon with the parametrized lon, lat, and center
+    polygon = SphericalPolygon.from_radec(lon=lon, lat=lat, center=center)
 
-    # Non-intersecting object
-    nonintersecting = SphericalPolygon.from_radec(lon=(335, 345, 345, 335),
-                                                  lat=(-15, -15, -5, -5),
-                                                  center=(340, -10))
-    
-    # Edge object that intersects
-    edge_intersect = SphericalPolygon.from_radec(lon=(340, 350, 350, 340),
-                                                 lat=(-15, -15, -5, -5),
-                                                 center=(345, -10))
-    
-    # Edge object that does not intersect
-    edge_nonintersect = SphericalPolygon.from_radec(lon=(340, 349, 349, 340),
-                                                    lat=(-15, -15, -5, -5),
-                                                    center=(345, -10))
-    
+    # Create a table with this polygon
     polygon_table = Table(names=['polygon'], dtype=[SphericalPolygon])
-    polygon_table['polygon'] = [intersecting, nonintersecting, edge_intersect, edge_nonintersect]
+    polygon_table['polygon'] = [polygon]
+
+    # Perform the intersection check
     intersection = _ffi_intersect(polygon_table, cutout_sp)
-    assert np.array_equal(intersection.value, np.array([True, False, True, False]))
+
+    # Assert the intersection result matches the expected value
+    assert intersection.value[0] == expected
 
 
 def test_extract_sequence_information_unknown_product():
