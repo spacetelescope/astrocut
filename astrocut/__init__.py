@@ -22,7 +22,6 @@ if sys.version_info < tuple((int(val) for val in __minimum_python_version__.spli
 
 # Set up logger
 log = logging.getLogger(__name__)
-log.setLevel(logging.INFO)
 log.addHandler(logging.StreamHandler())
 
 if not _ASTROPY_SETUP_:  # noqa
