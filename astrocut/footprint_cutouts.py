@@ -294,7 +294,6 @@ def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size,
             raise InvalidQueryError('No FFI cube files were found for sequences: ' +
                                     ', '.join(str(s) for s in sequence))
         
-        
         log.debug(f'Filtered to {len(all_ffis)} footprints for sequences: {", ".join(str(s) for s in sequence)}')
 
     # Get sector names and cube files that contain the cutout
