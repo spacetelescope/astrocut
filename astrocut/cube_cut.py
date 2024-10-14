@@ -875,7 +875,7 @@ class CutoutFactory():
                 self.center_coord = SkyCoord(coordinates, unit='deg')
 
             log.info("Cutout center coordinate: {},{}".format(self.center_coord.ra.deg,
-                                                               self.center_coord.dec.deg))
+                                                              self.center_coord.dec.deg))
 
             # Making size into an array [ny, nx]
             if np.isscalar(cutout_size):
