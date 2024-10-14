@@ -17,11 +17,10 @@ import numpy as np
 import requests
 from spherical_geometry.polygon import SphericalPolygon
 
-from astrocut.exceptions import InvalidQueryError
-from astrocut.cube_cut import CutoutFactory
-
 from . import log
 from .utils.utils import parse_size_input, _handle_verbose
+from .exceptions import InvalidQueryError
+from .cube_cut import CutoutFactory
 
 TESS_ARCSEC_PER_PX = 21  # Number of arcseconds per pixel in a TESS image
 FFI_TTLCACHE = TTLCache(maxsize=10, ttl=900)  # Cache for FFI footprint files
