@@ -304,7 +304,7 @@ def asdf_cut(input_file: Union[str, pathlib.Path, S3Path], ra: float, dec: float
     astropy.nddata.Cutout2D:
         An image cutout object.
     """
-
+    # Log messages based on verbosity
     _handle_verbose(verbose)
 
     # if file comes from AWS cloud bucket, get HTTP URL to open with asdf

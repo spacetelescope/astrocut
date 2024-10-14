@@ -844,6 +844,7 @@ class CutoutFactory():
         """
 
         start_time = time()
+        # Log messages based on verbosity
         _handle_verbose(verbose)
 
         # Declare the product type being used to make the cutouts

@@ -149,7 +149,7 @@ def _moving_target_focus(path, size, cutout_fles, verbose=False):
     response : `~astropy.table.Table`
         New cutout table.
     """
-
+    # Log messages based on verbosity
     _handle_verbose(verbose)
     
     cutout_table_list = list()
@@ -375,7 +375,7 @@ def center_on_path(path, size, cutout_fles, target=None, img_wcs=None,
     """
     
     # TODO: add ability to take sizes like in rest of cutout functionality
-
+    # Log messages based on verbosity
     _handle_verbose(verbose)
 
     # Performing the path transformation

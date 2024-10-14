@@ -49,6 +49,7 @@ def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, verbose=False
     response : `~astropy.io.fits.hdu.image.ImageHDU` 
         The cutout image and associated metadata.
     """
+    # Log messages based on verbosity
     _handle_verbose(verbose)
     hdu_header = fits.Header(img_hdu.header, copy=True)
 
@@ -240,6 +241,7 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
         If memory_only is True a list of `~astropy.io.fit.HDUList` objects is returned instead of
         file name(s).
     """
+    # Log messages based on verbosity
     _handle_verbose(verbose)
     start_time = time()
             
@@ -503,6 +505,7 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
         If colorize is True returns the single output filepath. Otherwise returns a list of all 
         the output filepaths.
     """
+    # Log messages based on verbosity
     _handle_verbose(verbose)
     start_time = time()
             

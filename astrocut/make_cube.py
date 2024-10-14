@@ -15,9 +15,8 @@ import numpy as np
 from astropy.io import fits
 from astropy.table import Column, Table
 
-from astrocut.utils.utils import _handle_verbose
-
 from . import log
+from .utils.utils import _handle_verbose
 
 if (version_info >= (3, 8)) and (platform != "win32"):
     from mmap import MADV_SEQUENTIAL
@@ -199,6 +198,7 @@ class CubeFactory():
 
         cube_hdu is am hdulist object opened in update mode
         """
+        # Log messages based on verbosity
         _handle_verbose(verbose)
 
         # Initializing the sub-cube
@@ -308,6 +308,7 @@ class CubeFactory():
             If successful, returns the path to the cube fits file, 
             if unsuccessful returns None.
         """
+        # Log messages based on verbosity
         _handle_verbose(verbose)
         startTime = time()
 
@@ -563,6 +564,7 @@ class TicaCubeFactory():
 
         cube_hdu is an hdulist object opened in update mode
         """
+        # Log messages based on verbosity
         _handle_verbose(verbose)
 
         # Initializing the sub-cube
@@ -726,6 +728,7 @@ class TicaCubeFactory():
         4. Rename the file accordingly(?)
 
         """
+        # Log messages based on verbosity
         _handle_verbose(verbose)
         startTime = time()
         self.update = True  # we're updating!
@@ -854,6 +857,7 @@ class TicaCubeFactory():
             If successful, returns the path to the cube fits file, 
             if unsuccessful returns None.
         """
+        # Log messages based on verbosity
         _handle_verbose(verbose)
         startTime = time()
 
