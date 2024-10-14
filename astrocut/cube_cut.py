@@ -122,7 +122,7 @@ class CutoutFactory():
                 if data_ind == len(table_data):
                     raise wcs.NoWcsKeywordsFoundError("No FFI rows contain valid WCS keywords.")
 
-        log.debug("Using WCS from row {} out of {}".format(data_ind, len(table_data)))
+        log.info("Using WCS from row {} out of {}".format(data_ind, len(table_data)))
 
         # Turning the table row into a new header object
         wcs_header = fits.header.Header()
@@ -462,9 +462,9 @@ class CutoutFactory():
                 uncert_cutout = np.pad(uncert_cutout, padding, 'constant', constant_values=np.nan)
             aperture = np.pad(aperture, padding[1:], 'constant', constant_values=0)
 
-        log.debug("Image cutout cube shape: {}".format(img_cutout.shape))
+        log.info("Image cutout cube shape: {}".format(img_cutout.shape))
         if self.product == "SPOC":
-            log.debug("Uncertainty cutout cube shape: {}".format(uncert_cutout.shape))
+            log.info("Uncertainty cutout cube shape: {}".format(uncert_cutout.shape))
     
         return img_cutout, uncert_cutout, aperture
 
@@ -874,7 +874,7 @@ class CutoutFactory():
             else:
                 self.center_coord = SkyCoord(coordinates, unit='deg')
 
-            log.debug("Cutout center coordinate: {},{}".format(self.center_coord.ra.deg,
+            log.info("Cutout center coordinate: {},{}".format(self.center_coord.ra.deg,
                                                                self.center_coord.dec.deg))
 
             # Making size into an array [ny, nx]
@@ -893,8 +893,8 @@ class CutoutFactory():
                 
             # Get cutout limits
             self._get_cutout_limits(cutout_size)
-            log.debug("xmin,xmax: {}".format(self.cutout_lims[1]))
-            log.debug("ymin,ymax: {}".format(self.cutout_lims[0]))
+            log.info("xmin,xmax: {}".format(self.cutout_lims[1]))
+            log.info("ymin,ymax: {}".format(self.cutout_lims[0]))
 
             # Make the cutout
             img_cutout, uncert_cutout, aperture = self._get_cutout(getattr(cube[1], cube_data_prop), threads=threads,
@@ -903,8 +903,8 @@ class CutoutFactory():
             # Get cutout wcs info
             cutout_wcs_full = self._get_full_cutout_wcs(cube[2].header)
             max_dist, sigma = self._fit_cutout_wcs(cutout_wcs_full, img_cutout.shape[1:])
-            log.debug("Maximum distance between approximate and true location: {}".format(max_dist))
-            log.debug("Error in approximate WCS (sigma): {}".format(sigma))
+            log.info("Maximum distance between approximate and true location: {}".format(max_dist))
+            log.info("Error in approximate WCS (sigma): {}".format(sigma))
                 
             cutout_wcs_dict = self._get_cutout_wcs_dict()
     
@@ -926,7 +926,7 @@ class CutoutFactory():
             target_pixel_file = os.path.join(output_path, target_pixel_file)
             
         
-            log.debug("Target pixel file: {}".format(target_pixel_file))
+            log.info("Target pixel file: {}".format(target_pixel_file))
 
             # Make sure the output directory exists
             if not os.path.exists(output_path):
@@ -935,7 +935,7 @@ class CutoutFactory():
             # Write the TPF
             tpf_object.writeto(target_pixel_file, overwrite=True, checksum=True)
 
-        log.debug("Write time: {:.2} sec".format(time()-write_time))
-        log.debug("Total time: {:.2} sec".format(time()-start_time))
+        log.info("Write time: {:.2} sec".format(time()-write_time))
+        log.info("Total time: {:.2} sec".format(time()-start_time))
 
         return target_pixel_file

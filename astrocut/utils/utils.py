@@ -219,5 +219,5 @@ def get_fits(cutout_hdus, center_coord=None, output_path=None):
 
 def _handle_verbose(verbose: bool):
     """Set the log level according to the verbose parameter"""
-    level = logging.DEBUG if verbose else logging.INFO
+    level = logging.INFO if verbose else logging.WARNING
     log.setLevel(level)

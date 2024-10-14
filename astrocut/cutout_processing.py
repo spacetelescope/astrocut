@@ -157,7 +157,7 @@ def _moving_target_focus(path, size, cutout_fles, verbose=False):
     tck_tuple, u = splprep([path["position"].ra, path["position"].dec], u=path["time"].jd, s=0)
     
     for fle in cutout_fles:
-        log.debug(fle)
+        log.info(f'Processing file: {fle}')
         
         # Get the stuff we need from the cutout file
         hdu = fits.open(fle)

@@ -45,7 +45,7 @@ def _get_cloud_http(s3_uri: Union[str, S3Path], key: str = None, secret: str = N
     resp = requests.head(url, timeout=10)
     is_anon = False if resp.status_code == 403 else True
     if not is_anon:
-        log.debug(f'Attempting to access private S3 bucket: {s3_path.bucket}')
+        log.info(f'Attempting to access private S3 bucket: {s3_path.bucket}')
 
     # create file system and get URL of file
     fs = s3fs.S3FileSystem(anon=is_anon, key=key, secret=secret, token=token)

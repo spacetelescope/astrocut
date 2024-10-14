@@ -80,13 +80,13 @@ def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, verbose=False
 
     img_data = img_hdu.data
 
-    log.debug("Original image shape: {}".format(img_data.shape))
+    log.info("Original image shape: {}".format(img_data.shape))
 
     # Get cutout limits
     cutout_lims = get_cutout_limits(img_wcs, center_coord, cutout_size)
 
-    log.debug("xmin,xmax: {}".format(cutout_lims[0]))
-    log.debug("ymin,ymax: {}".format(cutout_lims[1]))
+    log.info("xmin,xmax: {}".format(cutout_lims[0]))
+    log.info("ymin,ymax: {}".format(cutout_lims[1]))
 
     # These limits are not guarenteed to be within the image footprint
     xmin, xmax = cutout_lims[0]
@@ -119,7 +119,7 @@ def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, verbose=False
     if padding.any():  # only do if we need to pad
         img_cutout = np.pad(img_cutout, padding, 'constant', constant_values=np.nan)
 
-    log.debug("Image cutout shape: {}".format(img_cutout.shape))
+    log.info("Image cutout shape: {}".format(img_cutout.shape))
 
     # Getting the cutout wcs
     cutout_wcs = get_cutout_wcs(img_wcs, cutout_lims)
@@ -259,10 +259,10 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
     # Turning the cutout size into a 2 member array
     cutout_size = parse_size_input(cutout_size)
 
-    log.debug(f"Number of input files: {len(input_files)}")
-    log.debug(f"Cutting out {extension} extension(s)")
-    log.debug(f"Center coordinate: {coordinates.to_string()} deg")
-    log.debug(f"Cutout size: {cutout_size}")
+    log.info(f"Number of input files: {len(input_files)}")
+    log.info(f"Cutting out {extension} extension(s)")
+    log.info(f"Center coordinate: {coordinates.to_string()} deg")
+    log.info(f"Cutout size: {cutout_size}")
 
     # Making the cutouts
     cutout_hdu_dict = {}
@@ -270,7 +270,7 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
     num_cutouts = 0
     fsspec_kwargs = None
     for in_fle in input_files:
-        log.debug("\nCutting out {}".format(in_fle))
+        log.info("\nCutting out {}".format(in_fle))
 
         if "s3://" in in_fle:
             fsspec_kwargs = {"anon": True}
@@ -318,7 +318,7 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
     cutout_path = None
     if single_outfile:
 
-        log.debug("Returning cutout as single FITS")
+        log.info("Returning cutout as single FITS")
 
         if not memory_only:
             cutout_path = "{}_{:7f}_{:7f}_{}-x-{}_astrocut.fits".format(cutout_prefix,
@@ -327,7 +327,7 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
                                                                         str(cutout_size[0]).replace(' ', ''), 
                                                                         str(cutout_size[1]).replace(' ', ''))
             cutout_path = os.path.join(output_dir, cutout_path)
-            log.debug("Cutout fits file: {}".format(cutout_path))
+            log.info("Cutout fits file: {}".format(cutout_path))
             
         cutout_hdus = [x for fle in cutout_hdu_dict for x in cutout_hdu_dict[fle]]    
         cutout_fits = get_fits(cutout_hdus, coordinates, cutout_path)
@@ -339,13 +339,13 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
 
     else:  # one output file per input file
 
-        log.debug("Returning cutouts as individual FITS")
+        log.info("Returning cutouts as individual FITS")
             
         if memory_only:
             all_hdus = []
         else:
             all_paths = []
-            log.debug("Cutout fits files:")
+            log.info("Cutout fits files:")
             
         for fle in input_files:
             cutout_list = cutout_hdu_dict[fle]
@@ -366,9 +366,9 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
                 all_hdus.append(cutout_fits)
             else:
                 all_paths.append(cutout_path)
-                log.debug(cutout_path)
+                log.info(cutout_path)
         
-    log.debug("Total time: {:.2} sec".format(time()-start_time))
+    log.info("Total time: {:.2} sec".format(time()-start_time))
 
     if memory_only:
         return all_hdus
@@ -526,7 +526,7 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
     # Making the cutouts
     cutout_hdu_dict = {}
     for in_fle in input_files:
-        log.debug("\n{}".format(in_fle))
+        log.info("\n{}".format(in_fle))
 
 
         warnings.filterwarnings("ignore", category=wcs.FITSFixedWarning)
@@ -611,7 +611,7 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
             
                 Image.fromarray(cutout).save(file_path)
         
-    log.debug("Cutout fits file(s): {}".format(cutout_path))
-    log.debug("Total time: {:.2} sec".format(time()-start_time))
+    log.info("Cutout fits file(s): {}".format(cutout_path))
+    log.info("Total time: {:.2} sec".format(time()-start_time))
 
     return cutout_path
