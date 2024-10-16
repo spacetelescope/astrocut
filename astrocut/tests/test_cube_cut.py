@@ -612,7 +612,7 @@ def test_inputs(cube_file, ffi_type, tmp_path, caplog):
     captured = caplog.text
     assert "Image cutout cube shape: (100, 3, 5)" in captured
     assert "Using WCS from row 50 out of 100" in captured
-    assert "Cutout center coordinate: 256.88,6.38" in captured
+    assert "Cutout center coordinate: 256.88, 6.38" in captured
     assert "5x3" in cutout_file
 
     cutout_size = [5, 3]*u.arcmin

@@ -230,7 +230,7 @@ class CubeFactory():
                                 nulval = ""
                             self.info_table[kwd][i] = ffi_data[1].header.get(kwd, nulval)
 
-            log.info(f"Completed file {i} in {time()-st:.3} sec.")
+            log.debug("Completed file %d in %.3f sec.", i, time() - st)
 
         # Fill block and flush to disk
         cube_hdu[1].data[start_row:end_row, :, :, :] = sub_cube
@@ -319,8 +319,8 @@ class CubeFactory():
 
         self._configure_cube(file_list, sector=sector)
     
-        log.info("Using {} to initialize the image header table.".format(os.path.basename(self.template_file)))
-        log.info(f"Cube will be made in {self.num_blocks} blocks of {self.block_size} rows each.")
+        log.debug("Using %s to initialize the image header table.", os.path.basename(self.template_file))
+        log.debug("Cube will be made in %d blocks of %d rows each.", self.num_blocks, self.block_size)
 
         # Set up the table to old the individual image heades
         self._build_info_table()
@@ -345,11 +345,11 @@ class CubeFactory():
                 fill_info_table = True if (i == 0) else False
                 self._write_block(cube_hdu, start_row, end_row, fill_info_table, verbose)
                   
-                log.info(f"Completed block {i+1} of {self.num_blocks}")
+                log.debug("Completed block %d of %d", i + 1, self.num_blocks)
 
         # Add the info table to the cube file
         self._write_info_table()
-        log.info(f"Total time elapsed: {(time() - startTime)/60:.2f} min")
+        log.debug("Total time elapsed: %.2f min", (time() - startTime) / 60)
 
         return self.cube_file
 
@@ -625,7 +625,7 @@ class TicaCubeFactory():
                                 else:
                                     raise
 
-            log.info(f"Completed file {i} in {time()-st:.3} sec.")
+            log.debug("Completed file %d in %.3f sec.", i, time() - st)
 
         # Fill block and flush to disk
         if not self.update:
@@ -739,7 +739,7 @@ class TicaCubeFactory():
         assert os.path.exists(cube_file), err_msg
         self.cube_file = cube_file
 
-        log.info(f'Updating cube file: {cube_file}')
+        log.debug('Updating cube file: %s', cube_file)
 
         # Ensure that none of the files in file_list are in the cube already, to avoid duplicates
         in_cube = list(fits.getdata(self.cube_file, 2)['FFI_FILE'])
@@ -758,7 +758,7 @@ class TicaCubeFactory():
         noffis_err_msg = 'No new FFIs found for the given sector.'
         assert len(filtered_file_list) > 0, noffis_err_msg
 
-        log.info(f'{len(filtered_file_list)} new FFIs found!')
+        log.debug('%d new FFIs found!', len(filtered_file_list))
         
         # Creating an empty cube that will be appended to the existing cube
         og_cube = fits.getdata(cube_file, 1)
@@ -770,7 +770,7 @@ class TicaCubeFactory():
         sector = (sector, "Observing sector")
         self._configure_cube(filtered_file_list, sector=sector)
 
-        log.info(f"FFIs will be appended in {self.num_blocks} blocks of {self.block_size} rows each.")
+        log.debug("FFIs will be appended in %d blocks of %d rows each.", self.num_blocks, self.block_size)
         
         # Starting a new info table from scratch with new rows
         self._build_info_table()
@@ -799,16 +799,16 @@ class TicaCubeFactory():
                 # the info table also gets updated here 
                 fill_info_table = True
                 self._write_block(cube_hdu, start_row, end_row, fill_info_table, verbose)
-                log.info(f"Completed block {i+1} of {self.num_blocks}")
+                log.debug("Completed block %d of %d", i + 1, self.num_blocks)
        
         # Append the new cube to the existing cube
         new_cube = np.concatenate((og_cube, self.cube_append), axis=2)
 
         # Add it to the HDU list 
         with fits.open(self.cube_file, mode='update') as hdul:
-            log.info(f'Original cube of size: {str(og_cube.shape)}')
-            log.info(f'will now be replaced with cube of size: {str(new_cube.shape)}')
-            log.info(f'for file ``{cube_file}``')
+            log.debug('Original cube of size: %s', og_cube.shape)
+            log.debug('will now be replaced with cube of size: %s', new_cube.shape)
+            log.debug('for file ``%s``', cube_file)
             hdul[1].data = new_cube
 
         # Appending new info table to original 
@@ -816,7 +816,7 @@ class TicaCubeFactory():
         
         # Writing the info table to EXT2 of the FITS file 
         self._write_info_table()
-        log.info(f"Total time elapsed: {(time() - startTime)/60:.2f} min")
+        log.debug("Total time elapsed: %.2f min", (time() - startTime) / 60)
 
         return self.cube_file
 
@@ -866,8 +866,8 @@ class TicaCubeFactory():
         # Set up the basic cube parameters
         sector = (sector, "Observing sector")
         self._configure_cube(file_list, sector=sector)
-        log.info("Using {} to initialize the image header table.".format(os.path.basename(self.template_file)))
-        log.info(f"Cube will be made in {self.num_blocks} blocks of {self.block_size} rows each.")
+        log.debug("Using %s to initialize the image header table.", os.path.basename(self.template_file))
+        log.debug("Cube will be made in %d blocks of %d rows each.", self.num_blocks, self.block_size)
         
         # Set up the table to hold the individual image headers
         self._build_info_table()
@@ -891,11 +891,11 @@ class TicaCubeFactory():
 
                 fill_info_table = True if (i == 0) else False
                 self._write_block(cube_hdu, start_row, end_row, fill_info_table, verbose)
-                log.info(f"Completed block {i+1} of {self.num_blocks}")
+                log.debug("Completed block %d of %d", i + 1, self.num_blocks)
 
         # Add the info table to the cube file
         self._write_info_table()
-        log.info(f"Total time elapsed: {(time() - startTime)/60:.2f} min")
+        log.debug("Total time elapsed: %.2f min", (time() - startTime) / 60)
 
         return self.cube_file
         
