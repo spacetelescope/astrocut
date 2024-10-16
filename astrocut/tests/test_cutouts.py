@@ -17,7 +17,7 @@ from ..exceptions import InputWarning, InvalidInputError, InvalidQueryError
 
 
 @pytest.mark.parametrize('ffi_type', ['SPOC', 'TICA'])
-def test_fits_cut(tmpdir, capsys, ffi_type):
+def test_fits_cut(tmpdir, caplog, ffi_type):
 
     test_images = create_test_imgs(ffi_type, 50, 6, dir_name=tmpdir)
 
@@ -169,10 +169,10 @@ def test_fits_cut(tmpdir, capsys, ffi_type):
     assert "1.0arcsec-x-2.0arcsec" in cutout_file
     cutout_hdulist = fits.open(cutout_file)
     assert cutout_hdulist[1].data.shape == (33, 17)
-    captured = capsys.readouterr()
-    assert "Original image shape: (50, 50)" in captured.out
-    assert "Image cutout shape: (33, 17)" in captured.out
-    assert "Total time:" in captured.out
+    captured = caplog.text
+    assert "Original image shape: (50, 50)" in captured
+    assert "Image cutout shape: (33, 17)" in captured
+    assert "Total time:" in captured
 
     center_coord = "150.1159 2.2006"
     cutout_size = [10, 15, 20]
@@ -262,7 +262,7 @@ def test_normalize_img():
 
 
 @pytest.mark.parametrize('ffi_type', ['SPOC', 'TICA'])
-def test_img_cut(tmpdir, capsys, ffi_type):
+def test_img_cut(tmpdir, caplog, ffi_type):
 
     test_images = create_test_imgs(ffi_type, 50, 6, dir_name=tmpdir)
     center_coord = SkyCoord("150.1163213 2.200973097", unit='deg')
@@ -300,10 +300,10 @@ def test_img_cut(tmpdir, capsys, ffi_type):
     center_coord = "150.1163213 2.200973097"
     jpg_files = cutouts.img_cut(test_images, center_coord, cutout_size,
                                 output_dir=path.join(tmpdir, "image_path"), verbose=True)
-    captured = capsys.readouterr()
-    assert len(findall("Original image shape", captured.out)) == 6
-    assert "Cutout fits file(s)" in captured.out
-    assert "Total time" in captured.out
+    captured = caplog.text
+    assert len(findall("Original image shape", captured)) == 6
+    assert "Cutout fits file(s)" in captured
+    assert "Total time" in captured
 
     # test color image where one of the images is all zeros
     hdu = fits.open(test_images[0], mode='update')

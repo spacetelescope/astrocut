@@ -79,7 +79,7 @@ def test_extract_sequence_information_no_match():
 
 
 @pytest.mark.parametrize('ffi_type', ['SPOC', 'TICA'])
-def test_cube_cut_from_footprint(tmpdir, capsys, ffi_type):
+def test_cube_cut_from_footprint(tmpdir, caplog, ffi_type):
     """Test that data cube is cut from FFI file using parallel processing"""
     cutout = cube_cut_from_footprint(coordinates='130 30', 
                                      cutout_size=5,
@@ -89,14 +89,13 @@ def test_cube_cut_from_footprint(tmpdir, capsys, ffi_type):
                                      verbose=True)
     
     # Assert that messages were printed
-    captured = capsys.readouterr()
-    output = captured.out
-    assert 'Coordinates:' in output
-    assert 'Cutout size: [5 5]' in output
-    assert re.search(r'Found \d+ footprint files.', output)
-    assert re.search(r'Filtered to \d+ footprints for sequences: 44', output)
-    assert re.search(r'Found \d+ matching cube files.', output)
-    assert 'Generating cutouts...' in output
+    captured = caplog.text
+    assert 'Coordinates:' in captured
+    assert 'Cutout size: [5 5]' in captured
+    assert re.search(r'Found \d+ footprint files.', captured)
+    assert re.search(r'Filtered to \d+ footprints for sequences: 44', captured)
+    assert re.search(r'Found \d+ matching cube files.', captured)
+    assert 'Generating cutouts...' in captured
     check_output_file(cutout[0], ffi_type, [44])
 
 

@@ -102,9 +102,6 @@ def test_get_args():
     bounds = np.array([[0, 4], [0, 6]])
 
     args = cutout_processing._get_args(bounds, wcs_obj)
-    print(args["coordinates"])
-    print(wcs_obj.pixel_to_world(2, 3))
-    print(args["size"])
     assert args["coordinates"] == wcs_obj.pixel_to_world(2, 3)
     assert args["size"] == (6, 4)
 

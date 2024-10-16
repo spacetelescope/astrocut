@@ -6,26 +6,33 @@
 from ._astropy_init import *  # noqa
 # ----------------------------------------------------------------------------
 
-# Enforce Python version check during package import.
-# This is the same check as the one at the top of setup.py
+"""
+This module initializes the astrocut package and performs essential setup tasks, including:
+- Verifying the version of Python.
+- Setting up package-wide logging.
+- Importing key modules.
+"""
+
 import sys
 
-__minimum_python_version__ = "3.9"
+from .exceptions import UnsupportedPythonError
+from .utils.logger import setup_logger
 
+# Enforce Python version check during package import.
+__minimum_python_version__ = "3.9"  # minimum supported Python version
+if sys.version_info < tuple(map(int, __minimum_python_version__.split('.'))):
+    raise UnsupportedPythonError(f"astrocut does not support Python < {__minimum_python_version__}")
 
-class UnsupportedPythonError(Exception):
-    pass
+# Initialize package-wide logger using astropy's logging system
+log = setup_logger()
 
-
-if sys.version_info < tuple((int(val) for val in __minimum_python_version__.split('.'))):
-    raise UnsupportedPythonError("astrocut does not support Python < {}".format(__minimum_python_version__))
-
-
+# Import key submodules and functions if not in setup mode
 if not _ASTROPY_SETUP_:  # noqa
     from .make_cube import CubeFactory, TicaCubeFactory  # noqa
     from .cube_cut import CutoutFactory  # noqa
     from .cutouts import fits_cut, img_cut, normalize_img  # noqa
-    from .cutout_processing import (path_to_footprints, center_on_path,  # noqa
-                                    CutoutsCombiner, build_default_combine_function)  # noqa
+    from .cutout_processing import (  # noqa
+        path_to_footprints, center_on_path, CutoutsCombiner, build_default_combine_function  # noqa
+    )  # noqa
     from .asdf_cutouts import asdf_cut, get_center_pixel  # noqa
     from .footprint_cutouts import cube_cut_from_footprint  # noqa

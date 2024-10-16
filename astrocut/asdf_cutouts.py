@@ -16,6 +16,9 @@ from s3path import S3Path
 from astropy.coordinates import SkyCoord
 from astropy.modeling import models
 
+from . import log
+from .utils.utils import _handle_verbose
+
 
 def _get_cloud_http(s3_uri: Union[str, S3Path], key: str = None, secret: str = None,
                     token: str = None, verbose: bool = False) -> str:
@@ -41,8 +44,8 @@ def _get_cloud_http(s3_uri: Union[str, S3Path], key: str = None, secret: str = N
     url = f'https://{s3_path.bucket}.s3.amazonaws.com/{s3_path.key}'
     resp = requests.head(url, timeout=10)
     is_anon = False if resp.status_code == 403 else True
-    if verbose and not is_anon:
-        print(f'Attempting to access private S3 bucket: {s3_path.bucket}')
+    if not is_anon:
+        log.debug('Attempting to access private S3 bucket: %s', s3_path.bucket)
 
     # create file system and get URL of file
     fs = s3fs.S3FileSystem(anon=is_anon, key=key, secret=secret, token=token)
@@ -301,6 +304,8 @@ def asdf_cut(input_file: Union[str, pathlib.Path, S3Path], ra: float, dec: float
     astropy.nddata.Cutout2D:
         An image cutout object.
     """
+    # Log messages based on verbosity
+    _handle_verbose(verbose)
 
     # if file comes from AWS cloud bucket, get HTTP URL to open with asdf
     file = input_file

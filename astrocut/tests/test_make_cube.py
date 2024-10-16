@@ -122,7 +122,7 @@ def test_make_and_update_cube(tmpdir):
     os.remove(cube_file)
     
 
-def test_iteration(tmpdir, capsys):
+def test_iteration(tmpdir, caplog):
     """
     Testing cubes made with different numbers of iterations against each other.
     """
@@ -137,15 +137,14 @@ def test_iteration(tmpdir, capsys):
     # Should produce cube in single iteration
     cube_file_1 = cube_maker.make_cube(ffi_files, path.join(tmpdir, "iterated_cube_1.fits"),
                                        max_memory=0.5, verbose=True)
-    captured = capsys.readouterr()
-    assert len(findall("Completed block", captured.out)) == 1, "Incorrect number of iterations"
-    assert len(findall("Completed file", captured.out)) == num_im, "Incorrect number of complete files"
+    assert len(findall("Completed block", caplog.text)) == 1, "Incorrect number of iterations"
+    assert len(findall("Completed file", caplog.text)) == num_im, "Incorrect number of complete files"
+    caplog.clear()
 
     cube_file_2 = cube_maker.make_cube(ffi_files, path.join(tmpdir, "iterated_cube_2.fits"),
                                        max_memory=0.05, verbose=True)
-    captured = capsys.readouterr()
-    assert len(findall("Completed block", captured.out)) == 2, "Incorrect number of iterations"
-    assert len(findall("Completed file", captured.out)) == num_im*2, "Incorrect number of complete files"
+    assert len(findall("Completed block", caplog.text)) == 2, "Incorrect number of iterations"
+    assert len(findall("Completed file", caplog.text)) == num_im*2, "Incorrect number of complete files"
     
     hdu_1 = fits.open(cube_file_1)
     cube_1 = hdu_1[1].data

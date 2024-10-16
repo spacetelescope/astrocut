@@ -4,6 +4,7 @@
 
 import warnings
 import numpy as np
+import logging
 
 from datetime import date
 
@@ -12,7 +13,7 @@ from astropy.io import fits
 from astropy import units as u
 from astropy.utils import deprecated
 
-from .. import __version__
+from .. import __version__, log
 from ..exceptions import InvalidQueryError, InputWarning
 
 
@@ -216,3 +217,7 @@ def get_fits(cutout_hdus, center_coord=None, output_path=None):
     return cutout_hdulist
 
 
+def _handle_verbose(verbose: bool):
+    """Set the log level according to the verbose parameter"""
+    level = logging.DEBUG if verbose else logging.INFO
+    log.setLevel(level)
