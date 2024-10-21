@@ -9,7 +9,7 @@ import os
 from copy import deepcopy
 from datetime import date
 from sys import platform, version_info
-from time import time
+from time import monotonic
 
 import numpy as np
 from astropy.io import fits
@@ -207,7 +207,7 @@ class CubeFactory():
         
         # Loop through files
         for i, fle in enumerate(self.file_list):
-            st = time()
+            st = monotonic()
             with fits.open(fle, mode='denywrite', memmap=True) as ffi_data:
 
                 # add the image and info to the arrays
@@ -230,7 +230,7 @@ class CubeFactory():
                                 nulval = ""
                             self.info_table[kwd][i] = ffi_data[1].header.get(kwd, nulval)
 
-            log.debug("Completed file %d in %.3f sec.", i, time() - st)
+            log.debug("Completed file %d in %.3f sec.", i, monotonic() - st)
 
         # Fill block and flush to disk
         cube_hdu[1].data[start_row:end_row, :, :, :] = sub_cube
@@ -310,7 +310,7 @@ class CubeFactory():
         """
         # Log messages based on verbosity
         _handle_verbose(verbose)
-        startTime = time()
+        startTime = monotonic()
 
         self.max_memory = max_memory
 
@@ -349,7 +349,7 @@ class CubeFactory():
 
         # Add the info table to the cube file
         self._write_info_table()
-        log.debug("Total time elapsed: %.2f min", (time() - startTime) / 60)
+        log.debug("Total time elapsed: %.2f min", (monotonic() - startTime) / 60)
 
         return self.cube_file
 
@@ -574,7 +574,7 @@ class TicaCubeFactory():
         # Loop through files
         for i, fle in enumerate(self.file_list):
 
-            st = time()
+            st = monotonic()
 
             # In this section we will take the SCI data from self.file_list above
             # and "paste" a cutout of the full SCI array into a 4d array called 
@@ -625,7 +625,7 @@ class TicaCubeFactory():
                                 else:
                                     raise
 
-            log.debug("Completed file %d in %.3f sec.", i, time() - st)
+            log.debug("Completed file %d in %.3f sec.", i, monotonic() - st)
 
         # Fill block and flush to disk
         if not self.update:
@@ -730,7 +730,7 @@ class TicaCubeFactory():
         """
         # Log messages based on verbosity
         _handle_verbose(verbose)
-        startTime = time()
+        startTime = monotonic()
         self.update = True  # we're updating!
         self.max_memory = max_memory
 
@@ -816,7 +816,7 @@ class TicaCubeFactory():
         
         # Writing the info table to EXT2 of the FITS file 
         self._write_info_table()
-        log.debug("Total time elapsed: %.2f min", (time() - startTime) / 60)
+        log.debug("Total time elapsed: %.2f min", (monotonic() - startTime) / 60)
 
         return self.cube_file
 
@@ -859,7 +859,7 @@ class TicaCubeFactory():
         """
         # Log messages based on verbosity
         _handle_verbose(verbose)
-        startTime = time()
+        startTime = monotonic()
 
         self.max_memory = max_memory
 
@@ -895,7 +895,7 @@ class TicaCubeFactory():
 
         # Add the info table to the cube file
         self._write_info_table()
-        log.debug("Total time elapsed: %.2f min", (time() - startTime) / 60)
+        log.debug("Total time elapsed: %.2f min", (monotonic() - startTime) / 60)
 
         return self.cube_file
         

@@ -6,7 +6,7 @@ import os
 import warnings
 from concurrent.futures import ThreadPoolExecutor
 from itertools import product
-from time import time
+from time import monotonic
 from typing import Any, Dict, Literal, Union
 
 import astropy.units as u
@@ -843,7 +843,7 @@ class CutoutFactory():
             if unsuccessful returns None.
         """
 
-        start_time = time()
+        start_time = monotonic()
         # Log messages based on verbosity
         _handle_verbose(verbose)
 
@@ -903,14 +903,14 @@ class CutoutFactory():
             cutout_wcs_full = self._get_full_cutout_wcs(cube[2].header)
             max_dist, sigma = self._fit_cutout_wcs(cutout_wcs_full, img_cutout.shape[1:])
             log.debug("Maximum distance between approximate and true location: %s", max_dist)
-            log.debug("Error in approximate WCS (sigma): %f", sigma)
+            log.debug("Error in approximate WCS (sigma): %.4f", sigma)
                 
             cutout_wcs_dict = self._get_cutout_wcs_dict()
     
             # Build the TPF
             tpf_object = self._build_tpf(cube, img_cutout, uncert_cutout, cutout_wcs_dict, aperture)
 
-            write_time = time()
+            write_time = monotonic()
 
             if not target_pixel_file:
                 _, flename = os.path.split(cube_file)
@@ -934,7 +934,7 @@ class CutoutFactory():
             # Write the TPF
             tpf_object.writeto(target_pixel_file, overwrite=True, checksum=True)
 
-        log.debug("Write time: %.2f sec", (time() - write_time))
-        log.debug("Total time: %.2f sec", (time() - start_time))
+        log.debug("Write time: %.2f sec", (monotonic() - write_time))
+        log.debug("Total time: %.2f sec", (monotonic() - start_time))
 
         return target_pixel_file

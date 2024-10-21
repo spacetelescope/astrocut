@@ -5,8 +5,7 @@
 import os
 import warnings
 import numpy as np
-
-from time import time
+from time import monotonic
 
 from astropy import log as astropy_log
 from astropy.io import fits
@@ -243,7 +242,7 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
     """
     # Log messages based on verbosity
     _handle_verbose(verbose)
-    start_time = time()
+    start_time = monotonic()
             
     # Making sure we have an array of images
     if isinstance(input_files, str):
@@ -369,7 +368,7 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
                 all_paths.append(cutout_path)
                 log.debug(cutout_path)
         
-    log.debug("Total time: %.2f sec", time() - start_time)
+    log.debug("Total time: %.2f sec", monotonic() - start_time)
 
     if memory_only:
         return all_hdus
@@ -508,7 +507,7 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
     """
     # Log messages based on verbosity
     _handle_verbose(verbose)
-    start_time = time()
+    start_time = monotonic()
             
     # Making sure we have an array of images
     if isinstance(input_files, str):
@@ -613,6 +612,6 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
                 Image.fromarray(cutout).save(file_path)
         
     log.debug("Cutout fits file(s): %s", cutout_path)
-    log.debug("Total time: %.2f sec", time() - start_time)
+    log.debug("Total time: %.2f sec", monotonic() - start_time)
 
     return cutout_path
