@@ -108,7 +108,7 @@ def output(tmp_path):
         # create output fits path
         out = tmp_path / "roman"
         out.mkdir(exist_ok=True, parents=True)
-        output_file = out / f"test_output_cutout.{ext}" if ext else "test_output_cutout"
+        output_file = out / f"test_output_cutout.{ext}" if ext else out / "test_output_cutout"
         return output_file
     yield _output_file
 
@@ -174,7 +174,7 @@ def test_write_file(make_file, suffix, output):
 
     # if no suffix provided, check that the default output is fits
     if not suffix:
-        output_file += ".fits"
+        output_file = output_file.with_suffix('.fits')
 
     assert pathlib.Path(output_file).exists()
 

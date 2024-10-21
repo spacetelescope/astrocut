@@ -14,7 +14,8 @@ from astropy.time import Time
 
 from scipy.interpolate import splprep, splev
 
-from .utils.utils import get_fits
+from . import log
+from .utils.utils import get_fits, _handle_verbose
 from .exceptions import DataWarning, InvalidInputError
 
 
@@ -148,14 +149,15 @@ def _moving_target_focus(path, size, cutout_fles, verbose=False):
     response : `~astropy.table.Table`
         New cutout table.
     """
+    # Log messages based on verbosity
+    _handle_verbose(verbose)
     
     cutout_table_list = list()
     
     tck_tuple, u = splprep([path["position"].ra, path["position"].dec], u=path["time"].jd, s=0)
     
     for fle in cutout_fles:
-        if verbose:
-            print(fle)
+        log.debug('Processing file: %s', fle)
         
         # Get the stuff we need from the cutout file
         hdu = fits.open(fle)
@@ -373,6 +375,8 @@ def center_on_path(path, size, cutout_fles, target=None, img_wcs=None,
     """
     
     # TODO: add ability to take sizes like in rest of cutout functionality
+    # Log messages based on verbosity
+    _handle_verbose(verbose)
 
     # Performing the path transformation
     cutout_table = _moving_target_focus(path, size, cutout_fles, verbose)

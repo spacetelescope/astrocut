@@ -22,6 +22,14 @@ class InvalidInputError(Exception):
     pass
 
 
+class UnsupportedPythonError(Exception):
+    """
+    Exception to be issued when attempting to use astrocut with
+    an unsupported version of Python.
+    """
+    pass
+
+
 class InputWarning(AstropyWarning):
     """
     Warning to be issued when user input is incorrect in

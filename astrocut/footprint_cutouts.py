@@ -17,10 +17,10 @@ import numpy as np
 import requests
 from spherical_geometry.polygon import SphericalPolygon
 
-from astrocut.exceptions import InvalidQueryError
-from astrocut.cube_cut import CutoutFactory
-
-from .utils.utils import parse_size_input
+from . import log
+from .utils.utils import parse_size_input, _handle_verbose
+from .exceptions import InvalidQueryError
+from .cube_cut import CutoutFactory
 
 TESS_ARCSEC_PER_PX = 21  # Number of arcseconds per pixel in a TESS image
 FFI_TTLCACHE = TTLCache(maxsize=10, ttl=900)  # Cache for FFI footprint files
@@ -264,25 +264,24 @@ def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size,
     ['./cutouts/tess-s0001-4-4/tess-s0001-4-4_83.406310_-62.489771_64x64_astrocut.fits',
      './cutouts/tess-s0002-4-1/tess-s0002-4-1_83.406310_-62.489771_64x64_astrocut.fits']
     """
+    # Log messages based on verbosity
+    _handle_verbose(verbose)
     
     # Convert to SkyCoord
     if not isinstance(coordinates, SkyCoord):
         coordinates = SkyCoord(coordinates, unit='deg')
-    if verbose:
-        print('Coordinates:', coordinates)
+    log.debug('Coordinates: %s', coordinates)
 
     # Parse cutout size
     cutout_size = parse_size_input(cutout_size)
-    if verbose:
-        print('Cutout size:', cutout_size)
+    log.debug('Cutout size: %s', cutout_size)
 
     # Get FFI footprints from the cloud
     # s3_uri = 's3://tesscut-ops-footprints/tess_ffi_footprint_cache.json' if product == 'SPOC' \
     #     else 's3://tesscut-ops-footprints/tica_ffi_footprint_cache.json'
     # all_ffis = _get_s3_ffis(s3_uri=s3_uri, as_table=True, load_polys=True)
     all_ffis = get_caom_ffis(product)
-    if verbose:
-        print(f'Found {len(all_ffis)} footprint files.')
+    log.debug('Found %d footprint files.', len(all_ffis))
 
     # Filter FFIs by provided sectors
     if sequence:
@@ -295,8 +294,8 @@ def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size,
             raise InvalidQueryError('No FFI cube files were found for sequences: ' +
                                     ', '.join(str(s) for s in sequence))
         
-        if verbose:
-            print(f'Filtered to {len(all_ffis)} footprints for sequences: {", ".join(str(s) for s in sequence)}')
+        
+        log.debug('Filtered to %d footprints for sequences: %s', len(all_ffis), ", ".join(str(s) for s in sequence))
 
     # Get sector names and cube files that contain the cutout
     cone_results = ra_dec_crossmatch(all_ffis, coordinates, cutout_size, TESS_ARCSEC_PER_PX)
@@ -304,8 +303,7 @@ def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size,
         raise InvalidQueryError('The given coordinates were not found within the specified sequence(s).')
     seq_list = _create_sequence_list(cone_results, product)
     cube_files_mapping = _get_cube_files_from_sequence_obs(seq_list)
-    if verbose:
-        print(f'Found {len(cube_files_mapping)} matching cube files.')
+    log.debug('Found %d matching cube files.', len(cube_files_mapping))
     base_file_path = "s3://stpubdata/tess/public/mast/" if product == 'SPOC' \
         else "s3://stpubdata/tess/public/mast/tica/"
 
@@ -315,6 +313,7 @@ def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size,
 
     # Executor function to generate cutouts from a cube file
     def process_file(file):
+        log.debug('Creating cutout from %s', file['cube'])
         try:
             factory = CutoutFactory()
             file_path = os.path.join(base_file_path, file['cube'])
@@ -334,8 +333,7 @@ def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size,
             return None
         
     # Generate cutout from each cube file
-    if verbose:
-        print('Generating cutouts...')
+    log.debug('Generating cutouts...')
     cutout_files = [process_file(file) for file in cube_files_mapping]
 
     return cutout_files
