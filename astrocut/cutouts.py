@@ -77,7 +77,7 @@ def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, verbose=False
             for log_rec in log_list:
                 astropy_log.log(log_rec.levelno, log_rec.msg, extra={"origin": log_rec.name})
 
-    img_data = img_hdu.data
+    img_data = img_hdu.section
 
     log.debug("Original image shape: %s", img_data.shape)
 
@@ -112,7 +112,7 @@ def _hducut(img_hdu, center_coord, cutout_size, correct_wcs=False, verbose=False
         padding[0, 1] = ymax - ymax_img
         ymax = ymax_img  
         
-    img_cutout = img_hdu.data[ymin:ymax, xmin:xmax]
+    img_cutout = img_hdu.section[ymin:ymax, xmin:xmax]
 
     # Adding padding to the cutout so that it's the expected size
     if padding.any():  # only do if we need to pad
@@ -279,7 +279,7 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
         with fits.open(in_fle, mode='denywrite', memmap=True, fsspec_kwargs=fsspec_kwargs) as hdulist:
 
             # Sorting out which extension(s) to cutout
-            all_inds = np.where([x.is_image and (x.data is not None) for x in hdulist])[0]
+            all_inds = np.where([x.is_image and (x.section.shape != ()) for x in hdulist])[0]
             cutout_inds = _parse_extensions(all_inds, in_fle, extension)
 
             num_cutouts += len(cutout_inds)
@@ -354,12 +354,16 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
                               DataWarning)
                 continue
 
-            filename = "{}_{:7f}_{:7f}_{}-x-{}_astrocut.fits".format(os.path.basename(fle).rstrip('.fits'),
-                                                                     coordinates.ra.value,
-                                                                     coordinates.dec.value,
-                                                                     str(cutout_size[0]).replace(' ', ''), 
-                                                                     str(cutout_size[1]).replace(' ', ''))
-            cutout_path = os.path.join(output_dir, filename)
+            if memory_only:
+                cutout_path = None
+            else:
+                filename = "{}_{:7f}_{:7f}_{}-x-{}_astrocut.fits".format(os.path.basename(fle).rstrip('.fits'),
+                                                                         coordinates.ra.value,
+                                                                         coordinates.dec.value,
+                                                                         str(cutout_size[0]).replace(' ', ''), 
+                                                                         str(cutout_size[1]).replace(' ', ''))
+                cutout_path = os.path.join(output_dir, filename)
+
             cutout_fits = get_fits(cutout_list, coordinates, cutout_path)
 
             if memory_only:
@@ -533,7 +537,7 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
         with fits.open(in_fle, mode='denywrite', memmap=True) as hdulist:
 
             # Sorting out which extension(s) to cutout
-            all_inds = np.where([x.is_image and (x.data is not None) for x in hdulist])[0]
+            all_inds = np.where([x.is_image and (x.section.shape != ()) for x in hdulist])[0]
             cutout_inds = _parse_extensions(all_inds, in_fle, extension)
 
             for ind in cutout_inds:   
