@@ -279,7 +279,7 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
         with fits.open(in_fle, mode='denywrite', memmap=True, fsspec_kwargs=fsspec_kwargs) as hdulist:
 
             # Sorting out which extension(s) to cutout
-            all_inds = np.where([x.is_image and (x.size > 0) for x in hdulist])[0]
+            all_inds = np.where([hdu.is_image and hdu.size > 0 for hdu in hdulist])[0]
             cutout_inds = _parse_extensions(all_inds, in_fle, extension)
 
             num_cutouts += len(cutout_inds)
@@ -537,7 +537,7 @@ def img_cut(input_files, coordinates, cutout_size, stretch='asinh', minmax_perce
         with fits.open(in_fle, mode='denywrite', memmap=True) as hdulist:
 
             # Sorting out which extension(s) to cutout
-            all_inds = np.where([x.is_image and (x.size > 0) for x in hdulist])[0]
+            all_inds = np.where([hdu.is_image and hdu.size > 0 for hdu in hdulist])[0]
             cutout_inds = _parse_extensions(all_inds, in_fle, extension)
 
             for ind in cutout_inds:   
