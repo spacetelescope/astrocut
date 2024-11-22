@@ -1,7 +1,7 @@
 import pytest
 
 import numpy as np
-from os import path
+from os import path, listdir
 from re import findall
 
 from astropy.io import fits
@@ -64,19 +64,32 @@ def test_fits_cut(tmpdir, caplog, ffi_type):
 
     cutout_hdulist.close()
 
-    # Output directory that has to be made
-    cutout_files = cutouts.fits_cut(test_images, center_coord, cutout_size,
-                                    output_dir=path.join(tmpdir, "cutout_files"), single_outfile=False)
-
-    assert isinstance(cutout_files, list)
-    assert len(cutout_files) == len(test_images)
-    assert "cutout_files" in cutout_files[0]
-
-    # Memory only flag
-    cutout_list = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=True, memory_only=True)
+    # Memory only, single file
+    nonexisting_dir = "nonexisting"  # non-existing directory to check that no files are written
+    cutout_list = cutouts.fits_cut(test_images, center_coord, cutout_size, 
+                                   output_dir=nonexisting_dir, single_outfile=True, memory_only=True)
     assert isinstance(cutout_list, list)
     assert len(cutout_list) == 1
     assert isinstance(cutout_list[0], fits.HDUList)
+    assert not path.exists(nonexisting_dir)  # no files should be written
+
+    # Memory only, multiple files
+    cutout_list = cutouts.fits_cut(test_images, center_coord, cutout_size, 
+                                   output_dir=nonexisting_dir, single_outfile=False, memory_only=True)
+    assert isinstance(cutout_list, list)
+    assert len(cutout_list) == len(test_images)
+    assert isinstance(cutout_list[0], fits.HDUList)
+    assert not path.exists(nonexisting_dir)  # no files should be written
+
+    # Output directory that has to be created
+    new_dir = "cutout_files"  # non-existing directory to write files to
+    cutout_files = cutouts.fits_cut(test_images, center_coord, cutout_size,
+                                    output_dir=path.join(tmpdir, new_dir), single_outfile=False)
+
+    assert isinstance(cutout_files, list)
+    assert len(cutout_files) == len(test_images)
+    assert new_dir in cutout_files[0]
+    assert path.exists(new_dir)  # new directory should now exist
     
     # Do an off the edge test
     center_coord = SkyCoord("150.1163213 2.2005731", unit='deg')
