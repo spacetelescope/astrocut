@@ -1,7 +1,7 @@
 import pytest
 
 import numpy as np
-from os import path, listdir
+from os import path
 from re import findall
 
 from astropy.io import fits
