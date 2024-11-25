@@ -82,9 +82,9 @@ def test_fits_cut(tmpdir, caplog, ffi_type):
     assert not path.exists(nonexisting_dir)  # no files should be written
 
     # Output directory that has to be created
-    new_dir = "cutout_files"  # non-existing directory to write files to
+    new_dir = path.join(tmpdir, "cutout_files")  # non-existing directory to write files to
     cutout_files = cutouts.fits_cut(test_images, center_coord, cutout_size,
-                                    output_dir=path.join(tmpdir, new_dir), single_outfile=False)
+                                    output_dir=new_dir, single_outfile=False)
 
     assert isinstance(cutout_files, list)
     assert len(cutout_files) == len(test_images)
