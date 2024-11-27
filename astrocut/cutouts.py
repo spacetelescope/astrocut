@@ -311,7 +311,7 @@ def fits_cut(input_files, coordinates, cutout_size, correct_wcs=False, extension
         raise InvalidQueryError("Cutout contains no data! (Check image footprint.)")
 
     # Make sure the output directory exists
-    if not os.path.exists(output_dir):
+    if not memory_only and not os.path.exists(output_dir):
         os.makedirs(output_dir)
         
     # Setting up the output file(s) and writing them
