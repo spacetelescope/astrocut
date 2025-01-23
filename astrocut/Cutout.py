@@ -79,7 +79,6 @@ class Cutout(ABC):
         if not isinstance(fill_value, int) and not isinstance(fill_value, float):
             raise InvalidInputError('Fill value must be an integer or a float.')
         self._fill_value = fill_value
-        
         self._memory_only = memory_only
         self._output_dir = output_dir
         self._verbose = verbose
