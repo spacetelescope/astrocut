@@ -236,6 +236,7 @@ class FITSCutout(ImageCutout):
         """
         log.debug('Original image shape: %s', data.shape)
 
+
         # Get the limits for the cutout
         # These limits are not guaranteed to be within the image footprint
         cutout_lims = self._get_cutout_limits(wcs)
@@ -462,7 +463,6 @@ class FITSCutout(ImageCutout):
         cutout_paths : str | list
             The path(s) to the cutout file(s).
         """
-
         if self._single_outfile:
             log.debug('Returning cutout as a single FITS file.')
 

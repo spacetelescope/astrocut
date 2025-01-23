@@ -9,6 +9,7 @@ from astropy.io import fits
 from astropy.units import Quantity
 from astropy.visualization import (SqrtStretch, LogStretch, AsinhStretch, SinhStretch, LinearStretch,
                                    MinMaxInterval, ManualInterval, AsymmetricPercentileInterval)
+
 import numpy as np
 from PIL import Image
 from s3path import S3Path
