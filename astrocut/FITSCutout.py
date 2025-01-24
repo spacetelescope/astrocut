@@ -357,6 +357,7 @@ class FITSCutout(ImageCutout):
         # Check that there is data in the cutout image
         if (img_cutout == 0).all() or (np.isnan(img_cutout)).all():
             hdu_header["EMPTY"] = (True, "Indicates no data in cutout image.")
+            self._num_empty += 1
 
         return fits.ImageHDU(header=hdu_header, data=img_cutout)
 
@@ -374,6 +375,7 @@ class FITSCutout(ImageCutout):
 
         # Create HDU cutouts
         cutouts = []
+        self._num_cutouts += len(cutout_inds)
         for ind in cutout_inds:
             try:
                 # Get HDU, header, and WCS
@@ -404,13 +406,16 @@ class FITSCutout(ImageCutout):
             except OSError as err:
                 warnings.warn((f"Error {err} encountered when performing cutout on {file}, "
                                f"extension {ind}, skipping..."), DataWarning)
+                self._num_empty += 1
             except NoOverlapError:
                 warnings.warn((f"Cutout footprint does not overlap with data in {file}, "
                                f"extension {ind}, skipping..."), DataWarning)
+                self._num_empty += 1
             except ValueError as err:
                 if "Input position contains invalid values" in str(err):
                     warnings.warn((f"Cutout footprint does not overlap with data in {file}, "
                                    f"extension {ind}, skipping..."), DataWarning)
+                    self._num_empty += 1
                 else:
                     raise
         

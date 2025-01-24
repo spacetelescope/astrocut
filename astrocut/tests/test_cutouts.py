@@ -13,17 +13,43 @@ from PIL import Image
 
 from .utils_for_test import create_test_imgs
 from .. import cutouts
-from ..exceptions import InputWarning, InvalidInputError, InvalidQueryError 
+from ..exceptions import InputWarning, InvalidInputError, InvalidQueryError
 
 
-@pytest.mark.parametrize('ffi_type', ['SPOC', 'TICA'])
-def test_fits_cut(tmpdir, caplog, ffi_type):
+# Fixture to create test images for both SPOC and TICA
+@pytest.fixture(params=['SPOC', 'TICA'])
+def test_images(request, tmpdir):
+    if request.param == 'SPOC':
+        return create_test_imgs('SPOC', 50, 6, dir_name=tmpdir)
+    else:
+        return create_test_imgs('TICA', 50, 6, dir_name=tmpdir)
 
-    test_images = create_test_imgs(ffi_type, 50, 6, dir_name=tmpdir)
 
+# Fixture to create a test image with bad SIP keywords
+@pytest.fixture(params=['SPOC', 'TICA'])
+def test_image_bad_sip(request, tmpdir):
+    if request.param == 'SPOC':
+        return create_test_imgs('SPOC', 50, 1, dir_name=tmpdir,
+                                basename="img_badsip_{:04d}.fits", bad_sip_keywords=True)[0]
+    else:
+        return create_test_imgs('TICA', 50, 1, dir_name=tmpdir,
+                                basename="img_badsip_{:04d}.fits", bad_sip_keywords=True)[0]
+    
+
+# Fixture to return a center coordinate
+@pytest.fixture
+def center_coord():
+    return SkyCoord("150.1163213 2.200973097", unit='deg')
+
+
+# Fixture to return a cutout size
+@pytest.fixture
+def cutout_size():
+    return 10
+
+
+def test_fits_cut_single_file(tmpdir, test_images, center_coord, cutout_size):
     # Single file
-    center_coord = SkyCoord("150.1163213 2.200973097", unit='deg')
-    cutout_size = 10
     cutout_file = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=True, output_dir=tmpdir)
     assert isinstance(cutout_file, str)
     
@@ -45,6 +71,8 @@ def test_fits_cut(tmpdir, caplog, ffi_type):
 
     cutout_hdulist.close()
 
+
+def test_fits_cut_multiple_files(tmpdir, test_images, center_coord, cutout_size):
     # Multiple files
     cutout_files = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=False, output_dir=tmpdir)
 
@@ -62,8 +90,20 @@ def test_fits_cut(tmpdir, caplog, ffi_type):
     assert round(float(sra), 4) == round(center_coord.ra.deg, 4)
     assert round(float(sdec), 4) == round(center_coord.dec.deg, 4)
 
+    # Output directory that has to be created
+    new_dir = path.join(tmpdir, "cutout_files")  # non-existing directory to write files to
+    cutout_files = cutouts.fits_cut(test_images, center_coord, cutout_size,
+                                    output_dir=new_dir, single_outfile=False)
+
+    assert isinstance(cutout_files, list)
+    assert len(cutout_files) == len(test_images)
+    assert new_dir in cutout_files[0]
+    assert path.exists(new_dir)  # new directory should now exist
+
     cutout_hdulist.close()
 
+
+def test_fits_cut_memory_only(test_images, center_coord, cutout_size):
     # Memory only, single file
     nonexisting_dir = "nonexisting"  # non-existing directory to check that no files are written
     cutout_list = cutouts.fits_cut(test_images, center_coord, cutout_size, 
@@ -81,16 +121,8 @@ def test_fits_cut(tmpdir, caplog, ffi_type):
     assert isinstance(cutout_list[0], fits.HDUList)
     assert not path.exists(nonexisting_dir)  # no files should be written
 
-    # Output directory that has to be created
-    new_dir = path.join(tmpdir, "cutout_files")  # non-existing directory to write files to
-    cutout_files = cutouts.fits_cut(test_images, center_coord, cutout_size,
-                                    output_dir=new_dir, single_outfile=False)
 
-    assert isinstance(cutout_files, list)
-    assert len(cutout_files) == len(test_images)
-    assert new_dir in cutout_files[0]
-    assert path.exists(new_dir)  # new directory should now exist
-    
+def test_fits_cut_off_edge(tmpdir, test_images, cutout_size):
     # Do an off the edge test
     center_coord = SkyCoord("150.1163213 2.2005731", unit='deg')
     cutout_file = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=True, output_dir=tmpdir)
@@ -105,20 +137,21 @@ def test_fits_cut(tmpdir, caplog, ffi_type):
 
     cutout_hdulist.close()
 
+
+def test_fits_cutout_not_in_footprint(test_images, cutout_size):
+
     # Test when the requested cutout is not on the image
     center_coord = SkyCoord("140.1163213 2.2005731", unit='deg')
-    with pytest.raises(Exception, match='Cutout location is not in image footprint!') as e:
-        cutout_file = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=True)
-        assert e.type is InvalidQueryError
+    with pytest.raises(InvalidQueryError, match='Cutout location is not in image footprint!'):
+        cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=True)
 
     center_coord = SkyCoord("15.1163213 2.2005731", unit='deg')
-    with pytest.raises(Exception, match='Cutout location is not in image footprint!') as e:
-        cutout_file = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=True)
-        assert e.type is InvalidQueryError
+    with pytest.raises(InvalidQueryError, match='Cutout location is not in image footprint!'):
+        cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=True)
     
 
-    # Test when cutout is in some images not others
-
+def test_fits_cutout_no_data(tmpdir, test_images, cutout_size):
+    # Test behavior when some input files contain zeros in cutout footprint
     # Putting zeros into 2 images
     for img in test_images[:2]:
         hdu = fits.open(img, mode="update")
@@ -126,10 +159,9 @@ def test_fits_cut(tmpdir, caplog, ffi_type):
         hdu.flush()
         hdu.close()
         
-        
+    # Single outfile should include empty files as extensions
     center_coord = SkyCoord("150.1163213 2.2007", unit='deg')
     cutout_file = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=True, output_dir=tmpdir)
-    
     cutout_hdulist = fits.open(cutout_file)
     assert len(cutout_hdulist) == len(test_images) + 1  # num imgs + primary header
     assert (cutout_hdulist[1].data == 0).all()
@@ -138,31 +170,30 @@ def test_fits_cut(tmpdir, caplog, ffi_type):
     assert ~(cutout_hdulist[4].data == 0).any()
     assert ~(cutout_hdulist[5].data == 0).any()
     assert ~(cutout_hdulist[6].data == 0).any()
-
     
+    # Empty files should not be written to their own file
     cutout_files = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=False, output_dir=tmpdir)
     assert isinstance(cutout_files, list)
     assert len(cutout_files) == len(test_images) - 2
 
-    # Test when cutout is in no images
+    # Test when all input files contain only zeros in cutout footprint
+    # Putting zeros into the rest of the images
     for img in test_images[2:]:
         hdu = fits.open(img, mode="update")
         hdu[0].data[:20, :] = 0
         hdu.flush()
         hdu.close()
 
-    with pytest.raises(Exception) as e:
+    with pytest.raises(InvalidQueryError) as e:
         cutout_file = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=True, output_dir=tmpdir)
-        assert e.type is InvalidQueryError
-        assert "Cutout contains no data! (Check image footprint.)" in str(e.value)
+        assert 'Cutout contains no data! (Check image footprint.)' in e
 
-    # test single image and also conflicting sip keywords
-    test_image = create_test_imgs(ffi_type, 50, 1, dir_name=tmpdir,
-                                  basename="img_badsip_{:04d}.fits", bad_sip_keywords=True)[0]
 
+def test_fits_cutout_bad_sip(tmpdir, caplog, test_image_bad_sip):
+    # Test single image and also conflicting sip keywords
     center_coord = SkyCoord("150.1163213 2.2007", unit='deg')
     cutout_size = [10, 15]
-    cutout_file = cutouts.fits_cut(test_image, center_coord, cutout_size, output_dir=tmpdir)
+    cutout_file = cutouts.fits_cut(test_image_bad_sip, center_coord, cutout_size, output_dir=tmpdir)
     assert isinstance(cutout_file, str)
     assert "10-x-15" in cutout_file
     cutout_hdulist = fits.open(cutout_file)
@@ -170,14 +201,14 @@ def test_fits_cut(tmpdir, caplog, ffi_type):
 
     center_coord = SkyCoord("150.1159 2.2006", unit='deg')
     cutout_size = [10, 15]*u.pixel
-    cutout_file = cutouts.fits_cut(test_image, center_coord, cutout_size, output_dir=tmpdir)
+    cutout_file = cutouts.fits_cut(test_image_bad_sip, center_coord, cutout_size, output_dir=tmpdir)
     assert isinstance(cutout_file, str)
     assert "10.0pix-x-15.0pix" in cutout_file
     cutout_hdulist = fits.open(cutout_file)
     assert cutout_hdulist[1].data.shape == (15, 10)
 
     cutout_size = [1, 2]*u.arcsec
-    cutout_file = cutouts.fits_cut(test_image, center_coord, cutout_size, output_dir=tmpdir, verbose=True)
+    cutout_file = cutouts.fits_cut(test_image_bad_sip, center_coord, cutout_size, output_dir=tmpdir, verbose=True)
     assert isinstance(cutout_file, str)
     assert "1.0arcsec-x-2.0arcsec" in cutout_file
     cutout_hdulist = fits.open(cutout_file)
@@ -190,11 +221,13 @@ def test_fits_cut(tmpdir, caplog, ffi_type):
     center_coord = "150.1159 2.2006"
     cutout_size = [10, 15, 20]
     with pytest.warns(InputWarning):
-        cutout_file = cutouts.fits_cut(test_image, center_coord, cutout_size, output_dir=tmpdir)
+        cutout_file = cutouts.fits_cut(test_image_bad_sip, center_coord, cutout_size, output_dir=tmpdir)
     assert isinstance(cutout_file, str)
     assert "10-x-15" in cutout_file
     assert "x-20" not in cutout_file
 
+
+def test_fits_cloud(tmpdir):
     # Test single cloud image
     test_s3_uri = "s3://stpubdata/hst/public/j8pu/j8pu0y010/j8pu0y010_drc.fits"
     center_coord = SkyCoord("150.4275416667 2.42155", unit='deg')
@@ -208,7 +241,6 @@ def test_fits_cut(tmpdir, caplog, ffi_type):
 
 
 def test_normalize_img():
-
     # basic linear stretch
     img_arr = np.array([[1, 0], [.25, .75]])
     assert ((img_arr*255).astype(int) == cutouts.normalize_img(img_arr, stretch='linear')).all()
@@ -274,13 +306,7 @@ def test_normalize_img():
     assert (test_img == norm_img).all()
 
 
-@pytest.mark.parametrize('ffi_type', ['SPOC', 'TICA'])
-def test_img_cut(tmpdir, caplog, ffi_type):
-
-    test_images = create_test_imgs(ffi_type, 50, 6, dir_name=tmpdir)
-    center_coord = SkyCoord("150.1163213 2.200973097", unit='deg')
-    cutout_size = 10
-
+def test_img_cut(tmpdir, test_images, caplog, center_coord, cutout_size):
     # Basic jpg image
     jpg_files = cutouts.img_cut(test_images, center_coord, cutout_size, output_dir=tmpdir)
     
@@ -294,11 +320,24 @@ def test_img_cut(tmpdir, caplog, ffi_type):
         assert IMGFLE.read(8) == b'\x89\x50\x4E\x47\x0D\x0A\x1A\x0A'  # PNG
     assert len(img_files) == 1
 
+    # string coordinates and verbose
+    center_coord = "150.1163213 2.200973097"
+    jpg_files = cutouts.img_cut(test_images, center_coord, cutout_size,
+                                output_dir=path.join(tmpdir, "image_path"), verbose=True)
+    captured = caplog.text
+    assert len(findall("Original image shape", captured)) == 6
+    assert "Cutout fits file(s)" in captured
+    assert "Total time" in captured
+
+
+def test_img_cut_color(tmpdir, caplog, test_images, center_coord, cutout_size):
     # Color image
     color_jpg = cutouts.img_cut(test_images[:3], center_coord, cutout_size, colorize=True, output_dir=tmpdir)
     img = Image.open(color_jpg)
     assert img.mode == 'RGB'
 
+
+def test_img_cut_errors(tmpdir, test_images, center_coord, cutout_size):
     # Too few input images
     with pytest.raises(InvalidInputError):
         cutouts.img_cut(test_images[0], center_coord, cutout_size, colorize=True, output_dir=tmpdir)
@@ -309,16 +348,7 @@ def test_img_cut(tmpdir, caplog, ffi_type):
     img = Image.open(color_jpg)
     assert img.mode == 'RGB'
 
-    # string coordinates and verbose
-    center_coord = "150.1163213 2.200973097"
-    jpg_files = cutouts.img_cut(test_images, center_coord, cutout_size,
-                                output_dir=path.join(tmpdir, "image_path"), verbose=True)
-    captured = caplog.text
-    assert len(findall("Original image shape", captured)) == 6
-    assert "Cutout fits file(s)" in captured
-    assert "Total time" in captured
-
-    # test color image where one of the images is all zeros
+    # Test color image where one of the images is all zeros
     hdu = fits.open(test_images[0], mode='update')
     hdu[0].data[:, :] = 0
     hdu.flush()
@@ -327,6 +357,3 @@ def test_img_cut(tmpdir, caplog, ffi_type):
     with pytest.raises(InvalidInputError):
         cutouts.img_cut(test_images[:3], center_coord, cutout_size,
                         colorize=True, img_format='png', output_dir=tmpdir)
-
-    
-    

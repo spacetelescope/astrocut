@@ -110,8 +110,10 @@ class ImageCutout(Cutout, ABC):
         self._output_format = output_format.lower()
         self._cutout_prefix = cutout_prefix
 
-        # Initialize cutout dictionary
+        # Initialize cutout dictionary and counters
         self._cutout_dict = {}
+        self._num_empty = 0
+        self._num_cutouts = 0
 
         # Handle if output format is passed in without a dot
         if not self._output_format.startswith('.'):
@@ -298,7 +300,7 @@ class ImageCutout(Cutout, ABC):
             self._cutout_file(file)
 
         # If no cutouts contain data, raise exception
-        if all(len(value) == 0 for value in self._cutout_dict.values()):
+        if self._num_cutouts == self._num_empty:
             raise InvalidQueryError("Cutout contains no data! (Check image footprint.)")
 
         # Write cutout(s)
