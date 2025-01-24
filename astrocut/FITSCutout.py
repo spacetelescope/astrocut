@@ -298,13 +298,11 @@ class FITSCutout(ImageCutout):
         # Adding the physical WCS keywords
         wcs_header.set("WCSNAMEP", "PHYSICAL", "name of world coordinate system alternate P")
         wcs_header.set("WCSAXESP", 2, "number of WCS physical axes")
-        
         wcs_header.set("CTYPE1P", "RAWX", "physical WCS axis 1 type CCD col")
         wcs_header.set("CUNIT1P", "PIXEL", "physical WCS axis 1 unit")
         wcs_header.set("CRPIX1P", 1, "reference CCD column")
         wcs_header.set("CRVAL1P", cutout_lims[0, 0] + 1, "value at reference CCD column")
         wcs_header.set("CDELT1P", 1.0, "physical WCS axis 1 step")
-                    
         wcs_header.set("CTYPE2P", "RAWY", "physical WCS axis 2 type CCD col")
         wcs_header.set("CUNIT2P", "PIXEL", "physical WCS axis 2 unit")
         wcs_header.set("CRPIX2P", 1, "reference CCD row")
@@ -530,5 +528,7 @@ class FITSCutout(ImageCutout):
 
     def _write_as_asdf(self):
         """ASDF output is not yet implemented for FITS files."""
-        warnings.warn("ASDF output not yet implemented for FITS files. File will not be written.",
+        warnings.warn("ASDF output not yet implemented for FITS files. "
+                      "Returning cutout(s) as a list of ~astropy.io.fits.HDUList objects.",
                       InputWarning)
+        return self._write_to_memory()
