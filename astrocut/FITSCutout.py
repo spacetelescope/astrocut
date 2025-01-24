@@ -486,7 +486,7 @@ class FITSCutout(ImageCutout):
 
             return cutouts_fits
 
-    def _write_as_fits(self) -> str | List[str]:
+    def _write_as_fits(self) -> Union[str, List[str]]:
         """
         Write the cutouts to a file in FITS format.
 
