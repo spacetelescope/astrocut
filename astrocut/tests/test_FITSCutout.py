@@ -5,31 +5,60 @@ import numpy as np
 from os import path
 from re import findall
 
+<<<<<<< HEAD
 from astropy import units as u
 from astropy import wcs
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.table import Table
+=======
+from astropy.io import fits
+from astropy import wcs
+from astropy.coordinates import SkyCoord
+from astropy import units as u
+>>>>>>> 78d1da3 (Tests, style, more checks)
 
 from PIL import Image
 
 from astrocut.FITSCutout import FITSCutout
+<<<<<<< HEAD
+=======
+from astrocut.ImageCutout import ImageCutout
+>>>>>>> 78d1da3 (Tests, style, more checks)
 
 from .utils_for_test import create_test_imgs
 from ..exceptions import DataWarning, InputWarning, InvalidInputError, InvalidQueryError
 
 
+<<<<<<< HEAD
 # Fixture to create test images for both SPOC and TICA
 @pytest.fixture(params=['SPOC', 'TICA'])
 def test_images(request, tmpdir):
     return create_test_imgs(request.param, 50, 6, dir_name=tmpdir)
+=======
+@pytest.fixture(params=['SPOC', 'TICA'])
+def test_images(request, tmpdir):
+    if request.param == 'SPOC':
+        return create_test_imgs('SPOC', 50, 6, dir_name=tmpdir)
+    else:
+        return create_test_imgs('TICA', 50, 6, dir_name=tmpdir)
+>>>>>>> 78d1da3 (Tests, style, more checks)
 
 
 # Fixture to create a test image with bad SIP keywords
 @pytest.fixture(params=['SPOC', 'TICA'])
 def test_image_bad_sip(request, tmpdir):
+<<<<<<< HEAD
     return create_test_imgs(request.param, 50, 1, dir_name=tmpdir,
                             basename="img_badsip_{:04d}.fits", bad_sip_keywords=True)[0]
+=======
+    if request.param == 'SPOC':
+        return create_test_imgs('SPOC', 50, 1, dir_name=tmpdir,
+                                basename="img_badsip_{:04d}.fits", bad_sip_keywords=True)[0]
+    else:
+        return create_test_imgs('TICA', 50, 1, dir_name=tmpdir,
+                                basename="img_badsip_{:04d}.fits", bad_sip_keywords=True)[0]
+>>>>>>> 78d1da3 (Tests, style, more checks)
     
 
 # Fixture to return a center coordinate
@@ -111,6 +140,11 @@ def test_fits_cutout_multiple_files(tmpdir, test_images, center_coord, cutout_si
     assert new_dir in paths[0]
     assert path.exists(new_dir)  # new directory should now exist
 
+<<<<<<< HEAD
+=======
+    cutout_hdulist.close()
+
+>>>>>>> 78d1da3 (Tests, style, more checks)
 
 def test_fits_cutout_memory_only(test_images, center_coord, cutout_size):
     # Memory only, single file
@@ -241,6 +275,7 @@ def test_fits_cutout_extension(test_images, center_coord, cutout_size):
         cutout_list = FITSCutout(test_images[0], center_coord, cutout_size, extension=[1, 3]).fits_cutouts
         assert len(cutout_list[0]) == 2  # primary header + 1 image
 
+<<<<<<< HEAD
     # Remove image data from one of the input files
     with fits.open(test_images[1], mode='update') as hdul:
         primary = hdul[0]
@@ -254,6 +289,8 @@ def test_fits_cutout_extension(test_images, center_coord, cutout_size):
         with pytest.raises(InvalidInputError, match='Cutout contains no data!'):
             FITSCutout(test_images[1], center_coord, cutout_size)
 
+=======
+>>>>>>> 78d1da3 (Tests, style, more checks)
 
 def test_fits_cutout_not_in_footprint(test_images, cutout_size):
     # Test when the requested cutout is not on the image
