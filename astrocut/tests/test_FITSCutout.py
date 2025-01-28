@@ -5,10 +5,11 @@ import numpy as np
 from os import path
 from re import findall
 
-from astropy.io import fits
+from astropy import units as u
 from astropy import wcs
 from astropy.coordinates import SkyCoord
-from astropy import units as u
+from astropy.io import fits
+from astropy.table import Table
 
 from PIL import Image
 
@@ -243,6 +244,18 @@ def test_fits_cutout_extension(test_images, center_coord, cutout_size):
     with pytest.warns(DataWarning, match=r'extension\(s\) 3 will be skipped.'):
         cutout_list = FITSCutout(test_images[0], center_coord, cutout_size, memory_only=True, extension=[1, 3]).cutout()
         assert len(cutout_list[0]) == 2  # primary header + 1 image
+
+    # Remove image data from one of the input files
+    with fits.open(test_images[1], mode='update') as hdul:
+        primary = hdul[0]
+        primary.data = None
+        table_data = Table({'col1': [1, 2, 3], 'col2': ['a', 'b', 'c']})
+        table_hdu = fits.BinTableHDU(data=table_data, name='TABLE')
+        hdul.append(table_hdu)
+        hdul.flush()
+
+    with pytest.raises(InvalidQueryError, match='Cutout contains no data!'):
+        FITSCutout(test_images[1], center_coord, cutout_size, memory_only=True).cutout()
 
 
 def test_fits_cutout_not_in_footprint(test_images, cutout_size):
