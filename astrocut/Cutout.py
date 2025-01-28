@@ -49,7 +49,7 @@ class Cutout(ABC):
     def __init__(self, input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyCoord, str], 
                  cutout_size: Union[int, np.ndarray, u.Quantity, List[int], Tuple[int]] = 25,
                  fill_value: Union[int, float] = np.nan, memory_only: bool = False,
-                 output_dir: Union[str, Path] = '.', limit_rounding_method: str = 'round', verbose: bool = True):
+                 output_dir: Union[str, Path] = '.', limit_rounding_method: str = 'round', verbose: bool = False):
         
         # Log messages according to verbosity
         _handle_verbose(verbose)
@@ -75,7 +75,11 @@ class Cutout(ABC):
             raise InvalidInputError(f'Limit rounding method {limit_rounding_method} is not recognized. '
                                     'Valid options are {valid_rounding}.')
         self._limit_rounding_method = limit_rounding_method
+        
+        if not isinstance(fill_value, int) and not isinstance(fill_value, float):
+            raise InvalidInputError('Fill value must be an integer or a float.')
         self._fill_value = fill_value
+        
         self._memory_only = memory_only
         self._output_dir = output_dir
         self._verbose = verbose
@@ -101,11 +105,11 @@ class Cutout(ABC):
         try:
             center_pixel = self._coordinates.to_pixel(img_wcs)
         except wcs.NoConvergence:  # If wcs can't converge, center coordinate is far from the footprint
-            raise InvalidQueryError("Cutout location is not in image footprint!")
+            raise InvalidQueryError('Cutout location is not in image footprint!')
 
-        # Sometimes, we may get nans without a NoConvergence error
+        # We may get nans without a NoConvergence error
         if np.isnan(center_pixel).any():
-            raise InvalidQueryError("Cutout location is not in image footprint!")
+            raise InvalidQueryError('Cutout location is not in image footprint!')
         
         lims = np.zeros((2, 2), dtype=int)
         for axis, size in enumerate(self._cutout_size):
@@ -119,7 +123,7 @@ class Cutout(ABC):
                                          img_wcs.wcs.cunit[axis])
                 dim = (size / pixel_scale).decompose() / 2
             else:
-                raise InvalidInputError(f'Cutout size units {size.unit} are not supported.')
+                raise InvalidInputError(f'Cutout size unit {size.unit.aliases[0]} is not supported.')
 
             # Round the limits according to the requested method
             rounding_funcs = {
@@ -133,10 +137,9 @@ class Cutout(ABC):
             lims[axis, 1] = int(round_func(center_pixel[axis] + dim))
 
             # The case where the requested area is so small it rounds to zero
-            if self._limit_rounding_method == 'round' and lims[axis, 0] == lims[axis, 1]:
-                lims[axis, 0] = int(np.floor(center_pixel[axis] - 1))
+            if lims[axis, 0] == lims[axis, 1]:
+                lims[axis, 0] = int(np.floor(center_pixel[axis]))
                 lims[axis, 1] = lims[axis, 0] + 1
-
         return lims
 
     @abstractmethod

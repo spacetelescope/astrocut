@@ -20,10 +20,11 @@ from .ImageCutout import ImageCutout
 def fits_cut(input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyCoord, str], 
              cutout_size: Union[int, np.ndarray, Quantity, List[int], Tuple[int]] = 25,
              correct_wcs: bool = False, extension: Optional[Union[int, List[int], Literal['all']]] = None,
-             single_outfile: bool = True, cutout_prefix: str = "cutout", output_dir: Union[str, Path] = '.', 
-             memory_only: bool = False, verbose=False) -> Union[str, List[str], List[HDUList]]:
+             single_outfile: bool = True, cutout_prefix: str = 'cutout', output_dir: Union[str, Path] = '.', 
+             memory_only: bool = False, limit_rounding_method: str = 'round', 
+             verbose=False) -> Union[str, List[str], List[HDUList]]:
     """
-    Takes one or more fits files with the same WCS/pointing, makes the same cutout in each file,
+    Takes one or more FITS files with the same WCS/pointing, makes the same cutout in each file,
     and returns the result either in a single FITS file with one cutout per extension or in 
     individual fits files. The memory_only flag allows the cutouts to be returned as 
     `~astropy.io.fits.HDUList` objects rather than saving to disk.
@@ -62,11 +63,10 @@ def fits_cut(input_files: List[Union[str, Path, S3Path]], coordinates: Union[Sky
         the cutout(s) are returned as a list of `~astropy.io.fit.HDUList` objects. If set to
         True cutout_prefix and output_dir are ignored, however single_outfile can still be used to
         set the number of returned `~astropy.io.fits.HDUList` objects.
+    limit_rounding_method : str
+        Method to use for rounding the cutout limits. Options are 'round', 'ceil', and 'floor'.
     verbose : bool
         Default False. If true intermediate information is printed.
-    fsspec_kwargs : any
-        Default value {"anon": True}. This parameter should be used to provide cloud credentials to
-        access private data buckets (e.g. {"key": "YOUR-SECRET-KEY-ID", "secret": "YOUR-SECRET-KEY"}).
 
     Returns
     -------
@@ -81,6 +81,7 @@ def fits_cut(input_files: List[Union[str, Path, S3Path]], coordinates: Union[Sky
                       cutout_size=cutout_size,
                       memory_only=memory_only,
                       output_dir=output_dir,
+                      limit_rounding_method=limit_rounding_method,
                       output_format='.fits',
                       extension=extension,
                       single_outfile=single_outfile,
@@ -129,7 +130,7 @@ def img_cut(input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyC
             cutout_size: Union[int, np.ndarray, Quantity, List[int], Tuple[int]] = 25, stretch: str = 'asinh', 
             minmax_percent: Optional[List[int]] = None, minmax_value: Optional[List[int]] = None, 
             invert: bool = False, img_format: str = '.jpg', colorize: bool = False,
-            cutout_prefix: str = "cutout", output_dir: Union[str, Path] = '.', 
+            cutout_prefix: str = 'cutout', output_dir: Union[str, Path] = '.', 
             extension: Optional[Union[int, List[int], Literal['all']]] = None, fill_value: Union[int, float] = np.nan,
             limit_rounding_method: str = 'round', verbose=False) -> Union[str, List[str]]:
     """

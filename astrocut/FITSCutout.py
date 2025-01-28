@@ -95,14 +95,27 @@ class FITSCutout(ImageCutout):
     def __init__(self, input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyCoord, str], 
                  cutout_size: Union[int, np.ndarray, Quantity, List[int], Tuple[int]] = 25,
                  fill_value: Union[int, float] = np.nan, memory_only: bool = False,
-                 output_dir: Union[str, Path] = '.', limit_rounding_method: str = 'round', stretch: str = 'asinh', 
+                 output_dir: Union[str, Path] = '.', limit_rounding_method: str = 'round', stretch: str = None, 
                  minmax_percent: Optional[List[int]] = None, minmax_value: Optional[List[int]] = None, 
-                 invert: bool = False, colorize: bool = False, output_format: str = 'fits', 
+                 invert: bool = None, colorize: bool = None, output_format: str = 'fits', 
                  cutout_prefix: str = 'cutout', extension: Optional[Union[int, List[int], Literal['all']]] = None, 
-                 single_outfile: bool = True, verbose: bool = True):
+                 single_outfile: bool = True, verbose: bool = False):
+        # Warn if image processing parameters are provided for FITS output
+        if (output_format == 'fits' or output_format == '.fits') and (stretch or minmax_percent or 
+                                                                      minmax_value or invert or colorize):
+            warnings.warn('Stretch, minmax_percent, minmax_value, invert, and colorize are not supported '
+                          'for FITS output and will be ignored.', InputWarning)
+        else:
+            # Assign defaults if not provided
+            stretch = stretch or 'asinh'
+            invert = invert or False
+            colorize = colorize or False
+
+        # Superclass constructor 
         super().__init__(input_files, coordinates, cutout_size, fill_value, memory_only, output_dir, 
                          limit_rounding_method, stretch, minmax_percent, minmax_value, invert, colorize, 
-                         output_format, cutout_prefix, verbose)        
+                         output_format, cutout_prefix, verbose)
+               
         # If a single extension is given, make it a list
         if isinstance(extension, int):
             extension = [extension]
@@ -110,7 +123,6 @@ class FITSCutout(ImageCutout):
 
         # Assigning other attributes
         self._single_outfile = single_outfile
-        self._cutout_filenames = []
 
     def _parse_extensions(self, input_file: Union[str, Path, S3Path], infile_exts: np.ndarray) -> List[int]:
         """
@@ -131,8 +143,7 @@ class FITSCutout(ImageCutout):
         """
         # Skip files with no image data
         if len(infile_exts) == 0:
-            warnings.warn(f"No image extensions with data found in {input_file}, skipping...",
-                          DataWarning)
+            warnings.warn(f'No image extensions with data found in {input_file}, skipping...', DataWarning)
             return []
                 
         if self._extension is None:
@@ -142,9 +153,9 @@ class FITSCutout(ImageCutout):
         else:  # User input extentions
             cutout_exts = [x for x in infile_exts if x in self._extension]
             if len(cutout_exts) < len(self._extension):
-                warnings.warn((f"Not all requested extensions in {input_file} are image extensions or have "
-                               f"data, extension(s) {','.join([x for x in self._extension if x not in cutout_exts])}"
-                               " will be skipped."), DataWarning)
+                empty_exts = ','.join([str(x) for x in self._extension if x not in cutout_exts])
+                warnings.warn(f'Not all requested extensions in {input_file} are image extensions or have '
+                              f'data, extension(s) {empty_exts} will be skipped.', DataWarning)
 
         return cutout_exts
 
@@ -207,13 +218,13 @@ class FITSCutout(ImageCutout):
 
         no_sip = False
         if (len(log_list) > 0):
-            if ("Inconsistent SIP distortion information" in log_list[0].msg):
+            if ('Inconsistent SIP distortion information' in log_list[0].msg):
                 # Remove sip coefficients
                 img_wcs.sip = None
                 no_sip = True
             else:  # Message(s) we didn't prepare for we want to go ahead and display
                 for log_rec in log_list:
-                    astropy_log.log(log_rec.levelno, log_rec.msg, extra={"origin": log_rec.name})
+                    astropy_log.log(log_rec.levelno, log_rec.msg, extra={'origin': log_rec.name})
 
         return (img_wcs, no_sip)
     
@@ -233,7 +244,7 @@ class FITSCutout(ImageCutout):
         cutout_data : `numpy.ndarray`
             The cutout data.
         """
-        log.debug("Original image shape: %s", data.shape)
+        log.debug('Original image shape: %s', data.shape)
 
         # Get the limits for the cutout
         # These limits are not guaranteed to be within the image footprint
@@ -244,7 +255,7 @@ class FITSCutout(ImageCutout):
 
         # Check the cutout is on the image
         if (xmax <= 0) or (xmin >= xmax_img) or (ymax <= 0) or (ymin >= ymax_img):
-            raise InvalidQueryError("Cutout location is not in image footprint!")
+            raise InvalidQueryError('Cutout location is not in image footprint!')
 
         # Adjust limits and figure out the padding
         padding = np.zeros((2, 2), dtype=int)
@@ -259,15 +270,14 @@ class FITSCutout(ImageCutout):
             xmax = xmax_img
         if ymax > ymax_img:
             padding[0, 1] = ymax - ymax_img
-            ymax = ymax_img  
-            
+            ymax = ymax_img
         img_cutout = data[ymin:ymax, xmin:xmax]
 
         # Adding padding to the cutout so that it's the expected size
         if padding.any():  # only do if we need to pad
             img_cutout = np.pad(img_cutout, padding, 'constant', constant_values=self._fill_value)
 
-        log.debug("Image cutout shape: %s", img_cutout.shape)
+        log.debug('Image cutout shape: %s', img_cutout.shape)
 
         return img_cutout
     
@@ -292,22 +302,22 @@ class FITSCutout(ImageCutout):
         wcs_header = img_wcs.to_header(relax=True) 
 
         # Adjusting the CRPIX values
-        wcs_header["CRPIX1"] -= cutout_lims[0, 0]
-        wcs_header["CRPIX2"] -= cutout_lims[1, 0]
+        wcs_header['CRPIX1'] -= cutout_lims[0, 0]
+        wcs_header['CRPIX2'] -= cutout_lims[1, 0]
 
         # Adding the physical WCS keywords
-        wcs_header.set("WCSNAMEP", "PHYSICAL", "name of world coordinate system alternate P")
-        wcs_header.set("WCSAXESP", 2, "number of WCS physical axes")
-        wcs_header.set("CTYPE1P", "RAWX", "physical WCS axis 1 type CCD col")
-        wcs_header.set("CUNIT1P", "PIXEL", "physical WCS axis 1 unit")
-        wcs_header.set("CRPIX1P", 1, "reference CCD column")
-        wcs_header.set("CRVAL1P", cutout_lims[0, 0] + 1, "value at reference CCD column")
-        wcs_header.set("CDELT1P", 1.0, "physical WCS axis 1 step")
-        wcs_header.set("CTYPE2P", "RAWY", "physical WCS axis 2 type CCD col")
-        wcs_header.set("CUNIT2P", "PIXEL", "physical WCS axis 2 unit")
-        wcs_header.set("CRPIX2P", 1, "reference CCD row")
-        wcs_header.set("CRVAL2P", cutout_lims[1, 0] + 1, "value at reference CCD row")
-        wcs_header.set("CDELT2P", 1.0, "physical WCS axis 2 step")
+        wcs_header.set('WCSNAMEP', 'PHYSICAL', 'name of world coordinate system alternate P')
+        wcs_header.set('WCSAXESP', 2, 'number of WCS physical axes')
+        wcs_header.set('CTYPE1P', 'RAWX', 'physical WCS axis 1 type CCD col')
+        wcs_header.set('CUNIT1P', 'PIXEL', 'physical WCS axis 1 unit')
+        wcs_header.set('CRPIX1P', 1, 'reference CCD column')
+        wcs_header.set('CRVAL1P', cutout_lims[0, 0] + 1, 'value at reference CCD column')
+        wcs_header.set('CDELT1P', 1.0, 'physical WCS axis 1 step')
+        wcs_header.set('CTYPE2P', 'RAWY', 'physical WCS axis 2 type CCD col')
+        wcs_header.set('CUNIT2P', 'PIXEL', 'physical WCS axis 2 unit')
+        wcs_header.set('CRPIX2P', 1, 'reference CCD row')
+        wcs_header.set('CRVAL2P', cutout_lims[1, 0] + 1, 'value at reference CCD row')
+        wcs_header.set('CDELT2P', 1.0, 'physical WCS axis 2 step')
         
         return WCS(wcs_header)
 
@@ -345,16 +355,16 @@ class FITSCutout(ImageCutout):
             hdu_header.update(cutout_wcs.to_header(relax=True))  # relax arg is for sip distortions if they exist
 
         # Naming the extension and preserving the original name
-        hdu_header["O_EXT_NM"] = (hdu_header.get("EXTNAME"), "Original extension name.")
-        hdu_header["EXTNAME"] = "CUTOUT"
+        hdu_header['O_EXT_NM'] = (hdu_header.get('EXTNAME'), 'Original extension name.')
+        hdu_header['EXTNAME'] = 'CUTOUT'
 
         # Moving the filename, if present, into the ORIG_FLE keyword
-        hdu_header["ORIG_FLE"] = (hdu_header.get("FILENAME"), "Original image filename.")
-        hdu_header.remove("FILENAME", ignore_missing=True)
+        hdu_header['ORIG_FLE'] = (hdu_header.get('FILENAME'), 'Original image filename.')
+        hdu_header.remove('FILENAME', ignore_missing=True)
 
         # Check that there is data in the cutout image
         if (img_cutout == 0).all() or (np.isnan(img_cutout)).all():
-            hdu_header["EMPTY"] = (True, "Indicates no data in cutout image.")
+            hdu_header['EMPTY'] = (True, 'Indicates no data in cutout image.')
             self._num_empty += 1
 
         return fits.ImageHDU(header=hdu_header, data=img_cutout)
@@ -386,9 +396,9 @@ class FITSCutout(ImageCutout):
                     cutout = self._hducut(img_hdu, img_wcs, hdu_header, no_sip)
 
                     # Adding a few more keywords
-                    cutout.header["ORIG_EXT"] = (ind, "Extension in original file.")
-                    if not cutout.header.get("ORIG_FLE") and hdulist[0].header.get("FILENAME"):
-                        cutout.header["ORIG_FLE"] = hdulist[0].header.get("FILENAME")
+                    cutout.header['ORIG_EXT'] = (ind, 'Extension in original file.')
+                    if not cutout.header.get('ORIG_FLE') and hdulist[0].header.get('FILENAME'):
+                        cutout.header['ORIG_FLE'] = hdulist[0].header.get('FILENAME')
                 else:
                     # We only need the data array for images
                     cutout = self._get_cutout_data(img_hdu.section, img_wcs)
@@ -402,17 +412,17 @@ class FITSCutout(ImageCutout):
 
                 cutouts.append(cutout)
             except OSError as err:
-                warnings.warn((f"Error {err} encountered when performing cutout on {file}, "
-                               f"extension {ind}, skipping..."), DataWarning)
+                warnings.warn(f'Error {err} encountered when performing cutout on {file}, '
+                              f'extension {ind}, skipping...', DataWarning)
                 self._num_empty += 1
             except NoOverlapError:
-                warnings.warn((f"Cutout footprint does not overlap with data in {file}, "
-                               f"extension {ind}, skipping..."), DataWarning)
+                warnings.warn(f'Cutout footprint does not overlap with data in {file}, '
+                              f'extension {ind}, skipping...', DataWarning)
                 self._num_empty += 1
             except ValueError as err:
-                if "Input position contains invalid values" in str(err):
-                    warnings.warn((f"Cutout footprint does not overlap with data in {file}, "
-                                   f"extension {ind}, skipping..."), DataWarning)
+                if 'Input position contains invalid values' in str(err):
+                    warnings.warn(f'Cutout footprint does not overlap with data in {file}, '
+                                  f'extension {ind}, skipping...', DataWarning)
                     self._num_empty += 1
                 else:
                     raise
@@ -440,95 +450,82 @@ class FITSCutout(ImageCutout):
         # Setting up the Primary HDU
         keywords = dict()
         if self._coordinates:
-            keywords = {"RA_OBJ": (self._coordinates.ra.deg, '[deg] right ascension'),
-                        "DEC_OBJ": (self._coordinates.dec.deg, '[deg] declination')}
+            keywords = {'RA_OBJ': (self._coordinates.ra.deg, '[deg] right ascension'),
+                        'DEC_OBJ': (self._coordinates.dec.deg, '[deg] declination')}
 
         # Build the primary HDU with keywords
         primary_hdu = fits.PrimaryHDU()
-        primary_hdu.header.extend([("ORIGIN", 'STScI/MAST', "institution responsible for creating this file"),
-                                   ("DATE", str(date.today()), "file creation date"),
+        primary_hdu.header.extend([('ORIGIN', 'STScI/MAST', 'institution responsible for creating this file'),
+                                   ('DATE', str(date.today()), 'file creation date'),
                                    ('PROCVER', __version__, 'software version')])
         for kwd in keywords:
             primary_hdu.header[kwd] = keywords[kwd]
 
         return fits.HDUList([primary_hdu] + cutout_hdus)
 
-    def _write_to_memory(self) -> List[fits.HDUList]:
-        """
-        Return the cutouts as a list of HDUList objects.
-
-        Returns
-        -------
-        cutout_fits : list
-            List of `~astropy.io.fits.HDUList` objects.
-        """
-        if self._single_outfile:
-            # Collect all cutout HDUs into a single HDUList object
-            cutout_hdus = [x for file in self._cutout_dict for x in self._cutout_dict[file]]
-            return [self._construct_fits_from_hdus(cutout_hdus)]
-        else:
-            # Write cutouts for each input file to a separate HDUList object
-            cutouts_fits = []
-
-            for file, cutout_list in self._cutout_dict.items():
-                if np.array([x.header.get("EMPTY") for x in cutout_list]).all():
-                    # Skip files with no data in the cutout images
-                    warnings.warn(f"Cutout of {file} contains no data and will not be returned.",
-                                  DataWarning)
-                    continue
-
-                if not self._memory_only:
-                    # If cutouts are being written to disk, we need to keep track of their
-                    # input filenames to name the cutout files appropriately
-                    self._cutout_filenames.append(file)
-
-                cutouts_fits.append(self._construct_fits_from_hdus(cutout_list))
-
-            return cutouts_fits
-
     def _write_as_fits(self) -> Union[str, List[str]]:
         """
-        Write the cutouts to a file in FITS format.
+        Write the cutouts to memory or to a file in FITS format.
 
         Returns
         -------
         cutout_paths : str | list
             The path(s) to the cutout file(s).
         """
-        # Get cutouts as memory objects
-        cutouts_fits = self._write_to_memory()
 
-        cutout_paths = []  # Cutout file paths
-        for i, cutout in enumerate(cutouts_fits):
-            # Naming the cutout file
-            if self._single_outfile:
-                filename = "{}_{:.7f}_{:.7f}_{}-x-{}_astrocut.fits".format(
+        if self._single_outfile:
+            log.debug('Returning cutout as a single FITS file.')
+
+            cutout_hdus = [x for file in self._cutout_dict for x in self._cutout_dict[file]]
+            cutout_fits = self._construct_fits_from_hdus(cutout_hdus)
+
+            if self._memory_only:
+                return [cutout_fits]
+            else:
+                filename = '{}_{:.7f}_{:.7f}_{}-x-{}_astrocut.fits'.format(
                     self._cutout_prefix,
                     self._coordinates.ra.value,
                     self._coordinates.dec.value,
                     str(self._cutout_size[0]).replace(' ', ''),
                     str(self._cutout_size[1]).replace(' ', ''))
+                cutout_path = Path(self._output_dir, filename)
+                with warnings.catch_warnings():
+                    warnings.simplefilter('ignore') 
+                    cutout_fits.writeto(cutout_path, overwrite=True, checksum=True)
+                return cutout_path.as_posix()
+        else:  # one output file per input file
+            log.debug('Returning cutouts as individual FITS files.')
+
+            all_cutouts = []
+            for file, cutout_list in self._cutout_dict.items():
+                if np.array([x.header.get('EMPTY') for x in cutout_list]).all():
+                    # Skip files with no data in the cutout images
+                    warnings.warn(f'Cutout of {file} contains no data and will not be returned.', DataWarning)
+                    continue
+
+                cutout_fits = self._construct_fits_from_hdus(cutout_list)
+
+                if self._memory_only:
+                    all_cutouts.append(cutout_fits)
+                else:
+                    filename = '{}_{:.7f}_{:.7f}_{}-x-{}_astrocut.fits'.format(
+                        Path(file).stem,
+                        self._coordinates.ra.value,
+                        self._coordinates.dec.value,
+                        str(self._cutout_size[0]).replace(' ', ''), 
+                        str(self._cutout_size[1]).replace(' ', ''))
+                    cutout_path = Path(self._output_dir, filename)
+                    with warnings.catch_warnings():
+                        warnings.simplefilter('ignore') 
+                        cutout_fits.writeto(cutout_path, overwrite=True, checksum=True)
+                    all_cutouts.append(cutout_path.as_posix())
+
+            if self._memory_only:
+                return all_cutouts
             else:
-                filename = "{}_{:.7f}_{:.7f}_{}-x-{}_astrocut.fits".format(
-                    Path(self._cutout_filenames[i]).stem,
-                    self._coordinates.ra.value,
-                    self._coordinates.dec.value,
-                    str(self._cutout_size[0]).replace(' ', ''), 
-                    str(self._cutout_size[1]).replace(' ', ''))
-
-            # Write the cutout file to disk
-            cutout_path = Path(self._output_dir, filename)
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore") 
-                cutout.writeto(cutout_path, overwrite=True, checksum=True)
-            log.debug("Cutout fits file: %s", cutout_path)
-            cutout_paths.append(cutout_path.as_posix())
-
-        return cutout_paths if len(cutout_paths) > 1 else cutout_paths[0]
+                return all_cutouts if len(all_cutouts) > 1 else all_cutouts[0]
 
     def _write_as_asdf(self):
         """ASDF output is not yet implemented for FITS files."""
-        warnings.warn("ASDF output not yet implemented for FITS files. "
-                      "Returning cutout(s) as a list of ~astropy.io.fits.HDUList objects.",
-                      InputWarning)
-        return self._write_to_memory()
+        warnings.warn('ASDF output is not yet implemented for FITS files.', InputWarning)
+        return

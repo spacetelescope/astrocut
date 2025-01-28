@@ -94,14 +94,14 @@ class ImageCutout(Cutout, ABC):
                  output_dir: Union[str, Path] = '.', limit_rounding_method: str = 'round', stretch: str = 'asinh', 
                  minmax_percent: Optional[List[int]] = None, minmax_value: Optional[List[int]] = None, 
                  invert: bool = False, colorize: bool = False, output_format: str = 'jpg', 
-                 cutout_prefix: str = 'cutout', verbose: bool = True):
+                 cutout_prefix: str = 'cutout', verbose: bool = False):
         super().__init__(input_files, coordinates, cutout_size, fill_value, memory_only, output_dir, 
                          limit_rounding_method, verbose)
 
         # Attributes for normalizing image cutouts
         valid_stretches = ['asinh', 'sinh', 'sqrt', 'log', 'linear']
         if not isinstance(stretch, str) or stretch.lower() not in valid_stretches:
-            raise InvalidInputError(f"Stretch {stretch} is not recognized. Valid options are {valid_stretches}.")
+            raise InvalidInputError(f'Stretch {stretch} is not recognized. Valid options are {valid_stretches}.')
         self._stretch = stretch.lower()
         self._minmax_percent = minmax_percent
         self._minmax_value = minmax_value
@@ -140,14 +140,14 @@ class ImageCutout(Cutout, ABC):
             The cutout data.
         """
         # Using `~astropy.nddata.Cutout2D` to get the cutout data and handle WCS
-        log.debug("Original image shape: %s", data.shape)
+        log.debug('Original image shape: %s', data.shape)
         img_cutout = Cutout2D(data,
                               position=self._coordinates,
                               wcs=wcs_obj,
                               size=(self._cutout_size[1], self._cutout_size[0]),
                               mode='partial',
                               fill_value=self._fill_value)
-        log.debug("Image cutout shape: %s", img_cutout.shape)
+        log.debug('Image cutout shape: %s', img_cutout.shape)
 
         return img_cutout
 
@@ -160,14 +160,6 @@ class ImageCutout(Cutout, ABC):
         """
         pass
 
-    @abstractmethod
-    def _write_to_memory(self):
-        """
-        Write the cutouts to memory.
-
-        This method is abstract and should be defined in the subclass.
-        """
-        pass
 
     @abstractmethod
     def _write_as_fits(self):
@@ -187,10 +179,41 @@ class ImageCutout(Cutout, ABC):
         """
         pass
 
+    def _save_img_to_file(self, im: Image, file_path: str) -> bool:
+        """
+        Save a `~PIL.Image` object to a file.
+
+        Parameters
+        ----------
+        im : `~PIL.Image`
+            The image to save.
+        file_path : str
+            The path to save the image to.
+
+        Returns
+        -------
+        success : bool
+            True if the image was saved successfully, False otherwise.
+        """
+        try:
+            im.save(file_path)
+            return True
+        except ValueError as e:
+            warnings.warn(f'Cutout could not be saved in {self._output_format} format: {e}. '
+                          'Please try a different output format.', DataWarning)
+            return False
+        except KeyError as e:
+            warnings.warn(f'Cutout could not be saved in {self._output_format} format due to a KeyError: {e}. '
+                          'Please try a different output format.', DataWarning)
+            return False
+        except OSError as e:
+            warnings.warn(f'Cutout could not be saved: {e}', DataWarning)
+            return False
+
     def _write_as_img(self) -> Union[str, List[str]]:
         """
-        Write the cutout to a file in an image format. If colorize is set, the first 3 cutouts will be combined 
-        into a single RGB image. Otherwise, each cutout will be written to a separate file.
+        Write the cutout to memory or to a file in an image format. If colorize is set, the first 3 cutouts 
+        will be combined into a single RGB image. Otherwise, each cutout will be written to a separate file.
 
         Returns
         -------
@@ -208,14 +231,19 @@ class ImageCutout(Cutout, ABC):
 
             # Check for the correct number of cutouts
             if len(cutouts) < 3:
-                raise InvalidInputError(("Color cutouts require 3 input images (RGB)."
-                                         "If you supplied 3 images one of the cutouts may have been empty."))
+                raise InvalidInputError(('Color cutouts require 3 input images (RGB).'
+                                         'If you supplied 3 images one of the cutouts may have been empty.'))
             if len(cutouts) > 3:
-                warnings.warn("Too many inputs for a color cutout, only the first three will be used.", InputWarning)
+                warnings.warn('Too many inputs for a color cutout, only the first three will be used.', InputWarning)
                 cutouts = cutouts[:3]
 
+            im = Image.fromarray(np.dstack([cutouts[0], cutouts[1], cutouts[2]]).astype(np.uint8))
+
+            if self._memory_only:
+                return [im]
+
             # Write the colorized cutout to disk
-            cutout_path = "{}_{:.7f}_{:.7f}_{}-x-{}_astrocut{}".format(
+            cutout_path = '{}_{:.7f}_{:.7f}_{}-x-{}_astrocut{}'.format(
                 self._cutout_prefix,
                 self._coordinates.ra.value,
                 self._coordinates.dec.value,
@@ -224,17 +252,25 @@ class ImageCutout(Cutout, ABC):
                 self._output_format
             )
             cutout_path = Path(self._output_dir, cutout_path).as_posix()
-            Image.fromarray(np.dstack([cutouts[0], cutouts[1], cutouts[2]]).astype(np.uint8)).save(cutout_path)
+            success = self._save_img_to_file(im, cutout_path)
+            if not success:
+                return 
 
         else:  # Write each cutout to a separate image file
             cutout_path = []  # Store the paths of the written cutout files
             for file, cutout_list in self._cutout_dict.items():
                 if not cutout_list:
-                    warnings.warn("Cutout of {} contains no data and will not be written.".format(file), DataWarning)
+                    warnings.warn(f'Cutout of {file} contains no data and will not be written.', DataWarning)
                     continue
                 for i, cutout in enumerate(cutout_list):
+
+                    im = Image.fromarray(cutout)
+                    if self._memory_only:
+                        cutout_path.append(im)
+                        continue
+
                     # Write individual cutouts to disk
-                    file_path = "{}_{:.7f}_{:.7f}_{}-x-{}_astrocut_{}{}".format(
+                    file_path = '{}_{:.7f}_{:.7f}_{}-x-{}_astrocut_{}{}'.format(
                         Path(file).stem,
                         self._coordinates.ra.value,
                         self._coordinates.dec.value,
@@ -243,8 +279,9 @@ class ImageCutout(Cutout, ABC):
                         i,
                         self._output_format)
                     file_path = Path(self._output_dir, file_path).as_posix()
-                    cutout_path.append(file_path)
-                    Image.fromarray(cutout).save(file_path)
+                    success = self._save_img_to_file(im, file_path)
+                    if success:
+                        cutout_path.append(file_path)
 
         return cutout_path
 
@@ -264,7 +301,7 @@ class ImageCutout(Cutout, ABC):
         """
         if self._memory_only:
             # Write only to memory if specified
-            return self._write_to_memory()
+            log.info('Writing cutouts to memory only. No output files will be created.')
         else:
             # If writing to disk, ensure that output directory exists
             Path(self._output_dir).mkdir(parents=True, exist_ok=True)
@@ -276,7 +313,7 @@ class ImageCutout(Cutout, ABC):
         elif self._output_format in Image.registered_extensions().keys():
             return self._write_as_img()
         else:
-            raise InvalidInputError(f"Output format {self._output_format} is not supported.")
+            raise InvalidInputError(f'Output format {self._output_format} is not supported.')
         
     def cutout(self) -> Union[str, List[str], List[fits.HDUList]]:
         """
@@ -301,14 +338,14 @@ class ImageCutout(Cutout, ABC):
 
         # If no cutouts contain data, raise exception
         if self._num_cutouts == self._num_empty:
-            raise InvalidQueryError("Cutout contains no data! (Check image footprint.)")
+            raise InvalidQueryError('Cutout contains no data! (Check image footprint.)')
 
         # Write cutout(s)
         cutout_path = self._write_cutouts()
 
         # Log cutout path and total time elapsed
-        log.debug("Cutout fits file(s): %s", cutout_path)
-        log.debug("Total time: %.2f sec", monotonic() - start_time)
+        log.debug('Cutout fits file(s): %s', cutout_path)
+        log.debug('Total time: %.2f sec', monotonic() - start_time)
 
         return cutout_path
     
@@ -351,7 +388,7 @@ class ImageCutout(Cutout, ABC):
 
         # Check if the input image array is empty
         if img_arr.size == 0:
-            raise InvalidInputError("Input image array is empty.")
+            raise InvalidInputError('Input image array is empty.')
 
         # Setting up the transform with the stretch
         if stretch == 'asinh':
@@ -365,15 +402,15 @@ class ImageCutout(Cutout, ABC):
         elif stretch == 'linear':
             transform = LinearStretch()
         else:
-            raise InvalidInputError(f"Stretch '{stretch}' is not supported!"
-                                    "Valid options are: asinh, sinh, sqrt, log, linear.")
+            raise InvalidInputError(f'Stretch {stretch} is not supported!'
+                                    'Valid options are: asinh, sinh, sqrt, log, linear.')
 
         # Adding the scaling to the transform
         if minmax_percent is not None:
             transform += AsymmetricPercentileInterval(*minmax_percent)
             
             if minmax_value is not None:
-                warnings.warn("Both minmax_percent and minmax_value are set, minmax_value will be ignored.",
+                warnings.warn('Both minmax_percent and minmax_value are set, minmax_value will be ignored.', 
                               InputWarning)
         elif minmax_value is not None:
             transform += ManualInterval(*minmax_value)
