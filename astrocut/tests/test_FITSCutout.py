@@ -1,34 +1,67 @@
+<<<<<<< HEAD
+=======
+# Fixture to create test images for both SPOC and TICA
+>>>>>>> 78d1da3 (Tests, style, more checks)
 import pytest
 
 import numpy as np
 from os import path
 from re import findall
 
+<<<<<<< HEAD
 from astropy import units as u
 from astropy import wcs
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.table import Table
+=======
+from astropy.io import fits
+from astropy import wcs
+from astropy.coordinates import SkyCoord
+from astropy import units as u
+>>>>>>> 78d1da3 (Tests, style, more checks)
 
 from PIL import Image
 
 from astrocut.FITSCutout import FITSCutout
+<<<<<<< HEAD
+=======
+from astrocut.ImageCutout import ImageCutout
+>>>>>>> 78d1da3 (Tests, style, more checks)
 
 from .utils_for_test import create_test_imgs
 from ..exceptions import DataWarning, InputWarning, InvalidInputError, InvalidQueryError
 
 
+<<<<<<< HEAD
 # Fixture to create test images for both SPOC and TICA
 @pytest.fixture(params=['SPOC', 'TICA'])
 def test_images(request, tmpdir):
     return create_test_imgs(request.param, 50, 6, dir_name=tmpdir)
+=======
+@pytest.fixture(params=['SPOC', 'TICA'])
+def test_images(request, tmpdir):
+    if request.param == 'SPOC':
+        return create_test_imgs('SPOC', 50, 6, dir_name=tmpdir)
+    else:
+        return create_test_imgs('TICA', 50, 6, dir_name=tmpdir)
+>>>>>>> 78d1da3 (Tests, style, more checks)
 
 
 # Fixture to create a test image with bad SIP keywords
 @pytest.fixture(params=['SPOC', 'TICA'])
 def test_image_bad_sip(request, tmpdir):
+<<<<<<< HEAD
     return create_test_imgs(request.param, 50, 1, dir_name=tmpdir,
                             basename="img_badsip_{:04d}.fits", bad_sip_keywords=True)[0]
+=======
+    if request.param == 'SPOC':
+        return create_test_imgs('SPOC', 50, 1, dir_name=tmpdir,
+                                basename="img_badsip_{:04d}.fits", bad_sip_keywords=True)[0]
+    else:
+        return create_test_imgs('TICA', 50, 1, dir_name=tmpdir,
+                                basename="img_badsip_{:04d}.fits", bad_sip_keywords=True)[0]
+>>>>>>> 78d1da3 (Tests, style, more checks)
     
 
 # Fixture to return a center coordinate
@@ -103,8 +136,11 @@ def test_fits_cutout_multiple_files(tmpdir, test_images, center_coord, cutout_si
         assert round(float(sra), 4) == round(center_coord.ra.deg, 4)
         assert round(float(sdec), 4) == round(center_coord.dec.deg, 4)
 
+<<<<<<< HEAD
         cutout_hdulist.close()
 
+=======
+>>>>>>> 78d1da3 (Tests, style, more checks)
     # Test case where output directory does not exist
     new_dir = path.join(tmpdir, 'cutout_files')  # non-existing directory to write files to
     cutout_files = FITSCutout(test_images, center_coord, cutout_size,
@@ -115,6 +151,11 @@ def test_fits_cutout_multiple_files(tmpdir, test_images, center_coord, cutout_si
     assert new_dir in cutout_files[0]
     assert path.exists(new_dir)  # new directory should now exist
 
+<<<<<<< HEAD
+=======
+    cutout_hdulist.close()
+
+>>>>>>> 78d1da3 (Tests, style, more checks)
 
 def test_fits_cutout_memory_only(test_images, center_coord, cutout_size):
     # Memory only, single file
@@ -237,6 +278,7 @@ def test_fits_cutout_extension(test_images, center_coord, cutout_size):
         cutout_list = FITSCutout(test_images[0], center_coord, cutout_size, memory_only=True, extension=[1, 3]).cutout()
         assert len(cutout_list[0]) == 2  # primary header + 1 image
 
+<<<<<<< HEAD
     # Remove image data from one of the input files
     with fits.open(test_images[1], mode='update') as hdul:
         primary = hdul[0]
@@ -249,6 +291,8 @@ def test_fits_cutout_extension(test_images, center_coord, cutout_size):
     with pytest.raises(InvalidQueryError, match='Cutout contains no data!'):
         FITSCutout(test_images[1], center_coord, cutout_size, memory_only=True).cutout()
 
+=======
+>>>>>>> 78d1da3 (Tests, style, more checks)
 
 def test_fits_cutout_not_in_footprint(test_images, cutout_size):
     # Test when the requested cutout is not on the image
@@ -452,3 +496,81 @@ def test_fits_cutout_asdf_output(test_images, center_coord, cutout_size):
     # Should warn if output format is ASDF (not yet implemented)
     with pytest.warns(InputWarning, match='ASDF output is not yet implemented for FITS files.'):
         FITSCutout(test_images[0], center_coord, cutout_size, output_format='asdf').cutout()
+<<<<<<< HEAD
+=======
+
+
+def test_normalize_img():
+    # basic linear stretch
+    img_arr = np.array([[1, 0], [.25, .75]])
+    assert ((img_arr*255).astype(int) == ImageCutout.normalize_img(img_arr, stretch='linear')).all()
+
+    # invert
+    assert (255-(img_arr*255).astype(int) == ImageCutout.normalize_img(img_arr, stretch='linear', invert=True)).all()
+
+    # linear stretch where input image must be scaled 
+    img_arr = np.array([[10, 5], [2.5, 7.5]])
+    norm_img = ((img_arr - img_arr.min())/(img_arr.max()-img_arr.min())*255).astype(int)
+    assert (norm_img == ImageCutout.normalize_img(img_arr, stretch='linear')).all()
+
+    # min_max val
+    minval, maxval = 0, 1
+    img_arr = np.array([[1, 0], [-1, 2]])
+    norm_img = ImageCutout.normalize_img(img_arr, stretch='linear', minmax_value=[minval, maxval])
+    img_arr[img_arr < minval] = minval
+    img_arr[img_arr > maxval] = maxval
+    assert ((img_arr*255).astype(int) == norm_img).all()
+
+    minval, maxval = 0, 1
+    img_arr = np.array([[1, 0], [.1, .2]])
+    norm_img = ImageCutout.normalize_img(img_arr, stretch='linear', minmax_value=[minval, maxval])
+    img_arr[img_arr < minval] = minval
+    img_arr[img_arr > maxval] = maxval
+    ((img_arr*255).astype(int) == norm_img).all()
+
+    # min_max percent
+    img_arr = np.array([[1, 0], [0.1, 0.9], [.25, .75]])
+    norm_img = ImageCutout.normalize_img(img_arr, stretch='linear', minmax_percent=[25, 75])
+    assert (norm_img == [[255, 0], [0, 255], [39, 215]]).all()
+
+    # asinh
+    img_arr = np.array([[1, 0], [.25, .75]])
+    norm_img = ImageCutout.normalize_img(img_arr)
+    assert ((np.arcsinh(img_arr*10)/np.arcsinh(10)*255).astype(int) == norm_img).all()
+
+    # sinh
+    img_arr = np.array([[1, 0], [.25, .75]])
+    norm_img = ImageCutout.normalize_img(img_arr, stretch='sinh')
+    assert ((np.sinh(img_arr*3)/np.sinh(3)*255).astype(int) == norm_img).all()
+
+    # sqrt
+    img_arr = np.array([[1, 0], [.25, .75]])
+    norm_img = ImageCutout.normalize_img(img_arr, stretch='sqrt')
+    assert ((np.sqrt(img_arr)*255).astype(int) == norm_img).all()
+
+    # log
+    img_arr = np.array([[1, 0], [.25, .75]])
+    norm_img = ImageCutout.normalize_img(img_arr, stretch='log')
+    assert ((np.log(img_arr*1000+1)/np.log(1000)*255).astype(int) == norm_img).all()
+
+
+def test_normalize_img_errors():
+    # Bad stretch
+    with pytest.raises(InvalidInputError):
+        img_arr = np.array([[1, 0], [.25, .75]])
+        ImageCutout.normalize_img(img_arr, stretch='lin')
+
+    # Giving both minmax percent and cut
+    img_arr = np.array([[1, 0], [.25, .75]])
+    norm_img = ImageCutout.normalize_img(img_arr, stretch='asinh', minmax_percent=[0.7, 99.3])
+    with pytest.warns(InputWarning, 
+                      match='Both minmax_percent and minmax_value are set, minmax_value will be ignored.'):
+        test_img = ImageCutout.normalize_img(img_arr, stretch='asinh', minmax_value=[5, 2000], 
+                                             minmax_percent=[0.7, 99.3])
+    assert (test_img == norm_img).all()
+
+    # Raise error if image array is empty
+    img_arr = np.array([])
+    with pytest.raises(InvalidInputError):
+        ImageCutout.normalize_img(img_arr)
+>>>>>>> 78d1da3 (Tests, style, more checks)
