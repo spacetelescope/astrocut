@@ -6,6 +6,7 @@ from os import path
 from re import findall
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 from astropy import units as u
 from astropy import wcs
 from astropy.coordinates import SkyCoord
@@ -17,6 +18,13 @@ from astropy import wcs
 from astropy.coordinates import SkyCoord
 from astropy import units as u
 >>>>>>> 78d1da3 (Tests, style, more checks)
+=======
+from astropy import units as u
+from astropy import wcs
+from astropy.coordinates import SkyCoord
+from astropy.io import fits
+from astropy.table import Table
+>>>>>>> 0b8ff07 (test case for input file with no image data)
 
 from PIL import Image
 
@@ -276,6 +284,9 @@ def test_fits_cutout_extension(test_images, center_coord, cutout_size):
         assert len(cutout_list[0]) == 2  # primary header + 1 image
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 0b8ff07 (test case for input file with no image data)
     # Remove image data from one of the input files
     with fits.open(test_images[1], mode='update') as hdul:
         primary = hdul[0]
@@ -289,8 +300,11 @@ def test_fits_cutout_extension(test_images, center_coord, cutout_size):
         with pytest.raises(InvalidQueryError, match='Cutout contains no data!'):
             FITSCutout(test_images[1], center_coord, cutout_size)
 
+<<<<<<< HEAD
 =======
 >>>>>>> 78d1da3 (Tests, style, more checks)
+=======
+>>>>>>> 0b8ff07 (test case for input file with no image data)
 
 def test_fits_cutout_not_in_footprint(test_images, cutout_size):
     # Test when the requested cutout is not on the image
