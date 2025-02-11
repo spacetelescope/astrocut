@@ -22,7 +22,8 @@ from ..exceptions import DataWarning, InputWarning, InvalidInputError, InvalidQu
 
 @pytest.fixture(params=['SPOC', 'TICA'])
 def test_images(request, tmpdir):
-    create_test_imgs(request.param, 50, 6, dir_name=tmpdir)
+    return create_test_imgs(request.param, 50, 6, dir_name=tmpdir)
+
 
 # Fixture to create a test image with bad SIP keywords
 @pytest.fixture(params=['SPOC', 'TICA'])
