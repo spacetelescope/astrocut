@@ -32,6 +32,9 @@ def fits_cut(input_files: List[Union[str, Path, S3Path]], coordinates: Union[Sky
     Note: No checking is done on either the WCS pointing or pixel scale. If images don't line up
     the cutouts will also not line up.
 
+    This function is maintained for backwards compatibility. For maximum flexibility, we recommend using
+    ``FITSCutout`` directly.
+
     Parameters
     ----------
     input_files : list
@@ -139,6 +142,9 @@ def img_cut(input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyC
 
     Note: No checking is done on either the WCS pointing or pixel scale. If images don't line up
     the cutouts will also not line up.
+
+    This function is maintained for backwards compatibility. For maximum flexibility, we recommend using
+    ``FITSCutout`` directly.
 
     Parameters
     ----------
