@@ -91,33 +91,39 @@ class ImageCutout(Cutout, ABC):
     def __init__(self, input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyCoord, str], 
                  cutout_size: Union[int, np.ndarray, Quantity, List[int], Tuple[int]] = 25,
                  fill_value: Union[int, float] = np.nan, memory_only: bool = False,
-                 output_dir: Union[str, Path] = '.', limit_rounding_method: str = 'round', stretch: str = 'asinh', 
-                 minmax_percent: Optional[List[int]] = None, minmax_value: Optional[List[int]] = None, 
-                 invert: bool = False, colorize: bool = False, output_format: str = 'jpg', 
+                 output_dir: Union[str, Path] = '.', limit_rounding_method: str = 'round', 
+                 stretch: Optional[str] = None, minmax_percent: Optional[List[int]] = None, 
+                 minmax_value: Optional[List[int]] = None, invert: Optional[bool] = None, 
+                 colorize: Optional[bool] = None, output_format: str = 'jpg', 
                  cutout_prefix: str = 'cutout', verbose: bool = False):
         super().__init__(input_files, coordinates, cutout_size, fill_value, memory_only, output_dir, 
                          limit_rounding_method, verbose)
+        # Output format should be lowercase and begin with a dot
+        out_lower = output_format.lower()
+        self._output_format = f'.{out_lower}' if not output_format.startswith('.') else out_lower
+        
+        # Warn if image processing parameters are provided for FITS output
+        if (self._output_format == '.fits') and (stretch or minmax_percent or 
+                                                 minmax_value or invert or colorize):
+            warnings.warn('Stretch, minmax_percent, minmax_value, invert, and colorize are not supported '
+                          'for FITS output and will be ignored.', InputWarning)
 
-        # Attributes for normalizing image cutouts
+        # Assign attributes with defaults if not provided
+        stretch = stretch or 'asinh'
         valid_stretches = ['asinh', 'sinh', 'sqrt', 'log', 'linear']
-        if not isinstance(stretch, str) or stretch.lower() not in valid_stretches:
+        if stretch and not isinstance(stretch, str) or stretch.lower() not in valid_stretches:
             raise InvalidInputError(f'Stretch {stretch} is not recognized. Valid options are {valid_stretches}.')
         self._stretch = stretch.lower()
+        self._invert = invert or False
+        self._colorize = colorize or False
         self._minmax_percent = minmax_percent
         self._minmax_value = minmax_value
-        self._invert = invert
-        self._colorize = colorize
-        self._output_format = output_format.lower()
         self._cutout_prefix = cutout_prefix
 
         # Initialize cutout dictionary and counters
         self._cutout_dict = {}
         self._num_empty = 0
         self._num_cutouts = 0
-
-        # Handle if output format is passed in without a dot
-        if not self._output_format.startswith('.'):
-            self._output_format = f'.{self._output_format}'
 
         # Apply default scaling for image outputs
         if (self._minmax_percent is None) and (self._minmax_value is None):

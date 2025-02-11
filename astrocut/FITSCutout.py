@@ -100,17 +100,6 @@ class FITSCutout(ImageCutout):
                  invert: bool = None, colorize: bool = None, output_format: str = 'fits', 
                  cutout_prefix: str = 'cutout', extension: Optional[Union[int, List[int], Literal['all']]] = None, 
                  single_outfile: bool = True, verbose: bool = False):
-        # Warn if image processing parameters are provided for FITS output
-        if (output_format == 'fits' or output_format == '.fits') and (stretch or minmax_percent or 
-                                                                      minmax_value or invert or colorize):
-            warnings.warn('Stretch, minmax_percent, minmax_value, invert, and colorize are not supported '
-                          'for FITS output and will be ignored.', InputWarning)
-        else:
-            # Assign defaults if not provided
-            stretch = stretch or 'asinh'
-            invert = invert or False
-            colorize = colorize or False
-
         # Superclass constructor 
         super().__init__(input_files, coordinates, cutout_size, fill_value, memory_only, output_dir, 
                          limit_rounding_method, stretch, minmax_percent, minmax_value, invert, colorize, 
