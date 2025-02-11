@@ -71,9 +71,9 @@ def fits_cut(input_files: List[Union[str, Path, S3Path]], coordinates: Union[Sky
     Returns
     -------
     response : str or list
-        If single_outfile is True returns the single output filepath. Otherwise returns a list of all 
+        If single_outfile is True, returns the single output filepath. Otherwise, returns a list of all 
         the output filepaths.
-        If memory_only is True a list of `~astropy.io.fit.HDUList` objects is returned instead of
+        If memory_only is True, a list of `~astropy.io.fit.HDUList` objects is returned instead of
         file name(s).
     """
     return FITSCutout(input_files,
@@ -191,7 +191,7 @@ def img_cut(input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyC
     Returns
     -------
     response : str or list
-        If colorize is True returns the single output filepath. Otherwise returns a list of all 
+        If colorize is True, returns the single output filepath. Otherwise, returns a list of all 
         the output filepaths.
     """
 

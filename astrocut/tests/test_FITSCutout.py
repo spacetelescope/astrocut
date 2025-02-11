@@ -22,21 +22,13 @@ from ..exceptions import DataWarning, InputWarning, InvalidInputError, InvalidQu
 
 @pytest.fixture(params=['SPOC', 'TICA'])
 def test_images(request, tmpdir):
-    if request.param == 'SPOC':
-        return create_test_imgs('SPOC', 50, 6, dir_name=tmpdir)
-    else:
-        return create_test_imgs('TICA', 50, 6, dir_name=tmpdir)
-
+    create_test_imgs(request.param, 50, 6, dir_name=tmpdir)
 
 # Fixture to create a test image with bad SIP keywords
 @pytest.fixture(params=['SPOC', 'TICA'])
 def test_image_bad_sip(request, tmpdir):
-    if request.param == 'SPOC':
-        return create_test_imgs('SPOC', 50, 1, dir_name=tmpdir,
-                                basename="img_badsip_{:04d}.fits", bad_sip_keywords=True)[0]
-    else:
-        return create_test_imgs('TICA', 50, 1, dir_name=tmpdir,
-                                basename="img_badsip_{:04d}.fits", bad_sip_keywords=True)[0]
+    return create_test_imgs(request.param, 50, 1, dir_name=tmpdir,
+                            basename="img_badsip_{:04d}.fits", bad_sip_keywords=True)[0]
     
 
 # Fixture to return a center coordinate
@@ -111,6 +103,8 @@ def test_fits_cutout_multiple_files(tmpdir, test_images, center_coord, cutout_si
         assert round(float(sra), 4) == round(center_coord.ra.deg, 4)
         assert round(float(sdec), 4) == round(center_coord.dec.deg, 4)
 
+        cutout_hdulist.close()
+
     # Test case where output directory does not exist
     new_dir = path.join(tmpdir, 'cutout_files')  # non-existing directory to write files to
     cutout_files = FITSCutout(test_images, center_coord, cutout_size,
@@ -120,8 +114,6 @@ def test_fits_cutout_multiple_files(tmpdir, test_images, center_coord, cutout_si
     assert len(cutout_files) == len(test_images)
     assert new_dir in cutout_files[0]
     assert path.exists(new_dir)  # new directory should now exist
-
-    cutout_hdulist.close()
 
 
 def test_fits_cutout_memory_only(test_images, center_coord, cutout_size):
