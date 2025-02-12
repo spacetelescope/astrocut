@@ -91,13 +91,14 @@ class FITSCutout(ImageCutout):
     _write_as_asdf()
         Write the cutouts to a file in ASDF format.
     """
-
+        
     def __init__(self, input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyCoord, str], 
                  cutout_size: Union[int, np.ndarray, Quantity, List[int], Tuple[int]] = 25,
                  fill_value: Union[int, float] = np.nan, memory_only: bool = False,
-                 output_dir: Union[str, Path] = '.', limit_rounding_method: str = 'round', stretch: str = None, 
-                 minmax_percent: Optional[List[int]] = None, minmax_value: Optional[List[int]] = None, 
-                 invert: bool = None, colorize: bool = None, output_format: str = 'fits', 
+                 output_dir: Union[str, Path] = '.', limit_rounding_method: str = 'round', 
+                 stretch: Optional[str] = None, minmax_percent: Optional[List[int]] = None, 
+                 minmax_value: Optional[List[int]] = None, invert: Optional[bool] = None, 
+                 colorize: Optional[bool] = None, output_format: str = '.fits',
                  cutout_prefix: str = 'cutout', extension: Optional[Union[int, List[int], Literal['all']]] = None, 
                  single_outfile: bool = True, verbose: bool = False):
         # Superclass constructor 
