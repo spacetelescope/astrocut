@@ -110,7 +110,7 @@ class ImageCutout(Cutout, ABC):
         # Assign attributes with defaults if not provided
         stretch = stretch or 'asinh'
         valid_stretches = ['asinh', 'sinh', 'sqrt', 'log', 'linear']
-        if stretch and not isinstance(stretch, str) or stretch.lower() not in valid_stretches:
+        if not isinstance(stretch, str) or stretch.lower() not in valid_stretches:
             raise InvalidInputError(f'Stretch {stretch} is not recognized. Valid options are {valid_stretches}.')
         self._stretch = stretch.lower()
         self._invert = invert or False
