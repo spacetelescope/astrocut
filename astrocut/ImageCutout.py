@@ -102,10 +102,10 @@ class ImageCutout(Cutout, ABC):
         self._output_format = f'.{out_lower}' if not output_format.startswith('.') else out_lower
         
         # Warn if image processing parameters are provided for FITS output
-        if (self._output_format == '.fits') and (stretch or minmax_percent or 
-                                                 minmax_value or invert or colorize):
+        if ((self._output_format == '.fits' or self._output_format == '.asdf') and 
+           (stretch or minmax_percent or minmax_value or invert or colorize)):
             warnings.warn('Stretch, minmax_percent, minmax_value, invert, and colorize are not supported '
-                          'for FITS output and will be ignored.', InputWarning)
+                          'for FITS or ASDF output and will be ignored.', InputWarning)
 
         # Assign attributes with defaults if not provided
         stretch = stretch or 'asinh'

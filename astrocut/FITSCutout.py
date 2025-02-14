@@ -84,12 +84,10 @@ class FITSCutout(ImageCutout):
         Cutout an image file.
     _construct_fits_from_hdus()
         Make one or more cutout HDUs into a single HDUList object.
-    _write_to_memory()
-        Write the cutouts to memory.
     _write_as_fits()
-        Write the cutouts to a file in FITS format.
+        Write the cutouts to disk or memory in FITS format.
     _write_as_asdf()
-        Write the cutouts to a file in ASDF format.
+        Write the cutouts to disk or memory in ASDF format.
     """
         
     def __init__(self, input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyCoord, str], 
@@ -461,7 +459,7 @@ class FITSCutout(ImageCutout):
         Returns
         -------
         cutout_paths : str | list
-            The path(s) to the cutout file(s).
+            The path(s) to the cutout file(s) or the cutout memory objects.
         """
         if self._single_outfile:
             log.debug('Returning cutout as a single FITS file.')
