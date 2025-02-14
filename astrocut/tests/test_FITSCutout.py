@@ -1,4 +1,3 @@
-# Fixture to create test images for both SPOC and TICA
 import pytest
 
 import numpy as np
