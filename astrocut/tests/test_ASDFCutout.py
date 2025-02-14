@@ -1,3 +1,4 @@
+from pathlib import Path
 import numpy as np
 import pytest
 from unittest.mock import MagicMock, patch
@@ -14,6 +15,7 @@ from s3path import S3Path
 from PIL import Image
 
 from astrocut.ASDFCutout import ASDFCutout
+from astrocut.asdf_cutouts import asdf_cut
 from astrocut.exceptions import DataWarning, InputWarning, InvalidInputError, InvalidQueryError
 
 
@@ -35,7 +37,7 @@ def make_wcs(xsize, ysize, ra=30., dec=45.):
     det2sky = pixelshift | pixelscale | tangent_projection | celestial_rotation
 
     # define the wcs object
-    detector_frame = coordinate_frames.Frame2D(name="detector", axes_names=("x", "y"), unit=(u.pix, u.pix))
+    detector_frame = coordinate_frames.Frame2D(name='detector', axes_names=('x', 'y'), unit=(u.pix, u.pix))
     sky_frame = coordinate_frames.CelestialFrame(reference_frame=coord.ICRS(), name='world', unit=(u.deg, u.deg))
     return wcs.WCS([(detector_frame, det2sky), (sky_frame, None)])
 
@@ -93,12 +95,12 @@ def test_images(tmp_path, fakedata):
     tree = {'roman': {'data': data, 'meta': meta}}
     af = asdf.AsdfFile(tree)
 
-    path = tmp_path / "roman"
+    path = tmp_path / 'roman'
     path.mkdir(exist_ok=True)
 
     files = []
     for i in range(3):
-        filename = path / f"test_roman_{i}.asdf"
+        filename = path / f'test_roman_{i}.asdf'
         af.write_to(filename)
         files.append(filename)
 
@@ -231,7 +233,6 @@ def test_asdf_cutout_poles(cutout_size, makefake, tmp_path):
 
     # Set input cutout coord
     center_coord = SkyCoord(284.702, 89.986, unit='deg')
-    wcs = fits_wcs.WCS(gwcs.to_fits_sip())
 
     # create and write the asdf file
     meta = {'wcs': gwcs}
@@ -239,7 +240,7 @@ def test_asdf_cutout_poles(cutout_size, makefake, tmp_path):
     af = asdf.AsdfFile(tree)
     path = tmp_path / 'roman'
     path.mkdir(exist_ok=True)
-    filename = path / f'test_roman_poles.asdf'
+    filename = path / 'test_roman_poles.asdf'
     af.write_to(filename)
 
     # Get cutout
@@ -277,15 +278,15 @@ def test_asdf_cutout_no_gwcs(test_images, center_coord, cutout_size):
     assert len(cutouts) == 2
 
 
-def test_asdf_cutout_invalid_params(test_images, center_coord, cutout_size):
+def test_asdf_cutout_invalid_params(test_images, center_coord, cutout_size, tmpdir):
     # Warning when image options are given
     with pytest.warns(InputWarning, match='are not supported for FITS or ASDF output and will be ignored.'):
-        ASDFCutout(test_images, center_coord, cutout_size, stretch='asinh').cutout()
+        ASDFCutout(test_images, center_coord, cutout_size, stretch='asinh', output_dir=tmpdir).cutout()
 
     # Invalid units for cutout size
     cutout_size = 1 * u.m  # meters are not valid
     with pytest.raises(InvalidInputError, match='Cutout size unit meter is not supported.'):
-        ASDFCutout(test_images, center_coord, cutout_size).cutout()
+        ASDFCutout(test_images, center_coord, cutout_size, output_dir=tmpdir).cutout()
 
 
 def test_asdf_cutout_img_output(test_images, center_coord, cutout_size, tmpdir):
@@ -362,3 +363,28 @@ def test_get_center_pixel(fakedata):
     pixel_coordinates, wcs = ASDFCutout.get_center_pixel(gwcs, 30, 45)
     assert np.allclose(pixel_coordinates, (np.array(500), np.array(500)))
     assert np.allclose(wcs.celestial.wcs.crval, np.array([30, 45]))
+
+
+def test_asdf_cut(test_images, center_coord, cutout_size, tmpdir):
+    """ Test convenience function to create ASDF cutouts """
+    # Write files to disk
+    cutouts = asdf_cut(test_images, center_coord.ra.deg, center_coord.dec.deg, cutout_size, output_dir=tmpdir)
+    assert isinstance(cutouts, list)
+    assert isinstance(cutouts[0], str)
+    assert len(cutouts) == 3
+    for path in cutouts:
+        assert path.endswith('.asdf')
+        assert Path(path).exists()
+
+    # Write files to memory
+    cutouts = asdf_cut(test_images, center_coord.ra.deg, center_coord.dec.deg, cutout_size, write_file=False)
+    assert isinstance(cutouts, list)
+    assert isinstance(cutouts[0], asdf.AsdfFile)
+    assert len(cutouts) == 3
+
+    # Write FITS cutouts to memory
+    cutouts = asdf_cut(test_images, center_coord.ra.deg, center_coord.dec.deg, cutout_size, output_format='fits', 
+                       write_file=False)
+    assert isinstance(cutouts, list)
+    assert isinstance(cutouts[0], fits.HDUList)
+    assert len(cutouts) == 3
