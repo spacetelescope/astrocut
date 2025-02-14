@@ -14,7 +14,6 @@ from astropy.table import Table
 from PIL import Image
 
 from astrocut.FITSCutout import FITSCutout
-from astrocut.ImageCutout import ImageCutout
 
 from .utils_for_test import create_test_imgs
 from ..exceptions import DataWarning, InputWarning, InvalidInputError, InvalidQueryError
