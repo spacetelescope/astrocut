@@ -4,13 +4,11 @@ from time import monotonic
 from typing import List, Optional, Union, Tuple
 import warnings
 
-from astropy import wcs
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.units import Quantity
 from astropy.visualization import (SqrtStretch, LogStretch, AsinhStretch, SinhStretch, LinearStretch,
                                    MinMaxInterval, ManualInterval, AsymmetricPercentileInterval)
-from astropy.nddata import Cutout2D
 import numpy as np
 from PIL import Image
 from s3path import S3Path
