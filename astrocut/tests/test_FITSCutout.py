@@ -1,4 +1,3 @@
-# Fixture to create test images for both SPOC and TICA
 import pytest
 
 import numpy as np
@@ -20,6 +19,7 @@ from .utils_for_test import create_test_imgs
 from ..exceptions import DataWarning, InputWarning, InvalidInputError, InvalidQueryError
 
 
+# Fixture to create test images for both SPOC and TICA
 @pytest.fixture(params=['SPOC', 'TICA'])
 def test_images(request, tmpdir):
     return create_test_imgs(request.param, 50, 6, dir_name=tmpdir)

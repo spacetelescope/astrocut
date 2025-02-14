@@ -129,34 +129,6 @@ class ImageCutout(Cutout, ABC):
         if (self._minmax_percent is None) and (self._minmax_value is None):
             self._minmax_percent = [0.5, 99.5]
 
-    def _get_cutout_data(self, data: np.ndarray, wcs_obj: wcs.WCS) -> Cutout2D:
-        """
-        Get the cutout data from the input image.
-
-        Parameters
-        ----------
-        data : array
-            The input image data.
-        wcs : `~astropy.wcs.WCS`
-            The WCS of the input image.
-
-        Returns
-        -------
-        img_cutout : `~astropy.nddata.Cutout2D`
-            The cutout data.
-        """
-        # Using `~astropy.nddata.Cutout2D` to get the cutout data and handle WCS
-        log.debug('Original image shape: %s', data.shape)
-        img_cutout = Cutout2D(data,
-                              position=self._coordinates,
-                              wcs=wcs_obj,
-                              size=(self._cutout_size[1], self._cutout_size[0]),
-                              mode='partial',
-                              fill_value=self._fill_value)
-        log.debug('Image cutout shape: %s', img_cutout.shape)
-
-        return img_cutout
-
     @abstractmethod
     def _cutout_file(self, file: Union[str, Path, S3Path]):
         """
