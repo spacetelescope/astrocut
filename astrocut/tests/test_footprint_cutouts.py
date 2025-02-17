@@ -2,8 +2,15 @@ import re
 import pytest
 
 from astrocut.exceptions import InvalidQueryError
-from astrocut.footprint_cutouts import (cube_cut_from_footprint, _extract_sequence_information, _s_region_to_polygon, 
-                                        get_caom_ffis, _ffi_intersect, ra_dec_crossmatch, _create_sequence_list)
+from astrocut.footprint_cutouts import (
+    cube_cut_from_footprint,
+    _extract_sequence_information,
+    _s_region_to_polygon,
+    get_ffis,
+    _ffi_intersect,
+    ra_dec_crossmatch,
+    _create_sequence_list,
+)
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.table import Table
@@ -123,13 +130,15 @@ def test_cube_cut_from_footprint_all_sequences(tmpdir):
                                       cutout_size=cutout_size,
                                       product=product,
                                       output_dir=tmpdir)
-    
+    assert len(cutouts) >= 5
+
     # Crossmatch to get sectors that contain cutout
-    all_ffis = get_caom_ffis(product)
+    all_ffis = get_ffis(product)
     cone_results = ra_dec_crossmatch(all_ffis, coordinates, cutout_size, 21)
     seq_list = _create_sequence_list(cone_results, product)
     sequences = [int(seq['sector']) for seq in seq_list]
 
+    # assert non-empty results
     assert len(seq_list) == len(cutouts)
     for path in cutouts:
         check_output_file(path, 'SPOC', sequences)
