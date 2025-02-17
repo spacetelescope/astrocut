@@ -8,7 +8,8 @@ from re import findall
 from os import path
 
 from .utils_for_test import create_test_ffis
-from ..make_cube import CubeFactory, TicaCubeFactory
+from ..CubeFactory import CubeFactory
+from ..TicaCubeFactory import TicaCubeFactory
 
 
 def test_make_cube(tmpdir):
