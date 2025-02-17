@@ -327,6 +327,3 @@ def test_img_cut(tmpdir, caplog, ffi_type):
     with pytest.raises(InvalidInputError):
         cutouts.img_cut(test_images[:3], center_coord, cutout_size,
                         colorize=True, img_format='png', output_dir=tmpdir)
-
-    
-    
