@@ -99,7 +99,7 @@ def asdf_cut(input_files: List[Union[str, Path, S3Path]],
         A list of cutout file paths if `write_file` is True, otherwise a list of cutout objects.
     """
     return ASDFCutout(input_files=input_files,
-                      coordinates=(ra, dec),
+                      coordinates=f'{ra} {dec}',
                       cutout_size=cutout_size,
                       fill_value=fill_value,
                       memory_only=not write_file,
