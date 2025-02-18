@@ -68,8 +68,7 @@ def _get_s3_ffis(s3_uri, as_table: bool = False, load_polys: bool = False):
         Default False. Convert the s_region column to an array of SphericalPolygon objects
     """
     # Open footprint file with fsspec
-    open_file_container = fsspec.open(s3_uri, s3={'anon': True})
-    with open_file_container as f:
+    with fsspec.open(s3_uri, s3={'anon':True}) as f:
         ffis = json.load(f)
 
     if load_polys:
