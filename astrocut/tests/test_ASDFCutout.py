@@ -259,6 +259,7 @@ def test_asdf_cutout_not_in_footprint(test_images, center_coord, cutout_size):
     # Alter one of the test images to only contain zeros in cutout footprint
     with asdf.open(test_images[0], mode='rw') as af:
         af['roman']['data'][470:480, 471:481] = 0
+        af.update()
 
     # Should warn about first image containing no data, but not fail
     with pytest.warns(DataWarning, match='contains no data, skipping...'):
