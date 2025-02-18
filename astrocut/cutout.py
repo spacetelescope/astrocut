@@ -55,9 +55,7 @@ class Cutout(ABC):
         self._input_files = input_files
 
         # Get coordinates as a SkyCoord object
-        if isinstance(coordinates, tuple):
-            coordinates = SkyCoord(*coordinates, unit='deg')
-        elif not isinstance(coordinates, SkyCoord):
+        if not isinstance(coordinates, SkyCoord):
             coordinates = SkyCoord(coordinates, unit='deg')
         self._coordinates = coordinates
         log.debug('Coordinates: %s', self._coordinates)
