@@ -91,7 +91,7 @@ def test_make_and_update_cube(tmpdir):
 
     # Testing update_cube
 
-    cube_file = cube_maker._update_cube(ffi_files[num_im // 2:], cube_file, verbose=False)
+    cube_file = cube_maker.update_cube(ffi_files[num_im // 2:], cube_file, verbose=False)
 
     hdu = fits.open(cube_file)
     cube = hdu[1].data
