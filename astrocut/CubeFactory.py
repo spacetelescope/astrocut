@@ -3,7 +3,6 @@
 from copy import deepcopy
 from datetime import date
 from pathlib import Path
-from sys import platform, version_info
 from time import monotonic
 from typing import List, Optional, Union
 import warnings
@@ -12,22 +11,51 @@ import numpy as np
 from astropy.io import fits
 from astropy.table import Column, Table
 
-from astrocut.exceptions import DataWarning, InvalidInputError
+# Try to import the MADV_SEQUENTIAL constant from the mmap module
+# May fail on older Python versions or on Windows
+try:
+    from mmap import MADV_SEQUENTIAL
+    mmap_imported = True
+except ImportError:
+    mmap_imported = False
 
 from . import log
+from .exceptions import DataWarning, InvalidInputError
 from .utils.utils import _handle_verbose
-
-if (version_info >= (3, 8)) and (platform != 'win32'):
-    from mmap import MADV_SEQUENTIAL
 
 
 class CubeFactory():
     """
-    Class for creating image cubes.
+    Class for creating image cubes. This class is built to accept TESS SPOC FFI files,
+    but can be extended to work with other types of image files.
     
-    This class emcompasses all of the cube making functionality.  
-    In the current version this means creating image cubes FITS files from TESS full frame image sets.
-    Future versions will include more generalized cubing functionality.
+    Methods
+    -------
+    _get_img_start_time(img_data)
+        Get the start time of the image.
+    _get_img_shape(img_data)
+        Get the shape of the image data.
+    _configure_cube(file_list, **extra_keywords)
+        Iterate through the input files and set up the basic parameters and primary header for the data cube.
+    _build_info_table()
+        Read the keywords and set up the table to hold the image headers from every input file.
+    _build_cube_file(cube_file)
+        Build the cube file on disk with the primary header, cube extension header,
+        and space for the cube, filled with zeros.
+    _write_to_sub_cube(sub_cube, idx, img_data, start_row, end_row)
+        Write data from an input image to a sub-cube.
+    _get_header_keyword(kwd, img_data, nulval)
+        Get a header keyword from an input image and save it to the info table.
+    _write_block(cube_hdu, start_row, end_row, fill_info_table)
+        Write a block of the cube with data from input images.
+    _write_info_table()
+        Append the info table to the cube file as a binary table.
+    _update_info_table()
+        Update an existing info table with rows from a newly created info table.
+    make_cube(file_list, cube_file, sector, max_memory, verbose)
+        Turns a list of FITS image files into one large data cube.
+    update_cube(file_list, cube_file, sector, max_memory, verbose)
+        Updates an existing cube file with new FITS images.
     """
 
     ERROR_MSG = ('One or more incorrect file types were input. Please input TICA FFI files when using '
@@ -364,7 +392,9 @@ class CubeFactory():
         else:
             self._cube_append[start_row:end_row, :, :, :] = sub_cube
 
-        if (version_info <= (3, 8)) or (platform == 'win32'):
+        if not mmap_imported:
+            # Need to flush with older Python versions (< 3.8) and on Windows because
+            # memory-mapped files may not properly save changes
             cube_hdu.flush()
 
         # Delete the sub-cube to save memory
@@ -500,7 +530,7 @@ class CubeFactory():
             # functionality to read files as if they were one large string or array. 
             # This can provide significant performance improvements in code that 
             # requires a lot of file I/O."
-            if (version_info >= (3, 8)) and (platform != 'win32'):
+            if mmap_imported:
                 mm = fits.util._get_array_mmap(cube_hdu[1].data)
                 # madvise: "Send advice option to the kernel about the memory region 
                 # beginning at start and extending length bytes."
@@ -527,11 +557,10 @@ class CubeFactory():
     def update_cube(self, file_list: List[str], cube_file: str, sector: Optional[int] = None, max_memory: int = 50,
                     verbose: bool = True):
         """ 
-        Updates an existing cube file if one has already been made and a new delivery is being appended to it. 
-        Same functionality as `CutoutFactory.make_cube`, but working on an already existing file rather than 
-        building a new one. This function will: 
+        Updates an existing cube file with new FITS images. Same functionality as `CutoutFactory.make_cube`, 
+        but working on an already existing file rather than building a new one. This function will:
 
-        1. Create a new cube consisting of the new FFIs that will be appended to the existing cube
+        1. Create a new cube consisting of the new images that will be appended to the existing cube
         2. Update primary header keywords to reflect the update to the file
         3. Expand the file size of the FITS file containing the cube, to accomodate for the updated one
 
@@ -570,7 +599,7 @@ class CubeFactory():
         self._cube_file = cube_file
         log.debug('Updating cube file: %s', cube_file)
 
-        # Extract existing FFI filenames from the cube to prevent duplicates
+        # Extract existing image filenames from the cube to prevent duplicates
         existing_files = set(fits.getdata(self._cube_file, 2)[self._file_keyword])
         filtered_file_list = [file for file in file_list if Path(file).name not in existing_files]
 
@@ -579,11 +608,11 @@ class CubeFactory():
         for file in removed_files:
             warnings.warn(f'Removed duplicate file: {Path(file).name}', DataWarning)
 
-        # If no new FFIs are found, raise an error
+        # If no new images are found, raise an error
         if not filtered_file_list:
-            raise InvalidInputError('No new FFIs were found in the provided file list.')
+            raise InvalidInputError('No new images were found in the provided file list.')
 
-        log.debug('%d new FFIs found!', len(filtered_file_list))
+        log.debug('%d new images found!', len(filtered_file_list))
         
         # Creating an empty cube that will be appended to the existing cube
         original_cube = fits.getdata(cube_file, 1)
@@ -604,7 +633,7 @@ class CubeFactory():
             # functionality to read files as if they were one large string or array. 
             # This can provide significant performance improvements in code that 
             # requires a lot of file I/O."
-            if (version_info >= (3, 8)) and (platform != 'win32'):
+            if mmap_imported:
                 mm = fits.util._get_array_mmap(cube_hdu[1].data)
                 # madvise: "Send advice option to the kernel about the memory region 
                 # beginning at start and extending length bytes."

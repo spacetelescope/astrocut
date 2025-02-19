@@ -10,17 +10,24 @@ from .CubeFactory import CubeFactory
 
 class TicaCubeFactory(CubeFactory):
     """
-    Class for creating TICA image cubes.
-    
-    This class emcompasses all of the cube making functionality.  
-    In the current version this means creating image cubes fits files from TESS full frame image sets.
-    Future versions will include more generalized cubing functionality.
+    Class for creating TICA image cubes. 
 
     The TESS Image CAlibrator (TICA) products are high level science products (HLSPs) 
     developed by the MIT Quick Look Pipeline (https://github.com/mmfausnaugh/tica). These 
     images are produced and delivered up to 4x sooner than their SPOC counterparts (as of TESS EM2),
     and can therefore be used to produce the most up-to-date cutouts of a target. 
     More information on TICA can be found here: https://archive.stsci.edu/hlsp/tica
+    
+    Methods
+    -------
+    _get_img_start_time(img_data)
+        Get the start time of the image.
+    _get_img_shape(img_data)
+        Get the shape of the image data.
+    _write_to_sub_cube(sub_cube, idx, img_data, start_row, end_row)
+        Write data from an input image to a sub-cube.
+    _get_header_keyword(kwd, img_data, nulval)
+        Get a header keyword from an input image and save it to the info table.
     """
 
     def __init__(self, max_memory: int = 50):
@@ -105,22 +112,8 @@ class TicaCubeFactory(CubeFactory):
             The image data.
         nulval : int or str
             The null value for the keyword.
-        """
-        # NOTE: 
-        # A header keyword ('COMMENT') in TICA returns a keyword 
-        # value in the form of a _HeaderCommentaryCard instead of a STRING. 
-        # This breaks the info table because the info table 
-        # doesn't understand what a FITS header commentary card is. 
-        # Adding a try/except is a way to catch when these instances happen 
-        # and turn the keyword value from a _HeaderCommentaryCard to a
-        # string, which is what it's meant to be in the info table.
-        # TODO: Find a more elegant way to handle these stray 
-        # _HeaderCommentaryCards. 
-        try:
-            return img_data[0].header.get(kwd, nulval)
-        except ValueError:
-            kwd_val = img_data[0].header.get(kwd)
-            if isinstance(kwd_val, fits.header._HeaderCommentaryCards):
-                return str(kwd_val)
-            else:
-                raise
+        """        
+        val = img_data[0].header.get(kwd, nulval)
+
+        # The "COMMENT" keyword is in the form of a _HeaderCommentaryCard instead of a string
+        return str(val) if isinstance(val, fits.header._HeaderCommentaryCards) else val
