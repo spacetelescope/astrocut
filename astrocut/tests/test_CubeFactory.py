@@ -5,7 +5,6 @@ import pytest
 from astropy.io import fits
 from astropy.table import Table
 from re import findall
-from os import path
 
 from astrocut.exceptions import DataWarning, InvalidInputError
 
@@ -45,6 +44,7 @@ def test_make_cube(tmpdir, img_size, num_images, tmp_path):
     with fits.open(cube_file) as hdu:
         cube = hdu[1].data
         tab = Table(hdu[2].data)
+        filenames = np.array([Path(x).name for x in ffi_files])
     
         # Expected cube shape and values
         ecube = np.zeros((img_size, img_size, num_images, 2))
@@ -59,8 +59,6 @@ def test_make_cube(tmpdir, img_size, num_images, tmp_path):
         
         assert np.all(tab['TSTART'] == np.arange(num_images)), 'TSTART mismatch in table'
         assert np.all(tab['TSTOP'] == np.arange(num_images)+1), 'TSTOP mismatch in table'
-
-        filenames = np.array([path.split(x)[1] for x in ffi_files])
         assert np.all(tab['FFI_FILE'] == np.array(filenames)), 'FFI_FILE mismatch in table'
     
 
@@ -104,7 +102,7 @@ def test_make_and_update_cube(tmpdir, img_size, num_images):
     with fits.open(cube_file) as hdu:
         cube = hdu[1].data
         tab = Table(hdu[2].data)
-        filenames = np.array([path.split(x)[1] for x in ffi_files])
+        filenames = np.array([Path(x).name for x in ffi_files])
     
         # Expected values for cube after update_cube
         ecube = np.zeros((img_size, img_size, num_images, 1))
