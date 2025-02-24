@@ -32,6 +32,9 @@ class Cutout(ABC):
         Value to fill the cutout with if the cutout is outside the image.
     limit_rounding_method : str
         Method to use for rounding the cutout limits. Options are 'round', 'ceil', and 'floor'.
+    return_paths : bool
+        If True, a list of cutout file paths is returned. If False, a list of memory objects is returned.
+        This parameter only applies if `memory_only` is False and files are written to disk.
     verbose : bool
         If True, log messages are printed to the console.
 
@@ -52,6 +55,13 @@ class Cutout(ABC):
         
         # Log messages according to verbosity
         _handle_verbose(verbose)
+
+        # Warn if both memory_only and return_paths are True
+        if memory_only and return_paths:
+            warnings.warn('Both memory_only and return_paths are set to True. memory_only will take precedence '
+                          'and memory objects will be returned without writing cutouts to disk. To write files '
+                          'and return file paths, set memory_only to False.', InputWarning)
+            return_paths = False
 
         # Ensure that input files are in a list
         if isinstance(input_files, str) or isinstance(input_files, Path):
