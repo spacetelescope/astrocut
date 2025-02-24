@@ -49,11 +49,16 @@ def asdf_cut(input_files: List[Union[str, Path, S3Path]],
              output_format: str = '.asdf', 
              key: str = None,
              secret: str = None, 
-             token: str = None, 
+             token: str = None,
+             return_cutout2D: bool = True,
+             return_paths: bool = False,
              verbose: bool = False) -> astropy.nddata.Cutout2D:
     """
     Takes one of more ASDF input files (`input_files`) and generates a cutout of designated size `cutout_size`
     around the given coordinates (`coordinates`). The cutout is written to a file or returned as an object.
+
+    This function is maintained for backwards compatibility. For maximum flexibility, we recommend using the
+    ``ASDFCutout``class directly.
 
     Parameters
     ----------
@@ -77,6 +82,9 @@ def asdf_cut(input_files: List[Union[str, Path, S3Path]],
         Optional, default `np.nan`. The fill value for pixels outside the original image.
     output_dir : str | Path
         Optional, default ".". The directory to write the cutout file(s) to.
+    return_paths : bool
+        Optional, default False. If True, a list of cutout file paths is returned. If False, a list of
+        memory objects is returned. This parameter only applies if `write_file` is True.
     output_format : str
         Optional, default ".asdf". The format of the output cutout file. If `write_file` is False,
         then cutouts will be returned as `asdf.AsdfFile` objects if `output_format` is ".asdf" or
@@ -90,6 +98,9 @@ def asdf_cut(input_files: List[Union[str, Path, S3Path]],
     token : string
         Default None. Security token for S3 file system. Only applicable if `input_file` is a
         cloud resource.
+    return_cutout2D : bool
+        Optional, default True. If True, the cutout is returned as an `astropy.nddata.Cutout2D` object.
+        This parameter only applies if `return_paths` is False.
     verbose : bool
         Default False. If True, intermediate information is printed.
 
@@ -104,8 +115,10 @@ def asdf_cut(input_files: List[Union[str, Path, S3Path]],
                       fill_value=fill_value,
                       memory_only=not write_file,
                       output_dir=output_dir,
+                      return_paths=return_paths,
                       output_format=output_format,
                       key=key,
                       secret=secret,
                       token=token,
+                      return_cutout2D=return_cutout2D,
                       verbose=verbose).cutout()

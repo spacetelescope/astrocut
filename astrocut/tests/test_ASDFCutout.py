@@ -9,6 +9,7 @@ from astropy import coordinates as coord
 from astropy import units as u
 from astropy.coordinates import SkyCoord
 from astropy.modeling import models
+from astropy.nddata import Cutout2D
 from astropy.io import fits
 from gwcs import wcs, coordinate_frames
 from s3path import S3Path
@@ -123,27 +124,26 @@ def cutout_size():
 def test_asdf_cutout(test_images, center_coord, cutout_size, tmpdir, output_format):
     cutout = ASDFCutout(test_images[0], center_coord, cutout_size, output_format=output_format, 
                         output_dir=tmpdir).cutout()
-    # Should output a string for a single input file
-    assert isinstance(cutout, str)
+    # Should output a list of memory objects
+    assert isinstance(cutout, list)
+    assert isinstance(cutout[0], fits.HDUList if output_format == 'fits' else asdf.AsdfFile)
 
     cutouts = ASDFCutout(test_images, center_coord, cutout_size, output_format=output_format, 
                          output_dir=tmpdir).cutout()
     # Should output a list of strings for multiple input files
     assert isinstance(cutouts, list)
-    assert isinstance(cutouts[0], str)
+    assert isinstance(cutouts[0], fits.HDUList if output_format == 'fits' else asdf.AsdfFile)
     assert len(cutouts) == 3
 
     # Open output files
     for i, cutout in enumerate(cutouts):
         # Get cutout data and WCS based on output format
         if output_format == 'asdf':
-            with asdf.open(cutout) as af:
-                cutout_data = np.copy(af['roman']['data'])
-                cutout_wcs = af['roman']['meta']['wcs']
+            cutout_data = np.copy(cutout['roman']['data'])
+            cutout_wcs = cutout['roman']['meta']['wcs']
         else:
-            with fits.open(cutout) as hdulist:
-                cutout_data = hdulist[0].data
-                cutout_wcs = fits_wcs.WCS(hdulist[0].header)
+            cutout_data = cutout[0].data
+            cutout_wcs = fits_wcs.WCS(cutout[0].header)
 
         # Check shape of data
         assert cutout_data.shape == (10, 10)
@@ -189,6 +189,36 @@ def test_asdf_cutout_memory_only(test_images, center_coord, cutout_size, output_
         assert cutout_wcs.pixel_shape == (10, 10)
         assert np.isclose(s_coord.ra.deg, center_coord.ra.deg)
         assert np.isclose(s_coord.dec.deg, center_coord.dec.deg)
+
+
+def test_asdf_cutout_cutout2D(test_images, center_coord, cutout_size):
+    cutouts = ASDFCutout(test_images, center_coord, cutout_size, memory_only=True, return_cutout2D=True).cutout()
+    # Should output a list of Cutout2D objects
+    assert isinstance(cutouts, list)
+    assert isinstance(cutouts[0], Cutout2D)
+    assert len(cutouts) == 3
+
+    for i, cutout in enumerate(cutouts):
+        # Check shape of data
+        assert cutout.data.shape == (10, 10)
+
+        # Check that data is equal between cutout and original image
+        with asdf.open(test_images[i]) as input_af:
+            assert np.all(cutout.data == input_af['roman']['data'].value[470:480, 471:481])
+
+        # Check WCS and that center coordinate matches input
+        s_coord = cutout.wcs.pixel_to_world(cutout_size / 2, cutout_size / 2)
+        assert cutout.wcs.pixel_shape == (10, 10)
+        assert np.isclose(s_coord.ra.deg, center_coord.ra.deg)
+        assert np.isclose(s_coord.dec.deg, center_coord.dec.deg)
+
+    # Can also access `cutouts` attribute directly
+    asdf_cut = ASDFCutout(test_images, center_coord, cutout_size, memory_only=True)
+    cutouts = asdf_cut.cutout()
+    assert isinstance(cutouts[0], asdf.AsdfFile)
+    cutouts2D = asdf_cut.cutouts
+    assert isinstance(cutouts2D[0], Cutout2D)
+    assert len(cutouts2D) == 3
 
 
 def test_asdf_cutout_partial(test_images, center_coord, cutout_size):
@@ -292,14 +322,15 @@ def test_asdf_cutout_invalid_params(test_images, center_coord, cutout_size, tmpd
 
 def test_asdf_cutout_img_output(test_images, center_coord, cutout_size, tmpdir):
     # Basic JPG image
-    jpg_files = ASDFCutout(test_images, center_coord, cutout_size, output_dir=tmpdir, output_format='jpg').cutout()
-    
+    jpg_files = ASDFCutout(test_images, center_coord, cutout_size, output_dir=tmpdir, output_format='jpg', 
+                           return_paths=True).cutout()
     assert len(jpg_files) == len(test_images)
     with open(jpg_files[0], 'rb') as IMGFLE:
         assert IMGFLE.read(3) == b'\xFF\xD8\xFF'  # JPG
 
     # PNG (single input file, not as list)
-    png_files = ASDFCutout(test_images[0], center_coord, cutout_size, output_dir=tmpdir, output_format='png').cutout()
+    png_files = ASDFCutout(test_images[0], center_coord, cutout_size, output_dir=tmpdir, output_format='png', 
+                           return_paths=True).cutout()
     with open(png_files[0], 'rb') as IMGFLE:
         assert IMGFLE.read(8) == b'\x89\x50\x4E\x47\x0D\x0A\x1A\x0A'  # PNG
     assert len(png_files) == 1
@@ -313,7 +344,7 @@ def test_asdf_cutout_img_output(test_images, center_coord, cutout_size, tmpdir):
 
     # Color image
     color_jpg = ASDFCutout(test_images, center_coord, cutout_size, output_format='jpg', colorize=True, 
-                           output_dir=tmpdir).cutout()
+                           output_dir=tmpdir, return_paths=True).cutout()
     img = Image.open(color_jpg)
     assert img.mode == 'RGB'
 
@@ -369,23 +400,33 @@ def test_get_center_pixel(fakedata):
 def test_asdf_cut(test_images, center_coord, cutout_size, tmpdir):
     """ Test convenience function to create ASDF cutouts """
     # Write files to disk
-    cutouts = asdf_cut(test_images, center_coord.ra.deg, center_coord.dec.deg, cutout_size, output_dir=tmpdir)
+    cutouts = asdf_cut(test_images, center_coord.ra.deg, center_coord.dec.deg, cutout_size, output_dir=tmpdir, 
+                       return_paths=True, return_cutout2D=False)
     assert isinstance(cutouts, list)
     assert isinstance(cutouts[0], str)
     assert len(cutouts) == 3
-    for path in cutouts:
+    for i, path in enumerate(cutouts):
+        assert isinstance(path, str)
         assert path.endswith('.asdf')
         assert Path(path).exists()
+        assert str(tmpdir) in path
+        assert Path(test_images[i]).stem in path
+        assert center_coord.ra.to_string(unit='deg', decimal=True) in path
+        assert center_coord.dec.to_string(unit='deg', decimal=True) in path
+        assert '10-x-10' in path
 
-    # Write files to memory
+    # Write cutouts to memory as Cutout2D objects
     cutouts = asdf_cut(test_images, center_coord.ra.deg, center_coord.dec.deg, cutout_size, write_file=False)
     assert isinstance(cutouts, list)
-    assert isinstance(cutouts[0], asdf.AsdfFile)
+    assert isinstance(cutouts[0], Cutout2D)
     assert len(cutouts) == 3
 
-    # Write FITS cutouts to memory
+    # Write cutouts to memory as AsdfFile objects
+    cutouts = asdf_cut(test_images, center_coord.ra.deg, center_coord.dec.deg, cutout_size, write_file=False, 
+                       return_cutout2D=False)
+    assert isinstance(cutouts[0], asdf.AsdfFile)
+
+    # Write cutouts to memory as HDUList objects
     cutouts = asdf_cut(test_images, center_coord.ra.deg, center_coord.dec.deg, cutout_size, output_format='fits', 
-                       write_file=False)
-    assert isinstance(cutouts, list)
+                       write_file=False, return_cutout2D=False)
     assert isinstance(cutouts[0], fits.HDUList)
-    assert len(cutouts) == 3

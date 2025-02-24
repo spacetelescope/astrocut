@@ -38,8 +38,12 @@ class ImageCutout(Cutout, ABC):
         If True, the cutout is written to memory instead of disk.
     output_dir : str | Path
         Directory to write the cutout file(s) to.
+        This parameter only applies if `memory_only` is False and files are written to disk.
     limit_rounding_method : str
         Method to use for rounding the cutout limits. Options are 'round', 'ceil', and 'floor'.
+    return_paths : bool
+        If True, a list of cutout file paths is returned. If False, a list of memory objects is returned.
+        This parameter only applies if `memory_only` is False and files are written to disk.
     stretch : str
         Optional, default 'asinh'. The stretch to apply to the image array.
         Valid values are: asinh, sinh, sqrt, log, linear.
@@ -90,13 +94,13 @@ class ImageCutout(Cutout, ABC):
     def __init__(self, input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyCoord, str], 
                  cutout_size: Union[int, np.ndarray, Quantity, List[int], Tuple[int]] = 25,
                  fill_value: Union[int, float] = np.nan, memory_only: bool = False,
-                 output_dir: Union[str, Path] = '.', limit_rounding_method: str = 'round', 
+                 output_dir: Union[str, Path] = '.', limit_rounding_method: str = 'round', return_paths: bool = False, 
                  stretch: Optional[str] = None, minmax_percent: Optional[List[int]] = None, 
                  minmax_value: Optional[List[int]] = None, invert: Optional[bool] = None, 
                  colorize: Optional[bool] = None, output_format: str = 'jpg', 
                  cutout_prefix: str = 'cutout', verbose: bool = False):
         super().__init__(input_files, coordinates, cutout_size, fill_value, memory_only, output_dir, 
-                         limit_rounding_method, verbose)
+                         limit_rounding_method, return_paths, verbose)
         # Output format should be lowercase and begin with a dot
         out_lower = output_format.lower()
         self._output_format = f'.{out_lower}' if not output_format.startswith('.') else out_lower
@@ -204,23 +208,23 @@ class ImageCutout(Cutout, ABC):
         """
         # Set up output files and write them
         if self._colorize:  # Combine first three cutouts into a single RGB image
-            cutouts = [x for fle in self._input_files for x in self._cutout_dict.get(fle, [])]
+            all_cutouts = [x for fle in self._input_files for x in self._cutout_dict.get(fle, [])]
 
             # Check for the correct number of cutouts
-            if len(cutouts) < 3:
+            if len(all_cutouts) < 3:
                 raise InvalidInputError(('Color cutouts require 3 input images (RGB).'
                                          'If you supplied 3 images one of the cutouts may have been empty.'))
-            if len(cutouts) > 3:
+            if len(all_cutouts) > 3:
                 warnings.warn('Too many inputs for a color cutout, only the first three will be used.', InputWarning)
-                cutouts = cutouts[:3]
+                all_cutouts = all_cutouts[:3]
 
-            im = Image.fromarray(np.dstack([cutouts[0], cutouts[1], cutouts[2]]).astype(np.uint8))
+            im = Image.fromarray(np.dstack([all_cutouts[0], all_cutouts[1], all_cutouts[2]]).astype(np.uint8))
 
             if self._memory_only:
                 return [im]
 
             # Write the colorized cutout to disk
-            cutout_path = '{}_{:.7f}_{:.7f}_{}-x-{}_astrocut{}'.format(
+            cutouts = '{}_{:.7f}_{:.7f}_{}-x-{}_astrocut{}'.format(
                 self._cutout_prefix,
                 self._coordinates.ra.value,
                 self._coordinates.dec.value,
@@ -228,13 +232,18 @@ class ImageCutout(Cutout, ABC):
                 str(self._cutout_size[1]).replace(' ', ''),
                 self._output_format
             )
-            cutout_path = Path(self._output_dir, cutout_path).as_posix()
+
+            # Attempt to write image to file
+            cutout_path = Path(self._output_dir, cutouts).as_posix()
             success = self._save_img_to_file(im, cutout_path)
             if not success:
-                return 
+                cutout_path = None
+
+            # Return the path to the written file or the memory object
+            cutouts = cutout_path if self._return_paths else [im]
 
         else:  # Write each cutout to a separate image file
-            cutout_path = []  # Store the paths of the written cutout files
+            cutouts = []  # Store the paths of the written cutout files
             for file, cutout_list in self._cutout_dict.items():
                 if not cutout_list:
                     warnings.warn(f'Cutout of {file} contains no data and will not be written.', DataWarning)
@@ -243,11 +252,11 @@ class ImageCutout(Cutout, ABC):
 
                     im = Image.fromarray(cutout)
                     if self._memory_only:
-                        cutout_path.append(im)
+                        cutouts.append(im)
                         continue
 
                     # Write individual cutouts to disk
-                    file_path = '{}_{:.7f}_{:.7f}_{}-x-{}_astrocut_{}{}'.format(
+                    cutout_path = '{}_{:.7f}_{:.7f}_{}-x-{}_astrocut_{}{}'.format(
                         Path(file).stem,
                         self._coordinates.ra.value,
                         self._coordinates.dec.value,
@@ -255,12 +264,18 @@ class ImageCutout(Cutout, ABC):
                         str(self._cutout_size[1]).replace(' ', ''),
                         i,
                         self._output_format)
-                    file_path = Path(self._output_dir, file_path).as_posix()
-                    success = self._save_img_to_file(im, file_path)
-                    if success:
-                        cutout_path.append(file_path)
+                    
+                    # Attempt to write image to file
+                    cutout_path = Path(self._output_dir, cutout_path).as_posix()
+                    success = self._save_img_to_file(im, cutout_path)
 
-        return cutout_path
+                    # Append the path to the written file or the memory object
+                    # If the image could not be written, append None
+                    if not success:
+                        cutout_path = None
+                    cutouts.append(cutout_path if self._return_paths else im)
+
+        return cutouts
 
     def _write_cutouts(self) -> Union[str, List]:
         """
