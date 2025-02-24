@@ -171,6 +171,36 @@ def test_asdf_cutout_write_to_file(test_images, center_coord, cutout_size, tmpdi
             assert hdul[0].header['NAXIS2'] == 10
 
 
+def test_asdf_cutout_cutout2D(test_images, center_coord, cutout_size):
+    cutouts = ASDFCutout(test_images, center_coord, cutout_size, memory_only=True, return_cutout2D=True).cutout()
+    # Should output a list of Cutout2D objects
+    assert isinstance(cutouts, list)
+    assert isinstance(cutouts[0], Cutout2D)
+    assert len(cutouts) == 3
+
+    for i, cutout in enumerate(cutouts):
+        # Check shape of data
+        assert cutout.data.shape == (10, 10)
+
+        # Check that data is equal between cutout and original image
+        with asdf.open(test_images[i]) as input_af:
+            assert np.all(cutout.data == input_af['roman']['data'].value[470:480, 471:481])
+
+        # Check WCS and that center coordinate matches input
+        s_coord = cutout.wcs.pixel_to_world(cutout_size / 2, cutout_size / 2)
+        assert cutout.wcs.pixel_shape == (10, 10)
+        assert np.isclose(s_coord.ra.deg, center_coord.ra.deg)
+        assert np.isclose(s_coord.dec.deg, center_coord.dec.deg)
+
+    # Can also access `cutouts` attribute directly
+    asdf_cut = ASDFCutout(test_images, center_coord, cutout_size, memory_only=True)
+    cutouts = asdf_cut.cutout()
+    assert isinstance(cutouts[0], asdf.AsdfFile)
+    cutouts2D = asdf_cut.cutouts
+    assert isinstance(cutouts2D[0], Cutout2D)
+    assert len(cutouts2D) == 3
+
+
 def test_asdf_cutout_partial(test_images, center_coord, cutout_size):
     # Off the top
     center_coord = SkyCoord('29.99901792 44.9861', unit='deg')
