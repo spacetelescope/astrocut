@@ -13,7 +13,7 @@ from PIL import Image
 
 from .utils_for_test import create_test_imgs
 from .. import cutouts
-from ..exceptions import InputWarning, InvalidInputError, InvalidQueryError 
+from ..exceptions import DataWarning, InputWarning, InvalidInputError, InvalidQueryError 
 
 
 @pytest.mark.parametrize('ffi_type', ['SPOC', 'TICA'])
@@ -118,14 +118,12 @@ def test_fits_cut(tmpdir, caplog, ffi_type):
     
 
     # Test when cutout is in some images not others
-
     # Putting zeros into 2 images
     for img in test_images[:2]:
         hdu = fits.open(img, mode="update")
         hdu[0].data[:20, :] = 0
         hdu.flush()
         hdu.close()
-        
         
     center_coord = SkyCoord("150.1163213 2.2007", unit='deg')
     cutout_file = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=True, output_dir=tmpdir)
@@ -139,8 +137,8 @@ def test_fits_cut(tmpdir, caplog, ffi_type):
     assert ~(cutout_hdulist[5].data == 0).any()
     assert ~(cutout_hdulist[6].data == 0).any()
 
-    
-    cutout_files = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=False, output_dir=tmpdir)
+    with pytest.warns(DataWarning, match='contains no data and will not be returned.'):
+        cutout_files = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=False, output_dir=tmpdir)
     assert isinstance(cutout_files, list)
     assert len(cutout_files) == len(test_images) - 2
 
