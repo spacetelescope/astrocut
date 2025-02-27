@@ -35,8 +35,12 @@ class FITSCutout(ImageCutout):
         If True, the cutout is written to memory instead of disk.
     output_dir : str | Path
         Directory to write the cutout file(s) to.
+        This parameter only applies if `memory_only` is False and files are written to disk.
     limit_rounding_method : str
         Method to use for rounding the cutout limits. Options are 'round', 'ceil', and 'floor'.
+    return_paths : bool
+        If True, a list of cutout file paths is returned. If False, a list of memory objects is returned.
+        This parameter only applies if `memory_only` is False and files are written to disk.
     stretch : str
         Optional, default 'asinh'. The stretch to apply to the image array.
         Valid values are: asinh, sinh, sqrt, log, linear.
@@ -84,18 +88,16 @@ class FITSCutout(ImageCutout):
         Cutout an image file.
     _construct_fits_from_hdus()
         Make one or more cutout HDUs into a single HDUList object.
-    _write_to_memory()
-        Write the cutouts to memory.
     _write_as_fits()
-        Write the cutouts to a file in FITS format.
+        Write the cutouts to disk or memory in FITS format.
     _write_as_asdf()
-        Write the cutouts to a file in ASDF format.
+        Write the cutouts to disk or memory in ASDF format.
     """
         
     def __init__(self, input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyCoord, str], 
                  cutout_size: Union[int, np.ndarray, Quantity, List[int], Tuple[int]] = 25,
                  fill_value: Union[int, float] = np.nan, memory_only: bool = False,
-                 output_dir: Union[str, Path] = '.', limit_rounding_method: str = 'round', 
+                 output_dir: Union[str, Path] = '.', limit_rounding_method: str = 'round', return_paths: bool = False,
                  stretch: Optional[str] = None, minmax_percent: Optional[List[int]] = None, 
                  minmax_value: Optional[List[int]] = None, invert: Optional[bool] = None, 
                  colorize: Optional[bool] = None, output_format: str = '.fits',
@@ -103,7 +105,7 @@ class FITSCutout(ImageCutout):
                  single_outfile: bool = True, verbose: bool = False):
         # Superclass constructor 
         super().__init__(input_files, coordinates, cutout_size, fill_value, memory_only, output_dir, 
-                         limit_rounding_method, stretch, minmax_percent, minmax_value, invert, colorize, 
+                         limit_rounding_method, return_paths, stretch, minmax_percent, minmax_value, invert, colorize, 
                          output_format, cutout_prefix, verbose)
                
         # If a single extension is given, make it a list
@@ -235,6 +237,7 @@ class FITSCutout(ImageCutout):
             The cutout data.
         """
         log.debug('Original image shape: %s', data.shape)
+
 
         # Get the limits for the cutout
         # These limits are not guaranteed to be within the image footprint
@@ -460,10 +463,9 @@ class FITSCutout(ImageCutout):
         Returns
         -------
         cutout_paths : str | list
-            The path(s) to the cutout file(s).
+            The path(s) to the cutout file(s) or the cutout memory objects.
         """
-
-        if self._single_outfile:
+        if self._single_outfile:  # one output file for all input files
             log.debug('Returning cutout as a single FITS file.')
 
             cutout_hdus = [x for file in self._cutout_dict for x in self._cutout_dict[file]]
@@ -471,7 +473,7 @@ class FITSCutout(ImageCutout):
 
             if self._memory_only:
                 return [cutout_fits]
-            else:
+            else:  # write to disk
                 filename = '{}_{:.7f}_{:.7f}_{}-x-{}_astrocut.fits'.format(
                     self._cutout_prefix,
                     self._coordinates.ra.value,
@@ -482,11 +484,17 @@ class FITSCutout(ImageCutout):
                 with warnings.catch_warnings():
                     warnings.simplefilter('ignore') 
                     cutout_fits.writeto(cutout_path, overwrite=True, checksum=True)
-                return cutout_path.as_posix()
+
+                # Log file path
+                log.debug('Cutout file path: %s', cutout_path)
+
+                # Return file path or memory object
+                return cutout_path.as_posix() if self._return_paths else [cutout_fits]
+    
         else:  # one output file per input file
             log.debug('Returning cutouts as individual FITS files.')
 
-            all_cutouts = []
+            cutouts = []
             for file, cutout_list in self._cutout_dict.items():
                 if np.array([x.header.get('EMPTY') for x in cutout_list]).all():
                     # Skip files with no data in the cutout images
@@ -496,8 +504,8 @@ class FITSCutout(ImageCutout):
                 cutout_fits = self._construct_fits_from_hdus(cutout_list)
 
                 if self._memory_only:
-                    all_cutouts.append(cutout_fits)
-                else:
+                    cutouts.append(cutout_fits)
+                else:  # write to disk
                     filename = '{}_{:.7f}_{:.7f}_{}-x-{}_astrocut.fits'.format(
                         Path(file).stem,
                         self._coordinates.ra.value,
@@ -506,14 +514,16 @@ class FITSCutout(ImageCutout):
                         str(self._cutout_size[1]).replace(' ', ''))
                     cutout_path = Path(self._output_dir, filename)
                     with warnings.catch_warnings():
-                        warnings.simplefilter('ignore') 
+                        warnings.simplefilter('ignore')
                         cutout_fits.writeto(cutout_path, overwrite=True, checksum=True)
-                    all_cutouts.append(cutout_path.as_posix())
 
-            if self._memory_only:
-                return all_cutouts
-            else:
-                return all_cutouts if len(all_cutouts) > 1 else all_cutouts[0]
+                    # Log file path
+                    log.debug('Cutout file path: %s', cutout_path)
+
+                    # Append file path or memory object
+                    cutouts.append(cutout_path.as_posix() if self._return_paths else cutout_fits)
+
+            return cutouts[0] if len(cutouts) == 1 and self._return_paths else cutouts
 
     def _write_as_asdf(self):
         """ASDF output is not yet implemented for FITS files."""
