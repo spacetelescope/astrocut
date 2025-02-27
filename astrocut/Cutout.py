@@ -108,8 +108,6 @@ class Cutout(ABC):
             cutout_size = np.atleast_1d(cutout_size)
             if len(cutout_size) == 1:
                 cutout_size = np.repeat(cutout_size, 2)
-        elif not isinstance(cutout_size, np.ndarray):
-            cutout_size = np.array(cutout_size)
 
         if len(cutout_size) > 2:
             warnings.warn('Too many dimensions in cutout size, only the first two will be used.',
@@ -139,7 +137,7 @@ class Cutout(ABC):
         Parameters
         ----------
         img_wcs : `~astropy.wcs.WCS`
-            The WCS for the image that the cutout is being cut from.
+            The WCS for the image or cube that the cutout is being cut from.
 
         Returns
         -------
