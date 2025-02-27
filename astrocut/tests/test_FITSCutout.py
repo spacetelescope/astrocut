@@ -392,7 +392,7 @@ def test_fits_cutout_img_output(tmpdir, test_images, caplog, center_coord, cutou
                            verbose=True).cutout()
     captured = caplog.text
     assert len(findall('Original image shape', captured)) == 6
-    assert 'Cutout fits file(s)' in captured
+    assert 'Cutout file path:' in captured
     assert 'Total time' in captured
 
 

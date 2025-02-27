@@ -123,8 +123,7 @@ class ImageCutout(Cutout, ABC):
         self._minmax_value = minmax_value
         self._cutout_prefix = cutout_prefix
 
-        # Initialize cutout dictionary and counters
-        self._cutout_dict = {}
+        # Initialize counters
         self._num_empty = 0
         self._num_cutouts = 0
 
@@ -224,7 +223,7 @@ class ImageCutout(Cutout, ABC):
                 return [im]
 
             # Write the colorized cutout to disk
-            cutouts = '{}_{:.7f}_{:.7f}_{}-x-{}_astrocut{}'.format(
+            filename = '{}_{:.7f}_{:.7f}_{}-x-{}_astrocut{}'.format(
                 self._cutout_prefix,
                 self._coordinates.ra.value,
                 self._coordinates.dec.value,
@@ -234,10 +233,13 @@ class ImageCutout(Cutout, ABC):
             )
 
             # Attempt to write image to file
-            cutout_path = Path(self._output_dir, cutouts).as_posix()
+            cutout_path = Path(self._output_dir, filename).as_posix()
             success = self._save_img_to_file(im, cutout_path)
             if not success:
                 cutout_path = None
+            else:
+                # Log file path
+                log.debug('Cutout file path: %s', cutout_path)
 
             # Return the path to the written file or the memory object
             cutouts = cutout_path if self._return_paths else [im]
@@ -256,7 +258,7 @@ class ImageCutout(Cutout, ABC):
                         continue
 
                     # Write individual cutouts to disk
-                    cutout_path = '{}_{:.7f}_{:.7f}_{}-x-{}_astrocut_{}{}'.format(
+                    filename = '{}_{:.7f}_{:.7f}_{}-x-{}_astrocut_{}{}'.format(
                         Path(file).stem,
                         self._coordinates.ra.value,
                         self._coordinates.dec.value,
@@ -266,13 +268,17 @@ class ImageCutout(Cutout, ABC):
                         self._output_format)
                     
                     # Attempt to write image to file
-                    cutout_path = Path(self._output_dir, cutout_path).as_posix()
+                    cutout_path = Path(self._output_dir, filename).as_posix()
                     success = self._save_img_to_file(im, cutout_path)
 
                     # Append the path to the written file or the memory object
                     # If the image could not be written, append None
                     if not success:
                         cutout_path = None
+                    else:
+                        # Log file path
+                        log.debug('Cutout file path: %s', cutout_path)
+                    
                     cutouts.append(cutout_path if self._return_paths else im)
 
         return cutouts
@@ -333,13 +339,12 @@ class ImageCutout(Cutout, ABC):
             raise InvalidQueryError('Cutout contains no data! (Check image footprint.)')
 
         # Write cutout(s)
-        cutout_path = self._write_cutouts()
+        cutouts = self._write_cutouts()
 
-        # Log cutout path and total time elapsed
-        log.debug('Cutout fits file(s): %s', cutout_path)
+        # Log total time elapsed
         log.debug('Total time: %.2f sec', monotonic() - start_time)
 
-        return cutout_path
+        return cutouts
     
     @staticmethod
     def normalize_img(img_arr: np.ndarray, stretch: str = 'asinh', minmax_percent: Optional[List[int]] = None, 

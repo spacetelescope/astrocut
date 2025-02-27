@@ -313,7 +313,7 @@ def test_img_cut(tmpdir, caplog, ffi_type):
                                 output_dir=path.join(tmpdir, "image_path"), verbose=True)
     captured = caplog.text
     assert len(findall("Original image shape", captured)) == 6
-    assert "Cutout fits file(s)" in captured
+    assert "Cutout file path:" in captured
     assert "Total time" in captured
 
     # test color image where one of the images is all zeros

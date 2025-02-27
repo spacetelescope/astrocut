@@ -98,6 +98,9 @@ class Cutout(ABC):
         self._return_paths = return_paths
         self._verbose = verbose
 
+        # Dictionary to hold pairs of input files and cutouts
+        self._cutout_dict = {}
+
     def parse_size_input(self, cutout_size):
         """
         Makes the given cutout size into a length 2 array.
@@ -125,8 +128,6 @@ class Cutout(ABC):
             cutout_size = np.atleast_1d(cutout_size)
             if len(cutout_size) == 1:
                 cutout_size = np.repeat(cutout_size, 2)
-        elif not isinstance(cutout_size, np.ndarray):
-            cutout_size = np.array(cutout_size)
 
         if len(cutout_size) > 2:
             warnings.warn('Too many dimensions in cutout size, only the first two will be used.',
@@ -156,7 +157,7 @@ class Cutout(ABC):
         Parameters
         ----------
         img_wcs : `~astropy.wcs.WCS`
-            The WCS for the image that the cutout is being cut from.
+            The WCS for the image or cube that the cutout is being cut from.
 
         Returns
         -------

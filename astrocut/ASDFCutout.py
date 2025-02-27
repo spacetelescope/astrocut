@@ -364,6 +364,9 @@ class ASDFCutout(ImageCutout):
                         cutout.writeto(cutout_path, overwrite=True, checksum=True)
                 elif self._output_format == '.asdf':
                     cutout.write_to(cutout_path)
+
+                # Log filepath
+                log.debug('Cutout file path: %s', cutout_path)
     
                 # Append file path or memory object
                 cutouts.append(cutout_path.as_posix() if self._return_paths else cutout)

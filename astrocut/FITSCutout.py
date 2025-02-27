@@ -484,6 +484,10 @@ class FITSCutout(ImageCutout):
                 with warnings.catch_warnings():
                     warnings.simplefilter('ignore') 
                     cutout_fits.writeto(cutout_path, overwrite=True, checksum=True)
+
+                # Log file path
+                log.debug('Cutout file path: %s', cutout_path)
+
                 # Return file path or memory object
                 return cutout_path.as_posix() if self._return_paths else [cutout_fits]
     
@@ -512,6 +516,10 @@ class FITSCutout(ImageCutout):
                     with warnings.catch_warnings():
                         warnings.simplefilter('ignore')
                         cutout_fits.writeto(cutout_path, overwrite=True, checksum=True)
+
+                    # Log file path
+                    log.debug('Cutout file path: %s', cutout_path)
+
                     # Append file path or memory object
                     cutouts.append(cutout_path.as_posix() if self._return_paths else cutout_fits)
 
