@@ -1,11 +1,9 @@
 from abc import abstractmethod, ABC
 from pathlib import Path
-from time import monotonic
 from typing import List, Optional, Union, Tuple
 import warnings
 
 from astropy.coordinates import SkyCoord
-from astropy.io import fits
 from astropy.units import Quantity
 from astropy.visualization import (SqrtStretch, LogStretch, AsinhStretch, SinhStretch, LinearStretch,
                                    MinMaxInterval, ManualInterval, AsymmetricPercentileInterval)
@@ -15,7 +13,7 @@ from PIL import Image
 from s3path import S3Path
 
 from . import log
-from .exceptions import DataWarning, InputWarning, InvalidInputError, InvalidQueryError
+from .exceptions import DataWarning, InputWarning, InvalidInputError
 from .Cutout import Cutout
 
 
@@ -24,8 +22,8 @@ class ImageCutout(Cutout, ABC):
     Abstract class for creating cutouts from images. This class defines attributes and methods that are common to all
     image cutout classes.
 
-    Attributes
-    ----------
+    Args
+    ----
     input_files : list
         List of input image files.
     coordinates : str | `~astropy.coordinates.SkyCoord`
@@ -34,104 +32,138 @@ class ImageCutout(Cutout, ABC):
         Size of the cutout array.
     fill_value : int | float
         Value to fill the cutout with if the cutout is outside the image.
-    memory_only : bool
-        If True, the cutout is written to memory instead of disk.
-    output_dir : str | Path
-        Directory to write the cutout file(s) to.
-        This parameter only applies if `memory_only` is False and files are written to disk.
     limit_rounding_method : str
         Method to use for rounding the cutout limits. Options are 'round', 'ceil', and 'floor'.
-    return_paths : bool
-        If True, a list of cutout file paths is returned. If False, a list of memory objects is returned.
-        This parameter only applies if `memory_only` is False and files are written to disk.
-    stretch : str
-        Optional, default 'asinh'. The stretch to apply to the image array.
-        Valid values are: asinh, sinh, sqrt, log, linear.
-    minmax_percent : list
-        Optional. Interval based on a keeping a specified fraction of pixels (can be asymmetric) 
-        when scaling the image. The format is [lower percentile, upper percentile], where pixel
-        values below the lower percentile and above the upper percentile are clipped.
-        Only one of minmax_percent and minmax_value should be specified.
-    minmax_value : list
-        Optional. Interval based on user-specified pixel values when scaling the image.
-        The format is [min value, max value], where pixel values below the min value and above
-        the max value are clipped.
-        Only one of minmax_percent and minmax_value should be specified.
-    invert : bool
-        Optional, default False.  If True the image is inverted (light pixels become dark and vice versa).
-    colorize : bool
-        Optional, default False.  If True a single color image is produced as output, and it is expected
-        that three files are given as input.
-    output_format : str
-        Optional, default '.jpg'. The format of the output image file.
-    cutout_prefix : str
-        Optional, default 'cutout'. The prefix to use for the output file name.
     verbose : bool
         If True, log messages are printed to the console.
 
+    Attributes
+    ----------
+    cutouts_by_file : dict
+        Dictionary containing the cutouts for each input file.
+    image_cutouts : list
+        List of `~PIL.Image` objects representing the cutouts.
+
     Methods
     -------
-    _get_cutout_data()
-        Get the cutout data from the input image.
-    _cutout_file()
+    get_image_cutouts(stretch, minmax_percent, minmax_value, invert, colorize)
+        Get the cutouts as `~PIL.Image` objects.
+    _cutout_file(file)
         Cutout an image file.
-    _write_to_memory()
-        Write the cutouts to memory.
-    _write_as_fits()
-        Write the cutouts to a file in FITS format.
-    _write_as_asdf()
-        Write the cutouts to a file in ASDF format.
-    _write_as_img()
-        Write the cutouts to a file in an image format.
-    _write_cutouts()
-        Write the cutouts according to the specified location and output format.
     cutout()
         Generate the cutouts.
-    normalize_img()
+    _parse_output_format(output_format)
+        Parse the output format string and return it in a standardized format.
+    _save_img_to_file(im, file_path)
+        Save a `~PIL.Image` object to a file.
+    write_as_img(stretch, minmax_percent, minmax_value, invert, colorize, output_format, output_dir, cutout_prefix)
+        Write the cutouts to a file in an image format.
+    normalize_img(stretch, minmax_percent, minmax_value, invert)
         Apply given stretch and scaling to an image array.
     """
 
     def __init__(self, input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyCoord, str], 
                  cutout_size: Union[int, np.ndarray, Quantity, List[int], Tuple[int]] = 25,
-                 fill_value: Union[int, float] = np.nan, memory_only: bool = False,
-                 output_dir: Union[str, Path] = '.', limit_rounding_method: str = 'round', return_paths: bool = False, 
-                 stretch: Optional[str] = None, minmax_percent: Optional[List[int]] = None, 
-                 minmax_value: Optional[List[int]] = None, invert: Optional[bool] = None, 
-                 colorize: Optional[bool] = None, output_format: str = 'jpg', 
-                 cutout_prefix: str = 'cutout', verbose: bool = False):
-        super().__init__(input_files, coordinates, cutout_size, fill_value, memory_only, output_dir, 
-                         limit_rounding_method, return_paths, verbose)
-        # Output format should be lowercase and begin with a dot
-        out_lower = output_format.lower()
-        self._output_format = f'.{out_lower}' if not output_format.startswith('.') else out_lower
-        
-        # Warn if image processing parameters are provided for FITS output
-        if ((self._output_format == '.fits' or self._output_format == '.asdf') and 
-           (stretch or minmax_percent or minmax_value or invert or colorize)):
-            warnings.warn('Stretch, minmax_percent, minmax_value, invert, and colorize are not supported '
-                          'for FITS or ASDF output and will be ignored.', InputWarning)
+                 fill_value: Union[int, float] = np.nan, limit_rounding_method: str = 'round',
+                 verbose: bool = False):
+        super().__init__(input_files, coordinates, cutout_size, fill_value, limit_rounding_method, verbose)
 
-        # Assign attributes with defaults if not provided
-        stretch = stretch or 'asinh'
+        # Initialize cutout dictionary and counters
+        self.cutouts_by_file = {}
+        self._num_empty = 0
+        self._num_cutouts = 0
+        self._image_cutouts = None
+
+    @property
+    def image_cutouts(self) -> List[Image.Image]:
+        """
+        Return the cutouts as a list of `PIL.Image` objects.
+
+        If the image objects have not been generated yet, they will be generated with default
+        normalization parameters.
+        """
+        if not self._image_cutouts:
+            self._image_cutouts = self.get_image_cutouts()
+        return self._image_cutouts
+    
+    def get_image_cutouts(self, stretch: Optional[str] = 'asinh', minmax_percent: Optional[List[int]] = None, 
+                          minmax_value: Optional[List[int]] = None, invert: Optional[bool] = False, 
+                          colorize: Optional[bool] = False) -> List[Image.Image]:
+        """
+        Get the cutouts as `~PIL.Image` objects given certain normalization parameters. This method also sets
+        the `image_cutouts` attribute.
+
+        Parameters
+        ----------
+        stretch : str
+            Optional, default 'asinh'. The stretch to apply to the image array.
+            Valid values are: asinh, sinh, sqrt, log, linear
+        minmax_percent : array
+            Optional. Interval based on a keeping a specified fraction of pixels (can be asymmetric) 
+            when scaling the image. The format is [lower percentile, upper percentile], where pixel
+            values below the lower percentile and above the upper percentile are clipped.
+            Only one of minmax_percent and minmax_value should be specified.
+        minmax_value : array
+            Optional. Interval based on user-specified pixel values when scaling the image.
+            The format is [min value, max value], where pixel values below the min value and above
+            the max value are clipped.
+            Only one of minmax_percent and minmax_value should be specified.
+        invert : bool
+            Optional, default False.  If True the image is inverted (light pixels become dark and vice versa).
+        colorize : bool
+            Optional, default False. If True, the first three cutouts will be combined into a single RGB image.
+
+        Returns
+        -------
+        image_cutouts : list
+            List of `~PIL.Image` objects representing the cutouts.
+        """
+        # Validate the stretch parameter
         valid_stretches = ['asinh', 'sinh', 'sqrt', 'log', 'linear']
         if not isinstance(stretch, str) or stretch.lower() not in valid_stretches:
             raise InvalidInputError(f'Stretch {stretch} is not recognized. Valid options are {valid_stretches}.')
-        self._stretch = stretch.lower()
-        self._invert = invert or False
-        self._colorize = colorize or False
-        self._minmax_percent = minmax_percent
-        self._minmax_value = minmax_value
-        self._cutout_prefix = cutout_prefix
-
-        # Initialize cutout dictionary and counters
-        self._cutout_dict = {}
-        self._num_empty = 0
-        self._num_cutouts = 0
+        stretch = stretch.lower()
 
         # Apply default scaling for image outputs
-        if (self._minmax_percent is None) and (self._minmax_value is None):
-            self._minmax_percent = [0.5, 99.5]
+        if (minmax_percent is None) and (minmax_value is None):
+            minmax_percent = [0.5, 99.5]
 
+        if colorize:  # color cutout
+            all_cutouts = [x for fle in self._input_files for x in self.cutouts_by_file.get(fle, [])]
+
+            # Check for the correct number of cutouts
+            if len(all_cutouts) < 3:
+                raise InvalidInputError(('Color cutouts require 3 input images (RGB).'
+                                         'If you supplied 3 images one of the cutouts may have been empty.'))
+            if len(all_cutouts) > 3:
+                warnings.warn('Too many inputs for a color cutout, only the first three will be used.', InputWarning)
+                all_cutouts = all_cutouts[:3]
+
+            img_arrs = []
+            for cutout in all_cutouts:
+                # Get data as an array
+                cutout_data = cutout if isinstance(cutout, np.ndarray) else cutout.data
+
+                # Image output, applying the appropriate normalization parameters
+                img_arrs.append(self.normalize_img(cutout_data, stretch, minmax_percent, minmax_value, invert))
+
+            # Combine the three cutouts into a single RGB image
+            self._image_cutouts = [Image.fromarray(np.dstack([img_arrs[0], img_arrs[1], img_arrs[2]]).astype(np.uint8))]
+        else:  # one image per cutout
+            image_cutouts = []
+            for file, cutout_list in self.cutouts_by_file.items():
+                for i, cutout in enumerate(cutout_list):
+                    # Get data as an array
+                    cutout_data = cutout if isinstance(cutout, np.ndarray) else cutout.data
+
+                    # Apply the appropriate normalization parameters
+                    img_arr = self.normalize_img(cutout_data, stretch, minmax_percent, minmax_value, invert)
+                    image_cutouts.append(Image.fromarray(img_arr))
+
+            self._image_cutouts = image_cutouts
+
+        return self._image_cutouts
+    
     @abstractmethod
     def _cutout_file(self, file: Union[str, Path, S3Path]):
         """
@@ -141,24 +173,38 @@ class ImageCutout(Cutout, ABC):
         """
         pass
 
-
     @abstractmethod
-    def _write_as_fits(self):
+    def cutout(self):
         """
-        Write the cutouts to a file in FITS format.
+        Generate the cutout(s).
 
-        This method is abstract and should be defined in the subclass.
+        This method is abstract and should be defined in subclasses.
         """
         pass
-
-    @abstractmethod
-    def _write_as_asdf(self):
+    
+    def _parse_output_format(self, output_format: str) -> str:
         """
-        Write the cutouts to a file in ASDF format.
+        Parse the output format string and return it in a standardized format.
 
-        This method is abstract and should be defined in the subclass.
+        Parameters
+        ----------
+        output_format : str
+            The output format string.
+
+        Returns
+        -------
+        out_format : str
+            The output format string in a standardized format.
         """
-        pass
+        # Put format in standard format
+        out_lower = output_format.lower()
+        output_format = f'.{out_lower}' if not output_format.startswith('.') else out_lower
+    
+        # Error if the output format is not supported
+        if output_format not in Image.registered_extensions().keys():
+            raise InvalidInputError(f'Output format {output_format} is not supported.')
+        
+        return output_format
 
     def _save_img_to_file(self, im: Image, file_path: str) -> bool:
         """
@@ -180,21 +226,52 @@ class ImageCutout(Cutout, ABC):
             im.save(file_path)
             return True
         except ValueError as e:
-            warnings.warn(f'Cutout could not be saved in {self._output_format} format: {e}. '
+            output_format = Path(file_path).suffix
+            warnings.warn(f'Cutout could not be saved in {output_format} format: {e}. '
                           'Please try a different output format.', DataWarning)
             return False
         except KeyError as e:
-            warnings.warn(f'Cutout could not be saved in {self._output_format} format due to a KeyError: {e}. '
+            output_format = Path(file_path).suffix
+            warnings.warn(f'Cutout could not be saved in {output_format} format due to a KeyError: {e}. '
                           'Please try a different output format.', DataWarning)
             return False
         except OSError as e:
             warnings.warn(f'Cutout could not be saved: {e}', DataWarning)
             return False
 
-    def _write_as_img(self) -> Union[str, List[str]]:
+    def write_as_img(self, stretch: Optional[str] = 'asinh', minmax_percent: Optional[List[int]] = None, 
+                     minmax_value: Optional[List[int]] = None, invert: Optional[bool] = False, 
+                     colorize: Optional[bool] = False, output_format: str = '.jpg', 
+                     output_dir: Union[str, Path] = '.', cutout_prefix: str = 'cutout') -> Union[str, List[str]]:
         """
         Write the cutout to memory or to a file in an image format. If colorize is set, the first 3 cutouts 
         will be combined into a single RGB image. Otherwise, each cutout will be written to a separate file.
+
+        Parameters
+        ----------
+        stretch : str
+            Optional, default 'asinh'. The stretch to apply to the image array.
+            Valid values are: asinh, sinh, sqrt, log, linear
+        minmax_percent : array
+            Optional. Interval based on a keeping a specified fraction of pixels (can be asymmetric) 
+            when scaling the image. The format is [lower percentile, upper percentile], where pixel
+            values below the lower percentile and above the upper percentile are clipped.
+            Only one of minmax_percent and minmax_value shoul be specified.
+        minmax_value : array
+            Optional. Interval based on user-specified pixel values when scaling the image.
+            The format is [min value, max value], where pixel values below the min value and above
+            the max value are clipped.
+            Only one of minmax_percent and minmax_value should be specified.
+        invert : bool
+            Optional, default False.  If True the image is inverted (light pixels become dark and vice versa).
+        colorize : bool
+            Optional, default False. If True, the first three cutouts will be combined into a single RGB image.
+        output_format : str
+            Optional, default '.jpg'. The output format for the cutout image(s).
+        output_dir : str | `~pathlib.Path`
+            Optional, default '.'. The directory to write the cutout image(s) to.
+        cutout_prefix : str
+            Optional, default 'cutout'. The prefix to add to the cutout image file name.
 
         Returns
         -------
@@ -206,140 +283,58 @@ class ImageCutout(Cutout, ABC):
         InvalidInputError
             If less than three inputs were provided for a colorized cutout.
         """
+        # Parse the output format
+        output_format = self._parse_output_format(output_format)
+
+        # Get the image cutouts with the given normalization parameters
+        image_cutouts = self.get_image_cutouts(stretch, minmax_percent, minmax_value, invert, colorize)
+
+        # Create the output directory if it does not exist
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
+
         # Set up output files and write them
-        if self._colorize:  # Combine first three cutouts into a single RGB image
-            all_cutouts = [x for fle in self._input_files for x in self._cutout_dict.get(fle, [])]
-
-            # Check for the correct number of cutouts
-            if len(all_cutouts) < 3:
-                raise InvalidInputError(('Color cutouts require 3 input images (RGB).'
-                                         'If you supplied 3 images one of the cutouts may have been empty.'))
-            if len(all_cutouts) > 3:
-                warnings.warn('Too many inputs for a color cutout, only the first three will be used.', InputWarning)
-                all_cutouts = all_cutouts[:3]
-
-            im = Image.fromarray(np.dstack([all_cutouts[0], all_cutouts[1], all_cutouts[2]]).astype(np.uint8))
-
-            if self._memory_only:
-                return [im]
-
+        if colorize:  # Combine first three cutouts into a single RGB image
             # Write the colorized cutout to disk
-            cutouts = '{}_{:.7f}_{:.7f}_{}-x-{}_astrocut{}'.format(
-                self._cutout_prefix,
+            filename = '{}_{:.7f}_{:.7f}_{}-x-{}_astrocut{}'.format(
+                cutout_prefix,
                 self._coordinates.ra.value,
                 self._coordinates.dec.value,
                 str(self._cutout_size[0]).replace(' ', ''), 
                 str(self._cutout_size[1]).replace(' ', ''),
-                self._output_format
+                output_format
             )
 
             # Attempt to write image to file
-            cutout_path = Path(self._output_dir, cutouts).as_posix()
-            success = self._save_img_to_file(im, cutout_path)
+            cutout_paths = Path(output_dir, filename).as_posix()
+            success = self._save_img_to_file(image_cutouts[0], cutout_paths)
             if not success:
-                cutout_path = None
-
-            # Return the path to the written file or the memory object
-            cutouts = cutout_path if self._return_paths else [im]
+                cutout_paths = None
 
         else:  # Write each cutout to a separate image file
-            cutouts = []  # Store the paths of the written cutout files
-            for file, cutout_list in self._cutout_dict.items():
-                if not cutout_list:
-                    warnings.warn(f'Cutout of {file} contains no data and will not be written.', DataWarning)
-                    continue
-                for i, cutout in enumerate(cutout_list):
+            cutout_paths = []  # Store the paths of the written cutout files
+            for i, file in enumerate(self.cutouts_by_file):
+                # Write individual cutouts to disk
+                filename = '{}_{:.7f}_{:.7f}_{}-x-{}_astrocut_{}{}'.format(
+                    Path(file).stem,
+                    self._coordinates.ra.value,
+                    self._coordinates.dec.value,
+                    str(self._cutout_size[0]).replace(' ', ''), 
+                    str(self._cutout_size[1]).replace(' ', ''),
+                    i,
+                    output_format)
+                
+                # Attempt to write image to file
+                cutout_path = Path(output_dir, filename).as_posix()
+                success = self._save_img_to_file(image_cutouts[i], cutout_path)
 
-                    im = Image.fromarray(cutout)
-                    if self._memory_only:
-                        cutouts.append(im)
-                        continue
+                # Append the path to the written file or the memory object
+                # If the image could not be written, append None
+                if not success:
+                    cutout_path = None
+                cutout_paths.append(cutout_path)
 
-                    # Write individual cutouts to disk
-                    cutout_path = '{}_{:.7f}_{:.7f}_{}-x-{}_astrocut_{}{}'.format(
-                        Path(file).stem,
-                        self._coordinates.ra.value,
-                        self._coordinates.dec.value,
-                        str(self._cutout_size[0]).replace(' ', ''), 
-                        str(self._cutout_size[1]).replace(' ', ''),
-                        i,
-                        self._output_format)
-                    
-                    # Attempt to write image to file
-                    cutout_path = Path(self._output_dir, cutout_path).as_posix()
-                    success = self._save_img_to_file(im, cutout_path)
-
-                    # Append the path to the written file or the memory object
-                    # If the image could not be written, append None
-                    if not success:
-                        cutout_path = None
-                    cutouts.append(cutout_path if self._return_paths else im)
-
-        return cutouts
-
-    def _write_cutouts(self) -> Union[str, List]:
-        """
-        Write the cutout to a file according to the specified output format.
-
-        Returns
-        -------
-        cutout_path : Path | list
-            Cutouts as memory objects or path(s) to the written cutout files.
-
-        Raises
-        ------
-        InvalidInputError
-            If the output format is not supported.
-        """
-        if self._memory_only:
-            # Write only to memory if specified
-            log.info('Writing cutouts to memory only. No output files will be created.')
-        else:
-            # If writing to disk, ensure that output directory exists
-            Path(self._output_dir).mkdir(parents=True, exist_ok=True)
-
-        if self._output_format == '.fits':
-            return self._write_as_fits()
-        elif self._output_format == '.asdf':
-            return self._write_as_asdf()
-        elif self._output_format in Image.registered_extensions().keys():
-            return self._write_as_img()
-        else:
-            raise InvalidInputError(f'Output format {self._output_format} is not supported.')
-        
-    def cutout(self) -> Union[str, List[str], List[fits.HDUList]]:
-        """
-        Generate cutouts from a list of input images.
-
-        Returns
-        -------
-        cutout_path : Path | list
-            Cutouts as memory objects or path(s) to the written cutout files.
-
-        Raises
-        ------
-        InvalidQueryError
-            If no cutouts contain data.
-        """
-        # Track start time
-        start_time = monotonic()
-
-        # Cutout each input file
-        for file in self._input_files:
-            self._cutout_file(file)
-
-        # If no cutouts contain data, raise exception
-        if self._num_cutouts == self._num_empty:
-            raise InvalidQueryError('Cutout contains no data! (Check image footprint.)')
-
-        # Write cutout(s)
-        cutout_path = self._write_cutouts()
-
-        # Log cutout path and total time elapsed
-        log.debug('Cutout fits file(s): %s', cutout_path)
-        log.debug('Total time: %.2f sec', monotonic() - start_time)
-
-        return cutout_path
+        log.debug('Cutout filepaths: {}'.format(cutout_paths))
+        return cutout_paths
     
     @staticmethod
     def normalize_img(img_arr: np.ndarray, stretch: str = 'asinh', minmax_percent: Optional[List[int]] = None, 

@@ -46,12 +46,15 @@ def cutout_size():
 
 def test_fits_cutout_single_outfile(test_images, center_coord, cutout_size, tmpdir):
     # Create cutout with single output file
-    cutout = FITSCutout(test_images, center_coord, cutout_size, single_outfile=True, output_dir=tmpdir).cutout()[0]
+    cutouts = FITSCutout(test_images, center_coord, cutout_size, single_outfile=True).fits_cutouts
 
-    # Should output a single object
-    assert isinstance(cutout, fits.HDUList)
+    # Should output a list of objects
+    assert isinstance(cutouts, list)
+    assert isinstance(cutouts[0], fits.HDUList)
+    assert len(cutouts) == 1
 
     # Check shape of data
+    cutout = cutouts[0]
     assert len(cutout) == len(test_images) + 1  # num imgs + primary header
     assert cutout[1].data.shape == (cutout_size, cutout_size)
     assert cutout[1].data.shape == cutout[2].data.shape
@@ -74,9 +77,9 @@ def test_fits_cutout_single_outfile(test_images, center_coord, cutout_size, tmpd
 
 def test_fits_cutout_multiple_files(tmpdir, test_images, center_coord, cutout_size):
     # Output is multiple files
-    cutouts = FITSCutout(test_images, center_coord, cutout_size, single_outfile=False, output_dir=tmpdir).cutout()
+    cutouts = FITSCutout(test_images, center_coord, cutout_size, single_outfile=False).fits_cutouts
 
-    # Output is a list with paths to each file
+    # Should output a list of objects
     assert isinstance(cutouts, list)
     assert isinstance(cutouts[0], fits.HDUList)
     assert len(cutouts) == len(test_images)
@@ -100,28 +103,26 @@ def test_fits_cutout_multiple_files(tmpdir, test_images, center_coord, cutout_si
 
     # Test case where output directory does not exist
     new_dir = path.join(tmpdir, 'cutout_files')  # non-existing directory to write files to
-    cutouts = FITSCutout(test_images[0], center_coord, cutout_size,
-                         output_dir=new_dir, return_paths=True, single_outfile=False).cutout()
+    cutouts = FITSCutout(test_images[0], center_coord, cutout_size, single_outfile=False)
+    paths = cutouts.write_as_fits(output_dir=new_dir)
 
-    assert isinstance(cutouts, str)
-    assert new_dir in cutouts
+    assert isinstance(paths, list)
+    assert isinstance(paths[0], str)
+    assert new_dir in paths[0]
     assert path.exists(new_dir)  # new directory should now exist
 
 
 def test_fits_cutout_memory_only(test_images, center_coord, cutout_size):
     # Memory only, single file
     nonexisting_dir = 'nonexisting'  # non-existing directory to check that no files are written
-    cutout_list = FITSCutout(test_images, center_coord, cutout_size, output_dir=nonexisting_dir,
-                             single_outfile=True, memory_only=True).cutout()
-    cutout_hdu = cutout_list[0]
+    cutout_list = FITSCutout(test_images, center_coord, cutout_size, single_outfile=True).fits_cutouts
     assert isinstance(cutout_list, list)
     assert len(cutout_list) == 1
-    assert isinstance(cutout_hdu, fits.HDUList)
+    assert isinstance(cutout_list[0], fits.HDUList)
     assert not path.exists(nonexisting_dir)  # no files should be written
 
     # Memory only, multiple files
-    cutout_list = FITSCutout(test_images, center_coord, cutout_size, output_dir=nonexisting_dir, 
-                             single_outfile=False, memory_only=True).cutout()
+    cutout_list = FITSCutout(test_images, center_coord, cutout_size, single_outfile=False).fits_cutouts
     assert isinstance(cutout_list, list)
     assert len(cutout_list) == len(test_images)
     assert isinstance(cutout_list[0], fits.HDUList)
@@ -130,8 +131,8 @@ def test_fits_cutout_memory_only(test_images, center_coord, cutout_size):
 
 def test_fits_cutout_return_paths(test_images, center_coord, cutout_size, tmpdir):
     # Return filepath for single output file
-    cutout_file = FITSCutout(test_images, center_coord, cutout_size, output_dir=tmpdir, return_paths=True, 
-                             cutout_prefix='prefix').cutout()
+    cutout_file = FITSCutout(test_images, center_coord, cutout_size).write_as_fits(output_dir=tmpdir, 
+                                                                                   cutout_prefix='prefix')[0]
     assert isinstance(cutout_file, str)
     assert path.exists(cutout_file)
     assert str(tmpdir) in cutout_file
@@ -141,8 +142,8 @@ def test_fits_cutout_return_paths(test_images, center_coord, cutout_size, tmpdir
     assert '10-x-10' in cutout_file
 
     # Return list of filepaths for multiple output files
-    cutout_files = FITSCutout(test_images, center_coord, cutout_size, output_dir=tmpdir, return_paths=True, 
-                              single_outfile=False).cutout()
+    cutout_files = FITSCutout(test_images, center_coord, cutout_size, 
+                              single_outfile=False).write_as_fits(output_dir=tmpdir)
     assert isinstance(cutout_files, list)
     assert len(cutout_files) == len(test_images)
     for i, cutout_file in enumerate(cutout_files):
@@ -150,19 +151,11 @@ def test_fits_cutout_return_paths(test_images, center_coord, cutout_size, tmpdir
         assert str(tmpdir) in cutout_file
         assert Path(test_images[i]).stem in cutout_file
 
-    # Warn if memory_only and return_paths are both True. memory_only takes precedence
-    with pytest.warns(InputWarning, match='Both memory_only and return_paths are set to True.'):
-        cutouts = FITSCutout(test_images[0], center_coord, cutout_size, output_dir='nonexisting', return_paths=True, 
-                             memory_only=True).cutout()
-        assert isinstance(cutouts, list)
-        assert isinstance(cutouts[0], fits.HDUList)
-        assert not path.exists('nonexisting')  # no files should be written
-
 
 def test_fits_cutout_off_edge(test_images, cutout_size):
     #  Off the top
     center_coord = SkyCoord("150.1163213 2.2005731", unit='deg')
-    cutout = FITSCutout(test_images, center_coord, cutout_size, single_outfile=True, memory_only=True).cutout()[0]
+    cutout = FITSCutout(test_images, center_coord, cutout_size, single_outfile=True).fits_cutouts[0]
     assert isinstance(cutout, fits.HDUList)
     
     assert len(cutout) == len(test_images) + 1  # num imgs + primary header
@@ -173,55 +166,52 @@ def test_fits_cutout_off_edge(test_images, cutout_size):
 
     # Off the bottom
     center_coord = SkyCoord("150.1163213 2.2014", unit='deg')
-    cutout = FITSCutout(test_images[0], center_coord, cutout_size, memory_only=True).cutout()
-    assert np.isnan(cutout[0][1].data[cutout_size//2:, :]).all()
+    cutout = FITSCutout(test_images[0], center_coord, cutout_size).fits_cutouts[0]
+    assert np.isnan(cutout[1].data[cutout_size//2:, :]).all()
 
     # Off the left, with integer fill value
     center_coord = SkyCoord('150.11672 2.200973097', unit='deg')
-    cutout = FITSCutout(test_images[0], center_coord, cutout_size, memory_only=True, fill_value=1).cutout()
-    assert np.all(cutout[0][1].data[:, :cutout_size//2] == 1)
+    cutout = FITSCutout(test_images[0], center_coord, cutout_size, fill_value=1).fits_cutouts[0]
+    assert np.all(cutout[1].data[:, :cutout_size//2] == 1)
 
     # Off the right, with float fill value
     center_coord = SkyCoord('150.11588 2.200973097', unit='deg')
-    cutout = FITSCutout(test_images[0], center_coord, cutout_size, memory_only=True, fill_value=1.5).cutout()
-    assert np.all(cutout[0][1].data[:, cutout_size//2:] == 1.5)
+    cutout = FITSCutout(test_images[0], center_coord, cutout_size, fill_value=1.5).fits_cutouts[0]
+    assert np.all(cutout[1].data[:, cutout_size//2:] == 1.5)
 
     # Error if unexpected fill value
     with pytest.raises(InvalidInputError, match='Fill value must be an integer or a float.'):
-        FITSCutout(test_images[0], center_coord, cutout_size, memory_only=True, fill_value='invalid').cutout()
+        FITSCutout(test_images[0], center_coord, cutout_size, fill_value='invalid')
 
 
-def test_fits_cutout_cloud(tmpdir):
+def test_fits_cutout_cloud():
     # Test single cloud image
     test_s3_uri = "s3://stpubdata/hst/public/j8pu/j8pu0y010/j8pu0y010_drc.fits"
     center_coord = SkyCoord("150.4275416667 2.42155", unit='deg')
     cutout_size = [10, 15]
-    cutout = FITSCutout(test_s3_uri, center_coord, cutout_size, memory_only=True).cutout()[0]
+    cutout = FITSCutout(test_s3_uri, center_coord, cutout_size).fits_cutouts[0]
     assert cutout[1].data.shape == (15, 10)
 
 
 def test_fits_cutout_rounding(test_images, cutout_size):
     # Rounding normally
     center_coord = SkyCoord("150.1163117 2.200973097", unit='deg')
-    cutout_list = FITSCutout(test_images[0], center_coord, cutout_size, memory_only=True).cutout()
+    cutout = FITSCutout(test_images[0], center_coord, cutout_size).fits_cutouts[0]
     with fits.open(test_images[0]) as test_hdu:
-        assert np.all(cutout_list[0][1].data == test_hdu[0].data[19:29, 20:30])
+        assert np.all(cutout[1].data == test_hdu[0].data[19:29, 20:30])
 
         # Rounding to ceiling
-        cutout_list = FITSCutout(test_images[0], center_coord, cutout_size, memory_only=True, 
-                                 limit_rounding_method='ceil').cutout()
-        assert np.all(cutout_list[0][1].data == test_hdu[0].data[20:30, 20:30])
+        cutout = FITSCutout(test_images[0], center_coord, cutout_size, limit_rounding_method='ceil').fits_cutouts[0]
+        assert np.all(cutout[1].data == test_hdu[0].data[20:30, 20:30])
 
         # Rounding to floor
-        cutout_list = FITSCutout(test_images[0], center_coord, cutout_size, memory_only=True, 
-                                 limit_rounding_method='floor').cutout()
-        assert np.all(cutout_list[0][1].data == test_hdu[0].data[19:29, 19:29])
+        cutout = FITSCutout(test_images[0], center_coord, cutout_size, limit_rounding_method='floor').fits_cutouts[0]
+        assert np.all(cutout[1].data == test_hdu[0].data[19:29, 19:29])
 
         # Case that the cutout rounds to zero
         cutout_size = 0.57557495
-        cutout_list = FITSCutout(test_images[0], center_coord, cutout_size, memory_only=True, 
-                                 limit_rounding_method='round').cutout()
-        assert np.all(cutout_list[0][1].data == test_hdu[0].data[24:25, 24:25])
+        cutout = FITSCutout(test_images[0], center_coord, cutout_size, limit_rounding_method='round').fits_cutouts[0]
+        assert np.all(cutout[1].data == test_hdu[0].data[24:25, 24:25])
 
 
 def test_fits_cutout_extension(test_images, center_coord, cutout_size):
@@ -235,20 +225,20 @@ def test_fits_cutout_extension(test_images, center_coord, cutout_size):
         hdul.flush()  # save changes
 
     # Cutout all extensions
-    cutout_list = FITSCutout(test_images[0], center_coord, cutout_size, memory_only=True, extension='all').cutout()
+    cutout_list = FITSCutout(test_images[0], center_coord, cutout_size, extension='all').fits_cutouts
     assert len(cutout_list[0]) == 4  # primary header + 3 images
 
     # Specify a single extension
-    cutout_list = FITSCutout(test_images[0], center_coord, cutout_size, memory_only=True, extension=2).cutout()
+    cutout_list = FITSCutout(test_images[0], center_coord, cutout_size, extension=2).fits_cutouts
     assert len(cutout_list[0]) == 2  # primary header + 1 image
 
     # # Specify a list of extensions
-    cutout_list = FITSCutout(test_images[0], center_coord, cutout_size, memory_only=True, extension=[0, 1]).cutout()
+    cutout_list = FITSCutout(test_images[0], center_coord, cutout_size, extension=[0, 1]).fits_cutouts
     assert len(cutout_list[0]) == 3  # primary header + 2 images
 
     # Warning if a non-existing extension is specified
     with pytest.warns(DataWarning, match=r'extension\(s\) 3 will be skipped.'):
-        cutout_list = FITSCutout(test_images[0], center_coord, cutout_size, memory_only=True, extension=[1, 3]).cutout()
+        cutout_list = FITSCutout(test_images[0], center_coord, cutout_size, extension=[1, 3]).fits_cutouts
         assert len(cutout_list[0]) == 2  # primary header + 1 image
 
     # Remove image data from one of the input files
@@ -261,19 +251,19 @@ def test_fits_cutout_extension(test_images, center_coord, cutout_size):
         hdul.flush()
 
     with pytest.warns(DataWarning, match='No image extensions with data found.'):
-        with pytest.raises(InvalidQueryError, match='Cutout contains no data!'):
-            FITSCutout(test_images[1], center_coord, cutout_size, memory_only=True).cutout()
+        with pytest.raises(InvalidInputError, match='Cutout contains no data!'):
+            FITSCutout(test_images[1], center_coord, cutout_size)
 
 
 def test_fits_cutout_not_in_footprint(test_images, cutout_size):
     # Test when the requested cutout is not on the image
     center_coord = SkyCoord("140.1163213 2.2005731", unit='deg')
     with pytest.raises(InvalidQueryError, match='Cutout location is not in image footprint!'):
-        FITSCutout(test_images, center_coord, cutout_size, single_outfile=True).cutout()
+        FITSCutout(test_images, center_coord, cutout_size, single_outfile=True)
 
     center_coord = SkyCoord("15.1163213 2.2005731", unit='deg')
     with pytest.raises(InvalidQueryError, match='Cutout location is not in image footprint!'):
-        FITSCutout(test_images, center_coord, cutout_size, single_outfile=True).cutout()
+        FITSCutout(test_images, center_coord, cutout_size, single_outfile=True)
 
 
 def test_fits_cutout_no_data(tmpdir, test_images, cutout_size):
@@ -286,7 +276,7 @@ def test_fits_cutout_no_data(tmpdir, test_images, cutout_size):
         
     # Single outfile should include empty files as extensions
     center_coord = SkyCoord("150.1163213 2.2007", unit='deg')
-    cutout = FITSCutout(test_images, center_coord, cutout_size, single_outfile=True, output_dir=tmpdir).cutout()[0]
+    cutout = FITSCutout(test_images, center_coord, cutout_size, single_outfile=True).fits_cutouts[0]
     assert len(cutout) == len(test_images) + 1  # num imgs + primary header
     assert (cutout[1].data == 0).all()
     assert (cutout[2].data == 0).all()
@@ -296,9 +286,9 @@ def test_fits_cutout_no_data(tmpdir, test_images, cutout_size):
     assert ~(cutout[6].data == 0).any()
     
     # Empty files should not be written to their own file
-    with pytest.warns(DataWarning, match='contains no data and will not be returned.'):
-        cutout_files = FITSCutout(test_images, center_coord, cutout_size, single_outfile=False, 
-                                  output_dir=tmpdir).cutout()
+    with pytest.warns(DataWarning, match='contains no data and will not be written.'):
+        cutout_files = FITSCutout(test_images, center_coord, cutout_size, 
+                                  single_outfile=False).write_as_fits(output_dir=tmpdir)
     assert isinstance(cutout_files, list)
     assert len(cutout_files) == len(test_images) - 2
 
@@ -309,17 +299,15 @@ def test_fits_cutout_no_data(tmpdir, test_images, cutout_size):
             hdu[0].data[:20, :] = 0
             hdu.flush()
 
-    with pytest.raises(InvalidQueryError, match='Cutout contains no data!'):
-        FITSCutout(test_images, center_coord, cutout_size, single_outfile=True, 
-                   output_dir=tmpdir).cutout()
+    with pytest.raises(InvalidInputError, match='Cutout contains no data!'):
+        FITSCutout(test_images, center_coord, cutout_size, single_outfile=True)
 
 
 def test_fits_cutout_bad_sip(tmpdir, caplog, test_image_bad_sip):
     # Test single image and also conflicting sip keywords
     center_coord = SkyCoord("150.1163213 2.2007", unit='deg')
     cutout_size = [10, 15]
-    cutout_file = FITSCutout(test_image_bad_sip, center_coord, cutout_size, output_dir=tmpdir, 
-                             return_paths=True).cutout()
+    cutout_file = FITSCutout(test_image_bad_sip, center_coord, cutout_size).write_as_fits(output_dir=tmpdir)[0]
     assert isinstance(cutout_file, str)
     assert "10-x-15" in cutout_file
     with fits.open(cutout_file) as cutout_hdulist:
@@ -327,16 +315,15 @@ def test_fits_cutout_bad_sip(tmpdir, caplog, test_image_bad_sip):
 
     center_coord = SkyCoord("150.1159 2.2006", unit='deg')
     cutout_size = [10, 15]*u.pixel
-    cutout_file = FITSCutout(test_image_bad_sip, center_coord, cutout_size, output_dir=tmpdir, 
-                             return_paths=True).cutout()
+    cutout_file = FITSCutout(test_image_bad_sip, center_coord, cutout_size).write_as_fits(output_dir=tmpdir)[0]
     assert isinstance(cutout_file, str)
     assert "10.0pix-x-15.0pix" in cutout_file
     with fits.open(cutout_file) as cutout_hdulist:
         assert cutout_hdulist[1].data.shape == (15, 10)
 
     cutout_size = [1, 2]*u.arcsec
-    cutout_file = FITSCutout(test_image_bad_sip, center_coord, cutout_size, output_dir=tmpdir, return_paths=True, 
-                             verbose=True).cutout()
+    cutout_file = FITSCutout(test_image_bad_sip, center_coord, cutout_size, 
+                             verbose=True).write_as_fits(output_dir=tmpdir)[0]
     assert isinstance(cutout_file, str)
     assert "1.0arcsec-x-2.0arcsec" in cutout_file
     with fits.open(cutout_file) as cutout_hdulist:
@@ -349,71 +336,63 @@ def test_fits_cutout_bad_sip(tmpdir, caplog, test_image_bad_sip):
     center_coord = "150.1159 2.2006"
     cutout_size = [10, 15, 20]
     with pytest.warns(InputWarning, match='Too many dimensions in cutout size, only the first two will be used.'):
-        cutout_file = FITSCutout(test_image_bad_sip, center_coord, cutout_size, output_dir=tmpdir, 
-                                 return_paths=True).cutout()
+        cutout_file = FITSCutout(test_image_bad_sip, center_coord, cutout_size).write_as_fits(output_dir=tmpdir)[0]
     assert isinstance(cutout_file, str)
     assert "10-x-15" in cutout_file
     assert "x-20" not in cutout_file
 
 
 def test_fits_cutout_invalid_params(tmpdir, test_images, center_coord, cutout_size):
-    # Warning when image options are given
-    with pytest.warns(InputWarning, match='are not supported for FITS or ASDF output and will be ignored.'):
-        FITSCutout(test_images, center_coord, cutout_size, output_dir=tmpdir, stretch='asinh').cutout()
-
     # Invalid limit rounding method
     with pytest.raises(InvalidInputError, match='Limit rounding method invalid is not recognized.'):
-        FITSCutout(test_images, center_coord, cutout_size, limit_rounding_method='invalid').cutout()
+        FITSCutout(test_images, center_coord, cutout_size, limit_rounding_method='invalid')
 
     # Invalid units for cutout size
     cutout_size = 1 * u.m  # meters are not valid
     with pytest.raises(InvalidInputError, match='Cutout size unit meter is not supported.'):
-        FITSCutout(test_images, center_coord, cutout_size).cutout()
+        FITSCutout(test_images, center_coord, cutout_size)
 
 
 def test_fits_cutout_img_output(tmpdir, test_images, caplog, center_coord, cutout_size):
     # Basic jpg image
-    jpg_files = FITSCutout(test_images, center_coord, cutout_size, output_dir=tmpdir, output_format='jpg', 
-                           return_paths=True).cutout()
+    jpg_files = FITSCutout(test_images, center_coord, cutout_size).write_as_img(output_format='jpg', output_dir=tmpdir)
     assert len(jpg_files) == len(test_images)
     with open(jpg_files[0], 'rb') as IMGFLE:
         assert IMGFLE.read(3) == b'\xFF\xD8\xFF'  # JPG
 
     # Png (single input file, not as list)
-    img_files = FITSCutout(test_images[0], center_coord, cutout_size, output_format='png', output_dir=tmpdir, 
-                           return_paths=True).cutout()
+    img_files = FITSCutout(test_images[0], center_coord, cutout_size).write_as_img(output_format='png', 
+                                                                                   output_dir=tmpdir)
     with open(img_files[0], 'rb') as IMGFLE:
         assert IMGFLE.read(8) == b'\x89\x50\x4E\x47\x0D\x0A\x1A\x0A'  # PNG
     assert len(img_files) == 1
 
     # String coordinates and verbose
     center_coord = "150.1163213 2.200973097"
-    jpg_files = FITSCutout(test_images, center_coord, cutout_size, output_format='jpg', output_dir=tmpdir, 
-                           verbose=True).cutout()
+    jpg_files = FITSCutout(test_images, center_coord, cutout_size, verbose=True).write_as_img(output_format='jpg', 
+                                                                                              output_dir=tmpdir)
     captured = caplog.text
     assert len(findall('Original image shape', captured)) == 6
-    assert 'Cutout fits file(s)' in captured
     assert 'Total time' in captured
 
 
 def test_fits_cutout_img_color(tmpdir, test_images, center_coord, cutout_size):
     # Color image
-    color_jpg = FITSCutout(test_images[:3], center_coord, cutout_size, output_format='jpg', colorize=True, 
-                           output_dir=tmpdir, return_paths=True).cutout()
+    color_jpg = FITSCutout(test_images[:3], center_coord, cutout_size).write_as_img(output_format='jpg', colorize=True,
+                                                                                    output_dir=tmpdir)
     img = Image.open(color_jpg)
     assert img.mode == 'RGB'
 
 
 def test_fits_cutout_img_memory_only(test_images, center_coord, cutout_size):
     # Save black and white image to memory
-    imgs = FITSCutout(test_images[0], center_coord, cutout_size, output_format='png', memory_only=True).cutout()
+    imgs = FITSCutout(test_images[0], center_coord, cutout_size).image_cutouts
     assert isinstance(imgs, list)
     assert len(imgs) == 1
     assert isinstance(imgs[0], Image.Image)
 
     # Save color image to memory
-    color_imgs = FITSCutout(test_images[:3], center_coord, cutout_size, output_format='jpg', colorize=True, 
-                            memory_only=True).cutout()
+    color_imgs = FITSCutout(test_images[:3], center_coord, cutout_size).get_image_cutouts(colorize=True)
     assert isinstance(color_imgs, list)
     assert len(color_imgs) == 1
     assert isinstance(color_imgs[0], Image.Image)
@@ -423,32 +402,30 @@ def test_fits_cutout_img_memory_only(test_images, center_coord, cutout_size):
 def test_fits_cutout_img_errors(tmpdir, test_images, center_coord, cutout_size):
     # Error when too few input images
     with pytest.raises(InvalidInputError):
-        FITSCutout(test_images[0], center_coord, cutout_size, output_format='jpg', colorize=True, 
-                   output_dir=tmpdir).cutout()
+        FITSCutout(test_images[0], center_coord, cutout_size).get_image_cutouts(colorize=True)
 
     # Warning when too many input images
     with pytest.warns(InputWarning, match='Too many inputs for a color cutout, only the first three will be used.'):
-        color_jpg = FITSCutout(test_images, center_coord, cutout_size, output_format='jpg', colorize=True, 
-                               output_dir=tmpdir, return_paths=True).cutout()
+        color_jpg = FITSCutout(test_images, center_coord, cutout_size).write_as_img(colorize=True, output_dir=tmpdir)
     img = Image.open(color_jpg)
     assert img.mode == 'RGB'
 
     # Warning when saving image to unsupported image formats
     with pytest.warns(DataWarning, match='Cutout could not be saved in .blp format'):
-        FITSCutout(test_images[0], center_coord, cutout_size, output_format='blp', output_dir=tmpdir).cutout()
+        FITSCutout(test_images[0], center_coord, cutout_size).write_as_img(output_format='blp', output_dir=tmpdir)
 
     with pytest.warns(DataWarning, match='Cutout could not be saved in .mpg format'):
-        FITSCutout(test_images[:3], center_coord, cutout_size, output_format='mpg', colorize=True, 
-                   output_dir=tmpdir).cutout()
+        FITSCutout(test_images[:3], center_coord, cutout_size).write_as_img(output_format='mpg', output_dir=tmpdir, 
+                                                                            colorize=True)
         
     # Invalid stretch error
     with pytest.raises(InvalidInputError, match='Stretch invalid is not recognized.'):
-        FITSCutout(test_images[0], center_coord, cutout_size, stretch='invalid', output_format='png', 
-                   output_dir=tmpdir).cutout()
+        FITSCutout(test_images[0], center_coord, cutout_size).write_as_img(stretch='invalid', output_format='png',
+                                                                           output_dir=tmpdir)
 
     # Invalid output format
     with pytest.raises(InvalidInputError, match='Output format .invalid is not supported'):
-        FITSCutout(test_images[0], center_coord, cutout_size, output_format='invalid', output_dir=tmpdir).cutout()
+        FITSCutout(test_images[0], center_coord, cutout_size).write_as_img(output_format='invalid', output_dir=tmpdir)
 
     # Change first input file to be all zeros
     with fits.open(test_images[0], mode='update') as hdu:
@@ -456,16 +433,10 @@ def test_fits_cutout_img_errors(tmpdir, test_images, center_coord, cutout_size):
         hdu.flush()
 
     # Warning when outputting non-color images
-    with pytest.warns(DataWarning, match='contains no data and will not be written.'):
-        FITSCutout(test_images[0], center_coord, cutout_size, output_format='png', output_dir=tmpdir).cutout()
+    with pytest.raises(InvalidInputError, match='Cutout contains no data'):
+        FITSCutout(test_images[0], center_coord, cutout_size).write_as_img(output_format='png', output_dir=tmpdir)
 
     # Error when outputting color image
     with pytest.raises(InvalidInputError):
-        FITSCutout(test_images[:3], center_coord, cutout_size,
-                   colorize=True, output_format='png', output_dir=tmpdir).cutout()
-        
-
-def test_fits_cutout_asdf_output(test_images, center_coord, cutout_size):
-    # Should warn if output format is ASDF (not yet implemented)
-    with pytest.warns(InputWarning, match='ASDF output is not yet implemented for FITS files.'):
-        FITSCutout(test_images[0], center_coord, cutout_size, output_format='asdf').cutout()
+        FITSCutout(test_images[:3], center_coord, cutout_size).write_as_img(colorize=True, output_format='png', 
+                                                                            output_dir=tmpdir)

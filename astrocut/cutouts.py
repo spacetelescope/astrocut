@@ -21,7 +21,7 @@ def fits_cut(input_files: List[Union[str, Path, S3Path]], coordinates: Union[Sky
              cutout_size: Union[int, np.ndarray, Quantity, List[int], Tuple[int]] = 25,
              correct_wcs: bool = False, extension: Optional[Union[int, List[int], Literal['all']]] = None,
              single_outfile: bool = True, cutout_prefix: str = 'cutout', output_dir: Union[str, Path] = '.', 
-             memory_only: bool = False, limit_rounding_method: str = 'round', 
+             memory_only: bool = False, fill_value: Union[int, float] = np.nan, limit_rounding_method: str = 'round',
              verbose=False) -> Union[str, List[str], List[HDUList]]:
     """
     Takes one or more FITS files with the same WCS/pointing, makes the same cutout in each file,
@@ -66,6 +66,8 @@ def fits_cut(input_files: List[Union[str, Path, S3Path]], coordinates: Union[Sky
         the cutout(s) are returned as a list of `~astropy.io.fit.HDUList` objects. If set to
         True cutout_prefix and output_dir are ignored, however single_outfile can still be used to
         set the number of returned `~astropy.io.fits.HDUList` objects.
+    fill_value : int | float
+        Value to fill the cutout with if the cutout is outside the image.
     limit_rounding_method : str
         Method to use for rounding the cutout limits. Options are 'round', 'ceil', and 'floor'.
     verbose : bool
@@ -79,18 +81,14 @@ def fits_cut(input_files: List[Union[str, Path, S3Path]], coordinates: Union[Sky
         If memory_only is True, a list of `~astropy.io.fit.HDUList` objects is returned instead of
         file name(s).
     """
-    return FITSCutout(input_files,
-                      coordinates=coordinates,
-                      cutout_size=cutout_size,
-                      memory_only=memory_only,
-                      output_dir=output_dir,
-                      return_paths=not memory_only,
-                      limit_rounding_method=limit_rounding_method,
-                      output_format='.fits',
-                      extension=extension,
-                      single_outfile=single_outfile,
-                      cutout_prefix=cutout_prefix,
-                      verbose=verbose).cutout()
+    fits_cutout = FITSCutout(input_files, coordinates, cutout_size, fill_value, limit_rounding_method, 
+                             extension, single_outfile, verbose)
+    
+    if memory_only:
+        return fits_cutout.fits_cutouts
+    
+    cutout_paths = fits_cutout.write_as_fits(output_dir, cutout_prefix)
+    return cutout_paths[0] if len(cutout_paths) == 1 else cutout_paths
 
 
 def normalize_img(img_arr: np.ndarray, stretch: str = 'asinh', minmax_percent: Optional[List[int]] = None, 
@@ -160,8 +158,6 @@ def img_cut(input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyC
         If ``cutout_size`` has two elements, they should be in ``(ny, nx)`` order.  Scalar numbers 
         in ``cutout_size`` are assumed to be in units of pixels. `~astropy.units.Quantity` objects 
         must be in pixel or angular units.
-    fill_value : int | float
-        Value to fill the cutout with if the cutout is outside the image.
     stretch : str
         Optional, default 'asinh'. The stretch to apply to the image array.
         Valid values are: asinh, sinh, sqrt, log, linear
@@ -187,6 +183,8 @@ def img_cut(input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyC
         cutout filename. 
     output_dir : str
         Defaul value '.'. The directory to save the cutout file(s) to.
+    fill_value : int | float
+        Value to fill the cutout with if the cutout is outside the image.
     limit_rounding_method : str
         Method to use for rounding the cutout limits. Options are 'round', 'ceil', and 'floor'.
     extension : int, list of ints, None, or 'all'
@@ -202,19 +200,9 @@ def img_cut(input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyC
         the output filepaths.
     """
 
-    return FITSCutout(input_files=input_files,
-                      coordinates=coordinates,
-                      cutout_size=cutout_size,
-                      fill_value=fill_value,
-                      output_dir=output_dir,
-                      return_paths=True,
-                      limit_rounding_method=limit_rounding_method,
-                      stretch=stretch,
-                      minmax_percent=minmax_percent,
-                      minmax_value=minmax_value,
-                      invert=invert,
-                      colorize=colorize,
-                      output_format=img_format,
-                      cutout_prefix=cutout_prefix,
-                      extension=extension,
-                      verbose=verbose).cutout()
+    fits_cutout = FITSCutout(input_files, coordinates, cutout_size, fill_value, limit_rounding_method, 
+                             extension, verbose=verbose)
+    
+    cutout_paths = fits_cutout.write_as_img(stretch, minmax_percent, minmax_value, invert, colorize, img_format,
+                                            output_dir, cutout_prefix)
+    return cutout_paths

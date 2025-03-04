@@ -137,7 +137,7 @@ def test_fits_cut(tmpdir, caplog, ffi_type):
     assert ~(cutout_hdulist[5].data == 0).any()
     assert ~(cutout_hdulist[6].data == 0).any()
 
-    with pytest.warns(DataWarning, match='contains no data and will not be returned.'):
+    with pytest.warns(DataWarning, match='contains no data'):
         cutout_files = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=False, output_dir=tmpdir)
     assert isinstance(cutout_files, list)
     assert len(cutout_files) == len(test_images) - 2
@@ -313,7 +313,7 @@ def test_img_cut(tmpdir, caplog, ffi_type):
                                 output_dir=path.join(tmpdir, "image_path"), verbose=True)
     captured = caplog.text
     assert len(findall("Original image shape", captured)) == 6
-    assert "Cutout fits file(s)" in captured
+    assert "Cutout filepaths:" in captured
     assert "Total time" in captured
 
     # test color image where one of the images is all zeros

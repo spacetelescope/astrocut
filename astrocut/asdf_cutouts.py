@@ -50,8 +50,6 @@ def asdf_cut(input_files: List[Union[str, Path, S3Path]],
              key: str = None,
              secret: str = None, 
              token: str = None,
-             return_cutout2D: bool = True,
-             return_paths: bool = False,
              verbose: bool = False) -> astropy.nddata.Cutout2D:
     """
     Takes one of more ASDF input files (`input_files`) and generates a cutout of designated size `cutout_size`
@@ -82,9 +80,6 @@ def asdf_cut(input_files: List[Union[str, Path, S3Path]],
         Optional, default `np.nan`. The fill value for pixels outside the original image.
     output_dir : str | Path
         Optional, default ".". The directory to write the cutout file(s) to.
-    return_paths : bool
-        Optional, default False. If True, a list of cutout file paths is returned. If False, a list of
-        memory objects is returned. This parameter only applies if `write_file` is True.
     output_format : str
         Optional, default ".asdf". The format of the output cutout file. If `write_file` is False,
         then cutouts will be returned as `asdf.AsdfFile` objects if `output_format` is ".asdf" or
@@ -98,9 +93,6 @@ def asdf_cut(input_files: List[Union[str, Path, S3Path]],
     token : string
         Default None. Security token for S3 file system. Only applicable if `input_file` is a
         cloud resource.
-    return_cutout2D : bool
-        Optional, default True. If True, the cutout is returned as an `astropy.nddata.Cutout2D` object.
-        This parameter only applies if `return_paths` is False.
     verbose : bool
         Default False. If True, intermediate information is printed.
 
@@ -109,16 +101,23 @@ def asdf_cut(input_files: List[Union[str, Path, S3Path]],
     response : str | list
         A list of cutout file paths if `write_file` is True, otherwise a list of cutout objects.
     """
-    return ASDFCutout(input_files=input_files,
-                      coordinates=f'{ra} {dec}',
-                      cutout_size=cutout_size,
-                      fill_value=fill_value,
-                      memory_only=not write_file,
-                      output_dir=output_dir,
-                      return_paths=return_paths,
-                      output_format=output_format,
-                      key=key,
-                      secret=secret,
-                      token=token,
-                      return_cutout2D=return_cutout2D,
-                      verbose=verbose).cutout()
+    asdf_cutout = ASDFCutout(input_files, f'{ra} {dec}', cutout_size, fill_value, key=key, 
+                             secret=secret, token=token, verbose=verbose)
+    
+    if not write_file:  # Returns as Cutout2D objects
+        return asdf_cutout.cutouts
+    
+    # Get output format in standard form
+    output_format = f'.{output_format}' if not output_format.startswith('.') else output_format
+    output_format = output_format.lower()
+
+    if output_format == '.asdf':
+        return asdf_cutout.write_as_asdf(output_dir)
+    elif output_format == '.fits':
+        return asdf_cutout.write_as_fits(output_dir)
+    else:
+        # Error if output format not recognized
+        raise ValueError(f'Output format {output_format} is not recognized. '
+                         'Valid options are ".asdf" and ".fits".')
+    
+

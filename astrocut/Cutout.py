@@ -20,8 +20,8 @@ class Cutout(ABC):
     Abstract class for creating cutouts. This class defines attributes and methods that are common to all
     cutout classes.
 
-    Attributes
-    ----------
+    Args
+    ----
     input_files : list
         List of input image files.
     coordinates : str | `~astropy.coordinates.SkyCoord`
@@ -30,22 +30,16 @@ class Cutout(ABC):
         Size of the cutout array.
     fill_value : int | float
         Value to fill the cutout with if the cutout is outside the image.
-    memory_only : bool
-        If True, the cutout is written to memory instead of disk.
-    output_dir : str | Path
-        Directory to write the cutout file(s) to.
-        This parameter only applies if `memory_only` is False and files are written to disk.
     limit_rounding_method : str
         Method to use for rounding the cutout limits. Options are 'round', 'ceil', and 'floor'.
-    return_paths : bool
-        If True, a list of cutout file paths is returned. If False, a list of memory objects is returned.
-        This parameter only applies if `memory_only` is False and files are written to disk.
     verbose : bool
         If True, log messages are printed to the console.
 
     Methods
     -------
-    get_cutout_limits(img_wcs)
+    _parse_size_input(cutout_size)
+        Makes the given cutout size into a length 2 array
+    _get_cutout_limits(img_wcs)
         Returns the x and y pixel limits for the cutout.
     cutout()
         Generate the cutouts.
@@ -53,19 +47,11 @@ class Cutout(ABC):
 
     def __init__(self, input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyCoord, str], 
                  cutout_size: Union[int, np.ndarray, u.Quantity, List[int], Tuple[int]] = 25,
-                 fill_value: Union[int, float] = np.nan, memory_only: bool = False,
-                 output_dir: Union[str, Path] = '.', limit_rounding_method: str = 'round', 
-                 return_paths: bool = False, verbose: bool = False):
+                 fill_value: Union[int, float] = np.nan, limit_rounding_method: str = 'round', 
+                 verbose: bool = False):
         
         # Log messages according to verbosity
         _handle_verbose(verbose)
-
-        # Warn if both memory_only and return_paths are True
-        if memory_only and return_paths:
-            warnings.warn('Both memory_only and return_paths are set to True. memory_only will take precedence '
-                          'and memory objects will be returned without writing cutouts to disk. To write files '
-                          'and return file paths, set memory_only to False.', InputWarning)
-            return_paths = False
 
         # Ensure that input files are in a list
         if isinstance(input_files, str) or isinstance(input_files, Path):
@@ -79,7 +65,7 @@ class Cutout(ABC):
         log.debug('Coordinates: %s', self._coordinates)
 
         # Turning the cutout size into an array of two values
-        self._cutout_size = self.parse_size_input(cutout_size)
+        self._cutout_size = self._parse_size_input(cutout_size)
         log.debug('Cutout size: %s', self._cutout_size)
 
         # Assigning other attributes
@@ -92,13 +78,10 @@ class Cutout(ABC):
         if not isinstance(fill_value, int) and not isinstance(fill_value, float):
             raise InvalidInputError('Fill value must be an integer or a float.')
         self._fill_value = fill_value
-        
-        self._memory_only = memory_only
-        self._output_dir = output_dir
-        self._return_paths = return_paths
+    
         self._verbose = verbose
 
-    def parse_size_input(self, cutout_size):
+    def _parse_size_input(self, cutout_size):
         """
         Makes the given cutout size into a length 2 array.
 

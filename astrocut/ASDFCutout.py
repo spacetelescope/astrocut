@@ -1,5 +1,6 @@
 import copy
 from pathlib import Path
+from time import monotonic
 from typing import List, Tuple, Union, Optional
 import warnings
 
@@ -18,15 +19,15 @@ from s3path import S3Path
 
 from . import log
 from .ImageCutout import ImageCutout
-from .exceptions import DataWarning, InputWarning
+from .exceptions import DataWarning, InvalidInputError
 
 
 class ASDFCutout(ImageCutout):
     """
     Class for creating cutouts from ASDF files.
 
-    Attributes
-    ----------
+    Args
+    ----
     input_files : list
         List of input image files.
     coordinates : str | `~astropy.coordinates.SkyCoord`
@@ -35,90 +36,59 @@ class ASDFCutout(ImageCutout):
         Size of the cutout array.
     fill_value : int | float
         Value to fill the cutout with if the cutout is outside the image.
-    memory_only : bool
-        If True, the cutout is written to memory instead of disk.
-    output_dir : str | Path
-        Directory to write the cutout file(s) to.
-        This parameter only applies if `memory_only` is False and files are written to disk.
     limit_rounding_method : str
         Method to use for rounding the cutout limits. Options are 'round', 'ceil', and 'floor'.
-    return_paths : bool
-        If True, a list of cutout file paths is returned. If False, a list of memory objects is returned.
-        This parameter only applies if `memory_only` is False and files are written to disk.
-    stretch : str
-        Optional, default 'asinh'. The stretch to apply to the image array.
-        Valid values are: asinh, sinh, sqrt, log, linear.
-    minmax_percent : list
-        Optional. Interval based on a keeping a specified fraction of pixels (can be asymmetric) 
-        when scaling the image. The format is [lower percentile, upper percentile], where pixel
-        values below the lower percentile and above the upper percentile are clipped.
-        Only one of minmax_percent and minmax_value should be specified.
-    minmax_value : list
-        Optional. Interval based on user-specified pixel values when scaling the image.
-        The format is [min value, max value], where pixel values below the min value and above
-        the max value are clipped.
-        Only one of minmax_percent and minmax_value should be specified.
-    invert : bool
-        Optional, default False.  If True the image is inverted (light pixels become dark and vice versa).
-    colorize : bool
-        Optional, default False.  If True a single color image is produced as output, and it is expected
-        that three files are given as input.
-    output_format : str
-        Optional, default '.jpg'. The format of the output image file.
     key : str
         Optional, default None. Access key ID for S3 file system.
     secret : str
         Optional, default None. Secret access key for S3 file system.
     token : str
         Optional, default None. Security token for S3 file system.
-    return_cutout2D : bool
-        Optional, default False. If True, the cutout is returned as an `~astropy.nddata.Cutout2D` object.
-        This parameter only applies if `return_paths` is False.
     verbose : bool
         If True, log messages are printed to the console.
 
+    Attributes
+    ----------
+    cutouts : list
+        The cutouts as a list of `astropy.nddata.Cutout2D` objects.
+    cutouts_by_file : dict
+        The cutouts as `astropy.nddata.Cutout2D` objects stored by input filename.
+    fits_cutouts : list
+        The cutouts as a list `astropy.io.fits.HDUList` objects.
+    asdf_cutouts : list
+        The cutouts as a list of `asdf.AsdfFile` objects.
+
     Methods
     -------
-    _get_cloud_http()
+    _get_cloud_http(input_file)
         Get the HTTP URL of a cloud resource from an S3 URI.
-    _load_file_data()
+    _load_file_data(input_file)
         Load the data from an input file.
-    _get_cutout_data()
+    _get_cutout_data(data, wcs, pixel_coords)
         Get the cutout data from the input image.
-    _slice_gwcs()
+    _slice_gwcs(cutout, gwcs)
         Slice the original gwcs object to fit the cutout.
-    _cutout_file()
+    _cutout_file(file)
         Create a cutout from an input file.
-    _write_as_format()
+    cutout()
+        Generate cutouts from a list of input images.
+    _write_as_format(output_format, output_dir)
         Write the cutout to disk or memory in the specified format.
-    _write_as_fits()
+    write_as_fits(output_dir)
         Write the cutouts to disk or memory in FITS format.
-    _write_as_asdf()
+    write_as_asdf(output_dir)
         Write the cutouts to disk or memory in ASDF format.
-    get_center_pixel()
+    get_center_pixel(gwcsobj, ra, dec)
         Get the closest pixel location on an input image for a given set of coordinates.
     """
         
     def __init__(self, input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyCoord, str], 
                  cutout_size: Union[int, np.ndarray, Quantity, List[int], Tuple[int]] = 25,
-                 fill_value: Union[int, float] = np.nan, memory_only: bool = False,
-                 output_dir: Union[str, Path] = '.', limit_rounding_method: str = 'round', return_paths: bool = False,
-                 stretch: Optional[str] = None, minmax_percent: Optional[List[int]] = None, 
-                 minmax_value: Optional[List[int]] = None, invert: Optional[bool] = None, 
-                 colorize: Optional[bool] = None, output_format: str = '.asdf', 
+                 fill_value: Union[int, float] = np.nan, limit_rounding_method: str = 'round',
                  key: Optional[str] = None, secret: Optional[str] = None,
-                 token: Optional[str] = None, return_cutout2D: bool = False, verbose: bool = False):
+                 token: Optional[str] = None, verbose: bool = False):
         # Superclass constructor 
-        super().__init__(input_files, coordinates, cutout_size, fill_value, memory_only, output_dir, 
-                         limit_rounding_method, return_paths, stretch, minmax_percent, minmax_value, invert, colorize, 
-                         output_format, 'cutout', verbose=verbose)
-        
-        # Warn if both return_paths and return_cutout2D are True
-        if return_paths and return_cutout2D:
-            warnings.warn('Both return_paths and return_cutout2D are set to True. return_paths will take precedence '
-                          'and cutout file paths will be returned. To return `astropy.nddata.Cutout2D` objects, set '
-                          'return_paths to False.', InputWarning)
-            return_cutout2D = False
+        super().__init__(input_files, coordinates, cutout_size, fill_value, limit_rounding_method, verbose=verbose)
 
         # Assign AWS credential attributes
         self._key = key
@@ -126,11 +96,47 @@ class ASDFCutout(ImageCutout):
         self._token = token
         self._mission_kwd = 'roman'
 
-        # Attribute to return cutouts as Cutout2D objects
-        self._return_cutout2D = return_cutout2D
+        self.cutouts = []  # Public attribute to hold `Cutout2D` objects
+        self._asdf_cutouts = None  # Store ASDF objects
+        self._fits_cutouts = None  # Store FITS objects
+        self._gwcs_objects = []  # Store original GWCS objects
 
-        # Attribute to hold `Cutout2D` objects
-        self.cutouts = []
+        # Make cutouts
+        self.cutout()
+
+    @property
+    def fits_cutouts(self) -> List[fits.HDUList]:
+        """
+        Return the cutouts as a list `astropy.io.fits.HDUList` objects.
+        """
+        if not self._fits_cutouts:
+            fits_cutouts = []
+            for cutout in self.cutouts:
+                # TODO: Create a FITS object with ASDF extension
+                # Create a primary FITS header to hold data and WCS
+                primary_hdu = fits.PrimaryHDU(data=cutout.data, header=cutout.wcs.to_header(relax=True))
+
+                # Write to HDUList
+                fits_cutouts.append(fits.HDUList([primary_hdu]))
+            self._fits_cutouts = fits_cutouts
+        return self._fits_cutouts
+    
+    @property
+    def asdf_cutouts(self) -> List[asdf.AsdfFile]:
+        """
+        Return the cutouts as a list of `asdf.AsdfFile` objects.
+        """
+        if not self._asdf_cutouts:
+            asdf_cutouts = []
+            for i, cutout in enumerate(self.cutouts):
+                # Slice the origial gwcs to the cutout
+                sliced_gwcs = self._slice_gwcs(cutout, self._gwcs_objects[i])
+
+                # Create the asdf tree
+                tree = {self._mission_kwd: {'meta': {'wcs': sliced_gwcs}, 'data': cutout.data}}
+                asdf_cutouts.append(asdf.AsdfFile(tree))
+            self._asdf_cutouts = asdf_cutouts
+        return self._asdf_cutouts
 
     def _get_cloud_http(self, input_file: Union[str, S3Path]) -> str:
         """ 
@@ -159,7 +165,7 @@ class ASDFCutout(ImageCutout):
         with fs.open(input_file, 'rb') as f:
             return f.url()
 
-    def _load_file_data(self, input_file):
+    def _load_file_data(self, input_file: Union[str, Path, S3Path]) -> Tuple[np.ndarray, gwcs.wcs.WCS]:
         """
         Load relevant data from an input file.
 
@@ -308,91 +314,117 @@ class ASDFCutout(ImageCutout):
         # Store the Cutout2D object
         self.cutouts.append(cutout2D)
 
-        if self._return_cutout2D and self._memory_only:
-            # Return the Cutout2D object
-            cutout = cutout2D
-        elif self._output_format == '.asdf':            
-            # Slice the origial gwcs to the cutout
-            sliced_gwcs = self._slice_gwcs(cutout2D, gwcs)
+        # Store the original GWCS to use if creating asdf.AsdfFile objects
+        self._gwcs_objects.append(gwcs)
 
-            # Create the asdf tree
-            tree = {self._mission_kwd: {'meta': {'wcs': sliced_gwcs}, 'data': cutout2D.data}}
-            cutout = asdf.AsdfFile(tree)
+        # Store cutout with filename
+        self.cutouts_by_file[file] = [cutout2D]
 
-        elif self._output_format == '.fits':
-            # TODO: Create a FITS object with ASDF extension
-            # Create a primary FITS header to hold data and WCS
-            primary_hdu = fits.PrimaryHDU(data=cutout2D.data, header=cutout2D.wcs.to_header(relax=True))
-
-            # Write to HDUList
-            cutout = fits.HDUList([primary_hdu])
-            
-        else:
-            # Image output, apply the appropriate normalization parameters
-            cutout = [self.normalize_img(cutout2D.data, self._stretch, self._minmax_percent, self._minmax_value,
-                                         self._invert)]
-
-        # Add cutout to dictionary
-        self._cutout_dict[file] = cutout
-
-    def _write_as_format(self):
+    def cutout(self) -> Union[str, List[str], List[fits.HDUList]]:
         """
-        Write the cutout to disk or memory in the specified output format.
+        Generate cutouts from a list of input images.
 
         Returns
         -------
-        all_cutouts : str | list
+        cutout_path : Path | list
+            Cutouts as memory objects or path(s) to the written cutout files.
+
+        Raises
+        ------
+        InvalidInputError
+            If no cutouts contain data.
+        """
+        # Track start time
+        start_time = monotonic()
+
+        # Cutout each input file
+        for file in self._input_files:
+            self._cutout_file(file)
+
+        # If no cutouts contain data, raise exception
+        if self._num_cutouts == self._num_empty:
+            raise InvalidInputError('Cutout contains no data! (Check image footprint.)')
+
+        # Log total time elapsed
+        log.debug('Total time: %.2f sec', monotonic() - start_time)
+
+        return self.cutouts
+
+    def _write_as_format(self, output_format: str, output_dir: Union[str, Path] = '.') -> List[str]:
+        """
+        Write the cutout to disk in the specified output format.
+
+        Parameters
+        ----------
+        output_format : str
+            The output format to write the cutout to. Options are '.fits' and '.asdf'.
+        output_dir : str | Path
+            The output directory to write the cutouts to
+
+        Returns
+        -------
+        cutout_paths : list
             The path(s) to the cutout file(s) or the cutout memory objects.
         """
-        cutouts = []
-        if self._memory_only:
-            cutouts = list(self._cutout_dict.values())
-        else:
-            for file, cutout in self._cutout_dict.items():
-                # Write cutout to disk
-                filename = '{}_{:.7f}_{:.7f}_{}-x-{}_astrocut{}'.format(
-                    Path(file).stem,
-                    self._coordinates.ra.value,
-                    self._coordinates.dec.value,
-                    str(self._cutout_size[0]).replace(' ', ''), 
-                    str(self._cutout_size[1]).replace(' ', ''),
-                    self._output_format)
-                cutout_path = Path(self._output_dir, filename)
-                if self._output_format == '.fits':
-                    with warnings.catch_warnings():
-                        warnings.simplefilter('ignore') 
-                        cutout.writeto(cutout_path, overwrite=True, checksum=True)
-                elif self._output_format == '.asdf':
-                    cutout.write_to(cutout_path)
-    
-                # Append file path or memory object
-                cutouts.append(cutout_path.as_posix() if self._return_paths else cutout)
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
+        cutout_paths = []  # List to store paths to cutout files
+        for i, file in enumerate(self.cutouts_by_file):
+            # Determine the output path
+            filename = '{}_{:.7f}_{:.7f}_{}-x-{}_astrocut{}'.format(
+                Path(file).stem,
+                self._coordinates.ra.value,
+                self._coordinates.dec.value,
+                str(self._cutout_size[0]).replace(' ', ''), 
+                str(self._cutout_size[1]).replace(' ', ''),
+                output_format)
+            cutout_path = Path(output_dir, filename)
 
-        if self._return_cutout2D:  # return Cutout2D objects
-            return self.cutouts
-        return cutouts[0] if len(cutouts) == 1 and self._return_paths else cutouts
+            if output_format == '.fits':
+                cutout = self.fits_cutouts[i]
+                with warnings.catch_warnings():
+                    warnings.simplefilter('ignore') 
+                    cutout.writeto(cutout_path, overwrite=True, checksum=True)
+
+            elif output_format == '.asdf':
+                cutout = self.asdf_cutouts[i]
+                cutout.write_to(cutout_path)
+
+            cutout_paths.append(cutout_path.as_posix())
+
+        log.debug('Cutout filepaths: {}'.format(cutout_paths))
+        return cutout_paths
     
-    def _write_as_fits(self):
+    def write_as_fits(self, output_dir: Union[str, Path] = '.') -> List[str]:
         """
         Write the cutouts to disk or memory in FITS format.
 
+        Parameters
+        ----------
+        output_dir : str | Path
+            The output directory to write the cutouts to. Defaults to the current directory.
+
         Returns
         -------
-        str | list
-            The path(s) to the cutout FITS file(s) or the cutout memory objects.
+        list
+            A list of paths to the cutout FITS files.
         """
-        return self._write_as_format()
+        return self._write_as_format(output_format='.fits', output_dir=output_dir)
 
-    def _write_as_asdf(self):
+    def write_as_asdf(self, output_dir: Union[str, Path] = '.') -> List[str]:
         """
         Write the cutouts to disk or memory in ASDF format.
 
+        Parameters
+        ----------
+        output_dir : str | Path
+            The output directory to write the cutouts to. Defaults to the current directory.
+
         Returns
         -------
-        str | list
-            The path(s) to the cutout ASDF file(s) or the cutout memory objects.
+        list
+            A list of paths to the cutout ASDF files.
         """
-        return self._write_as_format()
+        return self._write_as_format(output_format='.asdf', output_dir=output_dir)
     
     @staticmethod 
     def get_center_pixel(gwcsobj: gwcs.wcs.WCS, ra: float, dec: float) -> Tuple[Tuple[int, int], WCS]:
