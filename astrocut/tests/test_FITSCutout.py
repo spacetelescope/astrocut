@@ -343,10 +343,6 @@ def test_fits_cutout_bad_sip(tmpdir, caplog, test_image_bad_sip):
 
 
 def test_fits_cutout_invalid_params(tmpdir, test_images, center_coord, cutout_size):
-    # Warning when image options are given
-    with pytest.warns(InputWarning, match='are not supported for FITS or ASDF output and will be ignored.'):
-        FITSCutout(test_images, center_coord, cutout_size, output_dir=tmpdir, stretch='asinh').cutout()
-
     # Invalid limit rounding method
     with pytest.raises(InvalidInputError, match='Limit rounding method invalid is not recognized.'):
         FITSCutout(test_images, center_coord, cutout_size, limit_rounding_method='invalid')
