@@ -147,6 +147,30 @@ def test_asdf_cutout(test_images, center_coord, cutout_size):
         assert np.isclose(s_coord.dec.deg, center_coord.dec.deg)
 
 
+def test_asdf_cutout_write_to_file(test_images, center_coord, cutout_size, tmpdir):
+    # Write cutouts to ASDF files on disk
+    cutout = ASDFCutout(test_images, center_coord, cutout_size)
+    asdf_files = cutout.write_as_asdf(output_dir=tmpdir)
+    assert len(asdf_files) == 3
+    for i, asdf_file in enumerate(asdf_files):
+        with asdf.open(asdf_file) as af:
+            assert 'roman' in af.tree
+            assert 'data' in af.tree['roman']
+            assert 'meta' in af.tree['roman']
+            assert np.all(af.tree['roman']['data'] == cutout.cutouts[i].data)
+            assert af.tree['roman']['meta']['wcs'].pixel_shape == (10, 10)
+
+    # Write cutouts to FITS files on disk
+    cutout = ASDFCutout(test_images, center_coord, cutout_size)
+    fits_files = cutout.write_as_fits(output_dir=tmpdir)
+    assert len(fits_files) == 3
+    for i, fits_file in enumerate(fits_files):
+        with fits.open(fits_file) as hdul:
+            assert np.all(hdul[0].data == cutout.cutouts[i].data)
+            assert hdul[0].header['NAXIS1'] == 10
+            assert hdul[0].header['NAXIS2'] == 10
+
+
 def test_asdf_cutout_partial(test_images, center_coord, cutout_size):
     # Off the top
     center_coord = SkyCoord('29.99901792 44.9861', unit='deg')
@@ -281,23 +305,35 @@ def test_get_center_pixel(fakedata):
 
 def test_asdf_cut(test_images, center_coord, cutout_size, tmpdir):
     """ Test convenience function to create ASDF cutouts """
-    # Write files to disk
-    cutouts = asdf_cut(test_images, center_coord.ra.deg, center_coord.dec.deg, cutout_size, output_dir=tmpdir)
-    assert isinstance(cutouts, list)
-    assert isinstance(cutouts[0], str)
-    assert len(cutouts) == 3
-    for i, path in enumerate(cutouts):
-        assert isinstance(path, str)
-        assert path.endswith('.asdf')
-        assert Path(path).exists()
-        assert str(tmpdir) in path
-        assert Path(test_images[i]).stem in path
-        assert center_coord.ra.to_string(unit='deg', decimal=True) in path
-        assert center_coord.dec.to_string(unit='deg', decimal=True) in path
-        assert '10-x-10' in path
+    def check_paths(cutout_paths, ext):
+        assert isinstance(cutout_paths, list)
+        assert isinstance(cutout_paths[0], str)
+        assert len(cutout_paths) == 3
+        for i, path in enumerate(cutout_paths):
+            assert isinstance(path, str)
+            assert path.endswith(ext)
+            assert Path(path).exists()
+            assert str(tmpdir) in path
+            assert Path(test_images[i]).stem in path
+            assert center_coord.ra.to_string(unit='deg', decimal=True) in path
+            assert center_coord.dec.to_string(unit='deg', decimal=True) in path
+            assert '10-x-10' in path
+    
+    # Write files to disk as ASDF files
+    asdf_paths = asdf_cut(test_images, center_coord.ra.deg, center_coord.dec.deg, cutout_size, output_dir=tmpdir)
+    check_paths(asdf_paths, '.asdf')
+
+    # Write files to disk as FITS files
+    fits_paths = asdf_cut(test_images, center_coord.ra.deg, center_coord.dec.deg, cutout_size, output_dir=tmpdir, 
+                          output_format='fits')
+    check_paths = (fits_paths, '.fits')
 
     # Write cutouts to memory as Cutout2D objects
     cutouts = asdf_cut(test_images, center_coord.ra.deg, center_coord.dec.deg, cutout_size, write_file=False)
     assert isinstance(cutouts, list)
     assert isinstance(cutouts[0], Cutout2D)
     assert len(cutouts) == 3
+
+    # Error if output format is not supported
+    with pytest.raises(InvalidInputError, match='Output format .invalid is not recognized.'):
+        asdf_cut(test_images, center_coord.ra.deg, center_coord.dec.deg, cutout_size, output_format='invalid')

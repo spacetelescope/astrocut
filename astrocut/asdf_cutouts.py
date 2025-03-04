@@ -11,6 +11,7 @@ from astropy.utils.decorators import deprecated_renamed_argument
 from s3path import S3Path
 
 from .ASDFCutout import ASDFCutout
+from .exceptions import InvalidInputError
 
 
 def get_center_pixel(gwcsobj: gwcs.wcs.WCS, ra: float, dec: float) -> tuple:
@@ -117,7 +118,7 @@ def asdf_cut(input_files: List[Union[str, Path, S3Path]],
         return asdf_cutout.write_as_fits(output_dir)
     else:
         # Error if output format not recognized
-        raise ValueError(f'Output format {output_format} is not recognized. '
-                         'Valid options are ".asdf" and ".fits".')
+        raise InvalidInputError(f'Output format {output_format} is not recognized. '
+                                'Valid options are ".asdf" and ".fits".')
     
 

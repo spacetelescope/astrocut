@@ -284,12 +284,10 @@ class ASDFCutout(ImageCutout):
         if gwcs is None:
             warnings.warn(f'File {file} does not contain a GWCS object. Skipping...',
                           DataWarning)
-            self._num_empty += 1
             return
 
         # Get closest pixel coordinates and approximated WCS
         pixel_coords, wcs = self.get_center_pixel(gwcs, self._coordinates.ra.value, self._coordinates.dec.value)
-        self._num_cutouts += 1
 
         # Create the cutout
         try:
@@ -297,14 +295,12 @@ class ASDFCutout(ImageCutout):
         except NoOverlapError:
             warnings.warn(f'Cutout footprint does not overlap with data in {file}, skipping...',
                           DataWarning)
-            self._num_empty += 1
             return
         
         # Check that there is data in the cutout image
         if (cutout2D.data == 0).all() or (np.isnan(cutout2D.data)).all():
             warnings.warn(f'Cutout of {file} contains no data, skipping...',
                           DataWarning)
-            self._num_empty += 1
             return
 
         # Convert Quantity data to ndarray
@@ -341,8 +337,8 @@ class ASDFCutout(ImageCutout):
         for file in self._input_files:
             self._cutout_file(file)
 
-        # If no cutouts contain data, raise exception
-        if self._num_cutouts == self._num_empty:
+        # If no cutouts contain data, raise exception        
+        if not self.cutouts:
             raise InvalidInputError('Cutout contains no data! (Check image footprint.)')
 
         # Log total time elapsed

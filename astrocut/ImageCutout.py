@@ -70,8 +70,6 @@ class ImageCutout(Cutout, ABC):
 
         # Initialize cutout dictionary and counters
         self.cutouts_by_file = {}
-        self._num_empty = 0
-        self._num_cutouts = 0
         self._image_cutouts = None
 
     @property
@@ -141,11 +139,8 @@ class ImageCutout(Cutout, ABC):
 
             img_arrs = []
             for cutout in all_cutouts:
-                # Get data as an array
-                cutout_data = cutout if isinstance(cutout, np.ndarray) else cutout.data
-
                 # Image output, applying the appropriate normalization parameters
-                img_arrs.append(self.normalize_img(cutout_data, stretch, minmax_percent, minmax_value, invert))
+                img_arrs.append(self.normalize_img(cutout.data, stretch, minmax_percent, minmax_value, invert))
 
             # Combine the three cutouts into a single RGB image
             self._image_cutouts = [Image.fromarray(np.dstack([img_arrs[0], img_arrs[1], img_arrs[2]]).astype(np.uint8))]
@@ -153,11 +148,8 @@ class ImageCutout(Cutout, ABC):
             image_cutouts = []
             for file, cutout_list in self.cutouts_by_file.items():
                 for i, cutout in enumerate(cutout_list):
-                    # Get data as an array
-                    cutout_data = cutout if isinstance(cutout, np.ndarray) else cutout.data
-
                     # Apply the appropriate normalization parameters
-                    img_arr = self.normalize_img(cutout_data, stretch, minmax_percent, minmax_value, invert)
+                    img_arr = self.normalize_img(cutout.data, stretch, minmax_percent, minmax_value, invert)
                     image_cutouts.append(Image.fromarray(img_arr))
 
             self._image_cutouts = image_cutouts

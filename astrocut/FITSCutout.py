@@ -43,6 +43,8 @@ class FITSCutout(ImageCutout):
 
     Attributes
     ----------
+    cutouts_by_file : dict
+        The cutouts as a list of `FITSCutout.CutoutInstance` objects stored by input filename.
     fits_cutouts : list
         The cutouts as a list of `astropy.io.fits.HDUList` objects.
     hdu_cutouts_by_file : dict
@@ -58,10 +60,6 @@ class FITSCutout(ImageCutout):
         Load the data from an input file.
     _get_img_wcs(hdu_header)
         Get the WCS for an image.
-    _get_cutout_data(data, wcs)
-        Get the cutout data from an image.
-    _get_cutout_wcs(img_wcs, cutout_lims)
-        Get the WCS for a cutout.
     _hducut(cutout_data, img_wcs, hdu_header, no_sip, ind, primary_filename, is_empty)
         Create a cutout HDU from an image HDU.
     _cutout_file(file)
@@ -87,7 +85,6 @@ class FITSCutout(ImageCutout):
 
         # Assigning other attributes
         self._single_outfile = single_outfile
-
         self._fits_cutouts = None
         self.hdu_cutouts_by_file = {}
 
@@ -243,102 +240,8 @@ class FITSCutout(ImageCutout):
                     astropy_log.log(log_rec.levelno, log_rec.msg, extra={'origin': log_rec.name})
 
         return (img_wcs, no_sip)
-    
-    def _get_cutout_data(self, data: fits.Section, wcs: WCS) -> np.ndarray:
-        """
-        Get the cutout data from an image.
 
-        Parameters
-        ----------
-        data : `~astropy.io.fits.Section`
-            The data for the image.
-        wcs : `~astropy.wcs.WCS`
-            The WCS for the image.
-
-        Returns
-        --------
-        cutout_data : `numpy.ndarray`
-            The cutout data.
-        """
-        log.debug('Original image shape: %s', data.shape)
-
-
-        # Get the limits for the cutout
-        # These limits are not guaranteed to be within the image footprint
-        cutout_lims = self._get_cutout_limits(wcs)
-        xmin, xmax = cutout_lims[0]
-        ymin, ymax = cutout_lims[1]
-        ymax_img, xmax_img = data.shape
-
-        # Check the cutout is on the image
-        if (xmax <= 0) or (xmin >= xmax_img) or (ymax <= 0) or (ymin >= ymax_img):
-            raise InvalidQueryError('Cutout location is not in image footprint!')
-
-        # Adjust limits and figure out the padding
-        padding = np.zeros((2, 2), dtype=int)
-        if xmin < 0:
-            padding[1, 0] = -xmin
-            xmin = 0
-        if ymin < 0:
-            padding[0, 0] = -ymin
-            ymin = 0
-        if xmax > xmax_img:
-            padding[1, 1] = xmax - xmax_img
-            xmax = xmax_img
-        if ymax > ymax_img:
-            padding[0, 1] = ymax - ymax_img
-            ymax = ymax_img
-        img_cutout = data[ymin:ymax, xmin:xmax]
-
-        # Adding padding to the cutout so that it's the expected size
-        if padding.any():  # only do if we need to pad
-            img_cutout = np.pad(img_cutout, padding, 'constant', constant_values=self._fill_value)
-
-        log.debug('Image cutout shape: %s', img_cutout.shape)
-
-        return img_cutout
-    
-    def _get_cutout_wcs(self, img_wcs: WCS, cutout_lims: np.ndarray) -> WCS:
-        """
-        Starting with the full image WCS and adjusting it for the cutout WCS.
-        Adjusts CRPIX values and adds physical WCS keywords.
-
-        Parameters
-        ----------
-        img_wcs : `~astropy.wcs.WCS`
-            WCS for the image the cutout is being cut from.
-        cutout_lims : `numpy.ndarray`
-            The cutout pixel limits in an array of the form [[ymin,ymax],[xmin,xmax]]
-
-        Returns
-        --------
-        response :  `~astropy.wcs.WCS`
-            The cutout WCS object including SIP distortions if present.
-        """
-        # relax = True is important when the WCS has sip distortions, otherwise it has no effect
-        wcs_header = img_wcs.to_header(relax=True) 
-
-        # Adjusting the CRPIX values
-        wcs_header['CRPIX1'] -= cutout_lims[0, 0]
-        wcs_header['CRPIX2'] -= cutout_lims[1, 0]
-
-        # Adding the physical WCS keywords
-        wcs_header.set('WCSNAMEP', 'PHYSICAL', 'name of world coordinate system alternate P')
-        wcs_header.set('WCSAXESP', 2, 'number of WCS physical axes')
-        wcs_header.set('CTYPE1P', 'RAWX', 'physical WCS axis 1 type CCD col')
-        wcs_header.set('CUNIT1P', 'PIXEL', 'physical WCS axis 1 unit')
-        wcs_header.set('CRPIX1P', 1, 'reference CCD column')
-        wcs_header.set('CRVAL1P', cutout_lims[0, 0] + 1, 'value at reference CCD column')
-        wcs_header.set('CDELT1P', 1.0, 'physical WCS axis 1 step')
-        wcs_header.set('CTYPE2P', 'RAWY', 'physical WCS axis 2 type CCD col')
-        wcs_header.set('CUNIT2P', 'PIXEL', 'physical WCS axis 2 unit')
-        wcs_header.set('CRPIX2P', 1, 'reference CCD row')
-        wcs_header.set('CRVAL2P', cutout_lims[1, 0] + 1, 'value at reference CCD row')
-        wcs_header.set('CDELT2P', 1.0, 'physical WCS axis 2 step')
-        
-        return WCS(wcs_header)
-
-    def _hducut(self, cutout_data: np.ndarray, img_wcs: WCS, hdu_header: fits.Header, no_sip: bool,
+    def _hducut(self, cutout_data: np.ndarray, cutout_wcs: WCS, hdu_header: fits.Header, no_sip: bool,
                 ind: int, primary_filename: fits.Header, is_empty: bool) -> fits.ImageHDU:
         """
         Create a cutout HDU from an image HDU.
@@ -365,10 +268,6 @@ class FITSCutout(ImageCutout):
         response : `~astropy.io.fits.ImageHDU`
             The cutout HDU.
         """
-        # Get the cutout WCS
-        # cutout_wcs = img_cutout.wcs
-        cutout_wcs = self._get_cutout_wcs(img_wcs, self._get_cutout_limits(img_wcs))
-
         # Updating the header with the new wcs info
         if no_sip:
             hdu_header.update(cutout_wcs.to_header(relax=False))
@@ -386,7 +285,6 @@ class FITSCutout(ImageCutout):
         # Check that there is data in the cutout image
         if is_empty:
             hdu_header['EMPTY'] = (True, 'Indicates no data in cutout image.')
-            self._num_empty += 1
 
         # Create the cutout HDU
         cutout_hdu = fits.ImageHDU(header=hdu_header, data=cutout_data)
@@ -410,10 +308,14 @@ class FITSCutout(ImageCutout):
         # Load data
         hdulist, cutout_inds = self._load_file_data(file)
 
+        if not len(cutout_inds):  # No image extensions with data were found
+            hdulist.close()
+            return
+
         # Create HDU cutouts
         cutouts = []
         fits_cutouts = []
-        self._num_cutouts += len(cutout_inds)
+        num_empty = 0
         for ind in cutout_inds:
             try:
                 # Get HDU, header, and WCS
@@ -422,41 +324,47 @@ class FITSCutout(ImageCutout):
                 img_wcs, no_sip = self._get_img_wcs(hdu_header)
                 primary_filename = hdulist[0].header.get('FILENAME')
 
-                # Get the cutout data
-                cutout_data = self._get_cutout_data(img_hdu.section, img_wcs)
+                # Create the cutout
+                # Eventually, this will be replaced by a call to Cutout2D
+                cutout = self.CutoutInstance(img_hdu.section, img_wcs, self)
 
                 # Save the cutout data to use when outputting as an image
                 # Eventually, the values here will be a list of Cutout2D objects
-                is_empty = (cutout_data == 0).all() or (np.isnan(cutout_data)).all()
-                if not is_empty:
-                    cutouts.append(cutout_data)
+                is_empty = (cutout.data == 0).all() or (np.isnan(cutout.data)).all()
+                if is_empty:
+                    num_empty += 1
+                else:
+                    cutouts.append(cutout)
 
                 # Also save the cutouts as ImageHDU objects for FITS output
-                fits_cutouts.append(self._hducut(cutout_data, img_wcs, hdu_header, no_sip, ind, 
+                fits_cutouts.append(self._hducut(cutout.data, cutout.wcs, hdu_header, no_sip, ind, 
                                                  primary_filename, is_empty))
 
             except OSError as err:
                 warnings.warn(f'Error {err} encountered when performing cutout on {file}, '
                               f'extension {ind}, skipping...', DataWarning)
-                self._num_empty += 1
+                num_empty += 1
             except NoOverlapError:
                 warnings.warn(f'Cutout footprint does not overlap with data in {file}, '
                               f'extension {ind}, skipping...', DataWarning)
-                self._num_empty += 1
+                num_empty += 1
             except ValueError as err:
                 if 'Input position contains invalid values' in str(err):
                     warnings.warn(f'Cutout footprint does not overlap with data in {file}, '
                                   f'extension {ind}, skipping...', DataWarning)
-                    self._num_empty += 1
+                    num_empty += 1
                 else:
                     raise
         
         # Close HDUList
         hdulist.close()
 
-        # Save cutouts
-        self.cutouts_by_file[file] = cutouts
-        self.hdu_cutouts_by_file[file] = fits_cutouts
+        if num_empty == len(cutout_inds):  # No extensions have cutout data
+            warnings.warn(f'Cutout of {file} contains no data, skipping...', DataWarning)
+        else:  # At least one extension has cutout data
+            # Save cutouts
+            self.cutouts_by_file[file] = cutouts
+            self.hdu_cutouts_by_file[file] = fits_cutouts
 
     def cutout(self) -> Union[str, List[str], List[fits.HDUList]]:
         """
@@ -479,8 +387,8 @@ class FITSCutout(ImageCutout):
         for file in self._input_files:
             self._cutout_file(file)
 
-        # If no cutouts contain data, raise exception
-        if self._num_cutouts == self._num_empty:
+        # If no cutouts contain data, raise exception        
+        if not self.cutouts_by_file:
             raise InvalidInputError('Cutout contains no data! (Check image footprint.)')
 
         # Log total time elapsed
@@ -520,12 +428,8 @@ class FITSCutout(ImageCutout):
             log.debug('Returning cutouts as individual FITS files.')
 
             cutout_paths = []
-            for i, (file, cutout_list) in enumerate(self.hdu_cutouts_by_file.items()):
+            for i, file in enumerate(self.hdu_cutouts_by_file):
                 cutout_fits = self.fits_cutouts[i]
-                if np.array([x.header.get('EMPTY') for x in cutout_list]).all():
-                    # Skip files with no data in the cutout images
-                    warnings.warn(f'Cutout of {file} contains no data and will not be written to a file.', DataWarning)
-                    continue
                 filename = '{}_{:.7f}_{:.7f}_{}-x-{}_astrocut.fits'.format(
                     Path(file).stem,
                     self._coordinates.ra.value,
@@ -541,3 +445,155 @@ class FITSCutout(ImageCutout):
 
             log.debug('Cutout filepaths: {}'.format(cutout_paths))
             return cutout_paths
+        
+    class CutoutInstance:
+        """
+        Represents an individual cutout with its own data and WCS. Eventually, this will be replaced
+        by `astropy.nddata.Cutout2D` objects.
+
+        Args
+        ----
+        img_data : `~astropy.io.fits.Section`
+            The data for the image.
+        img_wcs : `~astropy.wcs.WCS`
+            The WCS for the image.
+        parent : `FITSCutout`
+            The parent FITSCutout object.
+
+        Attributes
+        ----------
+        data : `numpy.ndarray`
+            The cutout data array.
+        shape : tuple
+            The shape of the cutout data array.
+        shape_input : tuple
+            The shape of the input image data array.
+        slices_original : tuple
+            Slices for the minimal bounding box of the cutout with respect to the original array.
+        xmin_original : int
+            The minimum x value of the cutout in the original array.
+        xmax_original : int
+            The maximum x value of the cutout in the original array.
+        ymin_original : int
+            The minimum y value of the cutout in the original array.
+        ymax_original : int
+            The maximum y value of the cutout in the original array.
+        wcs : `~astropy.wcs.WCS`
+            The WCS for the cutout.
+
+        Methods
+        -------
+        _get_cutout_data(data, wcs, cutout_lims, parent)
+            Extract the cutout data from an image.
+        _get_cutout_wcs(img_wcs, cutout_lims)
+            Get the WCS for a cutout.
+        """
+
+        def __init__(self, img_data: fits.Section, img_wcs: WCS, parent: 'FITSCutout'):
+            # Calculate cutout limits
+            cutout_lims = parent._get_cutout_limits(img_wcs)
+
+            # Extract data from Section
+            self.data = self._get_cutout_data(img_data, img_wcs, cutout_lims, parent)
+            self.shape = self.data.shape
+            self.shape_input = img_data.shape
+
+            self.wcs = self._get_cutout_wcs(img_wcs, cutout_lims)
+        
+        def _get_cutout_data(self, data: fits.Section, wcs: WCS, cutout_lims: np.ndarray, 
+                             parent: 'FITSCutout') -> np.ndarray:
+            """
+            Extract the cutout data from an image.
+
+            Parameters
+            ----------
+            data : `~astropy.io.fits.Section`
+                The data for the image.
+            wcs : `~astropy.wcs.WCS`
+                The WCS for the image.
+            cutout_lims : `numpy.ndarray`
+                The cutout pixel limits in an array of the form [[ymin,ymax],[xmin,xmax]]
+            parent : `FITSCutout`
+                The parent FITSCutout object. Needed for access to certain attributes.
+
+            Returns
+            --------
+            cutout_data : `numpy.ndarray`
+                The cutout data.
+            """
+            log.debug('Original image shape: %s', data.shape)
+
+            # Get the limits for the cutout
+            # These limits are not guaranteed to be within the image footprint
+            (xmin, xmax), (ymin, ymax) = cutout_lims
+            ymax_img, xmax_img = data.shape
+
+            # Check the cutout is on the image
+            if (xmax <= 0) or (xmin >= xmax_img) or (ymax <= 0) or (ymin >= ymax_img):
+                raise InvalidQueryError('Cutout location is not in image footprint!')
+
+            # Adjust limits to fit within image bounds
+            xmin_clipped, xmax_clipped = max(0, xmin), min(xmax_img, xmax)
+            ymin_clipped, ymax_clipped = max(0, ymin), min(ymax_img, ymax)
+
+            # Compute padding required (before and after in x and y)
+            padding = np.array([
+                (max(0, -ymin), max(0, ymax - ymax_img)),  # (top, bottom)
+                (max(0, -xmin), max(0, xmax - xmax_img))   # (left, right)
+            ])
+            
+            # Extract the cutout
+            img_cutout = data[ymin_clipped:ymax_clipped, xmin_clipped:xmax_clipped]
+
+            # Assign relevant attributes
+            self.slices_original = slice(ymin_clipped, ymax_clipped + 1), slice(xmin_clipped, xmax_clipped + 1)
+            self.xmin_original, self.xmax_original = xmin_clipped, xmax_clipped
+            self.ymin_original, self.ymax_original = ymin_clipped, ymax_clipped
+
+            # Adding padding to the cutout so that it's the expected size
+            if padding.any():  # only do if we need to pad
+                img_cutout = np.pad(img_cutout, padding, 'constant', constant_values=parent._fill_value)
+
+            log.debug('Image cutout shape: %s', img_cutout.shape)
+
+            return img_cutout
+
+        def _get_cutout_wcs(self, img_wcs: WCS, cutout_lims: np.ndarray) -> WCS:
+            """
+            Starting with the full image WCS and adjusting it for the cutout WCS.
+            Adjusts CRPIX values and adds physical WCS keywords.
+
+            Parameters
+            ----------
+            img_wcs : `~astropy.wcs.WCS`
+                WCS for the image the cutout is being cut from.
+            cutout_lims : `numpy.ndarray`
+                The cutout pixel limits in an array of the form [[ymin,ymax],[xmin,xmax]]
+
+            Returns
+            --------
+            response :  `~astropy.wcs.WCS`
+                The cutout WCS object including SIP distortions if present.
+            """
+            # relax = True is important when the WCS has sip distortions, otherwise it has no effect
+            wcs_header = img_wcs.to_header(relax=True) 
+
+            # Adjusting the CRPIX values
+            wcs_header['CRPIX1'] -= cutout_lims[0, 0]
+            wcs_header['CRPIX2'] -= cutout_lims[1, 0]
+
+            # Adding the physical WCS keywords
+            wcs_header.set('WCSNAMEP', 'PHYSICAL', 'name of world coordinate system alternate P')
+            wcs_header.set('WCSAXESP', 2, 'number of WCS physical axes')
+            wcs_header.set('CTYPE1P', 'RAWX', 'physical WCS axis 1 type CCD col')
+            wcs_header.set('CUNIT1P', 'PIXEL', 'physical WCS axis 1 unit')
+            wcs_header.set('CRPIX1P', 1, 'reference CCD column')
+            wcs_header.set('CRVAL1P', cutout_lims[0, 0] + 1, 'value at reference CCD column')
+            wcs_header.set('CDELT1P', 1.0, 'physical WCS axis 1 step')
+            wcs_header.set('CTYPE2P', 'RAWY', 'physical WCS axis 2 type CCD col')
+            wcs_header.set('CUNIT2P', 'PIXEL', 'physical WCS axis 2 unit')
+            wcs_header.set('CRPIX2P', 1, 'reference CCD row')
+            wcs_header.set('CRVAL2P', cutout_lims[1, 0] + 1, 'value at reference CCD row')
+            wcs_header.set('CDELT2P', 1.0, 'physical WCS axis 2 step')
+            
+            return WCS(wcs_header)

@@ -232,7 +232,7 @@ def test_fits_cutout_extension(test_images, center_coord, cutout_size):
     cutout_list = FITSCutout(test_images[0], center_coord, cutout_size, extension=2).fits_cutouts
     assert len(cutout_list[0]) == 2  # primary header + 1 image
 
-    # # Specify a list of extensions
+    # Specify a list of extensions
     cutout_list = FITSCutout(test_images[0], center_coord, cutout_size, extension=[0, 1]).fits_cutouts
     assert len(cutout_list[0]) == 3  # primary header + 2 images
 
@@ -276,17 +276,16 @@ def test_fits_cutout_no_data(tmpdir, test_images, cutout_size):
         
     # Single outfile should include empty files as extensions
     center_coord = SkyCoord("150.1163213 2.2007", unit='deg')
-    cutout = FITSCutout(test_images, center_coord, cutout_size, single_outfile=True).fits_cutouts[0]
-    assert len(cutout) == len(test_images) + 1  # num imgs + primary header
-    assert (cutout[1].data == 0).all()
-    assert (cutout[2].data == 0).all()
+    with pytest.warns(DataWarning, match='contains no data, skipping...'):
+        cutout = FITSCutout(test_images, center_coord, cutout_size, single_outfile=True).fits_cutouts[0]
+    assert len(cutout) == len(test_images) - 1  # 6 images - 2 empty + 1 primary header
+    assert ~(cutout[1].data == 0).any()
+    assert ~(cutout[2].data == 0).any()
     assert ~(cutout[3].data == 0).any()
     assert ~(cutout[4].data == 0).any()
-    assert ~(cutout[5].data == 0).any()
-    assert ~(cutout[6].data == 0).any()
     
     # Empty files should not be written to their own file
-    with pytest.warns(DataWarning, match='contains no data and will not be written.'):
+    with pytest.warns(DataWarning, match='contains no data, skipping...'):
         cutout_files = FITSCutout(test_images, center_coord, cutout_size, 
                                   single_outfile=False).write_as_fits(output_dir=tmpdir)
     assert isinstance(cutout_files, list)
@@ -299,8 +298,9 @@ def test_fits_cutout_no_data(tmpdir, test_images, cutout_size):
             hdu[0].data[:20, :] = 0
             hdu.flush()
 
-    with pytest.raises(InvalidInputError, match='Cutout contains no data!'):
-        FITSCutout(test_images, center_coord, cutout_size, single_outfile=True)
+    with pytest.warns(DataWarning, match='contains no data, skipping...'):
+        with pytest.raises(InvalidInputError, match='Cutout contains no data!'):
+            FITSCutout(test_images, center_coord, cutout_size, single_outfile=True)
 
 
 def test_fits_cutout_bad_sip(tmpdir, caplog, test_image_bad_sip):
@@ -433,10 +433,12 @@ def test_fits_cutout_img_errors(tmpdir, test_images, center_coord, cutout_size):
         hdu.flush()
 
     # Warning when outputting non-color images
-    with pytest.raises(InvalidInputError, match='Cutout contains no data'):
-        FITSCutout(test_images[0], center_coord, cutout_size).write_as_img(output_format='png', output_dir=tmpdir)
+    with pytest.warns(DataWarning, match='contains no data, skipping...'):
+        with pytest.raises(InvalidInputError, match='Cutout contains no data'):
+            FITSCutout(test_images[0], center_coord, cutout_size).write_as_img(output_format='png', output_dir=tmpdir)
 
     # Error when outputting color image
-    with pytest.raises(InvalidInputError):
-        FITSCutout(test_images[:3], center_coord, cutout_size).write_as_img(colorize=True, output_format='png', 
-                                                                            output_dir=tmpdir)
+    with pytest.warns(DataWarning, match='contains no data, skipping...'):
+        with pytest.raises(InvalidInputError):
+            FITSCutout(test_images[:3], center_coord, cutout_size).write_as_img(colorize=True, output_format='png', 
+                                                                                output_dir=tmpdir)
