@@ -45,9 +45,6 @@ class ASDFCutout(ImageCutout):
         Optional, default None. Secret access key for S3 file system.
     token : str
         Optional, default None. Security token for S3 file system.
-    return_cutout2D : bool
-        Optional, default False. If True, the cutout is returned as an `~astropy.nddata.Cutout2D` object.
-        This parameter only applies if `return_paths` is False.
     verbose : bool
         If True, log messages are printed to the console.
 
@@ -78,7 +75,7 @@ class ASDFCutout(ImageCutout):
                  cutout_size: Union[int, np.ndarray, Quantity, List[int], Tuple[int]] = 25,
                  fill_value: Union[int, float] = np.nan, limit_rounding_method: str = 'round',
                  key: Optional[str] = None, secret: Optional[str] = None,
-                 token: Optional[str] = None, return_cutout2D: bool = False, verbose: bool = False):
+                 token: Optional[str] = None, verbose: bool = False):
         # Superclass constructor 
         super().__init__(input_files, coordinates, cutout_size, fill_value, limit_rounding_method, verbose=verbose)
 

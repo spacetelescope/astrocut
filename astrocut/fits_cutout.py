@@ -127,6 +127,58 @@ class FITSCutout(ImageCutout):
             self._fits_cutouts = fits_cutouts
         return self._fits_cutouts
 
+        self._fits_cutouts = None
+        self.hdu_cutouts_by_file = {}
+
+        # Make the cutouts upon initialization
+        self.cutout()
+
+    def _construct_fits_from_hdus(self, cutout_hdus: List[fits.ImageHDU]) -> fits.HDUList:
+        """
+        Make one or more cutout HDUs into a single HDUList object.
+
+        Parameters
+        ----------
+        cutout_hdus : list
+            The `~astropy.io.fits.hdu.image.ImageHDU` object(s) to be written to the fits file.
+
+        Returns
+        -------
+        response : `~astropy.io.fits.HDUList`
+            The HDUList object.
+        """        
+        # Setting up the Primary HDU
+        keywords = dict()
+        if self._coordinates:
+            keywords = {'RA_OBJ': (self._coordinates.ra.deg, '[deg] right ascension'),
+                        'DEC_OBJ': (self._coordinates.dec.deg, '[deg] declination')}
+
+        # Build the primary HDU with keywords
+        primary_hdu = fits.PrimaryHDU()
+        primary_hdu.header.extend([('ORIGIN', 'STScI/MAST', 'institution responsible for creating this file'),
+                                   ('DATE', str(date.today()), 'file creation date'),
+                                   ('PROCVER', __version__, 'software version')])
+        for kwd in keywords:
+            primary_hdu.header[kwd] = keywords[kwd]
+
+        return fits.HDUList([primary_hdu] + cutout_hdus)
+
+    @property
+    def fits_cutouts(self):
+        """
+        Return the cutouts as a list `astropy.io.fits.HDUList` objects.
+        """
+        if not self._fits_cutouts:
+            fits_cutouts = []
+            if self._single_outfile:  # one output file for all input files
+                cutout_hdus = [x for file in self.hdu_cutouts_by_file for x in self.hdu_cutouts_by_file[file]]
+                fits_cutouts = [self._construct_fits_from_hdus(cutout_hdus)]
+            else:  # one output file per input file
+                for file, cutout_list in self.hdu_cutouts_by_file.items():
+                    fits_cutouts.append(self._construct_fits_from_hdus(cutout_list))
+            self._fits_cutouts = fits_cutouts
+        return self._fits_cutouts
+
     def _parse_extensions(self, input_file: Union[str, Path, S3Path], infile_exts: np.ndarray) -> List[int]:
         """
         Given a list of image extensions available in the file with infile_name, cross-match with
