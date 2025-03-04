@@ -1,272 +1,63 @@
 # Licensed under a 3-clause BSD style license - see LICENSE.rst
 
 """This module implements cutout functionality similar to fitscut, but for the ASDF file format."""
-import copy
-import pathlib
-from typing import Union, Tuple
-import requests
+from pathlib import Path
+from typing import List, Union
 
-import asdf
 import astropy
 import gwcs
 import numpy as np
-import s3fs
+from astropy.utils.decorators import deprecated_renamed_argument
 from s3path import S3Path
 
-from astropy.coordinates import SkyCoord
-from astropy.modeling import models
-
-from . import log
-from .utils.utils import _handle_verbose
-
-
-def _get_cloud_http(s3_uri: Union[str, S3Path], key: str = None, secret: str = None,
-                    token: str = None, verbose: bool = False) -> str:
-    """ 
-    Get the HTTP URI of a cloud resource from an S3 URI.
-
-    Parameters
-    ----------
-    s3_uri : string | S3Path
-        the S3 URI of the cloud resource
-    key : string
-        Default None. Access key ID for S3 file system.
-    secret : string
-        Default None. Secret access key for S3 file system.
-    token : string
-        Default None. Security token for S3 file system.
-    verbose : bool
-        Default False. If true intermediate information is printed.
-    """
-
-    # check if public or private by sending an HTTP request
-    s3_path = S3Path.from_uri(s3_uri) if isinstance(s3_uri, str) else s3_uri
-    url = f'https://{s3_path.bucket}.s3.amazonaws.com/{s3_path.key}'
-    resp = requests.head(url, timeout=10)
-    is_anon = False if resp.status_code == 403 else True
-    if not is_anon:
-        log.debug('Attempting to access private S3 bucket: %s', s3_path.bucket)
-
-    # create file system and get URL of file
-    fs = s3fs.S3FileSystem(anon=is_anon, key=key, secret=secret, token=token)
-    with fs.open(s3_uri, 'rb') as f:
-        return f.url()
+from .ASDFCutout import ASDFCutout
+from .exceptions import InvalidInputError
 
 
 def get_center_pixel(gwcsobj: gwcs.wcs.WCS, ra: float, dec: float) -> tuple:
     """ 
-    Get the center pixel from a Roman 2D science image.
-
-    For an input RA, Dec sky coordinate, get the closest pixel location
-    on the input Roman image.
+    Get the closest pixel location on an input image for a given set of coordinates.
 
     Parameters
     ----------
     gwcsobj : gwcs.wcs.WCS
-        The Roman GWCS object.
+        The GWCS object.
     ra : float
-        The input right ascension.
+        The right ascension of the input coordinates.
     dec : float
-        The input declination.
+        The declination of the input coordinates.
 
     Returns
     -------
-    tuple
-        The pixel position, FITS wcs object
+    pixel_position
+        The pixel position of the input coordinates.
+    wcs_updated : `~astropy.wcs.WCS`
+        The approximated FITS WCS object.
     """
-
-    # Convert the gwcs object to an astropy FITS WCS header
-    header = gwcsobj.to_fits_sip()
-
-    # Update WCS header with some keywords that it's missing.
-    # Otherwise, it won't work with astropy.wcs tools (TODO: Figure out why. What are these keywords for?)
-    for k in ['cpdis1', 'cpdis2', 'det2im1', 'det2im2', 'sip']:
-        if k not in header:
-            header[k] = 'na'
-
-    # New WCS object with updated header
-    wcs_updated = astropy.wcs.WCS(header)
-
-    # Turn input RA, Dec into a SkyCoord object
-    coordinates = SkyCoord(ra, dec, unit='deg')
-
-    # Map the coordinates to a pixel's location on the Roman 2d array (row, col)
-    row, col = gwcsobj.invert(coordinates)
-
-    return (row, col), wcs_updated
+    return ASDFCutout.get_center_pixel(gwcsobj, ra, dec)
 
 
-def _get_cutout(data: asdf.tags.core.ndarray.NDArrayType, coords: Union[tuple, SkyCoord],
-                wcs: astropy.wcs.wcs.WCS = None, size: int = 20, outfile: str = "example_roman_cutout.fits",
-                write_file: bool = True, fill_value: Union[int, float] = np.nan,
-                gwcsobj: gwcs.wcs.WCS = None) -> astropy.nddata.Cutout2D:
-    """ 
-    Get a Roman image cutout.
-
-    Cut out a square section from the input image data array.  The ``coords`` can either be a tuple of x, y
-    pixel coordinates or an astropy SkyCoord object, in which case, a wcs is required.  Writes out a
-    new output file containing the image cutout of the specified ``size``.  Default is 20 pixels.
-
-    Parameters
-    ----------
-    data : asdf.tags.core.ndarray.NDArrayType
-        the input Roman image data array
-    coords : Union[tuple, SkyCoord]
-        the input pixel or sky coordinates
-    wcs : astropy.wcs.wcs.WCS, Optional
-        the astropy FITS wcs object
-    size : int, optional
-        the image cutout pizel size, by default 20
-    outfile : str, optional
-        the name of the output cutout file, by default "example_roman_cutout.fits"
-    write_file : bool, by default True
-        Flag to write the cutout to a file or not
-    fill_value: int | float, by default np.nan
-        The fill value for pixels outside the original image.
-    gwcsobj : gwcs.wcs.WCS, Optional
-        the original gwcs object for the full image, needed only when writing cutout as asdf file
-
-    Returns
-    -------
-    astropy.nddata.Cutout2D:
-        an image cutout object
-
-    Raises
-    ------
-    ValueError:
-        when a wcs is not present when coords is a SkyCoord object
-    RuntimeError:
-        when the requested cutout does not overlap with the original image
-    ValueError:
-        when no gwcs object is provided when writing to an asdf file
+@deprecated_renamed_argument('output_file', None, '1.0.0', warning_type=DeprecationWarning,
+                             message='`output_file` is non-operational and will be removed in a future version.')
+def asdf_cut(input_files: List[Union[str, Path, S3Path]], 
+             ra: float, 
+             dec: float, 
+             cutout_size: int = 25,
+             output_file: Union[str, Path] = "example_roman_cutout.fits",
+             write_file: bool = True, 
+             fill_value: Union[int, float] = np.nan,
+             output_dir: Union[str, Path] = '.',
+             output_format: str = '.asdf', 
+             key: str = None,
+             secret: str = None, 
+             token: str = None,
+             verbose: bool = False) -> astropy.nddata.Cutout2D:
     """
+    Takes one of more ASDF input files (`input_files`) and generates a cutout of designated size `cutout_size`
+    around the given coordinates (`coordinates`). The cutout is written to a file or returned as an object.
 
-    # check for correct inputs
-    if isinstance(coords, SkyCoord) and not wcs:
-        raise ValueError('wcs must be input if coords is a SkyCoord.')
-
-    # create the cutout
-    try:
-        cutout = astropy.nddata.Cutout2D(data, position=coords, wcs=wcs, size=(size, size), mode='partial',
-                                         fill_value=fill_value)
-    except astropy.nddata.utils.NoOverlapError as e:
-        raise RuntimeError('Could not create 2d cutout.  The requested cutout does not overlap with the '
-                           'original image.') from e
-
-    # check if the data is a quantity and get the array data
-    if isinstance(cutout.data, astropy.units.Quantity):
-        data = cutout.data.value
-    else:
-        data = cutout.data
-
-    # write the cutout to the output file
-    if write_file:
-        # check the output file type
-        out = pathlib.Path(outfile)
-        write_as = out.suffix or '.fits'
-        outfile = outfile if out.suffix else str(out) + write_as
-
-        # write out the file
-        if write_as == '.fits':
-            _write_fits(cutout, outfile)
-        elif write_as == '.asdf':
-            if not gwcsobj:
-                raise ValueError('The original gwcs object is needed when writing to asdf file.')
-            _write_asdf(cutout, gwcsobj, outfile)
-
-    return cutout
-
-
-def _write_fits(cutout: astropy.nddata.Cutout2D, outfile: str = "example_roman_cutout.fits"):
-    """ 
-    Write cutout as FITS file.
-
-    Parameters
-    ----------
-    cutout : astropy.nddata.Cutout2D
-        the 2d cutout
-    outfile : str, optional
-        the name of the output cutout file, by default "example_roman_cutout.fits"
-    """
-    # check if the data is a quantity and get the array data
-    if isinstance(cutout.data, astropy.units.Quantity):
-        data = cutout.data.value
-    else:
-        data = cutout.data
-
-    astropy.io.fits.writeto(outfile, data=data, header=cutout.wcs.to_header(relax=True), overwrite=True)
-
-
-def _slice_gwcs(gwcsobj: gwcs.wcs.WCS, slices: Tuple[slice, slice]) -> gwcs.wcs.WCS:
-    """ 
-    Slice the original gwcs object.
-
-    "Slices" the original gwcs object down to the cutout shape.  This is a hack
-    until proper gwcs slicing is in place a la fits WCS slicing.  The ``slices``
-    keyword input is a tuple with the x, y cutout boundaries in the original image
-    array, e.g. ``cutout.slices_original``.  Astropy Cutout2D slices are in the form
-    ((ymin, ymax, None), (xmin, xmax, None))
-
-    Parameters
-    ----------
-    gwcsobj : gwcs.wcs.WCS
-        the original gwcs from the input image
-    slices : Tuple[slice, slice]
-        the cutout x, y slices as ((ymin, ymax), (xmin, xmax))
-
-    Returns
-    -------
-    gwcs.wcs.WCS
-        The sliced gwcs object
-    """
-    tmp = copy.deepcopy(gwcsobj)
-
-    # get the cutout array bounds and create a new shift transform to the cutout
-    # add the new transform to the gwcs
-    xmin, xmax = slices[1].start, slices[1].stop
-    ymin, ymax = slices[0].start, slices[0].stop
-    shape = (ymax - ymin, xmax - xmin)
-    offsets = models.Shift(xmin, name='cutout_offset1') & models.Shift(ymin, name='cutout_offset2')
-    tmp.insert_transform('detector', offsets, after=True)
-
-    # modify the gwcs bounding box to the cutout shape
-    tmp.bounding_box = ((0, shape[0] - 1), (0, shape[1] - 1))
-    tmp.pixel_shape = shape[::-1]
-    tmp.array_shape = shape
-    return tmp
-
-
-def _write_asdf(cutout: astropy.nddata.Cutout2D, gwcsobj: gwcs.wcs.WCS, outfile: str = "example_roman_cutout.asdf"):
-    """ 
-    Write cutout as ASDF file.
-
-    Parameters
-    ----------
-    cutout : astropy.nddata.Cutout2D
-        the 2d cutout
-    gwcsobj : gwcs.wcs.WCS
-        the original gwcs object for the full image
-    outfile : str, optional
-        the name of the output cutout file, by default "example_roman_cutout.asdf"
-    """
-    # slice the origial gwcs to the cutout
-    sliced_gwcs = _slice_gwcs(gwcsobj, cutout.slices_original)
-
-    # create the asdf tree
-    tree = {'roman': {'meta': {'wcs': sliced_gwcs}, 'data': cutout.data}}
-    af = asdf.AsdfFile(tree)
-
-    # Write the data to a new file
-    af.write_to(outfile)
-
-
-def asdf_cut(input_file: Union[str, pathlib.Path, S3Path], ra: float, dec: float, cutout_size: int = 25,
-             output_file: Union[str, pathlib.Path] = "example_roman_cutout.fits",
-             write_file: bool = True, fill_value: Union[int, float] = np.nan, key: str = None,
-             secret: str = None, token: str = None, verbose: bool = False) -> astropy.nddata.Cutout2D:
-    """ 
-    Takes a single ASDF input file (`input_file`) and generates a cutout of designated size `cutout_size`
-    around the given coordinates (`coordinates`).
+    This function is maintained for backwards compatibility. For maximum flexibility, we recommend using the
+    ``ASDFCutout``class directly.
 
     Parameters
     ----------
@@ -283,10 +74,17 @@ def asdf_cut(input_file: Union[str, pathlib.Path, S3Path], ra: float, dec: float
         pixel grid. 
     output_file : str | Path
         Optional, default "example_roman_cutout.fits". The name of the output cutout file.
+        This parameter is deprecated and will be removed in a future version.
     write_file : bool
         Optional, default True. Flag to write the cutout to a file or not.
     fill_value: int | float
         Optional, default `np.nan`. The fill value for pixels outside the original image.
+    output_dir : str | Path
+        Optional, default ".". The directory to write the cutout file(s) to.
+    output_format : str
+        Optional, default ".asdf". The format of the output cutout file. If `write_file` is False,
+        then cutouts will be returned as `asdf.AsdfFile` objects if `output_format` is ".asdf" or
+        as `astropy.io.fits.HDUList` objects if `output_format` is ".fits".
     key : string
         Default None. Access key ID for S3 file system. Only applicable if `input_file` is a
         cloud resource.
@@ -301,25 +99,26 @@ def asdf_cut(input_file: Union[str, pathlib.Path, S3Path], ra: float, dec: float
 
     Returns
     -------
-    astropy.nddata.Cutout2D:
-        An image cutout object.
+    response : str | list
+        A list of cutout file paths if `write_file` is True, otherwise a list of cutout objects.
     """
-    # Log messages based on verbosity
-    _handle_verbose(verbose)
+    asdf_cutout = ASDFCutout(input_files, f'{ra} {dec}', cutout_size, fill_value, key=key, 
+                             secret=secret, token=token, verbose=verbose)
+    
+    if not write_file:  # Returns as Cutout2D objects
+        return asdf_cutout.cutouts
+    
+    # Get output format in standard form
+    output_format = f'.{output_format}' if not output_format.startswith('.') else output_format
+    output_format = output_format.lower()
 
-    # if file comes from AWS cloud bucket, get HTTP URL to open with asdf
-    file = input_file
-    if (isinstance(input_file, str) and input_file.startswith('s3://')) or isinstance(input_file, S3Path):
-        file = _get_cloud_http(input_file, key, secret, token, verbose)
+    if output_format == '.asdf':
+        return asdf_cutout.write_as_asdf(output_dir)
+    elif output_format == '.fits':
+        return asdf_cutout.write_as_fits(output_dir)
+    else:
+        # Error if output format not recognized
+        raise InvalidInputError(f'Output format {output_format} is not recognized. '
+                                'Valid options are ".asdf" and ".fits".')
+    
 
-    # get the 2d image data
-    with asdf.open(file) as f:
-        data = f['roman']['data']
-        gwcsobj = f['roman']['meta']['wcs']
-
-        # get the center pixel
-        pixel_coordinates, wcs = get_center_pixel(gwcsobj, ra, dec)
-
-        # create the 2d image cutout
-        return _get_cutout(data, pixel_coordinates, wcs, size=cutout_size, outfile=output_file,
-                           write_file=write_file, fill_value=fill_value, gwcsobj=gwcsobj)
