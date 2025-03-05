@@ -8,7 +8,7 @@ import warnings
 from concurrent.futures import ThreadPoolExecutor
 from itertools import product
 from time import monotonic
-from typing import List, Literal, Optional, Tuple, Union
+from typing import List, Literal, Tuple, Union
 
 import astropy.units as u
 import numpy as np
@@ -16,6 +16,7 @@ from astropy import wcs
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.time import Time
+from astropy.wcs import WCS
 from s3path import S3Path
 
 from . import __version__, log
@@ -24,28 +25,85 @@ from .utils.wcs_fitting import fit_wcs_from_points
 
 
 class CubeCutout(Cutout):
+    """
+    Class for creating cutouts from full frame image cubes.
+
+    This class is currently specific to TESS full frame image cubes, but can be extended to support other missions.
+
+    Args
+    ----
+    input_files : list
+        List of input image files.
+    coordinates : str | `~astropy.coordinates.SkyCoord`
+        Coordinates of the center of the cutout.
+    cutout_size : int | array | list | tuple | `~astropy.units.Quantity`
+        Size of the cutout array.
+    fill_value : int | float
+        Value to fill the cutout with if the cutout is outside the image.
+    limit_rounding_method : str
+        Method to use for rounding the cutout limits. Options are 'round', 'ceil', and 'floor'.
+    product : str
+        The product type to make the cutouts from.
+        Can either be 'SPOC' or 'TICA' (default is 'SPOC').
+    threads : int | 'auto'
+        The number of threads to use for making the cutouts. If 'auto', the number of threads will be set to the number
+        of available CPUs.
+    verbose : bool
+        If True, log messages are printed to the console.
+
+    Attributes
+    ----------
+    cutouts_by_file : dict
+        Dictionary where each key is an input cube filename and its corresponding value is the resulting cutout as a 
+        ``CubeCutoutInstance`` object.
+    cutouts : list
+        List of cutout objects.
+    tpf_cutouts_by_file : dict
+        Dictionary where each key is an input cube filename and its corresponding value is the resulting cutout target
+        pixel file object.
+    tpf_cutouts : list
+        List of cutout target pixel file objects.
+
+    Methods
+    -------
+    _load_file_data(file)
+        Load the data from an input cube file.
+    _parse_table_info(table_data)
+        Takes the header and the middle entry from the cube table (EXT 2) of image header data,
+        builds a WCS object that encapsulates the given WCS information,
+        and collects other keywords into a dictionary.
+    _get_cutout_wcs_dict(cutout_wcs, cutout_lims)
+        Create a dictionary of WCS keywords for the cutout.
+        Adds the physical keywords for transformation back from cutout to location on FFI.
+    _update_primary_header(primary_header)
+        Updates the primary header of the cutout target pixel file.
+        This function sets the object's RA and Dec to the central coordinates of the cutout.
+        Since other TESS target pixel file keywords are not available, they are set to 0 or empty strings
+        as placeholders.
+    _add_column_wcs(table_header, wcs_dict)
+        Adds WCS information for the array columns to the cutout table header.
+    _add_img_kwds(table_header)
+        Adding extra keywords to the table header.
+    _apply_header_inherit(hdu_list)
+        Apply header inheritance to the cutout target pixel file.
+    _build_tpf(cube, cutout, cutout_wcs_dict)
+        Build the cutout target pixel file.
+    _cutout_file(file)
+        Make a cutout from a single cube file.
+    cutout()
+        Generate the cutouts.
+    write_as_tpf(output_dir, output_file)
+        Write the cutouts to target pixel files.
+
+    """
     def __init__(self, input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyCoord, str], 
                  cutout_size: Union[int, np.ndarray, u.Quantity, List[int], Tuple[int]] = 25,
-                 fill_value: Union[int, float] = np.nan, memory_only: bool = False,
-                 output_dir: Union[str, Path] = '.', limit_rounding_method: str = 'round', 
-                 return_paths: bool = False, product: str = 'SPOC', output_file: Optional[Union[str, Path]] = None, 
-                 threads: Union[int, Literal['auto']] = 1, verbose: bool = False):
-        super().__init__(input_files, coordinates, cutout_size, fill_value, memory_only, output_dir, 
-                         limit_rounding_method, return_paths, verbose)
+                 fill_value: Union[int, float] = np.nan, limit_rounding_method: str = 'round', 
+                 product: str = 'SPOC', threads: Union[int, Literal['auto']] = 1, verbose: bool = False):
+        super().__init__(input_files, coordinates, cutout_size, fill_value, limit_rounding_method, verbose)
         # Assign input attributes
         self._threads = threads
         self._product = product.upper()
-        self._output_file = output_file
-        
-        # Other internal attributes
-        # These are exposed in `CutoutFactory.cube_cut` for backwards compatibility
-        self._cube_wcs = None  # WCS information from the image cube
-        self._cutout_wcs = None  # WCS information (linear) for the cutout
-        self._cutout_wcs_fit = {
-            'WCS_MSEP': [None, '[deg] Max offset between cutout WCS and FFI WCS'],
-            'WCS_SIG': [None, '[deg] Error measurement of cutout WCS fit'],
-        }
-        self._cutout_lims = np.zeros((2, 2), dtype=int)  # Cutout pixel limits, [[ymin,ymax],[xmin,xmax]]
 
         # Extra keywords from the FFI image headers in SPOC (TESS-specific)
         # These are applied to both SPOC and TICA cutouts for consistency.
@@ -85,6 +143,25 @@ class CubeCutout(Cutout):
             'VIGNAPP': [None, 'vignetting or collimator correction applied'],
         }
 
+        self.tpf_cutouts_by_file = {}
+
+        # Make the cutouts upon initialization
+        self.cutout()
+
+    @property
+    def cutouts(self):
+        """
+        Return a list of cutouts as `CubeCutout.CubeCutoutInstance` objects.
+        """
+        return list(self.cutouts_by_file.values())
+
+    @property
+    def tpf_cutouts(self):
+        """
+        Return the cutouts as a list of `astropy.io.fits.HDUList` target pixel file objects.
+        """
+        return list(self.tpf_cutouts_by_file.values())
+
     def _load_file_data(self, file: Union[str, Path, S3Path]) -> fits.HDUList:
         """
         Load the data from an input cube file.
@@ -120,7 +197,7 @@ class CubeCutout(Cutout):
 
         return fits.open(file, **fits_options)
 
-    def _parse_table_info(self, table_data: fits.fitsrec.FITS_rec):
+    def _parse_table_info(self, table_data: fits.fitsrec.FITS_rec) -> WCS:
         """
         Takes the header and the middle entry from the cube table (EXT 2) of image header data,
         builds a WCS object that encapsulates the given WCS information,
@@ -130,6 +207,11 @@ class CubeCutout(Cutout):
         ----------
         table_data : `~astropy.io.fits.fitsrec.FITS_rec`
             The cube image header data table.
+
+        Returns
+        -------
+        wcs : `~astropy.wcs.WCS`
+            The WCS object built from the table data.
 
         Raises
         ------
@@ -169,9 +251,6 @@ class CubeCutout(Cutout):
                 continue  # Skip NaN values
 
             wcs_header[col.name] = wcs_val
-            
-        # Initialize the WCS object
-        self._cube_wcs = wcs.WCS(wcs_header, relax=True)
 
         # Populate the image keywords dictionary
         for kwd in self._img_kwds:
@@ -181,217 +260,28 @@ class CubeCutout(Cutout):
         self._img_kwds['WCS_FFI'] = [table_row['FFI_FILE'],
                                      'FFI used for cutout WCS']
         
-    def _get_cutout_data(self, transposed_cube: fits.ImageHDU.section, 
-                         has_uncert: bool = True) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """
-        Extract a cutout from an image/uncertainty cube that has been transposed to have time on the longest axis.
-
-        Parameters
-        ----------
-        transposed_cube : `fits.ImageHDU.section`
-            Transposed image/uncertainty array.
-        has_uncert : bool
-            If the cube has uncertainty data.
-
-        Returns
-        -------
-        img_cutout : `numpy.array`
-            The untransposed image cutout array.
-        uncert_cutout : `numpy.array` or `None`
-            The untransposed uncertainty cutout array if `self._product` is 'SPOC'. Otherwise, returns `None`.
-        aperture : `numpy.array`
-            The aperture array. This is a 2D array that is the same size as a single cutout that is 1 where 
-            there is image data and 0 where there isn't.
-        """
-        # Compute cutout limits based on WCS
-        self._cutout_lims = self._get_cutout_limits(self._cube_wcs)
-        xmin, xmax = self._cutout_lims[1]
-        ymin, ymax = self._cutout_lims[0]
-
-        # Get the cube's shape limits
-        xmax_cube, ymax_cube, _, _ = transposed_cube.shape
-
-        # Adjust limits and compute padding
-        padding = np.zeros((3, 2), dtype=int)
-        xmin, padding[1, 0] = max(0, xmin), max(0, -xmin)
-        ymin, padding[2, 0] = max(0, ymin), max(0, -ymin)
-        xmax, padding[1, 1] = min(xmax, xmax_cube), max(0, xmax - xmax_cube)
-        ymax, padding[2, 1] = min(ymax, ymax_cube), max(0, ymax - ymax_cube)    
-        
-        # Perform the cutout
-        if self._threads == 'auto' or self._threads > 1:
-            max_workers = None if self._threads == 'auto' else self._threads
-            with ThreadPoolExecutor(max_workers=max_workers) as pool:
-                # Increase download performance by making remote cutouts inside of a threadpool
-                # astropy.io.fits Section class executes a list comprehension, generating a sequence of http range
-                # requests (through fsspec) one per our slowest moving dimension (x).
-                # https://github.com/astropy/astropy/blob/0a71105fbaa71439206d496a44df11abc0e3ac96/astropy/io/fits/hdu/image.py#L1059
-                # By running inside a threadpool, these requests instead execute concurrently which increases cutout
-                # throughput. Extremely small cutouts (< 4px in x dim) are not likely to see an improvement
-                cutouts = list(pool.map(lambda x: transposed_cube[x, ymin:ymax, :, :], range(xmin, xmax)))
-            # Stack the list of cutouts
-            cutout = np.stack(cutouts)
-        else:
-            cutout = transposed_cube[xmin:xmax, ymin:ymax, :, :]
-
-        # Extract image and uncertainty cutouts
-        img_cutout = np.moveaxis(cutout[:, :, :, 0], 2, 0)
-        uncert_cutout = np.moveaxis(cutout[:, :, :, 1], 2, 0) if has_uncert else None
-        
-        # Create aperture mask
-        aperture = np.ones((xmax - xmin, ymax - ymin), dtype=np.int32)
-
-        # Apply padding if needed
-        if padding.any():
-            img_cutout = np.pad(img_cutout, padding, 'constant', constant_values=self._fill_value)
-            if has_uncert:
-                uncert_cutout = np.pad(uncert_cutout, padding, 'constant', constant_values=np.nan)
-            aperture = np.pad(aperture, padding[1:], 'constant', constant_values=0)
-
-        log.debug('Image cutout cube shape: %s', img_cutout.shape)
-        if has_uncert:
-            log.debug('Uncertainty cutout cube shape: %s', uncert_cutout.shape)
+        return WCS(wcs_header, relax=True)
     
-        return img_cutout, uncert_cutout, aperture
-
-    def _get_full_cutout_wcs(self, cube_table_header: fits.Header) -> wcs.WCS:
-        """
-        Adjust the full FFI WCS for the cutout WCS. Modifies CRPIX values and adds physical WCS keywords.
-
-        Parameters
-        ----------
-        cube_table_header :  `~astropy.io.fits.Header`
-           The FFI cube header for the data table extension. This allows the cutout WCS information
-           to more closely match the mission TPF format.
-
-        Returns
-        --------
-        response :  `~astropy.wcs.WCS`
-            The cutout WCS object including SIP distortions.
-        """
-        wcs_header = self._cube_wcs.to_header(relax=True)
-
-        # Using table comments if available
-        for kwd in wcs_header:
-            if cube_table_header.get(kwd, None):
-                wcs_header.comments[kwd] = cube_table_header[kwd]
-
-        # Adjusting the CRPIX values based on cutout limits
-        wcs_header['CRPIX1'] -= self._cutout_lims[0, 0]
-        wcs_header['CRPIX2'] -= self._cutout_lims[1, 0]
-
-        # Add physical WCS keywords
-        physical_wcs_keys = {
-            'WCSNAMEP': ('PHYSICAL', 'name of world coordinate system alternate P'),
-            'WCSAXESP': (2, 'mumber of WCS physical axes'),
-            'CTYPE1P': ('RAWX', 'physical WCS axis 1 type (CCD column)'),
-            'CUNIT1P': ('PIXEL', 'physical WCS axis 1 unit'),
-            'CRPIX1P': (1, 'reference CCD column'),
-            'CRVAL1P': (self._cutout_lims[0, 0] + 1, 'value at reference CCD column'),
-            'CDELT1P': (1.0, 'physical WCS axis 1 step'),
-            'CTYPE2P': ('RAWY', 'physical WCS axis 2 type (CCD row)'),
-            'CUNIT2P': ('PIXEL', 'physical WCS axis 2 unit'),
-            'CRPIX2P': (1, 'reference CCD row'),
-            'CRVAL2P': (self._cutout_lims[1, 0] + 1, 'value at reference CCD row'),
-            'CDELT2P': (1.0, 'physical WCS axis 2 step'),
-        }
-
-        for key, (value, comment) in physical_wcs_keys.items():
-            wcs_header[key] = (value, comment)
-
-        return wcs.WCS(wcs_header)
-    
-    def _fit_cutout_wcs(self, cutout_wcs: wcs.WCS, cutout_shape: Tuple[int, int]) -> Tuple[float, float]:
-        """
-        Given a full (including SIP coefficients) WCS for the cutout, 
-        calculate the best fit linear WCS and a measure of the goodness-of-fit.
-        
-        The new WCS is stored in ``self._cutout_wcs``.
-        Goodness-of-fit measures are returned and stored in ``self._cutout_wcs_fit``.
-
-        Parameters
-        ----------
-        cutout_wcs :  `~astropy.wcs.WCS`
-            The full (including SIP coefficients) cutout WCS object 
-        cutout_shape : tuple
-            The shape of the cutout in the form (width, height).
-
-        Returns
-        -------
-        max_dist : float
-            The maximum separation between the original and fitted WCS in degrees.
-        sigma : float
-            The error measurement of the fit in degrees.
-        """
-        # Getting matched pixel, world coordinate pairs
-        # We will choose no more than 100 pixels spread evenly throughout the image
-        # Centered on the center pixel.
-        # To do this we the appropriate "step size" between pixel coordinates
-        # (i.e. we take every ith pixel in each row/column) [TODOOOOOO]
-        # For example in a 5x7 cutout with i = 2 we get:
-        #
-        # xxoxoxx
-        # ooooooo
-        # xxoxoxx
-        # ooooooo
-        # xxoxoxx
-        #
-        # Where x denotes the indexes that will be used in the fit.
-        height, width = cutout_shape
-
-        # Determine step size for selecting up to 100 sample points
-        step_size = 1
-        while (width / step_size) * (height / step_size) > 100:
-            step_size += 1
-            
-        # Create evenly spaced pixel indices along the x and y axes
-        xvals = np.arange(0, width, step_size).tolist()
-        if xvals[-1] != width - 1:
-            xvals.append(width - 1)
-
-        yvals = np.arange(0, height, step_size).tolist()
-        if yvals[-1] != height - 1:
-            yvals.append(height - 1)
-        
-        # Generate pixel coordinate pairs
-        pix_inds = np.array(list(product(xvals, yvals)))
-
-        # Convert pixel coordinates to world coordinates
-        world_pix = SkyCoord(cutout_wcs.all_pix2world(pix_inds, 0), unit='deg')
-
-        # Fit a linear WCS
-        linear_wcs = fit_wcs_from_points([pix_inds[:, 0], pix_inds[:, 1]], world_pix, proj_point='center')
-        self._cutout_wcs = linear_wcs
-
-        # Evaluate fit using all the pixels in the cutout
-        full_pix_inds = np.array(list(product(range(width), range(height))))
-        world_pix_original = SkyCoord(cutout_wcs.all_pix2world(full_pix_inds, 0), unit='deg')
-        world_pix_fitted = SkyCoord(linear_wcs.all_pix2world(full_pix_inds, 0), unit='deg')
-
-        # Compute fit residuals
-        dists = world_pix_original.separation(world_pix_fitted).to('deg')
-        max_dist = dists.max().value
-        sigma = np.sqrt(np.sum(dists.value**2))
-
-        # Store fit quality metrics
-        self._cutout_wcs_fit['WCS_MSEP'][0] = max_dist
-        self._cutout_wcs_fit['WCS_SIG'][0] = sigma
-
-        return max_dist, sigma
-    
-    def _get_cutout_wcs_dict(self) -> dict:
+    def _get_cutout_wcs_dict(self, cutout_wcs: WCS, cutout_lims: np.ndarray) -> dict:
         """
         Create a dictionary of WCS keywords for the cutout.
         Adds the physical keywords for transformation back from cutout to location on FFI.
         This is a TESS-specific function.
+
+        Parameters
+        ----------
+        cutout_wcs : `~astropy.wcs.WCS`
+            The WCS object for the cutout.
+        cutout_lims : `~numpy.ndarray`
+            The limits of the cutout in pixel coordinates.
         
         Returns
         -------
-        response: dict
+        cutout_wcs_dict : dict
             Cutout WCS column header keywords as dictionary of 
             ``{<kwd format string>: [value, desc]} pairs.``
         """
-        wcs_header = self._cutout_wcs.to_header()
+        wcs_header = cutout_wcs.to_header()
         wcs_axes = wcs_header.get('WCSAXES', 2)  # Default to 2 if missing
 
         # Create the cutout WCS dictionary
@@ -421,8 +311,8 @@ class CubeCutout(Cutout):
             '2CTY{}P': ['RAWY', 'table column physical WCS axis 2 type, CCD row'],
             '1CUN{}P': ['PIXEL', 'table column physical WCS axis 1 unit'],
             '2CUN{}P': ['PIXEL', 'table column physical WCS axis 2 unit'],
-            '1CRV{}P': [self._cutout_lims[0, 0] + 1, 'table column physical WCS ax 1 ref value'],
-            '2CRV{}P': [self._cutout_lims[1, 0] + 1, 'table column physical WCS ax 2 ref value'],
+            '1CRV{}P': [cutout_lims[0, 0] + 1, 'table column physical WCS ax 1 ref value'],
+            '2CRV{}P': [cutout_lims[1, 0] + 1, 'table column physical WCS ax 2 ref value'],
             # TODO: can we calculate these? or are they fixed?
             '1CDL{}P': [1.0, 'table column physical WCS a1 step'],    
             '2CDL{}P': [1.0, 'table column physical WCS a2 step'],
@@ -440,7 +330,7 @@ class CubeCutout(Cutout):
         as placeholders.
         This is a TESS-specific function.
 
-        Parameter(s)
+        Parameters
         ----------
         primary_header : `~astropy.io.fits.Header`
             The primary header from the cube file that will be modified in place for the cutout.
@@ -617,8 +507,7 @@ class CubeCutout(Cutout):
                     if (kwd not in header) and (kwd not in reserved_kwds):
                         header[kwd] = (val, primary_header.comments[kwd])
 
-    def _build_tpf(self, cube_fits: fits.HDUList, img_cube: np.ndarray, uncert_cube: np.ndarray,
-                   aperture: np.ndarray, cutout_wcs_dict: dict) -> fits.HDUList:
+    def _build_tpf(self, cube_fits: fits.HDUList, cutout: 'CubeCutoutInstance') -> fits.HDUList:
         """
         Build the cutout target pixel file (TPF) and format it to match TESS pipeline TPFs.
 
@@ -626,17 +515,8 @@ class CubeCutout(Cutout):
         ---------
         cube_fits : `~astropy.io.fits.hdu.hdulist.HDUList`
             The cube hdu list.
-        img_cube : `numpy.array`
-            The untransposed image cutout array
-        uncert_cube : `numpy.array`
-            The untransposed uncertainty cutout array.
-            This value is set to `None` by default for TICA cutouts.
-        aperture : `numpy.array`
-            The aperture array (an array the size of a single cutout 
-            that is 1 where there is image data and 0 where there isn't)
-        cutout_wcs_dict : dict
-            Dictionary of wcs keyword/value pairs to be added to each array 
-            column in the cutout table header.
+        cutout : `CubeCutout.CubeCutoutInstance`
+            The cutout object.
 
         Returns
         -------
@@ -648,6 +528,7 @@ class CubeCutout(Cutout):
         self._update_primary_header(primary_hdu.header)
 
         cols = []  # list to store FITS table columns
+        img_cube = cutout.data
         empty_arr = np.zeros_like(img_cube)  # precompute empty array for missing data
         empty_single = empty_arr[:, 0, 0]  # extract single-value empty array for time & position
 
@@ -670,7 +551,7 @@ class CubeCutout(Cutout):
 
         # Define flux-related columns
         pixel_unit = 'e-/s' if self._product == 'SPOC' else 'e-'
-        flux_err_array = uncert_cube if self._product == 'SPOC' else empty_arr
+        flux_err_array = cutout.uncertainty if self._product == 'SPOC' else empty_arr
         cols.extend([
             fits.Column(name='RAW_CNTS', format=pixel_format.replace('E', 'J'), unit='count',
                         dim=pixel_dim, disp='I8', array=empty_arr - 1, null=-1),
@@ -704,22 +585,22 @@ class CubeCutout(Cutout):
         table_hdu.header['INHERIT'] = True
     
         # Add the WCS keywords to the columns and remove from the header
-        self._add_column_wcs(table_hdu.header, cutout_wcs_dict)
+        self._add_column_wcs(table_hdu.header, self._get_cutout_wcs_dict(cutout.wcs, cutout.cutout_lims))
 
         # Add the extra image keywords
         self._add_img_kwds(table_hdu.header)
 
         # Build the aperture HDU
-        aperture_hdu = fits.ImageHDU(data=aperture)
+        aperture_hdu = fits.ImageHDU(data=cutout.aperture)
         aperture_hdu.header['EXTNAME'] = 'APERTURE'
         # Copy WCS headers
-        for kwd, val, cmt in self._cutout_wcs.to_header().cards: 
+        for kwd, val, cmt in cutout.wcs.to_header().cards:
             aperture_hdu.header.set(kwd, val, cmt)
         # Add extra aperture keywords (TESS specific)
         aperture_hdu.header.set('NPIXMISS', None, 'Number of op. aperture pixels not collected')
         aperture_hdu.header.set('NPIXSAP', None, 'Number of pixels in optimal aperture')
         # Add goodness-of-fit keywords
-        for key, val in self._cutout_wcs_fit.items():
+        for key, val in cutout.wcs_fit.items():
             aperture_hdu.header[key] = tuple(val)
         aperture_hdu.header['INHERIT'] = True
     
@@ -730,10 +611,10 @@ class CubeCutout(Cutout):
         self._apply_header_inherit(cutout_hdu_list)
 
         return cutout_hdu_list
-
+    
     def _cutout_file(self, file: Union[str, Path, S3Path]):
         """
-        Create a cutout TPF from a single cube file.
+        Make a cutout from a single cube file.
 
         Parameters
         ----------
@@ -744,87 +625,37 @@ class CubeCutout(Cutout):
         cube = self._load_file_data(file)
 
         # Parse table info
-        self._parse_table_info(cube[2].data)
+        cube_wcs = self._parse_table_info(cube[2].data)
 
         # Log coordinates
         log.debug('Cutout center coordinate: %s, %s', self._coordinates.ra.deg, self._coordinates.dec.deg)
 
         # Get cutouts
         has_uncert = self._product == 'SPOC'
-        img_cutout, uncert_cutout, aperture = self._get_cutout_data(cube[1].section, has_uncert)
+        cutout = self.CubeCutoutInstance(cube, cube_wcs, has_uncert, self)
+
+        # Build TPF
+        tpf = self._build_tpf(cube, cutout)
 
         # Get cutout WCS info
-        cutout_wcs_full = self._get_full_cutout_wcs(cube[2].header)
-        max_dist, sigma = self._fit_cutout_wcs(cutout_wcs_full, img_cutout.shape[1:])
+        max_dist, sigma = cutout.wcs_fit['WCS_MSEP'][0], cutout.wcs_fit['WCS_SIG'][0]
         log.debug('Maximum distance between approximate and true location: %s', max_dist)
         log.debug('Error in approximate WCS (sigma): %.4f', sigma)
 
-        # Get cutout WCS dictionary
-        cutout_wcs_dict = self._get_cutout_wcs_dict()
-
-        # Build the cutout TPF
-        cutout_tpf = self._build_tpf(cube, img_cutout, uncert_cutout, aperture, cutout_wcs_dict)
-
         cube.close()
 
-        # Store cutout TPF
-        self._cutout_dict[file] = cutout_tpf
-
-    def _write_cutouts(self):
-        """
-        Write the cutouts to disk or return them as memory objects.
-
-        Returns
-        -------
-        cutouts : str | list
-            Cutout file path(s) or memory object(s).
-        """
-        if self._memory_only:
-            log.info('Writing cutouts to memory only. No output files will be created.')
-            return list(self._cutout_dict.values())
-        
-        # If writing to disk, ensure that output directory exists
-        Path(self._output_dir).mkdir(parents=True, exist_ok=True)
-        
-        cutouts = []
-        for file, cutout in self._cutout_dict.items():
-            # Determine file name
-            if not self._output_file or len(self._input_files) > 1:
-                width = self._cutout_lims[0, 1] - self._cutout_lims[0, 0]
-                height = self._cutout_lims[1, 1] - self._cutout_lims[1, 0]
-                filename = '{}_{:7f}_{:7f}_{}x{}_astrocut.fits'.format(
-                    Path(file).stem.rstrip('-cube'),
-                    self._coordinates.ra.value,
-                    self._coordinates.dec.value,
-                    width,
-                    height)
-            else:
-                filename = self._output_file
-
-            # Write the cutout TPF
-            cutout_path = Path(self._output_dir) / filename
-
-            with warnings.catch_warnings():
-                # Suppress FITS verification warnings
-                warnings.simplefilter('ignore', fits.verify.VerifyWarning)
-                cutout.writeto(cutout_path, overwrite=True, checksum=True)
-            
-            # Log file path
-            log.debug('Target pixel file path: %s', cutout_path)
-            # Append file path or memory object
-            cutouts.append(cutout_path.as_posix() if self._return_paths else cutout)
-
-        # Return a string if only one output file and ``_self.return_paths`` is True
-        return cutouts[0] if len(cutouts) == 1 and self._return_paths else cutouts
-        
+        # Store cutouts with filename
+        self.cutouts_by_file[file] = cutout
+        self.tpf_cutouts_by_file[file] = tpf
+    
     def cutout(self):
         """
         Generate cutouts from a list of input cube files.
 
         Returns
         -------
-        cutouts : str | list
-            Cutout file path(s) or memory object(s).
+        cutouts : list
+            List of cutout memory objects.
         """
         # Track start time
         start_time = monotonic()
@@ -833,12 +664,319 @@ class CubeCutout(Cutout):
         for file in self._input_files:
             self._cutout_file(file)
 
-        # Write cutout(s)
-        write_time = monotonic()
-        cutouts = self._write_cutouts()
-
         # Log total time elapsed
-        log.debug('Write time: %.2f sec', (monotonic() - write_time))
         log.debug('Total time: %.2f sec', (monotonic() - start_time))
 
-        return cutouts
+        return self.cutouts
+
+    def write_as_tpf(self, output_dir: Union[str, Path] = '.', output_file: str = None):
+        """
+        Write the cutouts to disk as target pixel files.
+
+        Parameters
+        ----------
+        output_dir : str | Path
+            The output directory where the cutout files will be saved.
+        output_file : str
+            The output filename. If not provided or more than one cutout is created, the filename 
+            will be generated based on the input filename. This parameter is included so that
+            ``CubeCutout`` is backwards compatible with ``CutoutFactory.cube_cut``.
+
+        Returns
+        -------
+        cutouts : list
+            List of file paths to cutout target pixel files.
+        """
+        # Track write time
+        write_time = monotonic()
+
+        # Ensure that output directory exists
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
+        
+        cutout_paths = []
+        for file, cutout in self.cutouts_by_file.items():
+            # Determine file name
+            if not output_file or len(self._input_files) > 1:
+                cutout_lims = cutout.cutout_lims
+                width = cutout_lims[0, 1] - cutout_lims[0, 0]
+                height = cutout_lims[1, 1] - cutout_lims[1, 0]
+                filename = '{}_{:7f}_{:7f}_{}x{}_astrocut.fits'.format(
+                    Path(file).stem.rstrip('-cube'),
+                    self._coordinates.ra.value,
+                    self._coordinates.dec.value,
+                    width,
+                    height)
+            else:
+                filename = output_file
+
+            # Write the cutout TPF
+            cutout_path = Path(output_dir) / filename
+
+            # Get the corresponding cutout TPF
+            tpf = self.tpf_cutouts_by_file[file]
+
+            with warnings.catch_warnings():
+                # Suppress FITS verification warnings
+                warnings.simplefilter('ignore', fits.verify.VerifyWarning)
+                tpf.writeto(cutout_path, overwrite=True, checksum=True)
+            
+            # Log file path
+            log.debug('Target pixel file path: %s', cutout_path)
+            # Append file path or memory object
+            cutout_paths.append(cutout_path.as_posix())
+
+        log.debug('Write time: %.2f sec', (monotonic() - write_time))
+        return cutout_paths
+    
+    class CubeCutoutInstance:
+        """
+        Represents an individual cutout with its own data, uncertainty, and aperture arrays.
+
+        Args
+        ----
+        cube : `~astropy.io.fits.HDUList`
+            The input cube.
+        cube_wcs : `~astropy.wcs.WCS`
+            The WCS object for the input cube.
+        has_uncert : bool
+            If the cube has uncertainty data.
+        parent : `CubeCutout`
+            The parent `CubeCutout` object.
+
+        Attributes
+        ----------
+        data : `numpy.array`
+            The image data cutout.
+        uncertainty : `numpy.array`
+            The uncertainty data cutout if the cube has uncertainties. Otherwise, returns `None`.
+        aperture : `numpy.array`
+            The aperture array.
+        wcs : `~astropy.wcs.WCS`
+            The WCS object for the cutout.
+        wcs_fit : dict
+            Dictionary of WCS fit keywords.
+        cutout_lims : `numpy.array`
+            The limits of the cutout in pixel coordinates.
+        cube_wcs : `~astropy.wcs.WCS`
+            The WCS object for the input cube.
+        """
+
+        def __init__(self, cube: fits.HDUList, cube_wcs: WCS, has_uncert: bool, parent: 'CubeCutout'):
+            self._parent = parent
+            self.cube_wcs = cube_wcs
+            self.wcs_fit = {
+                'WCS_MSEP': [None, '[deg] Max offset between cutout WCS and FFI WCS'],
+                'WCS_SIG': [None, '[deg] Error measurement of cutout WCS fit'],
+            }
+
+            # Get cutout limits
+            self.cutout_lims = self._parent._get_cutout_limits(cube_wcs)
+
+            # Get cutout data
+            self.data, self.uncertainty, self.aperture = self._get_cutout_data(cube[1].section, 
+                                                                               self._parent._threads, has_uncert)
+            
+            # Get cutout WCS
+            self.wcs = self._get_full_cutout_wcs(cube_wcs, cube[2].header)
+
+            # Fit the cutout WCS
+            self._fit_cutout_wcs(self.wcs, self.data.shape[1:])
+
+        def _get_cutout_data(self, transposed_cube: fits.ImageHDU.section, threads: int, 
+                             has_uncert: bool = True) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+            """
+            Extract a cutout from an image/uncertainty cube that has been transposed to have time on the longest axis.
+
+            Parameters
+            ----------
+            transposed_cube : `fits.ImageHDU.section`
+                Transposed image/uncertainty array.
+            threads : int
+                The number of threads to use for the cutout.
+            has_uncert : bool
+                If the cube has uncertainty data.
+
+            Returns
+            -------
+            img_cutout : `numpy.array`
+                The untransposed image cutout array.
+            uncert_cutout : `numpy.array` or `None`
+                The untransposed uncertainty cutout array if `self._product` is 'SPOC'. Otherwise, returns `None`.
+            aperture : `numpy.array`
+                The aperture array. This is a 2D array that is the same size as a single cutout that is 1 where 
+                there is image data and 0 where there isn't.
+            """
+            # Compute cutout limits based on WCS
+            xmin, xmax = self.cutout_lims[1]
+            ymin, ymax = self.cutout_lims[0]
+
+            # Get the cube's shape limits
+            xmax_cube, ymax_cube, _, _ = transposed_cube.shape
+
+            # Adjust limits and compute padding
+            padding = np.zeros((3, 2), dtype=int)
+            xmin, padding[1, 0] = max(0, xmin), max(0, -xmin)
+            ymin, padding[2, 0] = max(0, ymin), max(0, -ymin)
+            xmax, padding[1, 1] = min(xmax, xmax_cube), max(0, xmax - xmax_cube)
+            ymax, padding[2, 1] = min(ymax, ymax_cube), max(0, ymax - ymax_cube)    
+            
+            # Perform the cutout
+            if threads == 'auto' or threads > 1:
+                max_workers = None if threads == 'auto' else threads
+                with ThreadPoolExecutor(max_workers=max_workers) as pool:
+                    # Increase download performance by making remote cutouts inside of a threadpool
+                    # astropy.io.fits Section class executes a list comprehension, generating a sequence of http range
+                    # requests (through fsspec) one per our slowest moving dimension (x).
+                    # https://github.com/astropy/astropy/blob/0a71105fbaa71439206d496a44df11abc0e3ac96/astropy/io/fits/hdu/image.py#L1059
+                    # By running inside a threadpool, these requests instead execute concurrently which increases cutout
+                    # throughput. Extremely small cutouts (< 4px in x dim) are not likely to see an improvement
+                    cutouts = list(pool.map(lambda x: transposed_cube[x, ymin:ymax, :, :], range(xmin, xmax)))
+                # Stack the list of cutouts
+                cutout = np.stack(cutouts)
+            else:
+                cutout = transposed_cube[xmin:xmax, ymin:ymax, :, :]
+
+            # Extract image and uncertainty cutouts
+            img_cutout = np.moveaxis(cutout[:, :, :, 0], 2, 0)
+            uncert_cutout = np.moveaxis(cutout[:, :, :, 1], 2, 0) if has_uncert else None
+            
+            # Create aperture mask
+            aperture = np.ones((xmax - xmin, ymax - ymin), dtype=np.int32)
+
+            # Apply padding if needed
+            if padding.any():
+                img_cutout = np.pad(img_cutout, padding, 'constant', constant_values=self._parent._fill_value)
+                if has_uncert:
+                    uncert_cutout = np.pad(uncert_cutout, padding, 'constant', constant_values=np.nan)
+                aperture = np.pad(aperture, padding[1:], 'constant', constant_values=0)
+
+            log.debug('Image cutout cube shape: %s', img_cutout.shape)
+            if has_uncert:
+                log.debug('Uncertainty cutout cube shape: %s', uncert_cutout.shape)
+        
+            return img_cutout, uncert_cutout, aperture
+
+        def _get_full_cutout_wcs(self, cube_wcs: WCS, cube_table_header: fits.Header) -> WCS:
+            """
+            Adjust the full FFI WCS for the cutout WCS. Modifies CRPIX values and adds physical WCS keywords.
+
+            Parameters
+            ----------
+            cube_wcs : `~astropy.wcs.WCS`
+                The WCS for the input cube.
+            cube_table_header :  `~astropy.io.fits.Header`
+                The FFI cube header for the data table extension. This allows the cutout WCS information
+                to more closely match the mission TPF format.
+
+            Returns
+            --------
+            response :  `~astropy.wcs.WCS`
+                The cutout WCS object including SIP distortions.
+            """
+            wcs_header = cube_wcs.to_header(relax=True)
+
+            # Using table comments if available
+            for kwd in wcs_header:
+                if cube_table_header.get(kwd, None):
+                    wcs_header.comments[kwd] = cube_table_header[kwd]
+
+            # Adjusting the CRPIX values based on cutout limits
+            wcs_header['CRPIX1'] -= self.cutout_lims[0, 0]
+            wcs_header['CRPIX2'] -= self.cutout_lims[1, 0]
+
+            # Add physical WCS keywords
+            physical_wcs_keys = {
+                'WCSNAMEP': ('PHYSICAL', 'name of world coordinate system alternate P'),
+                'WCSAXESP': (2, 'mumber of WCS physical axes'),
+                'CTYPE1P': ('RAWX', 'physical WCS axis 1 type (CCD column)'),
+                'CUNIT1P': ('PIXEL', 'physical WCS axis 1 unit'),
+                'CRPIX1P': (1, 'reference CCD column'),
+                'CRVAL1P': (self.cutout_lims[0, 0] + 1, 'value at reference CCD column'),
+                'CDELT1P': (1.0, 'physical WCS axis 1 step'),
+                'CTYPE2P': ('RAWY', 'physical WCS axis 2 type (CCD row)'),
+                'CUNIT2P': ('PIXEL', 'physical WCS axis 2 unit'),
+                'CRPIX2P': (1, 'reference CCD row'),
+                'CRVAL2P': (self.cutout_lims[1, 0] + 1, 'value at reference CCD row'),
+                'CDELT2P': (1.0, 'physical WCS axis 2 step'),
+            }
+
+            for key, (value, comment) in physical_wcs_keys.items():
+                wcs_header[key] = (value, comment)
+
+            return WCS(wcs_header)
+
+        def _fit_cutout_wcs(self, cutout_wcs: WCS, cutout_shape: Tuple[int, int]) -> Tuple[float, float]:
+            """
+            Given a full (including SIP coefficients) WCS for the cutout, 
+            calculate the best fit linear WCS and a measure of the goodness-of-fit.
+            
+            The new WCS is stored in ``self.wcs``.
+            Goodness-of-fit measures are returned and stored in ``self.wcs_fit``.
+
+            Parameters
+            ----------
+            cutout_wcs :  `~astropy.wcs.WCS`
+                The full (including SIP coefficients) cutout WCS object 
+            cutout_shape : tuple
+                The shape of the cutout in the form (width, height).
+
+            Returns
+            -------
+            max_dist : float
+                The maximum separation between the original and fitted WCS in degrees.
+            sigma : float
+                The error measurement of the fit in degrees.
+            """
+            # Getting matched pixel, world coordinate pairs
+            # We will choose no more than 100 pixels spread evenly throughout the image
+            # Centered on the center pixel.
+            # To do this we the appropriate "step size" between pixel coordinates
+            # (i.e. we take every ith pixel in each row/column) [TODOOOOOO]
+            # For example in a 5x7 cutout with i = 2 we get:
+            #
+            # xxoxoxx
+            # ooooooo
+            # xxoxoxx
+            # ooooooo
+            # xxoxoxx
+            #
+            # Where x denotes the indexes that will be used in the fit.
+            height, width = cutout_shape
+
+            # Determine step size for selecting up to 100 sample points
+            step_size = 1
+            while (width / step_size) * (height / step_size) > 100:
+                step_size += 1
+                
+            # Create evenly spaced pixel indices along the x and y axes
+            xvals = np.arange(0, width, step_size).tolist()
+            if xvals[-1] != width - 1:
+                xvals.append(width - 1)
+
+            yvals = np.arange(0, height, step_size).tolist()
+            if yvals[-1] != height - 1:
+                yvals.append(height - 1)
+            
+            # Generate pixel coordinate pairs
+            pix_inds = np.array(list(product(xvals, yvals)))
+
+            # Convert pixel coordinates to world coordinates
+            world_pix = SkyCoord(cutout_wcs.all_pix2world(pix_inds, 0), unit='deg')
+
+            # Fit a linear WCS
+            linear_wcs = fit_wcs_from_points([pix_inds[:, 0], pix_inds[:, 1]], world_pix, proj_point='center')
+            self.wcs = linear_wcs
+
+            # Evaluate fit using all the pixels in the cutout
+            full_pix_inds = np.array(list(product(range(width), range(height))))
+            world_pix_original = SkyCoord(cutout_wcs.all_pix2world(full_pix_inds, 0), unit='deg')
+            world_pix_fitted = SkyCoord(linear_wcs.all_pix2world(full_pix_inds, 0), unit='deg')
+
+            # Compute fit residuals
+            dists = world_pix_original.separation(world_pix_fitted).to('deg')
+            max_dist = dists.max().value
+            sigma = np.sqrt(np.sum(dists.value**2))
+
+            # Store fit quality metrics
+            self.wcs_fit['WCS_MSEP'][0] = max_dist
+            self.wcs_fit['WCS_SIG'][0] = sigma

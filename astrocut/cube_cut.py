@@ -27,6 +27,7 @@ class CutoutFactory():
         product="SPOC",
         target_pixel_file=None,
         output_path=".",
+        memory_only=False,
         threads: Union[int, Literal["auto"]] = 1,
         verbose=False,
     ):
@@ -62,6 +63,9 @@ class CutoutFactory():
         output_path : str
             Optional. The path where the output file is saved.
             The current directory is default.
+        memory_only : bool
+            Optional. If true, the cutout is made in memory only and not saved to disk.
+            Default is False.
         threads : int, "auto", default=1
             Number of threads to use when making remote (e.g. s3) cutouts, will not use threads for local access
             <=1 disables the threadpool, >1 sets threadpool to the specified number of threads,
@@ -72,25 +76,25 @@ class CutoutFactory():
         Returns
         -------
         response: string or None
-            If successfull, returns the path to the target pixel file,
+            If successful, returns the path to the target pixel file,
             if unsuccessful returns None.
         """
-
-        factory = CubeCutout(input_files=cube_file,
-                             coordinates=coordinates,
-                             cutout_size=cutout_size,
-                             product=product,
-                             output_file=target_pixel_file,
-                             output_dir=output_path,
-                             return_paths=True,
-                             threads=threads,
-                             verbose=verbose)
-        cutout_path = factory.cutout()
+        cube_cutout = CubeCutout(input_files=cube_file,
+                                 coordinates=coordinates,
+                                 cutout_size=cutout_size,
+                                 product=product,
+                                 threads=threads,
+                                 verbose=verbose)
         
         # Assign these attributes to be backwards compatible
-        self.cube_wcs = factory._cube_wcs
-        self.center_coord = factory._coordinates
-        self.cutout_lims = factory._cutout_lims
-        self.cutout_wcs = factory._cutout_wcs
-
-        return cutout_path
+        cutout_obj = cube_cutout.cutouts_by_file[cube_file]
+        self.cube_wcs = cutout_obj.cube_wcs
+        self.center_coord = cube_cutout._coordinates
+        self.cutout_lims = cutout_obj.cutout_lims
+        self.cutout_wcs = cutout_obj.wcs
+        
+        if memory_only:
+            return cube_cutout.tpf_cutouts[0]
+        
+        return cube_cutout.write_as_tpf(output_dir=output_path, 
+                                        output_file=target_pixel_file)[0]
