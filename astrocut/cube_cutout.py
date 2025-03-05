@@ -70,6 +70,10 @@ class CubeCutout(Cutout, ABC):
         self._wcs_axes_keyword = None  # Keyword corresponding to WCS axis
         self._wcs_axes_value = None  # Expected value for the WCS axis keyword
         self._skip_kwds = []  # Keywords to skip when adding to the TPF headers
+        self.tpf_cutouts_by_file = {}
+
+        # Make the cutouts upon initialization
+        self.cutout()
 
     @property
     def cutouts(self):
@@ -77,6 +81,13 @@ class CubeCutout(Cutout, ABC):
         Return a list of cutouts as `CubeCutout.CubeCutoutInstance` objects.
         """
         return list(self.cutouts_by_file.values())
+
+    @property
+    def tpf_cutouts(self):
+        """
+        Return the cutouts as a list of `astropy.io.fits.HDUList` target pixel file objects.
+        """
+        return list(self.tpf_cutouts_by_file.values())
 
     def _load_file_data(self, file: Union[str, Path, S3Path]) -> fits.HDUList:
         """
