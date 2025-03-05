@@ -13,7 +13,7 @@ from PIL import Image
 
 from .utils_for_test import create_test_imgs
 from .. import cutouts
-from ..exceptions import InputWarning, InvalidInputError, InvalidQueryError 
+from ..exceptions import DataWarning, InputWarning, InvalidInputError, InvalidQueryError 
 
 
 @pytest.mark.parametrize('ffi_type', ['SPOC', 'TICA'])
@@ -118,7 +118,6 @@ def test_fits_cut(tmpdir, caplog, ffi_type):
     
 
     # Test when cutout is in some images not others
-
     # Putting zeros into 2 images
     for img in test_images[:2]:
         hdu = fits.open(img, mode="update")
@@ -126,21 +125,19 @@ def test_fits_cut(tmpdir, caplog, ffi_type):
         hdu.flush()
         hdu.close()
         
-        
     center_coord = SkyCoord("150.1163213 2.2007", unit='deg')
-    cutout_file = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=True, output_dir=tmpdir)
+    with pytest.warns(DataWarning, match='contains no data, skipping...'):
+        cutout_file = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=True, output_dir=tmpdir)
     
     cutout_hdulist = fits.open(cutout_file)
-    assert len(cutout_hdulist) == len(test_images) + 1  # num imgs + primary header
-    assert (cutout_hdulist[1].data == 0).all()
-    assert (cutout_hdulist[2].data == 0).all()
+    assert len(cutout_hdulist) == len(test_images) - 1  # 6 images - 2 empty + 1 primary header
+    assert ~(cutout_hdulist[1].data == 0).any()
+    assert ~(cutout_hdulist[2].data == 0).any()
     assert ~(cutout_hdulist[3].data == 0).any()
     assert ~(cutout_hdulist[4].data == 0).any()
-    assert ~(cutout_hdulist[5].data == 0).any()
-    assert ~(cutout_hdulist[6].data == 0).any()
 
-    
-    cutout_files = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=False, output_dir=tmpdir)
+    with pytest.warns(DataWarning, match='contains no data'):
+        cutout_files = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=False, output_dir=tmpdir)
     assert isinstance(cutout_files, list)
     assert len(cutout_files) == len(test_images) - 2
 
@@ -151,10 +148,10 @@ def test_fits_cut(tmpdir, caplog, ffi_type):
         hdu.flush()
         hdu.close()
 
-    with pytest.raises(Exception) as e:
-        cutout_file = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=True, output_dir=tmpdir)
-        assert e.type is InvalidQueryError
-        assert "Cutout contains no data! (Check image footprint.)" in str(e.value)
+    with pytest.warns(DataWarning, match='contains no data, skipping...'):
+        with pytest.raises(InvalidInputError, match='Cutout contains no data!'):
+            cutout_file = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=True, 
+                                           output_dir=tmpdir)
 
     # test single image and also conflicting sip keywords
     test_image = create_test_imgs(ffi_type, 50, 1, dir_name=tmpdir,
@@ -315,7 +312,7 @@ def test_img_cut(tmpdir, caplog, ffi_type):
                                 output_dir=path.join(tmpdir, "image_path"), verbose=True)
     captured = caplog.text
     assert len(findall("Original image shape", captured)) == 6
-    assert "Cutout fits file(s)" in captured
+    assert "Cutout filepaths:" in captured
     assert "Total time" in captured
 
     # test color image where one of the images is all zeros
@@ -324,6 +321,7 @@ def test_img_cut(tmpdir, caplog, ffi_type):
     hdu.flush()
     hdu.close()
 
-    with pytest.raises(InvalidInputError):
-        cutouts.img_cut(test_images[:3], center_coord, cutout_size,
-                        colorize=True, img_format='png', output_dir=tmpdir)
+    with pytest.warns(DataWarning, match='contains no data, skipping...'):
+        with pytest.raises(InvalidInputError):
+            cutouts.img_cut(test_images[:3], center_coord, cutout_size,
+                            colorize=True, img_format='png', output_dir=tmpdir)
