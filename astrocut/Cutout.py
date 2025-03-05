@@ -81,6 +81,9 @@ class Cutout(ABC):
     
         self._verbose = verbose
 
+        # Initialize cutout dictionary
+        self.cutouts_by_file = {}
+
     def _parse_size_input(self, cutout_size):
         """
         Makes the given cutout size into a length 2 array.
