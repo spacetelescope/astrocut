@@ -13,7 +13,7 @@ from astropy.wcs import WCS
 import numpy as np
 from s3path import S3Path
 
-from .exceptions import DataWarning, InvalidInputError, InvalidQueryError
+from .exceptions import DataWarning, InvalidQueryError
 from .ImageCutout import ImageCutout
 from . import __version__, log
 
@@ -400,6 +400,10 @@ class FITSCutout(ImageCutout):
                 warnings.warn(f'Cutout footprint does not overlap with data in {file}, '
                               f'extension {ind}, skipping...', DataWarning)
                 num_empty += 1
+            except InvalidQueryError:
+                warnings.warn(f'Cutout footprint does not overlap with data in {file}, '
+                              f'extension {ind}, skipping...', DataWarning)
+                num_empty += 1
             except ValueError as err:
                 if 'Input position contains invalid values' in str(err):
                     warnings.warn(f'Cutout footprint does not overlap with data in {file}, '
@@ -429,7 +433,7 @@ class FITSCutout(ImageCutout):
 
         Raises
         ------
-        InvalidInputError
+        InvalidQueryError
             If no cutouts contain data.
         """
         # Track start time
@@ -441,7 +445,7 @@ class FITSCutout(ImageCutout):
 
         # If no cutouts contain data, raise exception        
         if not self.cutouts_by_file:
-            raise InvalidInputError('Cutout contains no data! (Check image footprint.)')
+            raise InvalidQueryError('Cutout contains no data! (Check image footprint.)')
 
         # Log total time elapsed
         log.debug('Total time: %.2f sec', monotonic() - start_time)
@@ -546,13 +550,13 @@ class FITSCutout(ImageCutout):
             cutout_lims = parent._get_cutout_limits(img_wcs)
 
             # Extract data from Section
-            self.data = self._get_cutout_data(img_data, img_wcs, cutout_lims, parent)
+            self.data = self._get_cutout_data(img_data, cutout_lims, parent)
             self.shape = self.data.shape
             self.shape_input = img_data.shape
 
             self.wcs = self._get_cutout_wcs(img_wcs, cutout_lims)
         
-        def _get_cutout_data(self, data: fits.Section, wcs: WCS, cutout_lims: np.ndarray, 
+        def _get_cutout_data(self, data: fits.Section, cutout_lims: np.ndarray, 
                              parent: 'FITSCutout') -> np.ndarray:
             """
             Extract the cutout data from an image.
@@ -561,8 +565,6 @@ class FITSCutout(ImageCutout):
             ----------
             data : `~astropy.io.fits.Section`
                 The data for the image.
-            wcs : `~astropy.wcs.WCS`
-                The WCS for the image.
             cutout_lims : `numpy.ndarray`
                 The cutout pixel limits in an array of the form [[ymin,ymax],[xmin,xmax]]
             parent : `FITSCutout`

@@ -149,7 +149,9 @@ class Cutout(ABC):
         """
         # Calculate pixel corresponding to coordinate
         try:
-            center_pixel = self._coordinates.to_pixel(img_wcs)
+            with warnings.catch_warnings():
+                warnings.filterwarnings('ignore', message='All-NaN slice encountered')
+                center_pixel = self._coordinates.to_pixel(img_wcs)
         except wcs.NoConvergence:  # If wcs can't converge, center coordinate is far from the footprint
             raise InvalidQueryError('Cutout location is not in image footprint!')
 
