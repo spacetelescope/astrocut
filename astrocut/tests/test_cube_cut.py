@@ -48,7 +48,7 @@ def cube_file(ffi_type: Literal["SPOC", "TICA"], ffi_files: List[str], tmp_path)
     return cube_file
 
 
-def checkcutout(product, cutfile, pixcrd, world, csize, ecube, eps=1.e-7):
+def check_cutout(product, hdulist, center_pix, center_world, cutout_size, ecube, eps=1.e-7):
     """Check FITS cutout for correctness
     
     Checks RA_OBJ/DEC_OBJ in primary header, and TIME, FLUX, and
@@ -63,70 +63,64 @@ def checkcutout(product, cutfile, pixcrd, world, csize, ecube, eps=1.e-7):
     eps      Maximum allowed distance offset in degrees
     Returns True on success, False on failure
     """
-    
-    ix = int(pixcrd[1])
-    iy = int(pixcrd[0])
-    x1 = ix - csize//2
-    x2 = x1 + csize - 1
-    y1 = iy - csize//2
-    y2 = y1 + csize - 1
-    hdulist = fits.open(cutfile)
+    # Compute cutout bounds
+    ix, iy = int(center_pix[1]), int(center_pix[0])
+    x1, x2 = ix - cutout_size // 2, ix + cutout_size // 2
+    y1, y2 = iy - cutout_size // 2, iy + cutout_size // 2
+
+    # Check RA and Dec in primary header
     ra_obj = hdulist[0].header['RA_OBJ']
     dec_obj = hdulist[0].header['DEC_OBJ']
-    pinput = SkyCoord(world[0], world[1], frame='icrs', unit='deg')
-    poutput = SkyCoord(ra_obj, dec_obj, frame='icrs', unit='deg')
+    expected_coords = SkyCoord(center_world[0], center_world[1], frame='icrs', unit='deg')
+    actual_coords = SkyCoord(ra_obj, dec_obj, frame='icrs', unit='deg')
     
-    dist = pinput.separation(poutput).degree
-    assert dist <= eps, "{} separation in primary header {} too large".format(cutfile, dist)
+    dist = expected_coords.separation(actual_coords).degree
+    assert dist <= eps, "{} separation in primary header {} too large".format(hdulist, dist)
         
+    # Check timeseries data
     ntimes = ecube.shape[2]
     tab = hdulist[1].data
-    assert len(tab) == ntimes, "{} expected {} entries, found {}".format(cutfile, ntimes, len(tab))
-    assert (tab['TIME'] == (np.arange(ntimes)+0.5)).all(), "{} some time values are incorrect".format(cutfile)
+    assert len(tab) == ntimes, f"Expected {ntimes} entries, found {len(tab)}"
+    assert (tab['TIME'] == (np.arange(ntimes)+0.5)).all(), "Some time values are incorrect"
 
+    # Check flux data if product is SPOC
     if product == 'SPOC':
         # TODO: Modify check1 to take TICA - adjust for TICA's slightly different WCS
         # solutions (TICA will usually be ~1 pixel off from SPOC for the same cutout)
-        check1(tab['FLUX'], x1, x2, y1, y2, ecube[:, :, :, 0], 'FLUX', cutfile)
+        check_flux(tab['FLUX'], x1, x2, y1, y2, ecube[:, :, :, 0], 'FLUX', hdulist)
         # Only SPOC propagates errors, so TICA will always have an empty error array
-        check1(tab['FLUX_ERR'], x1, x2, y1, y2, ecube[:, :, :, 1], 'FLUX_ERR', cutfile)
+        check_flux(tab['FLUX_ERR'], x1, x2, y1, y2, ecube[:, :, :, 1], 'FLUX_ERR', hdulist)
     
-    # Regression test for PR #6
+    # Ensure correct data type in third HDU
     assert hdulist[2].data.dtype.type == np.int32
 
-    return 
 
-
-def check1(flux, x1, x2, y1, y2, ecube, label, cutfile):
+def check_flux(flux, x1, x2, y1, y2, ecube, label, hdulist):
     """ Checking to make sure the right corresponding pixels 
     are replaced by NaNs when cutout goes off the TESS camera.
     Test one of flux or error
     """
+    cx, cy = ecube.shape[:2]
 
-    cx = ecube.shape[0]
-    cy = ecube.shape[1]
-
+    # Check NaNs in regions outside valid cutout bounds
     if x1 < 0:
-        assert np.isnan(flux[:, :-x1, :]).all(), "{} {} x1 NaN failure".format(cutfile, label)
-    
+        assert np.isnan(flux[:, :-x1, :]).all(), "{} {} x1 NaN failure".format(hdulist, label)
     if y1 < 0:
-        assert np.isnan(flux[:, :, :-y1]).all(), "{} {} y1 NaN failure".format(cutfile, label)
-        
+        assert np.isnan(flux[:, :, :-y1]).all(), "{} {} y1 NaN failure".format(hdulist, label)
     if x2 >= cx:
-        assert np.isnan(flux[:, -(x2-cx+1):, :]).all(), "{} {} x2 NaN failure".format(cutfile, label)
-        
+        assert np.isnan(flux[:, -(x2-cx+1):, :]).all(), "{} {} x2 NaN failure".format(hdulist, label)
     if y2 >= cy:
-        assert np.isnan(flux[:, :, -(y2-cy+1):]).all(), "{} {} y2 NaN failure".format(cutfile, label)
+        assert np.isnan(flux[:, :, -(y2-cy+1):]).all(), "{} {} y2 NaN failure".format(hdulist, label)
         
-    x1c = max(x1, 0)
-    y1c = max(y1, 0)
-    x2c = min(x2, cx-1)
-    y2c = min(y2, cy-1)
+    # Compute valid indices within cutout bounds
+    x1c, x2c = max(x1, 0), min(x2, cx - 1)
+    y1c, y2c = max(y1, 0), min(y2, cy - 1)
 
-    scube = ecube[x1c:x2c, y1c:y2c, :]
-    sflux = np.moveaxis(flux[:, x1c-x1:x2c-x1, y1c-y1:y2c-y1], 0, -1)
+    # Extract and compare valid data
+    expected_flux = ecube[x1c:x2c, y1c:y2c, :]
+    cutout_flux = np.moveaxis(flux[:, x1c-x1:x2c-x1, y1c-y1:y2c-y1], 0, -1)
 
-    assert (scube == sflux).all(), "{} {} comparison failure".format(cutfile, label)
+    assert np.array_equal(expected_flux, cutout_flux)
 
 
 @pytest.mark.parametrize("ffi_type", ["SPOC", "TICA"])
@@ -179,7 +173,8 @@ def test_cube_cutout(cube_file, ffi_files, ffi_type, tmp_path):
 
     # Doing the actual checking
     for i, cutfile in enumerate(cutlist):
-        checkcutout(ffi_type, cutfile, pixcrd[i], world_coords[i], csize[i], ecube)
+        with fits.open(cutfile) as hdulist:
+            check_cutout(ffi_type, hdulist, pixcrd[i], world_coords[i], csize[i], ecube)
 
 
 @pytest.mark.parametrize("ffi_type", ["SPOC", "TICA"])

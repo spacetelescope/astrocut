@@ -21,6 +21,7 @@ from s3path import S3Path
 
 from . import __version__, log
 from .Cutout import Cutout
+from .exceptions import DataWarning, InvalidQueryError
 from .utils.wcs_fitting import fit_wcs_from_points
 
 
@@ -186,7 +187,7 @@ class CubeCutout(Cutout):
         }
 
         # Add options based on the file's location
-        if file.startswith('s3://'):  # cloud-hosted file
+        if isinstance(file, str) and file.startswith('s3://'):  # cloud-hosted file
             fits_options.update({
                 'use_fsspec': True,
                 'fsspec_kwargs': {'default_block_size': 10_000, 'anon': True}
@@ -627,22 +628,26 @@ class CubeCutout(Cutout):
         # Parse table info
         cube_wcs = self._parse_table_info(cube[2].data)
 
-        # Log coordinates
-        log.debug('Cutout center coordinate: %s, %s', self._coordinates.ra.deg, self._coordinates.dec.deg)
-
         # Get cutouts
         has_uncert = self._product == 'SPOC'
-        cutout = self.CubeCutoutInstance(cube, cube_wcs, has_uncert, self)
+        try:
+            cutout = self.CubeCutoutInstance(cube, cube_wcs, has_uncert, self)
+        except InvalidQueryError:
+            warnings.warn(f'Cutout footprint does not overlap with data in {file}, skipping...', DataWarning)
+            cube.close()
+            return
 
         # Build TPF
         tpf = self._build_tpf(cube, cutout)
+        cube.close()
+
+        # Log coordinates
+        log.debug('Cutout center coordinate: %s, %s', self._coordinates.ra.deg, self._coordinates.dec.deg)
 
         # Get cutout WCS info
         max_dist, sigma = cutout.wcs_fit['WCS_MSEP'][0], cutout.wcs_fit['WCS_SIG'][0]
         log.debug('Maximum distance between approximate and true location: %s', max_dist)
         log.debug('Error in approximate WCS (sigma): %.4f', sigma)
-
-        cube.close()
 
         # Store cutouts with filename
         self.cutouts_by_file[file] = cutout
@@ -663,6 +668,9 @@ class CubeCutout(Cutout):
         # Cutout each input cube file
         for file in self._input_files:
             self._cutout_file(file)
+
+        if not self.cutouts_by_file:
+            raise InvalidQueryError('Cube cutout contains no data! (Check image footprint.)')
 
         # Log total time elapsed
         log.debug('Total time: %.2f sec', (monotonic() - start_time))
@@ -775,12 +783,13 @@ class CubeCutout(Cutout):
             # Get cutout data
             self.data, self.uncertainty, self.aperture = self._get_cutout_data(cube[1].section, 
                                                                                self._parent._threads, has_uncert)
+            self.shape = self.data.shape
             
             # Get cutout WCS
             self.wcs = self._get_full_cutout_wcs(cube_wcs, cube[2].header)
 
             # Fit the cutout WCS
-            self._fit_cutout_wcs(self.wcs, self.data.shape[1:])
+            self._fit_cutout_wcs(self.data.shape[1:])
 
         def _get_cutout_data(self, transposed_cube: fits.ImageHDU.section, threads: int, 
                              has_uncert: bool = True) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -847,7 +856,7 @@ class CubeCutout(Cutout):
             if padding.any():
                 img_cutout = np.pad(img_cutout, padding, 'constant', constant_values=self._parent._fill_value)
                 if has_uncert:
-                    uncert_cutout = np.pad(uncert_cutout, padding, 'constant', constant_values=np.nan)
+                    uncert_cutout = np.pad(uncert_cutout, padding, 'constant', constant_values=self._parent._fill_value)
                 aperture = np.pad(aperture, padding[1:], 'constant', constant_values=0)
 
             log.debug('Image cutout cube shape: %s', img_cutout.shape)
@@ -905,7 +914,7 @@ class CubeCutout(Cutout):
 
             return WCS(wcs_header)
 
-        def _fit_cutout_wcs(self, cutout_wcs: WCS, cutout_shape: Tuple[int, int]) -> Tuple[float, float]:
+        def _fit_cutout_wcs(self, cutout_shape: Tuple[int, int]) -> Tuple[float, float]:
             """
             Given a full (including SIP coefficients) WCS for the cutout, 
             calculate the best fit linear WCS and a measure of the goodness-of-fit.
@@ -961,7 +970,7 @@ class CubeCutout(Cutout):
             pix_inds = np.array(list(product(xvals, yvals)))
 
             # Convert pixel coordinates to world coordinates
-            world_pix = SkyCoord(cutout_wcs.all_pix2world(pix_inds, 0), unit='deg')
+            world_pix = SkyCoord(self.wcs.all_pix2world(pix_inds, 0), unit='deg')
 
             # Fit a linear WCS
             linear_wcs = fit_wcs_from_points([pix_inds[:, 0], pix_inds[:, 1]], world_pix, proj_point='center')
@@ -969,7 +978,7 @@ class CubeCutout(Cutout):
 
             # Evaluate fit using all the pixels in the cutout
             full_pix_inds = np.array(list(product(range(width), range(height))))
-            world_pix_original = SkyCoord(cutout_wcs.all_pix2world(full_pix_inds, 0), unit='deg')
+            world_pix_original = SkyCoord(self.wcs.all_pix2world(full_pix_inds, 0), unit='deg')
             world_pix_fitted = SkyCoord(linear_wcs.all_pix2world(full_pix_inds, 0), unit='deg')
 
             # Compute fit residuals
