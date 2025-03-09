@@ -1,6 +1,7 @@
 from abc import abstractmethod, ABC
 from pathlib import Path
 from typing import List, Union, Tuple
+import warnings
 
 from astropy import wcs
 import astropy.units as u
@@ -8,10 +9,10 @@ from s3path import S3Path
 from astropy.coordinates import SkyCoord
 import numpy as np
 
-from astrocut.exceptions import InvalidInputError, InvalidQueryError
+from astrocut.exceptions import InputWarning, InvalidInputError, InvalidQueryError
 
 from . import log
-from .utils.utils import _handle_verbose, parse_size_input
+from .utils.utils import _handle_verbose
 
 
 class Cutout(ABC):
@@ -19,8 +20,8 @@ class Cutout(ABC):
     Abstract class for creating cutouts. This class defines attributes and methods that are common to all
     cutout classes.
 
-    Attributes
-    ----------
+    Args
+    ----
     input_files : list
         List of input image files.
     coordinates : str | `~astropy.coordinates.SkyCoord`
@@ -29,10 +30,6 @@ class Cutout(ABC):
         Size of the cutout array.
     fill_value : int | float
         Value to fill the cutout with if the cutout is outside the image.
-    memory_only : bool
-        If True, the cutout is written to memory instead of disk.
-    output_dir : str | Path
-        Directory to write the cutout file(s) to.
     limit_rounding_method : str
         Method to use for rounding the cutout limits. Options are 'round', 'ceil', and 'floor'.
     verbose : bool
@@ -40,7 +37,9 @@ class Cutout(ABC):
 
     Methods
     -------
-    get_cutout_limits(img_wcs)
+    _parse_size_input(cutout_size)
+        Makes the given cutout size into a length 2 array
+    _get_cutout_limits(img_wcs)
         Returns the x and y pixel limits for the cutout.
     cutout()
         Generate the cutouts.
@@ -48,8 +47,8 @@ class Cutout(ABC):
 
     def __init__(self, input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyCoord, str], 
                  cutout_size: Union[int, np.ndarray, u.Quantity, List[int], Tuple[int]] = 25,
-                 fill_value: Union[int, float] = np.nan, memory_only: bool = False,
-                 output_dir: Union[str, Path] = '.', limit_rounding_method: str = 'round', verbose: bool = False):
+                 fill_value: Union[int, float] = np.nan, limit_rounding_method: str = 'round', 
+                 verbose: bool = False):
         
         # Log messages according to verbosity
         _handle_verbose(verbose)
@@ -60,13 +59,13 @@ class Cutout(ABC):
         self._input_files = input_files
 
         # Get coordinates as a SkyCoord object
-        if coordinates and not isinstance(coordinates, SkyCoord):
+        if not isinstance(coordinates, SkyCoord):
             coordinates = SkyCoord(coordinates, unit='deg')
         self._coordinates = coordinates
         log.debug('Coordinates: %s', self._coordinates)
 
         # Turning the cutout size into an array of two values
-        self._cutout_size = parse_size_input(cutout_size)
+        self._cutout_size = self._parse_size_input(cutout_size)
         log.debug('Cutout size: %s', self._cutout_size)
 
         # Assigning other attributes
@@ -79,10 +78,56 @@ class Cutout(ABC):
         if not isinstance(fill_value, int) and not isinstance(fill_value, float):
             raise InvalidInputError('Fill value must be an integer or a float.')
         self._fill_value = fill_value
-        
-        self._memory_only = memory_only
-        self._output_dir = output_dir
+    
         self._verbose = verbose
+
+    def _parse_size_input(self, cutout_size):
+        """
+        Makes the given cutout size into a length 2 array.
+
+        Parameters
+        ----------
+        cutout_size : int, array-like, `~astropy.units.Quantity`
+            The size of the cutout array. If ``cutout_size`` is a scalar number or a scalar 
+            `~astropy.units.Quantity`, then a square cutout of ``cutout_size`` will be created.  
+            If ``cutout_size`` has two elements, they should be in ``(ny, nx)`` order.  Scalar numbers 
+            in ``cutout_size`` are assumed to be in units of pixels. `~astropy.units.Quantity` objects 
+            must be in pixel or angular units.
+
+        Returns
+        -------
+        response : array
+            Length two cutout size array, in the form [ny, nx].
+        """
+
+        # Making size into an array [ny, nx]
+        if np.isscalar(cutout_size):
+            cutout_size = np.repeat(cutout_size, 2)
+
+        if isinstance(cutout_size, u.Quantity):
+            cutout_size = np.atleast_1d(cutout_size)
+            if len(cutout_size) == 1:
+                cutout_size = np.repeat(cutout_size, 2)
+        elif not isinstance(cutout_size, np.ndarray):
+            cutout_size = np.array(cutout_size)
+
+        if len(cutout_size) > 2:
+            warnings.warn('Too many dimensions in cutout size, only the first two will be used.',
+                          InputWarning)
+            cutout_size = cutout_size[:2]
+
+        
+        for dim in cutout_size:
+            # Raise error if either dimension is not a positive number
+            if dim <= 0:
+                raise InvalidInputError('Cutout size dimensions must be greater than zero. '
+                                        f'Provided size: ({cutout_size[0]}, {cutout_size[1]})')
+            
+            # Raise error if either dimension is not an pixel or angular Quantity
+            if isinstance(dim, u.Quantity) and dim.unit != u.pixel and dim.unit.physical_type != 'angle':
+                raise InvalidInputError(f'Cutout size unit {dim.unit.aliases[0]} is not supported.')
+
+        return cutout_size
 
     def _get_cutout_limits(self, img_wcs: wcs.WCS) -> np.ndarray:
         """
