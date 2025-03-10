@@ -4,7 +4,7 @@
 
 from typing import Literal, Union
 
-from .CubeCutout import CubeCutout
+from .TessCubeCutout import TessCubeCutout
 
 
 class CutoutFactory():
@@ -79,12 +79,12 @@ class CutoutFactory():
             If successful, returns the path to the target pixel file,
             if unsuccessful returns None.
         """
-        cube_cutout = CubeCutout(input_files=cube_file,
-                                 coordinates=coordinates,
-                                 cutout_size=cutout_size,
-                                 product=product,
-                                 threads=threads,
-                                 verbose=verbose)
+        cube_cutout = TessCubeCutout(input_files=cube_file,
+                                     coordinates=coordinates,
+                                     cutout_size=cutout_size,
+                                     product=product,
+                                     threads=threads,
+                                     verbose=verbose)
         
         # Assign these attributes to be backwards compatible
         cutout_obj = cube_cutout.cutouts_by_file[cube_file]
