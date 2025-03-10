@@ -12,9 +12,10 @@ from astropy.time import Time
 from astropy.wcs import WCS, FITSFixedWarning
 
 from .utils_for_test import create_test_ffis
-from ..exceptions import DataWarning, InvalidQueryError
+from ..exceptions import DataWarning, InvalidInputError, InvalidQueryError
 from ..make_cube import CubeFactory, TicaCubeFactory
 from ..CubeCutout import CubeCutout
+from ..TessCubeCutout import TessCubeCutout
 
 
 @pytest.fixture
@@ -79,9 +80,9 @@ def cube_wcs(ffi_files: List[str], tmpdir, ffi_type: Literal["SPOC", "TICA"]):
 
 
 @pytest.mark.parametrize("ffi_type", ["SPOC", "TICA"])
-def test_cube_cutout(cube_file, num_images, ffi_type, cutout_size, coordinates, cutout_lims):
+def test_tess_cube_cutout(cube_file, num_images, ffi_type, cutout_size, coordinates, cutout_lims):
     # Make Cutout
-    cutouts = CubeCutout(cube_file, coordinates, cutout_size, product=ffi_type).cutouts
+    cutouts = TessCubeCutout(cube_file, coordinates, cutout_size, product=ffi_type).cutouts
     cutout = cutouts[0]
 
     # Should return a list of CubeCutoutInstance objects
@@ -112,9 +113,9 @@ def test_cube_cutout(cube_file, num_images, ffi_type, cutout_size, coordinates, 
 
 
 @pytest.mark.parametrize("ffi_type", ["SPOC", "TICA"])
-def test_cube_cutout_tpf(cube_file, num_images, ffi_type, cutout_size, coordinates, cutout_lims):
+def test_tess_cube_cutout_tpf(cube_file, num_images, ffi_type, cutout_size, coordinates, cutout_lims):
     # Make Cutout
-    tpfs = CubeCutout(cube_file, coordinates, cutout_size, product=ffi_type).tpf_cutouts
+    tpfs = TessCubeCutout(cube_file, coordinates, cutout_size, product=ffi_type).tpf_cutouts
     tpf = tpfs[0]
 
     # Should return a list of HDUList objects
@@ -206,10 +207,10 @@ def test_cube_cutout_tpf(cube_file, num_images, ffi_type, cutout_size, coordinat
 
 
 @pytest.mark.parametrize("ffi_type", ["SPOC", "TICA"])
-def test_cutout_partial(cube_file, cutout_size, ffi_type, cube_wcs, img_size, coordinates, num_images):
+def test_tess_cutout_partial(cube_file, cutout_size, ffi_type, cube_wcs, img_size, coordinates, num_images):
     # Off the top
     coord = cube_wcs.pixel_to_world(0, img_size // 2)
-    cutout = CubeCutout(cube_file, coord, cutout_size, product=ffi_type).cutouts[0]
+    cutout = TessCubeCutout(cube_file, coord, cutout_size, product=ffi_type).cutouts[0]
     offset = cutout_size // 2
     assert np.all(np.isnan(cutout.data[:, :, :offset]))
     assert np.all(cutout.aperture[:, :offset] == 0)
@@ -218,7 +219,7 @@ def test_cutout_partial(cube_file, cutout_size, ffi_type, cube_wcs, img_size, co
 
     # Off the bottom
     coord = cube_wcs.pixel_to_world(img_size, img_size // 2)
-    cutout = CubeCutout(cube_file, coord, cutout_size, product=ffi_type).cutouts[0]
+    cutout = TessCubeCutout(cube_file, coord, cutout_size, product=ffi_type).cutouts[0]
     assert np.all(np.isnan(cutout.data[:, :, offset:]))
     assert np.all(cutout.aperture[:, offset:] == 0)
     if ffi_type == 'SPOC':
@@ -226,7 +227,7 @@ def test_cutout_partial(cube_file, cutout_size, ffi_type, cube_wcs, img_size, co
 
     # Off the left, integer fill value
     coord = cube_wcs.pixel_to_world(img_size // 2, 0)
-    cutout = CubeCutout(cube_file, coord, cutout_size, product=ffi_type, fill_value=0).cutouts[0]
+    cutout = TessCubeCutout(cube_file, coord, cutout_size, product=ffi_type, fill_value=0).cutouts[0]
     assert np.all(cutout.data[:, :offset, :] == 0)
     assert np.all(cutout.aperture[:offset, :] == 0)
     if ffi_type == 'SPOC':
@@ -234,7 +235,7 @@ def test_cutout_partial(cube_file, cutout_size, ffi_type, cube_wcs, img_size, co
 
     # Off the right, float fill value
     coord = cube_wcs.pixel_to_world(img_size // 2, img_size)
-    cutout = CubeCutout(cube_file, coord, cutout_size, product=ffi_type, fill_value=1.5).cutouts[0]
+    cutout = TessCubeCutout(cube_file, coord, cutout_size, product=ffi_type, fill_value=1.5).cutouts[0]
     assert np.all(cutout.data[:, offset:, :] == 1.5)
     assert np.all(cutout.aperture[offset:, :] == 0)
     if ffi_type == 'SPOC':
@@ -244,7 +245,7 @@ def test_cutout_partial(cube_file, cutout_size, ffi_type, cube_wcs, img_size, co
     cutout_size = [120, 140]
     diff_width = (cutout_size[0] - img_size) // 2
     diff_height = (cutout_size[1] - img_size) // 2
-    cutout = CubeCutout(cube_file, coordinates, cutout_size, product=ffi_type).cutouts[0]
+    cutout = TessCubeCutout(cube_file, coordinates, cutout_size, product=ffi_type).cutouts[0]
     cutout_mask = np.zeros((num_images, cutout_size[1], cutout_size[0]), dtype=bool)
     cutout_mask[:, diff_height:diff_height + img_size, diff_width:diff_width + img_size] = True
     aper_mask = np.zeros((cutout_size[1], cutout_size[0]), dtype=bool)
@@ -256,7 +257,7 @@ def test_cutout_partial(cube_file, cutout_size, ffi_type, cube_wcs, img_size, co
 
 
 @pytest.mark.parametrize("ffi_type", ["SPOC"])
-def test_cube_cutout_batching(cube_file, tmpdir, cutout_size, coordinates, num_images):
+def test_tess_cube_cutout_batching(cube_file, tmpdir, cutout_size, coordinates, num_images):
     # Make copies of cube file
     copy1 = Path(tmpdir, "test_cube_1.fits")
     copy2 = Path(tmpdir, "test_cube_2.fits")
@@ -266,7 +267,7 @@ def test_cube_cutout_batching(cube_file, tmpdir, cutout_size, coordinates, num_i
 
     # Make multiple cutouts at once
     cutout_size = (5, 3)
-    cutouts = CubeCutout(input_files, coordinates, cutout_size).cutouts
+    cutouts = TessCubeCutout(input_files, coordinates, cutout_size).cutouts
 
     # Should return a list of CubeCutoutInstance objects
     assert isinstance(cutouts, list)
@@ -289,9 +290,9 @@ def test_cube_cutout_batching(cube_file, tmpdir, cutout_size, coordinates, num_i
 
 
 @pytest.mark.parametrize("ffi_type", ["SPOC", "TICA"])
-def test_cube_cutout_write_to_tpf(cube_file, tmpdir, cutout_size, coordinates, ffi_type):
+def test_tess_cube_cutout_write_to_tpf(cube_file, tmpdir, cutout_size, coordinates, ffi_type):
     # Make cutout
-    cutout = CubeCutout(cube_file, coordinates, cutout_size, product=ffi_type)
+    cutout = TessCubeCutout(cube_file, coordinates, cutout_size, product=ffi_type)
 
     # Write to TPF with output_file specified
     cutout_paths = cutout.write_as_tpf(tmpdir, 'cutout.fits')
@@ -323,12 +324,12 @@ def test_cube_cutout_write_to_tpf(cube_file, tmpdir, cutout_size, coordinates, f
     assert 'astrocut' in cutout_path
 
 
-def test_cube_cutout_s3():
+def test_tess_cube_cutout_s3():
     # Test case: Proxima Cen in Sector 38 (Camera 2, CCD 2)
     # Make a cutout from cloud cube file
     coord = SkyCoord(217.42893801, -62.67949189, unit="deg", frame="icrs")
     cube_file = "s3://stpubdata/tess/public/mast/tess-s0038-2-2-cube.fits"
-    tpf = CubeCutout(cube_file, coord, 3).tpf_cutouts[0]
+    tpf = TessCubeCutout(cube_file, coord, 3).tpf_cutouts[0]
 
     # Check the cutout for proper shape and some values
     assert tpf[1].data.shape == (3705,)
@@ -340,20 +341,20 @@ def test_cube_cutout_s3():
     tpf.close()
 
 
-def test_cube_cutout_threads():
+def test_tess_cube_cutout_threads():
     # Using a cloud file to test multithreading
     cutout_size = 5
     coord = SkyCoord(217.42893801, -62.67949189, unit="deg", frame="icrs")
     cube_file = "s3://stpubdata/tess/public/mast/tess-s0038-2-2-cube.fits"
 
     # 1 thread condition (no threading) used as verification for the different thread conditions
-    cutout_no_threads = CubeCutout(cube_file, coord, cutout_size, threads=1).tpf_cutouts[0]
+    cutout_no_threads = TessCubeCutout(cube_file, coord, cutout_size, threads=1).tpf_cutouts[0]
     data_no_threads = cutout_no_threads[1].data
 
     # when threads="auto", number of threads is system dependent: cpu_count + 4, limited to max of 32
     # https://docs.python.org/3/library/concurrent.futures.html#threadpoolexecutor
     for threads in (4, "auto"):
-        cutout_threads = CubeCutout(cube_file, coord, cutout_size, threads=threads).tpf_cutouts[0]
+        cutout_threads = TessCubeCutout(cube_file, coord, cutout_size, threads=threads).tpf_cutouts[0]
         data_threads = cutout_threads[1].data
 
         for ext_name in ("FLUX", "FLUX_ERR"):
@@ -361,10 +362,17 @@ def test_cube_cutout_threads():
 
 
 @pytest.mark.parametrize("ffi_type", ["SPOC"])
-def test_cube_cutout_not_in_footprint(cube_file):
+def test_tess_cube_cutout_not_in_footprint(cube_file):
     # Make a cutout with a coordinate outside the image footprint
     warnings.simplefilter('error')
     coord = SkyCoord(10, 10, unit="deg", frame="icrs")
     with pytest.warns(DataWarning, match='Cutout footprint does not overlap'):
         with pytest.raises(InvalidQueryError, match='Cube cutout contains no data!'):
-            CubeCutout(cube_file, coord, 3)
+            TessCubeCutout(cube_file, coord, 3)
+
+
+@pytest.mark.parametrize("ffi_type", ["SPOC"])
+def test_tess_cube_cutout_invalid_product(cube_file):
+    # Error if an invalid product name is input
+    with pytest.raises(InvalidInputError, match='Product for TESS cube cutouts must be'):
+        TessCubeCutout(cube_file, SkyCoord(0, 0, unit='deg'), 3, product='INVALID')
