@@ -108,6 +108,7 @@ def add_tica_keywords(hdu, time_increment):
     hdu.header['BP_1_1'] = -1.711876336719E-05
     hdu.header['A_DMAX'] = 44.72893589844534
     hdu.header['B_DMAX'] = 44.62692873032506
+    hdu.header['COMMENT'] = 'TICA TEST'
 
 
 def create_test_ffis(img_size, num_images, dir_name=".", product='SPOC', basename='make_cube-test{:04d}.fits'):

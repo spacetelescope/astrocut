@@ -12,7 +12,8 @@ from astropy.time import Time
 
 from ..cube_cut import CutoutFactory
 from ..exceptions import InputWarning, InvalidQueryError
-from ..make_cube import CubeFactory, TicaCubeFactory
+from ..CubeFactory import CubeFactory
+from ..TicaCubeFactory import TicaCubeFactory
 from .utils_for_test import create_test_ffis
 
 
