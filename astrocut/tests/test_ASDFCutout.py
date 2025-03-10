@@ -14,7 +14,7 @@ from PIL import Image
 
 from astrocut.ASDFCutout import ASDFCutout
 from astrocut.asdf_cutouts import asdf_cut
-from astrocut.exceptions import DataWarning, InvalidInputError
+from astrocut.exceptions import DataWarning, InvalidInputError, InvalidQueryError
 
 
 def make_wcs(xsize, ysize, ra=30., dec=45.):
@@ -233,7 +233,7 @@ def test_asdf_cutout_poles(cutout_size, makefake, tmp_path):
 def test_asdf_cutout_not_in_footprint(test_images, center_coord, cutout_size):
     # Throw error if cutout location is not in image footprint
     with pytest.warns(DataWarning, match='Cutout footprint does not overlap'):
-        with pytest.raises(InvalidInputError, match='Cutout contains no data!'):
+        with pytest.raises(InvalidQueryError, match='Cutout contains no data!'):
             ASDFCutout(test_images[0], SkyCoord('0 0', unit='deg'), cutout_size)
 
     # Alter one of the test images to only contain zeros in cutout footprint
