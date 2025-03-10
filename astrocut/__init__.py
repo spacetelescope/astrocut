@@ -37,3 +37,6 @@ if not _ASTROPY_SETUP_:  # noqa
     )  # noqa
     from .asdf_cutouts import asdf_cut, get_center_pixel  # noqa
     from .footprint_cutouts import cube_cut_from_footprint  # noqa
+    from .FITSCutout import FITSCutout  # noqa
+    from .ASDFCutout import ASDFCutout  # noqa
+    from .TessCubeCutout import TessCubeCutout  # noqa
