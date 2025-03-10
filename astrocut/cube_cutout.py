@@ -90,13 +90,6 @@ class CubeCutout(Cutout, ABC):
         """
         return list(self.cutouts_by_file.values())
 
-    @property
-    def tpf_cutouts(self):
-        """
-        Return the cutouts as a list of `astropy.io.fits.HDUList` target pixel file objects.
-        """
-        return list(self.tpf_cutouts_by_file.values())
-
     def _load_file_data(self, file: Union[str, Path, S3Path]) -> fits.HDUList:
         """
         Load the data from an input cube file.
