@@ -84,52 +84,6 @@ class Cutout(ABC):
         # Initialize cutout dictionary
         self.cutouts_by_file = {}
 
-    def _parse_size_input(self, cutout_size):
-        """
-        Makes the given cutout size into a length 2 array.
-
-        Parameters
-        ----------
-        cutout_size : int, array-like, `~astropy.units.Quantity`
-            The size of the cutout array. If ``cutout_size`` is a scalar number or a scalar 
-            `~astropy.units.Quantity`, then a square cutout of ``cutout_size`` will be created.  
-            If ``cutout_size`` has two elements, they should be in ``(ny, nx)`` order.  Scalar numbers 
-            in ``cutout_size`` are assumed to be in units of pixels. `~astropy.units.Quantity` objects 
-            must be in pixel or angular units.
-
-        Returns
-        -------
-        response : array
-            Length two cutout size array, in the form [ny, nx].
-        """
-
-        # Making size into an array [ny, nx]
-        if np.isscalar(cutout_size):
-            cutout_size = np.repeat(cutout_size, 2)
-
-        if isinstance(cutout_size, u.Quantity):
-            cutout_size = np.atleast_1d(cutout_size)
-            if len(cutout_size) == 1:
-                cutout_size = np.repeat(cutout_size, 2)
-
-        if len(cutout_size) > 2:
-            warnings.warn('Too many dimensions in cutout size, only the first two will be used.',
-                          InputWarning)
-            cutout_size = cutout_size[:2]
-
-        
-        for dim in cutout_size:
-            # Raise error if either dimension is not a positive number
-            if dim <= 0:
-                raise InvalidInputError('Cutout size dimensions must be greater than zero. '
-                                        f'Provided size: ({cutout_size[0]}, {cutout_size[1]})')
-            
-            # Raise error if either dimension is not an pixel or angular Quantity
-            if isinstance(dim, u.Quantity) and dim.unit != u.pixel and dim.unit.physical_type != 'angle':
-                raise InvalidInputError(f'Cutout size unit {dim.unit.aliases[0]} is not supported.')
-
-        return cutout_size
-
     def _get_cutout_limits(self, img_wcs: wcs.WCS) -> np.ndarray:
         """
         Returns the x and y pixel limits for the cutout.
@@ -198,3 +152,50 @@ class Cutout(ABC):
         This method is abstract and should be defined in subclasses.
         """
         pass
+
+    @staticmethod
+    def _parse_size_input(cutout_size):
+        """
+        Makes the given cutout size into a length 2 array.
+
+        Parameters
+        ----------
+        cutout_size : int, array-like, `~astropy.units.Quantity`
+            The size of the cutout array. If ``cutout_size`` is a scalar number or a scalar 
+            `~astropy.units.Quantity`, then a square cutout of ``cutout_size`` will be created.  
+            If ``cutout_size`` has two elements, they should be in ``(ny, nx)`` order.  Scalar numbers 
+            in ``cutout_size`` are assumed to be in units of pixels. `~astropy.units.Quantity` objects 
+            must be in pixel or angular units.
+
+        Returns
+        -------
+        response : array
+            Length two cutout size array, in the form [ny, nx].
+        """
+
+        # Making size into an array [ny, nx]
+        if np.isscalar(cutout_size):
+            cutout_size = np.repeat(cutout_size, 2)
+
+        if isinstance(cutout_size, u.Quantity):
+            cutout_size = np.atleast_1d(cutout_size)
+            if len(cutout_size) == 1:
+                cutout_size = np.repeat(cutout_size, 2)
+
+        if len(cutout_size) > 2:
+            warnings.warn('Too many dimensions in cutout size, only the first two will be used.',
+                          InputWarning)
+            cutout_size = cutout_size[:2]
+
+        
+        for dim in cutout_size:
+            # Raise error if either dimension is not a positive number
+            if dim <= 0:
+                raise InvalidInputError('Cutout size dimensions must be greater than zero. '
+                                        f'Provided size: ({cutout_size[0]}, {cutout_size[1]})')
+            
+            # Raise error if either dimension is not an pixel or angular Quantity
+            if isinstance(dim, u.Quantity) and dim.unit != u.pixel and dim.unit.physical_type != 'angle':
+                raise InvalidInputError(f'Cutout size unit {dim.unit.aliases[0]} is not supported.')
+
+        return cutout_size
