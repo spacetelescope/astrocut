@@ -217,4 +217,4 @@ def test_cube_cut_from_footprint(coordinates, cutout_size, tmpdir):
     assert len(cutouts) == 1
     assert isinstance(cutouts, list)
     assert isinstance(cutouts[0], str)
-    assert tmpdir in cutouts[0]
+    assert str(tmpdir) in cutouts[0]
