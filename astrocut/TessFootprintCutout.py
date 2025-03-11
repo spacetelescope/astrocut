@@ -105,7 +105,6 @@ class TessFootprintCutout(FootprintCutout):
             A dictionary containing the sector name, sector number, camera number, and CCD number.
         """
         # Define the pattern based on the product
-        print(self._product, sector_name)
         if self._product == 'SPOC':
             pattern = re.compile(r"(tess-s)(?P<sector>\d{4})-(?P<camera>\d{1,4})-(?P<ccd>\d{1,4})")
         elif self._product == 'TICA':
