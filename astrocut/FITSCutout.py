@@ -22,8 +22,8 @@ class FITSCutout(ImageCutout):
     """
     Class for creating cutouts from FITS files.
 
-    Args
-    ----
+    Parameters
+    ----------
     input_files : list
         List of input image files.
     coordinates : str | `~astropy.coordinates.SkyCoord`
@@ -455,8 +455,8 @@ class FITSCutout(ImageCutout):
         Represents an individual cutout with its own data and WCS. Eventually, this will be replaced
         by `astropy.nddata.Cutout2D` objects.
 
-        Args
-        ----
+        Parameters
+        ----------
         img_data : `~astropy.io.fits.Section`
             The data for the image.
         img_wcs : `~astropy.wcs.WCS`
