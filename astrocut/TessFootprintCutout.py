@@ -18,8 +18,8 @@ class TessFootprintCutout(FootprintCutout):
     Class for generating cutouts from TESS Full Frame Images (FFIs) hosted on the cloud 
     based on the footprint of the cutout.
 
-    Args
-    ----
+    Parameters
+    ----------
     coordinates : str | `~astropy.coordinates.SkyCoord`
         Coordinates of the center of the cutout.
     cutout_size : int | array | list | tuple | `~astropy.units.Quantity`

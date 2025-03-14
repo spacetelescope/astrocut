@@ -26,8 +26,8 @@ class ASDFCutout(ImageCutout):
     """
     Class for creating cutouts from ASDF files.
 
-    Args
-    ----
+    Parameters
+    ----------
     input_files : list
         List of input image files.
     coordinates : str | `~astropy.coordinates.SkyCoord`

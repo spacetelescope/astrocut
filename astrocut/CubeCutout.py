@@ -24,8 +24,8 @@ class CubeCutout(Cutout, ABC):
     """
     Abstract class for creating cutouts from image cubes.
 
-    Args
-    ----
+    Parameters
+    ----------
     input_files : list
         List of input image files.
     coordinates : str | `~astropy.coordinates.SkyCoord`
@@ -303,8 +303,8 @@ class CubeCutout(Cutout, ABC):
         """
         Represents an individual cutout with its own data, uncertainty, and aperture arrays.
 
-        Args
-        ----
+        Parameters
+        ----------
         cube : `~astropy.io.fits.HDUList`
             The input cube.
         file : str | Path | S3Path

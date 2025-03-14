@@ -20,8 +20,8 @@ class Cutout(ABC):
     Abstract class for creating cutouts. This class defines attributes and methods that are common to all
     cutout classes.
 
-    Args
-    ----
+    Parameters
+    ----------
     input_files : list
         List of input image files.
     coordinates : str | `~astropy.coordinates.SkyCoord`
