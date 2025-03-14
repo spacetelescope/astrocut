@@ -19,15 +19,15 @@ from s3path import S3Path
 
 from . import log
 from .ImageCutout import ImageCutout
-from .exceptions import DataWarning, InvalidInputError
+from .exceptions import DataWarning, InvalidQueryError
 
 
 class ASDFCutout(ImageCutout):
     """
     Class for creating cutouts from ASDF files.
 
-    Args
-    ----
+    Parameters
+    ----------
     input_files : list
         List of input image files.
     coordinates : str | `~astropy.coordinates.SkyCoord`
@@ -327,7 +327,7 @@ class ASDFCutout(ImageCutout):
 
         Raises
         ------
-        InvalidInputError
+        InvalidQueryError
             If no cutouts contain data.
         """
         # Track start time
@@ -339,7 +339,7 @@ class ASDFCutout(ImageCutout):
 
         # If no cutouts contain data, raise exception        
         if not self.cutouts:
-            raise InvalidInputError('Cutout contains no data! (Check image footprint.)')
+            raise InvalidQueryError('Cutout contains no data! (Check image footprint.)')
 
         # Log total time elapsed
         log.debug('Total time: %.2f sec', monotonic() - start_time)
