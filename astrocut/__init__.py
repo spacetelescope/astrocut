@@ -40,3 +40,4 @@ if not _ASTROPY_SETUP_:  # noqa
     from .FITSCutout import FITSCutout  # noqa
     from .ASDFCutout import ASDFCutout  # noqa
     from .TessCubeCutout import TessCubeCutout  # noqa
+    from .TessFootprintCutout import TessFootprintCutout  # noqa

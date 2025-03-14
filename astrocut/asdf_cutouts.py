@@ -57,7 +57,7 @@ def asdf_cut(input_files: List[Union[str, Path, S3Path]],
     around the given coordinates (`coordinates`). The cutout is written to a file or returned as an object.
 
     This function is maintained for backwards compatibility. For maximum flexibility, we recommend using the
-    ``ASDFCutout``class directly.
+    ``ASDFCutout`` class directly.
 
     Parameters
     ----------
