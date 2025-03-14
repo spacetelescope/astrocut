@@ -20,8 +20,8 @@ class FootprintCutout(Cutout, ABC):
     """
     Abstract class that creates cutouts from data files hosted on the S3 cloud.
 
-    Args
-    ----
+    Parameters
+    ----------
     coordinates : str | `~astropy.coordinates.SkyCoord`
         Coordinates of the center of the cutout.
     cutout_size : int | array | list | tuple | `~astropy.units.Quantity`
