@@ -13,8 +13,9 @@ from astropy.time import Time
 from astropy.wcs import FITSFixedWarning
 
 from ..cube_cut import CutoutFactory
-from ..exceptions import InputWarning
-from ..make_cube import CubeFactory, TicaCubeFactory
+from ..exceptions import InputWarning, InvalidQueryError
+from ..CubeFactory import CubeFactory
+from ..TicaCubeFactory import TicaCubeFactory
 from .utils_for_test import create_test_ffis
 
 

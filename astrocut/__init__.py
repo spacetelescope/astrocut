@@ -28,7 +28,8 @@ log = setup_logger()
 
 # Import key submodules and functions if not in setup mode
 if not _ASTROPY_SETUP_:  # noqa
-    from .make_cube import CubeFactory, TicaCubeFactory  # noqa
+    from .CubeFactory import CubeFactory  # noqa
+    from .TicaCubeFactory import TicaCubeFactory  # noqa
     from .cube_cut import CutoutFactory  # noqa
     from .cutouts import fits_cut, img_cut, normalize_img  # noqa
     from .cutout_processing import (  # noqa
