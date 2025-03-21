@@ -427,7 +427,7 @@ class TessCubeCutout(CubeCutout):
 
         return cutout_hdu_list
     
-    def write_as_tpf(self, output_dir: Union[str, Path] = '.', output_file: str = None):
+    def write_as_tpf(self, output_dir: Union[str, Path] = '.', output_file: str = None) -> List[str]:
         """
         Write the cutouts to disk as target pixel files.
 
