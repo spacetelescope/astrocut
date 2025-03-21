@@ -36,8 +36,6 @@ class ASDFCutout(ImageCutout):
         Size of the cutout array.
     fill_value : int | float
         Value to fill the cutout with if the cutout is outside the image.
-    limit_rounding_method : str
-        Method to use for rounding the cutout limits. Options are 'round', 'ceil', and 'floor'.
     key : str
         Optional, default None. Access key ID for S3 file system.
     secret : str
@@ -57,23 +55,13 @@ class ASDFCutout(ImageCutout):
         The cutouts as a list `astropy.io.fits.HDUList` objects.
     asdf_cutouts : list
         The cutouts as a list of `asdf.AsdfFile` objects.
+    image_cutouts : list
+        List of `~PIL.Image.Image` objects representing the cutouts.
 
     Methods
     -------
-    _get_cloud_http(input_file)
-        Get the HTTP URL of a cloud resource from an S3 URI.
-    _load_file_data(input_file)
-        Load the data from an input file.
-    _get_cutout_data(data, wcs, pixel_coords)
-        Get the cutout data from the input image.
-    _slice_gwcs(cutout, gwcs)
-        Slice the original gwcs object to fit the cutout.
-    _cutout_file(file)
-        Create a cutout from an input file.
     cutout()
         Generate cutouts from a list of input images.
-    _write_as_format(output_format, output_dir)
-        Write the cutout to disk or memory in the specified format.
     write_as_fits(output_dir)
         Write the cutouts to disk or memory in FITS format.
     write_as_asdf(output_dir)
@@ -84,11 +72,10 @@ class ASDFCutout(ImageCutout):
         
     def __init__(self, input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyCoord, str], 
                  cutout_size: Union[int, np.ndarray, Quantity, List[int], Tuple[int]] = 25,
-                 fill_value: Union[int, float] = np.nan, limit_rounding_method: str = 'round',
-                 key: Optional[str] = None, secret: Optional[str] = None,
+                 fill_value: Union[int, float] = np.nan, key: Optional[str] = None, secret: Optional[str] = None,
                  token: Optional[str] = None, verbose: bool = False):
         # Superclass constructor 
-        super().__init__(input_files, coordinates, cutout_size, fill_value, limit_rounding_method, verbose=verbose)
+        super().__init__(input_files, coordinates, cutout_size, fill_value, verbose=verbose)
 
         # Assign AWS credential attributes
         self._key = key
