@@ -37,8 +37,6 @@ class ASDFCutout(ImageCutout):
         Size of the cutout array.
     fill_value : int | float
         Value to fill the cutout with if the cutout is outside the image.
-    limit_rounding_method : str
-        Method to use for rounding the cutout limits. Options are 'round', 'ceil', and 'floor'.
     key : str
         Optional, default None. Access key ID for S3 file system.
     secret : str
@@ -58,6 +56,8 @@ class ASDFCutout(ImageCutout):
         The cutouts as a list `astropy.io.fits.HDUList` objects.
     asdf_cutouts : list
         The cutouts as a list of `asdf.AsdfFile` objects.
+    image_cutouts : list
+        List of `~PIL.Image.Image` objects representing the cutouts.
 
     Methods
     -------
@@ -73,11 +73,10 @@ class ASDFCutout(ImageCutout):
         
     def __init__(self, input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyCoord, str], 
                  cutout_size: Union[int, np.ndarray, Quantity, List[int], Tuple[int]] = 25,
-                 fill_value: Union[int, float] = np.nan, limit_rounding_method: str = 'round',
-                 key: Optional[str] = None, secret: Optional[str] = None,
+                 fill_value: Union[int, float] = np.nan, key: Optional[str] = None, secret: Optional[str] = None,
                  token: Optional[str] = None, verbose: bool = False):
         # Superclass constructor 
-        super().__init__(input_files, coordinates, cutout_size, fill_value, limit_rounding_method, verbose=verbose)
+        super().__init__(input_files, coordinates, cutout_size, fill_value, verbose=verbose)
 
         # Assign AWS credential attributes
         self._key = key

@@ -228,7 +228,7 @@ class TessFootprintCutout(FootprintCutout):
         self.tpf_cutouts_by_file = tess_cube_cutout.tpf_cutouts_by_file
         self.tpf_cutouts = tess_cube_cutout.tpf_cutouts
         
-    def write_as_tpf(self, output_dir: Union[str, Path]):
+    def write_as_tpf(self, output_dir: Union[str, Path] = '.') -> List[str]:
         """
         Write the cutouts to disk as target pixel files.
 
