@@ -11,10 +11,9 @@ from astropy.time import Time
 from astropy.wcs import WCS
 from s3path import S3Path
 
-from astrocut.exceptions import InvalidInputError
-
 from . import __version__, log
 from .CubeCutout import CubeCutout
+from .exceptions import DataWarning, InvalidInputError, InvalidQueryError
 
 
 class TessCubeCutout(CubeCutout):
@@ -67,6 +66,8 @@ class TessCubeCutout(CubeCutout):
         as placeholders.
     _build_tpf(cube, cutout, cutout_wcs_dict)
         Build the cutout target pixel file.
+    _cutout_file(file)
+        Make a cutout from a single TESS cube file.
     write_as_tpf(output_dir, output_file)
         Write the cutouts to target pixel files.
     """
@@ -426,6 +427,44 @@ class TessCubeCutout(CubeCutout):
         self.tpf_cutouts_by_file[cutout.cube_filename] = cutout_hdu_list
 
         return cutout_hdu_list
+    
+    def _cutout_file(self, file: Union[str, Path, S3Path]):
+        """
+        Make a cutout from a single cube file.
+
+        Parameters
+        ----------
+        file : str, Path, or S3Path
+            The path to the cube file.
+        """
+        # Read in file data
+        cube = self._load_file_data(file)
+
+        # Parse table info
+        cube_wcs = self._parse_table_info(cube[2].data)
+
+        # Get cutouts
+        try:
+            cutout = self.CubeCutoutInstance(cube, file, cube_wcs, self._has_uncertainty, self)
+        except InvalidQueryError:
+            warnings.warn(f'Cutout footprint does not overlap with data in {file}, skipping...', DataWarning)
+            cube.close()
+            return
+
+        # Build TPF
+        self._build_tpf(cube, cutout)
+        cube.close()
+
+        # Log coordinates
+        log.debug('Cutout center coordinate: %s, %s', self._coordinates.ra.deg, self._coordinates.dec.deg)
+
+        # Get cutout WCS info
+        max_dist, sigma = cutout.wcs_fit['WCS_MSEP'][0], cutout.wcs_fit['WCS_SIG'][0]
+        log.debug('Maximum distance between approximate and true location: %s', max_dist)
+        log.debug('Error in approximate WCS (sigma): %.4f', sigma)
+
+        # Store cutouts with filename
+        self.cutouts_by_file[file] = cutout
     
     def write_as_tpf(self, output_dir: Union[str, Path] = '.', output_file: str = None):
         """

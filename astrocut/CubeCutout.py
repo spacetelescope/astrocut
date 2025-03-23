@@ -16,7 +16,7 @@ from s3path import S3Path
 
 from . import log
 from .Cutout import Cutout
-from .exceptions import DataWarning, InvalidQueryError
+from .exceptions import InvalidQueryError
 from .utils.wcs_fitting import fit_wcs_from_points
 
 
@@ -64,8 +64,6 @@ class CubeCutout(Cutout, ABC):
         Adding extra keywords to the table header.
     _apply_header_inherit(hdu_list)
         Apply header inheritance to the cutout target pixel file.
-    _build_tpf(cube, cutout, cutout_wcs_dict)
-        Build the cutout target pixel file.
     _cutout_file(file)
         Make a cutout from a single cube file.
     cutout()
@@ -262,53 +260,15 @@ class CubeCutout(Cutout, ABC):
                 for kwd, val in primary_header.items():
                     if (kwd not in header) and (kwd not in reserved_kwds):
                         header[kwd] = (val, primary_header.comments[kwd])
-
-    @abstractmethod
-    def _build_tpf(self, cube_fits: fits.HDUList, cutout: 'CubeCutoutInstance') -> fits.HDUList:
-        """
-        Build the cutout target pixel file (TPF).
-
-        This method is abstract and should be defined in subclasses.
-        """
-        pass
     
+    @abstractmethod
     def _cutout_file(self, file: Union[str, Path, S3Path]):
         """
         Make a cutout from a single cube file.
 
-        Parameters
-        ----------
-        file : str, Path, or S3Path
-            The path to the cube file.
+        This method is abstract and should be defined in subclasses.
         """
-        # Read in file data
-        cube = self._load_file_data(file)
-
-        # Parse table info
-        cube_wcs = self._parse_table_info(cube[2].data)
-
-        # Get cutouts
-        try:
-            cutout = self.CubeCutoutInstance(cube, file, cube_wcs, self._has_uncertainty, self)
-        except InvalidQueryError:
-            warnings.warn(f'Cutout footprint does not overlap with data in {file}, skipping...', DataWarning)
-            cube.close()
-            return
-
-        # Build TPF
-        self._build_tpf(cube, cutout)
-        cube.close()
-
-        # Log coordinates
-        log.debug('Cutout center coordinate: %s, %s', self._coordinates.ra.deg, self._coordinates.dec.deg)
-
-        # Get cutout WCS info
-        max_dist, sigma = cutout.wcs_fit['WCS_MSEP'][0], cutout.wcs_fit['WCS_SIG'][0]
-        log.debug('Maximum distance between approximate and true location: %s', max_dist)
-        log.debug('Error in approximate WCS (sigma): %.4f', sigma)
-
-        # Store cutouts with filename
-        self.cutouts_by_file[file] = cutout
+        pass
     
     def cutout(self):
         """

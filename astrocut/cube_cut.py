@@ -16,7 +16,8 @@ class CutoutFactory():
     SPOC (Science Processing Operations Center) and TICA (Tess Image CAlibration) 
     full frame image cubes.
 
-    Future versions will include more generalized cutout functionality.
+    This class is maintained for backwards compatibility. For maximum flexibility, we recommend using the
+    `~astrocut.TessCubeCutout` class.
     """
 
     def cube_cut(
@@ -35,6 +36,9 @@ class CutoutFactory():
         Takes a cube file (as created by `~astrocut.CubeFactory`), and makes a cutout target pixel
         file of the given size around the given coordinates. The target pixel file is formatted like
         a TESS pipeline target pixel file.
+
+        This function is maintained for backwards compatibility. For maximum flexibility, we recommend using the
+        `~astrocut.TessCubeCutout` class.
 
         Parameters
         ----------
