@@ -22,8 +22,8 @@ class ImageCutout(Cutout, ABC):
     Abstract class for creating cutouts from images. This class defines attributes and methods that are common to all
     image cutout classes.
 
-    Args
-    ----
+    Parameters
+    ----------
     input_files : list
         List of input image files.
     coordinates : str | `~astropy.coordinates.SkyCoord`
@@ -68,8 +68,7 @@ class ImageCutout(Cutout, ABC):
                  verbose: bool = False):
         super().__init__(input_files, coordinates, cutout_size, fill_value, limit_rounding_method, verbose)
 
-        # Initialize cutout dictionary and counters
-        self.cutouts_by_file = {}
+        # Stores the image cutouts as PIL.Image objects
         self._image_cutouts = None
 
     @property
