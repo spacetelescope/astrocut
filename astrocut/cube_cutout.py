@@ -70,11 +70,6 @@ class CubeCutout(Cutout, ABC):
         self._wcs_axes_keyword = None  # Keyword corresponding to WCS axis
         self._wcs_axes_value = None  # Expected value for the WCS axis keyword
         self._skip_kwds = []  # Keywords to skip when adding to the TPF headers
-        
-        self.tpf_cutouts_by_file = {}
-
-        # Make the cutouts upon initialization
-        self.cutout()
 
     @property
     def cutouts(self):
@@ -154,6 +149,8 @@ class CubeCutout(Cutout, ABC):
 
             # Making sure we have a row with wcs info.
             row = table_data[data_ind]
+            print('hello', self._wcs_axes_keyword)
+            print(self._wcs_axes_keyword, self._wcs_axes_value, row[self._wcs_axes_keyword])
             if row[self._wcs_axes_keyword] == self._wcs_axes_value:
                 table_row = row
             else:
