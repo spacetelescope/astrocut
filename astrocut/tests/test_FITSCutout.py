@@ -251,19 +251,23 @@ def test_fits_cutout_extension(test_images, center_coord, cutout_size):
         hdul.flush()
 
     with pytest.warns(DataWarning, match='No image extensions with data found.'):
-        with pytest.raises(InvalidInputError, match='Cutout contains no data!'):
+        with pytest.raises(InvalidQueryError, match='Cutout contains no data!'):
             FITSCutout(test_images[1], center_coord, cutout_size)
 
 
 def test_fits_cutout_not_in_footprint(test_images, cutout_size):
     # Test when the requested cutout is not on the image
     center_coord = SkyCoord("140.1163213 2.2005731", unit='deg')
-    with pytest.raises(InvalidQueryError, match='Cutout location is not in image footprint!'):
-        FITSCutout(test_images, center_coord, cutout_size, single_outfile=True)
+    with pytest.warns(DataWarning, match='does not overlap'):
+        with pytest.warns(DataWarning, match='contains no data, skipping...'):
+            with pytest.raises(InvalidQueryError, match='Cutout contains no data!'):
+                FITSCutout(test_images, center_coord, cutout_size, single_outfile=True)
 
     center_coord = SkyCoord("15.1163213 2.2005731", unit='deg')
-    with pytest.raises(InvalidQueryError, match='Cutout location is not in image footprint!'):
-        FITSCutout(test_images, center_coord, cutout_size, single_outfile=True)
+    with pytest.warns(DataWarning, match='does not overlap'):
+        with pytest.warns(DataWarning, match='contains no data, skipping...'):
+            with pytest.raises(InvalidQueryError, match='Cutout contains no data!'):
+                FITSCutout(test_images, center_coord, cutout_size, single_outfile=True)
 
 
 def test_fits_cutout_no_data(tmpdir, test_images, cutout_size):
@@ -299,7 +303,7 @@ def test_fits_cutout_no_data(tmpdir, test_images, cutout_size):
             hdu.flush()
 
     with pytest.warns(DataWarning, match='contains no data, skipping...'):
-        with pytest.raises(InvalidInputError, match='Cutout contains no data!'):
+        with pytest.raises(InvalidQueryError, match='Cutout contains no data!'):
             FITSCutout(test_images, center_coord, cutout_size, single_outfile=True)
 
 
@@ -434,7 +438,7 @@ def test_fits_cutout_img_errors(tmpdir, test_images, center_coord, cutout_size):
 
     # Warning when outputting non-color images
     with pytest.warns(DataWarning, match='contains no data, skipping...'):
-        with pytest.raises(InvalidInputError, match='Cutout contains no data'):
+        with pytest.raises(InvalidQueryError, match='Cutout contains no data'):
             FITSCutout(test_images[0], center_coord, cutout_size).write_as_img(output_format='png', output_dir=tmpdir)
 
     # Error when outputting color image

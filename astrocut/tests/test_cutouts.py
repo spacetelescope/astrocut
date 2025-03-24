@@ -107,14 +107,16 @@ def test_fits_cut(tmpdir, caplog, ffi_type):
 
     # Test when the requested cutout is not on the image
     center_coord = SkyCoord("140.1163213 2.2005731", unit='deg')
-    with pytest.raises(Exception, match='Cutout location is not in image footprint!') as e:
-        cutout_file = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=True)
-        assert e.type is InvalidQueryError
+    with pytest.warns(DataWarning, match='does not overlap'):
+        with pytest.warns(DataWarning, match='contains no data, skipping...'):
+            with pytest.raises(InvalidQueryError, match='Cutout contains no data!'):
+                cutout_file = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=True)
 
     center_coord = SkyCoord("15.1163213 2.2005731", unit='deg')
-    with pytest.raises(Exception, match='Cutout location is not in image footprint!') as e:
-        cutout_file = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=True)
-        assert e.type is InvalidQueryError
+    with pytest.warns(DataWarning, match='does not overlap'):
+        with pytest.warns(DataWarning, match='contains no data, skipping...'):
+            with pytest.raises(InvalidQueryError, match='Cutout contains no data!'):
+                cutout_file = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=True)
     
 
     # Test when cutout is in some images not others
@@ -149,7 +151,7 @@ def test_fits_cut(tmpdir, caplog, ffi_type):
         hdu.close()
 
     with pytest.warns(DataWarning, match='contains no data, skipping...'):
-        with pytest.raises(InvalidInputError, match='Cutout contains no data!'):
+        with pytest.raises(InvalidQueryError, match='Cutout contains no data!'):
             cutout_file = cutouts.fits_cut(test_images, center_coord, cutout_size, single_outfile=True, 
                                            output_dir=tmpdir)
 

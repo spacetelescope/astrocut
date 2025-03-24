@@ -30,10 +30,13 @@ log = setup_logger()
 if not _ASTROPY_SETUP_:  # noqa
     from .CubeFactory import CubeFactory  # noqa
     from .TicaCubeFactory import TicaCubeFactory  # noqa
-    from .cube_cut import CutoutFactory  # noqa
+    from .cube_cut import CutoutFactory, cube_cut  # noqa
     from .cutouts import fits_cut, img_cut, normalize_img  # noqa
     from .cutout_processing import (  # noqa
         path_to_footprints, center_on_path, CutoutsCombiner, build_default_combine_function  # noqa
     )  # noqa
     from .asdf_cutouts import asdf_cut, get_center_pixel  # noqa
     from .footprint_cutouts import cube_cut_from_footprint  # noqa
+    from .FITSCutout import FITSCutout  # noqa
+    from .ASDFCutout import ASDFCutout  # noqa
+    from .TessCubeCutout import TessCubeCutout  # noqa
