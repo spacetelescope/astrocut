@@ -124,16 +124,14 @@ def check_flux(flux, x1, x2, y1, y2, ecube, label, hdulist):
 
 
 @pytest.mark.parametrize("ffi_type", ["SPOC", "TICA"])
-def test_cube_cutout(cube_file, ffi_files, ffi_type, tmp_path):
+@pytest.mark.parametrize("use_factory", [True, False])
+def test_cube_cutout(cube_file, ffi_files, ffi_type, use_factory, tmp_path):
     """
     Testing the cube cutout functionality.
     """
     tmpdir = str(tmp_path)
-
     img_sz = 10
     num_im = 100
-
-    cutout_maker = CutoutFactory()
 
     # Read one of the input images to get the WCS
     n = 1 if ffi_type == 'SPOC' else 0
@@ -160,8 +158,14 @@ def test_cube_cutout(cube_file, ffi_files, ffi_type, tmp_path):
     csize[-1] = img_sz+5
     for i, v in enumerate(world_coords):
         coord = SkyCoord(v[0], v[1], frame='icrs', unit='deg')
-        cutout_maker.cube_cut(cube_file, coord, csize[i], ffi_type, target_pixel_file=cutlist[i],
-                              output_path=tmpdir, verbose=False)
+        if use_factory:
+            cutout_maker = CutoutFactory()
+            cutout_maker.cube_cut(cube_file, coord, csize[i], ffi_type, target_pixel_file=cutlist[i],
+                                  output_path=tmpdir, verbose=False)
+        else:
+            cube_cut(cube_file, coord, csize[i], ffi_type, target_pixel_file=cutlist[i],
+                     output_path=tmpdir, verbose=False)
+
 
     # expected values for cube
     ecube = np.zeros((img_sz, img_sz, num_im, 2))
@@ -471,7 +475,7 @@ def test_tica_cutout_error(tmp_path):
 
     ffi_type = 'TICA'
     # Test cutouts from TICA cube with error array
-    test_cube_cutout(tica_cube_error_file, tica_ffi_files, ffi_type, tmp_path)
+    test_cube_cutout(tica_cube_error_file, tica_ffi_files, ffi_type, True, tmp_path)
     test_header_keywords_quality(tica_cube_error_file, ffi_type, tmp_path)
     test_header_keywords_diffs(tica_cube_error_file, ffi_type, tmp_path)
     test_target_pixel_file(tica_cube_error_file, ffi_type, tmp_path)
