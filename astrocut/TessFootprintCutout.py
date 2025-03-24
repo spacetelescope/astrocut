@@ -9,7 +9,7 @@ from astropy.table import Table
 
 from . import log
 from .exceptions import InvalidQueryError, InvalidInputError
-from .FootprintCutout import FootprintCutout
+from .FootprintCutout import FootprintCutout, get_ffis
 from .TessCubeCutout import TessCubeCutout
 
 
@@ -199,7 +199,7 @@ class TessFootprintCutout(FootprintCutout):
             If the given coordinates are not found within the specified sequence(s).
         """
         # Get footprints from the cloud
-        all_ffis = self._get_ffis()
+        all_ffis = get_ffis(self._s3_footprint_cache)
         log.debug('Found %d footprint files.', len(all_ffis))
 
         # Filter footprints by sequence
