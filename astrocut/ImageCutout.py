@@ -162,7 +162,7 @@ class ImageCutout(Cutout, ABC):
 
         This method is abstract and should be defined in subclasses.
         """
-        pass
+        raise NotImplementedError('Subclasses must implement this method.')
 
     @abstractmethod
     def cutout(self):
@@ -171,7 +171,7 @@ class ImageCutout(Cutout, ABC):
 
         This method is abstract and should be defined in subclasses.
         """
-        pass
+        raise NotImplementedError('Subclasses must implement this method.')
     
     def _parse_output_format(self, output_format: str) -> str:
         """

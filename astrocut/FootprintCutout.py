@@ -39,8 +39,6 @@ class FootprintCutout(Cutout, ABC):
 
     Methods
     -------
-    _get_ffis()
-        Fetches footprints for Full Frame Images (FFIs) from the S3 cloud.
     _get_files_from_cone_results(cone_results)
         Returns the files that contain the cutout.
     cutout()
@@ -68,30 +66,6 @@ class FootprintCutout(Cutout, ABC):
         self._s3_footprint_cache = None  # S3 URI to footprint cache file
         self._arcsec_per_px = None  # Number of arcseconds per pixel in an image
     
-    @cached(cache=FFI_TTLCACHE, lock=Lock())
-    def _get_ffis(self) -> Table:
-        """
-        Fetches footprints for Full Frame Images (FFIs) from S3. The resulting
-        table contains each (FFI) and a 'polygon' column that describes the image's footprints as polygon points
-        and vectors.
-
-        Returns
-        -------
-        ffis : `~astropy.table.Table`
-            Table containing information about FFIs and their footprints.
-        """
-        # Open footprint file with fsspec
-        with fsspec.open(self._s3_footprint_cache, s3={'anon': True}) as f:
-            ffis = json.load(f)
-
-        # Compute spherical polygons
-        ffis['polygon'] = self._s_region_to_polygon(ffis['s_region'])
-
-        # Convert to Astropy table
-        ffis = Table(ffis)
-
-        return ffis
-    
     @abstractmethod
     def _get_files_from_cone_results(self, cone_results: Table) -> dict:
         """
@@ -100,7 +74,7 @@ class FootprintCutout(Cutout, ABC):
         
         This method is abstract and should be implemented in subclasses.
         """
-        pass
+        raise NotImplementedError('Subclasses must implement this method.')
 
     @abstractmethod
     def cutout(self):
@@ -109,7 +83,7 @@ class FootprintCutout(Cutout, ABC):
 
         This method is abstract and should be implemented in subclasses.
         """
-        pass
+        raise NotImplementedError('Subclasses must implement this method.')
 
     @staticmethod
     def _s_region_to_polygon(s_region: Column) -> Column:
@@ -255,3 +229,35 @@ class FootprintCutout(Cutout, ABC):
         ffi_inds = FootprintCutout._ffi_intersect(all_ffis, cutout_fp)
 
         return all_ffis[ffi_inds]
+    
+
+@cached(cache=FFI_TTLCACHE, lock=Lock())
+def get_ffis(s3_footprint_cache: str) -> Table:
+    """
+    Fetches footprints for Full Frame Images (FFIs) from S3. The resulting
+    table contains each (FFI) and a 'polygon' column that describes the image's footprints as polygon points
+    and vectors.
+
+    This method is outside the class definition to allow for caching.
+
+    Parameters
+    ----------
+    s3_footprint_cache : str
+        S3 URI to the footprint cache file.
+
+    Returns
+    -------
+    ffis : `~astropy.table.Table`
+        Table containing information about FFIs and their footprints.
+    """
+    # Open footprint file with fsspec
+    with fsspec.open(s3_footprint_cache, s3={'anon': True}) as f:
+        ffis = json.load(f)
+
+    # Compute spherical polygons
+    ffis['polygon'] = FootprintCutout._s_region_to_polygon(ffis['s_region'])
+
+    # Convert to Astropy table
+    ffis = Table(ffis)
+
+    return ffis

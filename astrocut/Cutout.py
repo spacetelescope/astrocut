@@ -151,7 +151,7 @@ class Cutout(ABC):
 
         This method is abstract and should be defined in subclasses.
         """
-        pass
+        raise NotImplementedError('Subclasses must implement this method.')
 
     @staticmethod
     def _parse_size_input(cutout_size):

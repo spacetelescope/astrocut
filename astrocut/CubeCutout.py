@@ -268,7 +268,7 @@ class CubeCutout(Cutout, ABC):
 
         This method is abstract and should be defined in subclasses.
         """
-        pass
+        raise NotImplementedError('Subclasses must implement this method.')
     
     def cutout(self):
         """
@@ -445,7 +445,7 @@ class CubeCutout(Cutout, ABC):
 
             This method is abstract and should be defined in subclasses.
             """
-            pass
+            raise NotImplementedError('Subclasses must implement this method.')
 
         def _fit_cutout_wcs(self, cutout_shape: Tuple[int, int]) -> Tuple[float, float]:
             """
