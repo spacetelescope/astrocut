@@ -24,8 +24,8 @@ class CubeCutout(Cutout, ABC):
     """
     Abstract class for creating cutouts from image cubes.
 
-    Args
-    ----
+    Parameters
+    ----------
     input_files : list
         List of input image files.
     coordinates : str | `~astropy.coordinates.SkyCoord`
@@ -268,7 +268,7 @@ class CubeCutout(Cutout, ABC):
 
         This method is abstract and should be defined in subclasses.
         """
-        pass
+        raise NotImplementedError('Subclasses must implement this method.')
     
     def cutout(self):
         """
@@ -298,8 +298,8 @@ class CubeCutout(Cutout, ABC):
         """
         Represents an individual cutout with its own data, uncertainty, and aperture arrays.
 
-        Args
-        ----
+        Parameters
+        ----------
         cube : `~astropy.io.fits.HDUList`
             The input cube.
         file : str | Path | S3Path
@@ -445,7 +445,7 @@ class CubeCutout(Cutout, ABC):
 
             This method is abstract and should be defined in subclasses.
             """
-            pass
+            raise NotImplementedError('Subclasses must implement this method.')
 
         def _fit_cutout_wcs(self, cutout_shape: Tuple[int, int]) -> Tuple[float, float]:
             """

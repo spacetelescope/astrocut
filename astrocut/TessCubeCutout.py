@@ -20,8 +20,8 @@ class TessCubeCutout(CubeCutout):
     """
     Class for creating cutouts from TESS full frame image cubes.
 
-    Args
-    ----
+    Parameters
+    ----------
     input_files : list
         List of input image files.
     coordinates : str | `~astropy.coordinates.SkyCoord`
