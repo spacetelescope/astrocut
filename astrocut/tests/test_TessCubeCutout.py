@@ -13,7 +13,8 @@ from astropy.wcs import WCS, FITSFixedWarning
 
 from .utils_for_test import create_test_ffis
 from ..exceptions import DataWarning, InvalidInputError, InvalidQueryError
-from ..make_cube import CubeFactory, TicaCubeFactory
+from ..CubeFactory import CubeFactory
+from ..TicaCubeFactory import TicaCubeFactory
 from ..CubeCutout import CubeCutout
 from ..TessCubeCutout import TessCubeCutout
 
