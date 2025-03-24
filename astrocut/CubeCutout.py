@@ -163,8 +163,6 @@ class CubeCutout(Cutout, ABC):
 
             # Making sure we have a row with wcs info.
             row = table_data[data_ind]
-            print('hello', self._wcs_axes_keyword)
-            print(self._wcs_axes_keyword, self._wcs_axes_value, row[self._wcs_axes_keyword])
             if row[self._wcs_axes_keyword] == self._wcs_axes_value:
                 table_row = row
             else:
