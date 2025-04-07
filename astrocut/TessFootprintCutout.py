@@ -55,12 +55,6 @@ class TessFootprintCutout(FootprintCutout):
 
     Methods
     -------
-    _extract_sequence_information(sector_name)
-        Extract the sector, camera, and ccd information from the sector name.
-    _create_sequence_list(observations)
-        Extracts sequence information from a list of observations.
-    _get_files_from_cone_results(cone_results)
-        Converts a table of cone search results to a list of dictionaries containing file information.
     cutout()
         Generate the cutouts from the cloud FFIs that intersect the cutout footprint.
     write_as_tpf(output_dir)

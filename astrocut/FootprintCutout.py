@@ -39,14 +39,8 @@ class FootprintCutout(Cutout, ABC):
 
     Methods
     -------
-    _get_files_from_cone_results(cone_results)
-        Returns the files that contain the cutout.
     cutout()
         Fetch the cloud files that contain the cutout and generate the cutouts.
-    _s_region_to_polygon(s_region)
-        Converts the s_region string to a SphericalPolygon object.
-    _ffi_intersect(ffi_list, polygon)
-        Vectorizes the intersects_polygon function.
     ra_dec_crossmatch(all_ffis, coordinates, cutout_size, arcsec_per_px)
         Returns the FFIs whose footprints overlap with the cutout.
     """
