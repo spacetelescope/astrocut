@@ -56,18 +56,6 @@ class TessCubeCutout(CubeCutout):
 
     Methods
     -------
-    _get_cutout_wcs_dict(cutout_wcs, cutout_lims)
-        Create a dictionary of WCS keywords for the cutout.
-        Adds the physical keywords for transformation back from cutout to location on FFI.
-    _update_primary_header(primary_header)
-        Updates the primary header of the cutout target pixel file.
-        This function sets the object's RA and Dec to the central coordinates of the cutout.
-        Since other TESS target pixel file keywords are not available, they are set to 0 or empty strings
-        as placeholders.
-    _build_tpf(cube, cutout, cutout_wcs_dict)
-        Build the cutout target pixel file.
-    _cutout_file(file)
-        Make a cutout from a single TESS cube file.
     write_as_tpf(output_dir, output_file)
         Write the cutouts to target pixel files.
     """

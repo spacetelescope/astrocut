@@ -5,12 +5,13 @@
 from typing import List, Union
 
 from astropy.coordinates import SkyCoord
+from astropy.io.fits import HDUList
 from astropy.table import Table
 
 from .TessFootprintCutout import TessFootprintCutout
 
 
-def ra_dec_crossmatch(all_ffis: Table, coordinates: SkyCoord, cutout_size, arcsec_per_px: int = 21):
+def ra_dec_crossmatch(all_ffis: Table, coordinates: SkyCoord, cutout_size, arcsec_per_px: int = 21) -> Table:
     """
     Returns the Full Frame Images (FFIs) whose footprints overlap with a cutout of a given position and size.
 
@@ -45,7 +46,8 @@ def ra_dec_crossmatch(all_ffis: Table, coordinates: SkyCoord, cutout_size, arcse
 
 def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size, 
                             sequence: Union[int, List[int], None] = None, product: str = 'SPOC',
-                            memory_only=False, output_dir: str = '.', verbose: bool = False):
+                            memory_only=False, output_dir: str = '.', 
+                            verbose: bool = False) -> Union[List[str], List[HDUList]]:
     """
     Generates cutouts around `coordinates` of size `cutout_size` from image cube files hosted on the S3 cloud.
 
@@ -81,7 +83,8 @@ def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size,
     Returns
     -------
     cutout_files : list
-        List of paths to cutout files.
+        List of paths to the cutout files if ``memory_only`` is False.
+        If ``memory_only`` is True, returns a list of cutouts as memory objects.
 
     Examples
     --------

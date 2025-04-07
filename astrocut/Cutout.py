@@ -37,10 +37,6 @@ class Cutout(ABC):
 
     Methods
     -------
-    _parse_size_input(cutout_size)
-        Makes the given cutout size into a length 2 array
-    _get_cutout_limits(img_wcs)
-        Returns the x and y pixel limits for the cutout.
     cutout()
         Generate the cutouts.
     """

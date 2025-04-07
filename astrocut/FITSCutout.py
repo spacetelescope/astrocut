@@ -52,18 +52,6 @@ class FITSCutout(ImageCutout):
 
     Methods
     -------
-    _construct_fits_from_hdus(cutout_hdus)
-        Make one or more cutout HDUs into a single HDUList object.
-    _parse_extensions(input_file, infile_exts)
-        Determine which extension(s) to cutout from.
-    _load_file_data(input_file)
-        Load the data from an input file.
-    _get_img_wcs(hdu_header)
-        Get the WCS for an image.
-    _hducut(cutout_data, img_wcs, hdu_header, no_sip, ind, primary_filename, is_empty)
-        Create a cutout HDU from an image HDU.
-    _cutout_file(file)
-        Cutout an image file.
     cutout()
         Generate cutouts from a list of input images.
     write_as_fits(output_dir, cutout_prefix)
@@ -484,13 +472,6 @@ class FITSCutout(ImageCutout):
             The maximum y value of the cutout in the original array.
         wcs : `~astropy.wcs.WCS`
             The WCS for the cutout.
-
-        Methods
-        -------
-        _get_cutout_data(data, wcs, cutout_lims, parent)
-            Extract the cutout data from an image.
-        _get_cutout_wcs(img_wcs, cutout_lims)
-            Get the WCS for a cutout.
         """
 
         def __init__(self, img_data: fits.Section, img_wcs: WCS, parent: 'FITSCutout'):

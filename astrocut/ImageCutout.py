@@ -48,14 +48,8 @@ class ImageCutout(Cutout, ABC):
     -------
     get_image_cutouts(stretch, minmax_percent, minmax_value, invert, colorize)
         Get the cutouts as `~PIL.Image` objects.
-    _cutout_file(file)
-        Cutout an image file.
     cutout()
         Generate the cutouts.
-    _parse_output_format(output_format)
-        Parse the output format string and return it in a standardized format.
-    _save_img_to_file(im, file_path)
-        Save a `~PIL.Image` object to a file.
     write_as_img(stretch, minmax_percent, minmax_value, invert, colorize, output_format, output_dir, cutout_prefix)
         Write the cutouts to a file in an image format.
     normalize_img(stretch, minmax_percent, minmax_value, invert)

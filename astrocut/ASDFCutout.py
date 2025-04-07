@@ -60,20 +60,8 @@ class ASDFCutout(ImageCutout):
 
     Methods
     -------
-    _get_cloud_http(input_file)
-        Get the HTTP URL of a cloud resource from an S3 URI.
-    _load_file_data(input_file)
-        Load the data from an input file.
-    _get_cutout_data(data, wcs, pixel_coords)
-        Get the cutout data from the input image.
-    _slice_gwcs(cutout, gwcs)
-        Slice the original gwcs object to fit the cutout.
-    _cutout_file(file)
-        Create a cutout from an input file.
     cutout()
         Generate cutouts from a list of input images.
-    _write_as_format(output_format, output_dir)
-        Write the cutout to disk or memory in the specified format.
     write_as_fits(output_dir)
         Write the cutouts to disk or memory in FITS format.
     write_as_asdf(output_dir)

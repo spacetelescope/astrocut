@@ -28,30 +28,16 @@ class CubeFactory():
     """
     Class for creating image cubes. This class is built to accept TESS SPOC FFI files,
     but can be extended to work with other types of image files.
+
+    Parameters
+    ----------
+    max_memory : int
+        The maximum amount of memory to make available for building the data cube in GB.
+        Note, this is the maximum amount of space to be used for the cube array only,
+        so should not be set to the full amount of memory on the system.
     
     Methods
     -------
-    _get_img_start_time(img_data)
-        Get the start time of the image.
-    _get_img_shape(img_data)
-        Get the shape of the image data.
-    _configure_cube(file_list, **extra_keywords)
-        Iterate through the input files and set up the basic parameters and primary header for the data cube.
-    _build_info_table()
-        Read the keywords and set up the table to hold the image headers from every input file.
-    _build_cube_file(cube_file)
-        Build the cube file on disk with the primary header, cube extension header,
-        and space for the cube, filled with zeros.
-    _write_to_sub_cube(sub_cube, idx, img_data, start_row, end_row)
-        Write data from an input image to a sub-cube.
-    _get_header_keyword(kwd, img_data, nulval)
-        Get a header keyword from an input image and save it to the info table.
-    _write_block(cube_hdu, start_row, end_row, fill_info_table)
-        Write a block of the cube with data from input images.
-    _write_info_table()
-        Append the info table to the cube file as a binary table.
-    _update_info_table()
-        Update an existing info table with rows from a newly created info table.
     make_cube(file_list, cube_file, sector, max_memory, verbose)
         Turns a list of FITS image files into one large data cube.
     update_cube(file_list, cube_file, sector, max_memory, verbose)
