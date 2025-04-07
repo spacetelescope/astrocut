@@ -71,13 +71,6 @@ class CubeCutout(Cutout, ABC):
         self._wcs_axes_value = None  # Expected value for the WCS axis keyword
         self._skip_kwds = []  # Keywords to skip when adding to the TPF headers
 
-    @property
-    def cutouts(self):
-        """
-        Return a list of cutouts as `CubeCutout.CubeCutoutInstance` objects.
-        """
-        return list(self.cutouts_by_file.values())
-
         self.tpf_cutouts_by_file = {}
 
         # Make the cutouts upon initialization
