@@ -226,6 +226,11 @@ class ASDFCutout(ImageCutout):
         
         log.debug('Image cutout shape: %s', img_cutout.shape)
 
+        # Data in the Cutout2D object is a view into the original data. We need to deep copy the 
+        # data in the cutout object to ensure that it is fully independent of the original data 
+        # and that it does not take up the same amount of storage.
+        img_cutout.data = np.array(img_cutout.data, copy=True)
+
         return img_cutout
 
     def _slice_gwcs(self, cutout: Cutout2D, gwcs: gwcs.wcs.WCS) -> gwcs.wcs.WCS:
