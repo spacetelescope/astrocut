@@ -159,6 +159,7 @@ def test_asdf_cutout_write_to_file(test_images, center_coord, cutout_size, tmpdi
             assert 'meta' in af.tree['roman']
             assert np.all(af.tree['roman']['data'] == cutout.cutouts[i].data)
             assert af.tree['roman']['meta']['wcs'].pixel_shape == (10, 10)
+            assert Path(asdf_file).stat().st_size < Path(test_images[i]).stat().st_size
 
     # Write cutouts to FITS files on disk
     cutout = ASDFCutout(test_images, center_coord, cutout_size)
@@ -169,6 +170,7 @@ def test_asdf_cutout_write_to_file(test_images, center_coord, cutout_size, tmpdi
             assert np.all(hdul[0].data == cutout.cutouts[i].data)
             assert hdul[0].header['NAXIS1'] == 10
             assert hdul[0].header['NAXIS2'] == 10
+            assert Path(fits_file).stat().st_size < Path(test_images[i]).stat().st_size
 
 
 def test_asdf_cutout_partial(test_images, center_coord, cutout_size):
