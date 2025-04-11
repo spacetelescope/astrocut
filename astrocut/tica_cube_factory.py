@@ -5,7 +5,7 @@ from typing import Optional, Union
 import numpy as np
 from astropy.io import fits
 
-from .CubeFactory import CubeFactory
+from .cube_factory import CubeFactory
 
 
 class TicaCubeFactory(CubeFactory):

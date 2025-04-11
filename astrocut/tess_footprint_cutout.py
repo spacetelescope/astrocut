@@ -5,12 +5,13 @@ from typing import Union, List, Tuple
 import astropy.units as u
 import numpy as np
 from astropy.coordinates import SkyCoord
+from astropy.io.fits import HDUList
 from astropy.table import Table
 
 from . import log
 from .exceptions import InvalidQueryError, InvalidInputError
-from .FootprintCutout import FootprintCutout, get_ffis
-from .TessCubeCutout import TessCubeCutout
+from .footprint_cutout import FootprintCutout, get_ffis
+from .tess_cube_cutout import TessCubeCutout
 
 
 class TessFootprintCutout(FootprintCutout):
@@ -243,3 +244,67 @@ class TessFootprintCutout(FootprintCutout):
             List of file paths to cutout target pixel files.
         """
         return self.tess_cube_cutout.write_as_tpf(output_dir)
+    
+
+def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size, 
+                            sequence: Union[int, List[int], None] = None, product: str = 'SPOC',
+                            memory_only=False, output_dir: str = '.', 
+                            verbose: bool = False) -> Union[List[str], List[HDUList]]:
+    """
+    Generates cutouts around `coordinates` of size `cutout_size` from image cube files hosted on the S3 cloud.
+
+    Parameters
+    ----------
+    coordinates : str or `astropy.coordinates.SkyCoord` object
+        The position around which to cutout.
+        It may be specified as a string ("ra dec" in degrees)
+        or as the appropriate `~astropy.coordinates.SkyCoord` object.
+    cutout_size : int, array-like, `~astropy.units.Quantity`
+        The size of the cutout array. If ``cutout_size``
+        is a scalar number or a scalar `~astropy.units.Quantity`,
+        then a square cutout of ``cutout_size`` will be created.  If
+        ``cutout_size`` has two elements, they should be in ``(ny, nx)``
+        order.  Scalar numbers in ``cutout_size`` are assumed to be in
+        units of pixels. `~astropy.units.Quantity` objects must be in pixel or
+        angular units.
+    sequence : int, List[int], optional
+        Default None. Sequence(s) from which to generate cutouts. Can provide a single
+        sequence number as an int or a list of sequence numbers. If not specified, 
+        cutouts will be generated from all sequences that contain the cutout.
+        For the TESS mission, this parameter corresponds to sectors.
+    product : str, optional
+        Default 'SPOC'. The product type to make the cutouts from.
+    memory_only : bool, optional
+        Default False. If True, the cutouts are stored in memory and not written to disk.
+    output_dir : str, optional
+        Default '.'. The path to which output files are saved.
+        The current directory is default.
+    verbose : bool, optional
+        Default False. If True, intermediate information is printed.
+
+    Returns
+    -------
+    cutout_files : list
+        List of paths to the cutout files if ``memory_only`` is False.
+        If ``memory_only`` is True, returns a list of cutouts as memory objects.
+
+    Examples
+    --------
+    >>> from astrocut import cube_cut_from_footprint
+    >>> cube_cut_from_footprint(  #doctest: +SKIP
+    ...         coordinates='83.40630967798376 -62.48977125108528',
+    ...         cutout_size=64,
+    ...         sequence=[1, 2],  # TESS sectors
+    ...         product='SPOC',
+    ...         output_dir='./cutouts')
+    ['./cutouts/tess-s0001-4-4/tess-s0001-4-4_83.406310_-62.489771_64x64_astrocut.fits',
+     './cutouts/tess-s0002-4-1/tess-s0002-4-1_83.406310_-62.489771_64x64_astrocut.fits']
+    """
+
+    cutouts = TessFootprintCutout(coordinates, cutout_size, sequence=sequence, product=product, verbose=verbose)
+
+    if memory_only:
+        return cutouts.tpf_cutouts
+    
+    # Write cutouts
+    return cutouts.write_as_tpf(output_dir)

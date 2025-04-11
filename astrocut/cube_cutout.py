@@ -15,7 +15,7 @@ from astropy.wcs import WCS
 from s3path import S3Path
 
 from . import log
-from .Cutout import Cutout
+from .cutout import Cutout
 from .exceptions import InvalidQueryError
 from .utils.wcs_fitting import fit_wcs_from_points
 

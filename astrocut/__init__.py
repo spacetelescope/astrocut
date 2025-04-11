@@ -28,16 +28,15 @@ log = setup_logger()
 
 # Import key submodules and functions if not in setup mode
 if not _ASTROPY_SETUP_:  # noqa
-    from .CubeFactory import CubeFactory  # noqa
-    from .TicaCubeFactory import TicaCubeFactory  # noqa
-    from .cube_cut import CutoutFactory, cube_cut  # noqa
-    from .cutouts import fits_cut, img_cut, normalize_img  # noqa
+    from .cube_factory import CubeFactory  # noqa
+    from .tica_cube_factory import TicaCubeFactory  # noqa
+    from .cutout_factory import CutoutFactory, cube_cut  # noqa
     from .cutout_processing import (  # noqa
         path_to_footprints, center_on_path, CutoutsCombiner, build_default_combine_function  # noqa
     )  # noqa
-    from .asdf_cutouts import asdf_cut, get_center_pixel  # noqa
-    from .footprint_cutouts import cube_cut_from_footprint  # noqa
-    from .FITSCutout import FITSCutout  # noqa
-    from .ASDFCutout import ASDFCutout  # noqa
-    from .TessCubeCutout import TessCubeCutout  # noqa
-    from .TessFootprintCutout import TessFootprintCutout  # noqa
+    from .image_cutout import normalize_img # noqa
+    from .fits_cutout import FITSCutout, fits_cut, img_cut  # noqa
+    from .asdf_cutout import ASDFCutout, asdf_cut, get_center_pixel  # noqa
+    from .tess_cube_cutout import TessCubeCutout  # noqa
+    from .footprint_cutout import ra_dec_crossmatch # noqa
+    from .tess_footprint_cutout import TessFootprintCutout, cube_cut_from_footprint  # noqa

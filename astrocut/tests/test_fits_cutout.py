@@ -13,7 +13,7 @@ from astropy.table import Table
 
 from PIL import Image
 
-from astrocut.FITSCutout import FITSCutout
+from astrocut.fits_cutout import FITSCutout
 
 from .utils_for_test import create_test_imgs
 from ..exceptions import DataWarning, InputWarning, InvalidInputError, InvalidQueryError

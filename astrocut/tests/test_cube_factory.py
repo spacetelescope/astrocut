@@ -9,8 +9,8 @@ from re import findall
 from astrocut.exceptions import DataWarning, InvalidInputError
 
 from .utils_for_test import create_test_ffis
-from ..CubeFactory import CubeFactory
-from ..TicaCubeFactory import TicaCubeFactory
+from ..cube_factory import CubeFactory
+from ..tica_cube_factory import TicaCubeFactory
 
 
 @pytest.fixture

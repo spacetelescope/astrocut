@@ -12,7 +12,7 @@ from astropy.wcs import WCS
 from s3path import S3Path
 
 from . import __version__, log
-from .CubeCutout import CubeCutout
+from .cube_cutout import CubeCutout
 from .exceptions import DataWarning, InvalidInputError, InvalidQueryError
 
 

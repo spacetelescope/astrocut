@@ -10,7 +10,7 @@ import numpy as np
 from astropy.coordinates import SkyCoord
 from s3path import S3Path
 
-from .TessCubeCutout import TessCubeCutout
+from .tess_cube_cutout import TessCubeCutout
 
 
 class CutoutFactory():

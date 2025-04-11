@@ -7,12 +7,11 @@ from astropy.io import fits
 from astropy.table import Table
 from spherical_geometry.polygon import SphericalPolygon
 
-from ..CubeCutout import CubeCutout
+from ..cube_cutout import CubeCutout
 from ..exceptions import InvalidInputError, InvalidQueryError
-from ..FootprintCutout import get_ffis
-from ..footprint_cutouts import cube_cut_from_footprint
-from ..TessFootprintCutout import TessFootprintCutout
-from ..TessCubeCutout import TessCubeCutout
+from ..footprint_cutout import get_ffis
+from ..tess_footprint_cutout import TessFootprintCutout, cube_cut_from_footprint
+from ..tess_cube_cutout import TessCubeCutout
 
 
 @pytest.fixture

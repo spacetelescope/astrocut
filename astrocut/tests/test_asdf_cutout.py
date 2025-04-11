@@ -12,8 +12,7 @@ from astropy.io import fits
 from gwcs import wcs, coordinate_frames
 from PIL import Image
 
-from astrocut.ASDFCutout import ASDFCutout
-from astrocut.asdf_cutouts import asdf_cut
+from astrocut.asdf_cutout import ASDFCutout, asdf_cut
 from astrocut.exceptions import DataWarning, InvalidInputError, InvalidQueryError
 
 

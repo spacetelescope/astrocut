@@ -11,7 +11,7 @@ from astropy.table import Table
 from astropy.time import Time
 
 from .utils_for_test import create_test_ffis, create_test_imgs
-from .. import cutout_processing, cutouts, CubeFactory, CutoutFactory
+from .. import cutout_processing, CubeFactory, CutoutFactory, fits_cut
 
 
 # Example FFI WCS for testing
@@ -344,10 +344,10 @@ def test_combiner(tmpdir, ffi_type):
     center_coord = SkyCoord("150.1163213 2.200973097", unit='deg')
     cutout_size = 2
 
-    cutout_file_1 = cutouts.fits_cut(test_images[:3], center_coord, cutout_size, 
-                                     cutout_prefix="cutout_1", output_dir=tmpdir)
-    cutout_file_2 = cutouts.fits_cut(test_images[3:], center_coord, cutout_size, 
-                                     cutout_prefix="cutout_2", output_dir=tmpdir)
+    cutout_file_1 = fits_cut(test_images[:3], center_coord, cutout_size, 
+                             cutout_prefix="cutout_1", output_dir=tmpdir)
+    cutout_file_2 = fits_cut(test_images[3:], center_coord, cutout_size, 
+                             cutout_prefix="cutout_2", output_dir=tmpdir)
 
     combiner = cutout_processing.CutoutsCombiner([cutout_file_1, cutout_file_2])
 
