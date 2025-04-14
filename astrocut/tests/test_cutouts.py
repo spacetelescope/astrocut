@@ -22,6 +22,8 @@ def test_fits_cut(tmpdir, caplog, ffi_type):
     test_images = create_test_imgs(ffi_type, 50, 6, dir_name=tmpdir)
 
     # Single file
+    center_coord = SkyCoord("150.1163213 2.200973097", unit='deg')
+    cutout_size = 10
     cutout_file = fits_cut(test_images, center_coord, cutout_size, single_outfile=True, output_dir=tmpdir)
     assert isinstance(cutout_file, str)
     
@@ -81,8 +83,8 @@ def test_fits_cut(tmpdir, caplog, ffi_type):
 
     # Output directory that has to be created
     new_dir = path.join(tmpdir, "cutout_files")  # non-existing directory to write files to
-    cutout_files = cutouts.fits_cut(test_images, center_coord, cutout_size,
-                                    output_dir=new_dir, single_outfile=False)
+    cutout_files = fits_cut(test_images, center_coord, cutout_size,
+                            output_dir=new_dir, single_outfile=False)
 
     assert isinstance(cutout_files, list)
     assert len(cutout_files) == len(test_images)
@@ -159,7 +161,7 @@ def test_fits_cut(tmpdir, caplog, ffi_type):
 
     center_coord = SkyCoord("150.1163213 2.2007", unit='deg')
     cutout_size = [10, 15]
-    cutout_file = fits_cut(test_image_bad_sip, center_coord, cutout_size, output_dir=tmpdir)
+    cutout_file = fits_cut(test_image, center_coord, cutout_size, output_dir=tmpdir)
     assert isinstance(cutout_file, str)
     assert "10-x-15" in cutout_file
     cutout_hdulist = fits.open(cutout_file)
@@ -167,14 +169,14 @@ def test_fits_cut(tmpdir, caplog, ffi_type):
 
     center_coord = SkyCoord("150.1159 2.2006", unit='deg')
     cutout_size = [10, 15]*u.pixel
-    cutout_file = fits_cut(test_image_bad_sip, center_coord, cutout_size, output_dir=tmpdir)
+    cutout_file = fits_cut(test_image, center_coord, cutout_size, output_dir=tmpdir)
     assert isinstance(cutout_file, str)
     assert "10.0pix-x-15.0pix" in cutout_file
     cutout_hdulist = fits.open(cutout_file)
     assert cutout_hdulist[1].data.shape == (15, 10)
 
     cutout_size = [1, 2]*u.arcsec
-    cutout_file = fits_cut(test_image_bad_sip, center_coord, cutout_size, output_dir=tmpdir, verbose=True)
+    cutout_file = fits_cut(test_image, center_coord, cutout_size, output_dir=tmpdir, verbose=True)
     assert isinstance(cutout_file, str)
     assert "1.0arcsec-x-2.0arcsec" in cutout_file
     cutout_hdulist = fits.open(cutout_file)
@@ -187,7 +189,7 @@ def test_fits_cut(tmpdir, caplog, ffi_type):
     center_coord = "150.1159 2.2006"
     cutout_size = [10, 15, 20]
     with pytest.warns(InputWarning):
-        cutout_file = fits_cut(test_image_bad_sip, center_coord, cutout_size, output_dir=tmpdir)
+        cutout_file = fits_cut(test_image, center_coord, cutout_size, output_dir=tmpdir)
     assert isinstance(cutout_file, str)
     assert "10-x-15" in cutout_file
     assert "x-20" not in cutout_file
