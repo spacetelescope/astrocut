@@ -15,7 +15,7 @@ from .tess_cube_cutout import TessCubeCutout
 
 class CutoutFactory():
     """
-    Class for creating image cutouts.
+    Class for creating image cutouts from TESS image cube files.
 
     This class encompasses all of the cutout functionality.  
     In the current version this means creating cutout target pixel files from both 
