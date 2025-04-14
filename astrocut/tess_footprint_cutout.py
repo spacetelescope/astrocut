@@ -10,7 +10,7 @@ from astropy.table import Table
 
 from . import log
 from .exceptions import InvalidQueryError, InvalidInputError
-from .footprint_cutout import FootprintCutout, get_ffis
+from .footprint_cutout import FootprintCutout, get_ffis, ra_dec_crossmatch
 from .tess_cube_cutout import TessCubeCutout
 
 
@@ -209,7 +209,7 @@ class TessFootprintCutout(FootprintCutout):
                       ', '.join(str(s) for s in self._sequence))
 
         # Get sequence names and files that contain the cutout
-        cone_results = self.ra_dec_crossmatch(all_ffis, self._coordinates, self._cutout_size, self._arcsec_per_px)
+        cone_results = ra_dec_crossmatch(all_ffis, self._coordinates, self._cutout_size, self._arcsec_per_px)
         if not cone_results:
             raise InvalidQueryError('The given coordinates were not found within the specified sequence(s).')
         files_mapping = self._get_files_from_cone_results(cone_results)
@@ -229,7 +229,7 @@ class TessFootprintCutout(FootprintCutout):
         self.tpf_cutouts_by_file = tess_cube_cutout.tpf_cutouts_by_file
         self.tpf_cutouts = tess_cube_cutout.tpf_cutouts
         
-    def write_as_tpf(self, output_dir: Union[str, Path]):
+    def write_as_tpf(self, output_dir: Union[str, Path] = '.') -> List[str]:
         """
         Write the cutouts to disk as target pixel files.
 

@@ -9,7 +9,7 @@ from spherical_geometry.polygon import SphericalPolygon
 
 from ..cube_cutout import CubeCutout
 from ..exceptions import InvalidInputError, InvalidQueryError
-from ..footprint_cutout import get_ffis
+from ..footprint_cutout import get_ffis, ra_dec_crossmatch
 from ..tess_footprint_cutout import TessFootprintCutout, cube_cut_from_footprint
 from ..tess_cube_cutout import TessCubeCutout
 
@@ -152,7 +152,7 @@ def test_tess_footprint_cutout_all_sequences(coordinates, cutout_size):
 
     # Crossmatch to get sectors that contain cutout
     all_ffis = get_ffis(cutout._s3_footprint_cache)
-    cone_results = TessFootprintCutout.ra_dec_crossmatch(all_ffis, '350 -80', cutout_size, 21)
+    cone_results = ra_dec_crossmatch(all_ffis, '350 -80', cutout_size, 21)
     seq_list = cutout._create_sequence_list(cone_results)
     sequences = [int(seq['sector']) for seq in seq_list]
 
