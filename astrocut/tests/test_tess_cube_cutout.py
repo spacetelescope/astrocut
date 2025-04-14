@@ -13,10 +13,10 @@ from astropy.wcs import WCS, FITSFixedWarning
 
 from .utils_for_test import create_test_ffis
 from ..exceptions import DataWarning, InvalidInputError, InvalidQueryError
-from ..CubeFactory import CubeFactory
-from ..TicaCubeFactory import TicaCubeFactory
-from ..CubeCutout import CubeCutout
-from ..TessCubeCutout import TessCubeCutout
+from ..cube_factory import CubeFactory
+from ..tica_cube_factory import TicaCubeFactory
+from ..cube_cutout import CubeCutout
+from ..tess_cube_cutout import TessCubeCutout
 
 
 @pytest.fixture

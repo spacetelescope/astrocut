@@ -15,7 +15,7 @@ from astropy.wcs import WCS
 from s3path import S3Path
 
 from . import log
-from .Cutout import Cutout
+from .cutout import Cutout
 from .exceptions import InvalidQueryError
 from .utils.wcs_fitting import fit_wcs_from_points
 
@@ -24,8 +24,8 @@ class CubeCutout(Cutout, ABC):
     """
     Abstract class for creating cutouts from image cubes.
 
-    Args
-    ----
+    Parameters
+    ----------
     input_files : list
         List of input image files.
     coordinates : str | `~astropy.coordinates.SkyCoord`
@@ -52,20 +52,6 @@ class CubeCutout(Cutout, ABC):
 
     Methods
     -------
-    _load_file_data(file)
-        Load the data from an input cube file.
-    _parse_table_info(table_data)
-        Takes the header and the middle entry from the cube table (EXT 2) of image header data,
-        builds a WCS object that encapsulates the given WCS information,
-        and collects other keywords into a dictionary.
-    _add_column_wcs(table_header, wcs_dict)
-        Adds WCS information for the array columns to the cutout table header.
-    _add_img_kwds(table_header)
-        Adding extra keywords to the table header.
-    _apply_header_inherit(hdu_list)
-        Apply header inheritance to the cutout target pixel file.
-    _cutout_file(file)
-        Make a cutout from a single cube file.
     cutout()
         Generate the cutouts.
     """
@@ -268,7 +254,7 @@ class CubeCutout(Cutout, ABC):
 
         This method is abstract and should be defined in subclasses.
         """
-        pass
+        raise NotImplementedError('Subclasses must implement this method.')
     
     def cutout(self):
         """
@@ -298,8 +284,8 @@ class CubeCutout(Cutout, ABC):
         """
         Represents an individual cutout with its own data, uncertainty, and aperture arrays.
 
-        Args
-        ----
+        Parameters
+        ----------
         cube : `~astropy.io.fits.HDUList`
             The input cube.
         file : str | Path | S3Path
@@ -329,15 +315,6 @@ class CubeCutout(Cutout, ABC):
             The WCS object for the input cube.
         cube_filename : str | Path | S3Path
             The input cube filename.
-
-        Methods
-        -------
-        _get_cutout_data(transposed_cube, threads, has_uncert)
-            Extract a cutout from an image/uncertainty cube that has been transposed to have time on the longest axis.
-        _get_full_cutout_wcs(cube_wcs, cube_table_header)
-            Adjust the full FFI WCS for the cutout WCS.
-        _fit_cutout_wcs(cutout_shape)
-            Given a full WCS for the cutout, calculate the best fit linear WCS and a measure of the goodness-of-fit.
         """
 
         def __init__(self, cube: fits.HDUList, file: Union[str, Path, S3Path], cube_wcs: WCS, 
@@ -445,7 +422,7 @@ class CubeCutout(Cutout, ABC):
 
             This method is abstract and should be defined in subclasses.
             """
-            pass
+            raise NotImplementedError('Subclasses must implement this method.')
 
         def _fit_cutout_wcs(self, cutout_shape: Tuple[int, int]) -> Tuple[float, float]:
             """

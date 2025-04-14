@@ -14,7 +14,7 @@ from s3path import S3Path
 
 from . import log
 from .exceptions import DataWarning, InputWarning, InvalidInputError
-from .Cutout import Cutout
+from .cutout import Cutout
 
 
 class ImageCutout(Cutout, ABC):
@@ -22,8 +22,8 @@ class ImageCutout(Cutout, ABC):
     Abstract class for creating cutouts from images. This class defines attributes and methods that are common to all
     image cutout classes.
 
-    Args
-    ----
+    Parameters
+    ----------
     input_files : list
         List of input image files.
     coordinates : str | `~astropy.coordinates.SkyCoord`
@@ -48,14 +48,8 @@ class ImageCutout(Cutout, ABC):
     -------
     get_image_cutouts(stretch, minmax_percent, minmax_value, invert, colorize)
         Get the cutouts as `~PIL.Image` objects.
-    _cutout_file(file)
-        Cutout an image file.
     cutout()
         Generate the cutouts.
-    _parse_output_format(output_format)
-        Parse the output format string and return it in a standardized format.
-    _save_img_to_file(im, file_path)
-        Save a `~PIL.Image` object to a file.
     write_as_img(stretch, minmax_percent, minmax_value, invert, colorize, output_format, output_dir, cutout_prefix)
         Write the cutouts to a file in an image format.
     normalize_img(stretch, minmax_percent, minmax_value, invert)
@@ -162,7 +156,7 @@ class ImageCutout(Cutout, ABC):
 
         This method is abstract and should be defined in subclasses.
         """
-        pass
+        raise NotImplementedError('Subclasses must implement this method.')
 
     @abstractmethod
     def cutout(self):
@@ -171,7 +165,7 @@ class ImageCutout(Cutout, ABC):
 
         This method is abstract and should be defined in subclasses.
         """
-        pass
+        raise NotImplementedError('Subclasses must implement this method.')
     
     def _parse_output_format(self, output_format: str) -> str:
         """
@@ -404,3 +398,40 @@ class ImageCutout(Cutout, ABC):
         np.subtract(255, norm_img, out=norm_img, where=invert)
 
         return norm_img
+    
+
+def normalize_img(img_arr: np.ndarray, stretch: str = 'asinh', minmax_percent: Optional[List[int]] = None, 
+                  minmax_value: Optional[List[int]] = None, invert: bool = False) -> np.ndarray:
+    """
+    Apply given stretch and scaling to an image array.
+
+    Parameters
+    ----------
+    img_arr : array
+        The input image array.
+    stretch : str
+        Optional, default 'asinh'. The stretch to apply to the image array.
+        Valid values are: asinh, sinh, sqrt, log, linear
+    minmax_percent : array
+        Optional. Interval based on a keeping a specified fraction of pixels (can be asymmetric) 
+        when scaling the image. The format is [lower percentile, upper percentile], where pixel
+        values below the lower percentile and above the upper percentile are clipped.
+        Only one of minmax_percent and minmax_value shoul be specified.
+    minmax_value : array
+        Optional. Interval based on user-specified pixel values when scaling the image.
+        The format is [min value, max value], where pixel values below the min value and above
+        the max value are clipped.
+        Only one of minmax_percent and minmax_value should be specified.
+    invert : bool
+        Optional, default False.  If True the image is inverted (light pixels become dark and vice versa).
+
+    Returns
+    -------
+    response : array
+        The normalized image array, in the form in an integer arrays with values in the range 0-255.
+    """
+    return ImageCutout.normalize_img(img_arr=img_arr,
+                                     stretch=stretch,
+                                     minmax_percent=minmax_percent,
+                                     minmax_value=minmax_value,
+                                     invert=invert)

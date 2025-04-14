@@ -2,7 +2,7 @@ import pytest
 
 import numpy as np
 
-from astrocut.ImageCutout import ImageCutout
+from astrocut.image_cutout import ImageCutout
 
 from ..exceptions import InputWarning, InvalidInputError
 

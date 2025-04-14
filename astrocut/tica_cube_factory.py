@@ -5,7 +5,7 @@ from typing import Optional, Union
 import numpy as np
 from astropy.io import fits
 
-from .CubeFactory import CubeFactory
+from .cube_factory import CubeFactory
 
 
 class TicaCubeFactory(CubeFactory):
@@ -17,17 +17,13 @@ class TicaCubeFactory(CubeFactory):
     images are produced and delivered up to 4x sooner than their SPOC counterparts (as of TESS EM2),
     and can therefore be used to produce the most up-to-date cutouts of a target. 
     More information on TICA can be found here: https://archive.stsci.edu/hlsp/tica
-    
-    Methods
-    -------
-    _get_img_start_time(img_data)
-        Get the start time of the image.
-    _get_img_shape(img_data)
-        Get the shape of the image data.
-    _write_to_sub_cube(sub_cube, idx, img_data, start_row, end_row)
-        Write data from an input image to a sub-cube.
-    _get_header_keyword(kwd, img_data, nulval)
-        Get a header keyword from an input image and save it to the info table.
+
+    Parameters
+    ----------
+    max_memory : int
+        The maximum amount of memory to make available for building the data cube in GB.
+        Note, this is the maximum amount of space to be used for the cube array only,
+        so should not be set to the full amount of memory on the system.
     """
 
     def __init__(self, max_memory: int = 50):
