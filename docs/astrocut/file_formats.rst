@@ -7,7 +7,7 @@ Astrocut File Formats
 FITS Cutout Files
 =================
 
-FITS files output by `~astrocut.fits_cut` consist of a PrimaryHDU extension
+FITS files output by image cutout classes consist of a PrimaryHDU extension
 and one or more ImageHDU extensions, each containing a single cutout.
 
 PRIMARY PrimaryHDU (Extension 0)
@@ -42,7 +42,7 @@ it contains the name of the file the cutout comes from.
 ASDF Cutout Files
 ==================
 
-ASDF files output by `asdf_cut` are a minimal tree structure that mirrors the format of the original Roman image file.
+ASDF files output by `~astrocut.ASDFCutout` are a minimal tree structure that mirrors the format of the original Roman image file.
 
 .. code-block:: python
 
@@ -55,7 +55,7 @@ ASDF files output by `asdf_cut` are a minimal tree structure that mirrors the fo
         }
     }
 
-`wcs` is the original `gwcs` object from the input ASDF file that has been sliced into the shape of the cutout.
+``wcs`` is the original ``gwcs`` object from the input ASDF file that has been sliced into the shape of the cutout.
 
 
 
@@ -326,9 +326,3 @@ is the WCS for the original FFI, including all distortion coefficients. This can
 used in combination with the TGT_RA/DEC and TGT_X/Y columns to trace the path of the
 target across the FFI footprint and calculate the WCS object for individual cutout images
 if necessary.
-
-
-
-
-
-

@@ -41,8 +41,6 @@ class FootprintCutout(Cutout, ABC):
     -------
     cutout()
         Fetch the cloud files that contain the cutout and generate the cutouts.
-    ra_dec_crossmatch(all_ffis, coordinates, cutout_size, arcsec_per_px)
-        Returns the FFIs whose footprints overlap with the cutout.
     """
 
     def __init__(self, coordinates: Union[SkyCoord, str], 
@@ -162,68 +160,6 @@ class FootprintCutout(Cutout, ABC):
 
         return np.vectorize(single_intersect)(ffi_list['polygon'], polygon)
     
-    @staticmethod
-    def ra_dec_crossmatch(all_ffis: Table, coordinates: SkyCoord, cutout_size, 
-                          arcsec_per_px: int = 21) -> Table:
-        """
-        Returns the Full Frame Images (FFIs) whose footprints overlap with a cutout of a given position and size.
-
-        Parameters
-        ----------
-        all_ffis : `~astropy.table.Table`
-            Table of FFIs to crossmatch with the cutout.
-        coordinates : str or `astropy.coordinates.SkyCoord` object
-            The position around which to cutout.
-            It may be specified as a string ("ra dec" in degrees)
-            or as the appropriate `~astropy.coordinates.SkyCoord` object.
-        cutout_size : int, array-like, `~astropy.units.Quantity`
-            The size of the cutout array. If ``cutout_size``
-            is a scalar number or a scalar `~astropy.units.Quantity`,
-            then a square cutout of ``cutout_size`` will be created.  If
-            ``cutout_size`` has two elements, they should be in ``(ny, nx)``
-            order.  Scalar numbers in ``cutout_size`` are assumed to be in
-            units of pixels. `~astropy.units.Quantity` objects must be in pixel or
-            angular units.
-        arcsec_per_px : int, optional
-            Default 21. The number of arcseconds per pixel in an image. Used to determine
-            the footprint of the cutout. Default is the number of arcseconds per pixel in
-            a TESS image.
-
-        Returns
-        -------
-        matching_ffis : `~astropy.table.Table`
-            Table containing information about FFIs whose footprints overlap those of the cutout.
-        """
-        # Convert coordinates to SkyCoord
-        if not isinstance(coordinates, SkyCoord):
-            coordinates = SkyCoord(coordinates, unit='deg')
-        ra, dec = coordinates.ra, coordinates.dec
-
-        # Parse cutout size
-        cutout_size = Cutout._parse_size_input(cutout_size)
-
-        # Create polygon for intersection
-        # Convert dimensions from pixels to arcseconds and divide by 2 to get offset from center
-        ra_offset = ((cutout_size[0] * arcsec_per_px) / 2) * u.arcsec
-        dec_offset = ((cutout_size[1] * arcsec_per_px) / 2) * u.arcsec
-
-        # Calculate RA and Dec boundaries
-        ra_bounds = [ra - ra_offset, ra + ra_offset]
-        dec_bounds = [dec - dec_offset, dec + dec_offset]
-
-        # Get RA and Dec for four corners of rectangle
-        ras = [ra_bounds[0].value, ra_bounds[1].value, ra_bounds[1].value, ra_bounds[0].value]
-        decs = [dec_bounds[0].value, dec_bounds[0].value, dec_bounds[1].value, dec_bounds[1].value]
-
-        # Create SphericalPolygon for comparison
-        cutout_fp = SphericalPolygon.from_radec(ras, decs, center=(ra, dec))
-
-        # Find indices of FFIs that intersect with the cutout
-        ffi_inds = np.vectorize(lambda ffi: ffi.intersects_poly(cutout_fp))(all_ffis['polygon'])
-        ffi_inds = FootprintCutout._ffi_intersect(all_ffis, cutout_fp)
-
-        return all_ffis[ffi_inds]
-    
 
 @cached(cache=FFI_TTLCACHE, lock=Lock())
 def get_ffis(s3_footprint_cache: str) -> Table:
@@ -287,4 +223,32 @@ def ra_dec_crossmatch(all_ffis: Table, coordinates: SkyCoord, cutout_size, arcse
     matching_ffis : `~astropy.table.Table`
         Table containing information about FFIs whose footprints overlap those of the cutout.
     """
-    return FootprintCutout.ra_dec_crossmatch(all_ffis, coordinates, cutout_size, arcsec_per_px)
+    # Convert coordinates to SkyCoord
+    if not isinstance(coordinates, SkyCoord):
+        coordinates = SkyCoord(coordinates, unit='deg')
+    ra, dec = coordinates.ra, coordinates.dec
+
+    # Parse cutout size
+    cutout_size = Cutout._parse_size_input(cutout_size)
+
+    # Create polygon for intersection
+    # Convert dimensions from pixels to arcseconds and divide by 2 to get offset from center
+    ra_offset = ((cutout_size[0] * arcsec_per_px) / 2) * u.arcsec
+    dec_offset = ((cutout_size[1] * arcsec_per_px) / 2) * u.arcsec
+
+    # Calculate RA and Dec boundaries
+    ra_bounds = [ra - ra_offset, ra + ra_offset]
+    dec_bounds = [dec - dec_offset, dec + dec_offset]
+
+    # Get RA and Dec for four corners of rectangle
+    ras = [ra_bounds[0].value, ra_bounds[1].value, ra_bounds[1].value, ra_bounds[0].value]
+    decs = [dec_bounds[0].value, dec_bounds[0].value, dec_bounds[1].value, dec_bounds[1].value]
+
+    # Create SphericalPolygon for comparison
+    cutout_fp = SphericalPolygon.from_radec(ras, decs, center=(ra, dec))
+
+    # Find indices of FFIs that intersect with the cutout
+    ffi_inds = np.vectorize(lambda ffi: ffi.intersects_poly(cutout_fp))(all_ffis['polygon'])
+    ffi_inds = FootprintCutout._ffi_intersect(all_ffis, cutout_fp)
+
+    return all_ffis[ffi_inds]
