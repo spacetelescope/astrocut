@@ -1,8 +1,8 @@
-import copy
+import warnings
+from copy import deepcopy
 from pathlib import Path
 from time import monotonic
 from typing import List, Tuple, Union, Optional
-import warnings
 
 import asdf
 import gwcs
@@ -67,8 +67,6 @@ class ASDFCutout(ImageCutout):
         Write the cutouts to disk or memory in FITS format.
     write_as_asdf(output_dir)
         Write the cutouts to disk or memory in ASDF format.
-    get_center_pixel(gwcsobj, ra, dec)
-        Get the closest pixel location on an input image for a given set of coordinates.
     """
         
     def __init__(self, input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyCoord, str], 
@@ -175,8 +173,8 @@ class ASDFCutout(ImageCutout):
 
         # Get data and GWCS object from ASDF input file
         with asdf.open(input_file) as af:
-            data = af[self._mission_kwd]['data']
-            gwcs = af[self._mission_kwd]['meta'].get('wcs', None)
+            data = deepcopy(af[self._mission_kwd]['data'])
+            gwcs = deepcopy(af[self._mission_kwd]['meta'].get('wcs', None))
 
         return (data, gwcs)
     
@@ -244,7 +242,7 @@ class ASDFCutout(ImageCutout):
             The sliced GWCS object.
         """
         # Create copy of original gwcs object
-        tmp = copy.deepcopy(gwcs)
+        tmp = deepcopy(gwcs)
 
         # Get the cutout array bounds and create a new shift transform to the cutout
         # Add the new transform to the gwcs
@@ -280,7 +278,7 @@ class ASDFCutout(ImageCutout):
             return
 
         # Get closest pixel coordinates and approximated WCS
-        pixel_coords, wcs = self.get_center_pixel(gwcs, self._coordinates.ra.value, self._coordinates.dec.value)
+        pixel_coords, wcs = get_center_pixel(gwcs, self._coordinates.ra.value, self._coordinates.dec.value)
 
         # Create the cutout
         try:
@@ -415,53 +413,8 @@ class ASDFCutout(ImageCutout):
         """
         return self._write_as_format(output_format='.asdf', output_dir=output_dir)
     
-    @staticmethod 
-    def get_center_pixel(gwcsobj: gwcs.wcs.WCS, ra: float, dec: float) -> Tuple[Tuple[int, int], WCS]:
-        """ 
-        Get the closest pixel location on an input image for a given set of coordinates.
 
-        Parameters
-        ----------
-        gwcsobj : gwcs.wcs.WCS
-            The GWCS object.
-        ra : float
-            The right ascension of the input coordinates.
-        dec : float
-            The declination of the input coordinates.
-
-        Returns
-        -------
-        pixel_position
-            The pixel position of the input coordinates.
-        wcs_updated : `~astropy.wcs.WCS`
-            The approximated FITS WCS object.
-        """
-
-        # Convert the gwcs object to an astropy FITS WCS header
-        header = gwcsobj.to_fits_sip()
-
-        # Update WCS header with some keywords that it's missing.
-        # Otherwise, it won't work with astropy.wcs tools (TODO: Figure out why. What are these keywords for?)
-        for k in ['cpdis1', 'cpdis2', 'det2im1', 'det2im2', 'sip']:
-            if k not in header:
-                header[k] = 'na'
-
-        # New WCS object with updated header
-        with warnings.catch_warnings():
-            warnings.simplefilter('ignore')
-            wcs_updated = WCS(header)
-
-        # Turn input RA, Dec into a SkyCoord object
-        coordinates = SkyCoord(ra, dec, unit='deg')
-
-        # Map the coordinates to a pixel's location on the Roman 2d array (row, col)
-        gwcsobj.bounding_box = None
-        row, col = gwcsobj.invert(coordinates)
-
-        return (row, col), wcs_updated
-    
-
-def get_center_pixel(gwcsobj: gwcs.wcs.WCS, ra: float, dec: float) -> tuple:
+def get_center_pixel(gwcsobj: gwcs.wcs.WCS, ra: float, dec: float) -> Tuple[Tuple[int, int], WCS]:
     """ 
     Get the closest pixel location on an input image for a given set of coordinates.
 
@@ -481,7 +434,27 @@ def get_center_pixel(gwcsobj: gwcs.wcs.WCS, ra: float, dec: float) -> tuple:
     wcs_updated : `~astropy.wcs.WCS`
         The approximated FITS WCS object.
     """
-    return ASDFCutout.get_center_pixel(gwcsobj, ra, dec)
+    # Convert the gwcs object to an astropy FITS WCS header
+    header = gwcsobj.to_fits_sip()
+
+    # Update WCS header with some keywords that it's missing.
+    # Otherwise, it won't work with astropy.wcs tools (TODO: Figure out why. What are these keywords for?)
+    for k in ['cpdis1', 'cpdis2', 'det2im1', 'det2im2', 'sip']:
+        if k not in header:
+            header[k] = 'na'
+
+    # New WCS object with updated header
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        wcs_updated = WCS(header)
+
+    # Turn input RA, Dec into a SkyCoord object
+    coordinates = SkyCoord(ra, dec, unit='deg')
+
+    # Map the coordinates to a pixel's location on the Roman 2d array (row, col)
+    row, col = gwcsobj.invert(coordinates, with_bounding_box=False)
+
+    return (row, col), wcs_updated
 
 
 @deprecated_renamed_argument('output_file', None, '1.0.0', warning_type=DeprecationWarning,
