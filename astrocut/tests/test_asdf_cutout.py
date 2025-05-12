@@ -12,7 +12,7 @@ from astropy.io import fits
 from gwcs import wcs, coordinate_frames
 from PIL import Image
 
-from astrocut.asdf_cutout import ASDFCutout, asdf_cut
+from astrocut.asdf_cutout import ASDFCutout, asdf_cut, get_center_pixel
 from astrocut.exceptions import DataWarning, InvalidInputError, InvalidQueryError
 
 
@@ -296,12 +296,19 @@ def test_asdf_cutout_img_output(test_images, center_coord, cutout_size, tmpdir):
 
 def test_get_center_pixel(fakedata):
     """ Test get_center_pixel function """
-    # get the fake data
+    # Get the fake data
     __, gwcs = fakedata
 
-    pixel_coordinates, wcs = ASDFCutout.get_center_pixel(gwcs, 30, 45)
+    # Using center coordinates
+    pixel_coordinates, wcs = get_center_pixel(gwcs, 30, 45)
     assert np.allclose(pixel_coordinates, (np.array(500), np.array(500)))
     assert np.allclose(wcs.celestial.wcs.crval, np.array([30, 45]))
+
+    # Using upper left corner
+    # Running this without parametrization to make sure that gwcs is not corrupted
+    ra, dec = wcs.all_pix2world(0, 0, 0)
+    pixel_coordinates, wcs = get_center_pixel(gwcs, ra, dec)
+    assert np.allclose(pixel_coordinates, (np.array(0), np.array(0)))
 
 
 def test_asdf_cut(test_images, center_coord, cutout_size, tmpdir):
