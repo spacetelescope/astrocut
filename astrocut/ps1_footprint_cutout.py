@@ -14,8 +14,7 @@ class PS1FootprintCutout(FITSCutout):
                  coordinates: Union[SkyCoord, str], 
                  cutout_size: Union[int, np.ndarray, u.Quantity, List[int], Tuple[int]] = 25,
                  fill_value: Union[int, float] = np.nan, 
-                 limit_rounding_method: str = 'round', 
-                 sequence: Union[int, List[int], None] = None, 
+                 limit_rounding_method: str = 'round',
                  img_filters: list[str] = ['g', 'r', 'i', 'z', 'y'],
                  verbose: bool = False):
 
