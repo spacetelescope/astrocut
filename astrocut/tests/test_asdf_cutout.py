@@ -4,6 +4,7 @@ import pytest
 
 import asdf
 from astropy import coordinates as coord
+from astropy.time import Time
 from astropy import units as u
 from astropy.coordinates import SkyCoord
 from astropy.modeling import models
@@ -86,7 +87,10 @@ def test_images(tmp_path, fakedata):
     data, wcsobj = fakedata
 
     # create meta
-    meta = {'wcs': wcsobj}
+    meta = {'wcs': wcsobj,
+            'product_type': 'l2',
+            'origin': 'STSCI/SOC',
+            'file_date': Time('2023-10-01T00:00:00', format='isot')}
 
     # create and write the asdf file
     tree = {'roman': {'data': data, 'meta': meta}}
@@ -153,11 +157,16 @@ def test_asdf_cutout_write_to_file(test_images, center_coord, cutout_size, tmpdi
     assert len(asdf_files) == 3
     for i, asdf_file in enumerate(asdf_files):
         with asdf.open(asdf_file) as af:
-            assert 'roman' in af.tree
-            assert 'data' in af.tree['roman']
-            assert 'meta' in af.tree['roman']
+            assert 'roman' in af
+            assert 'data' in af['roman']
+            assert 'meta' in af['roman']
+            # Check cutout data and metadata
             assert np.all(af.tree['roman']['data'] == cutout.cutouts[i].data)
-            assert af.tree['roman']['meta']['wcs'].pixel_shape == (10, 10)
+            assert af['roman']['meta']['wcs'].pixel_shape == (10, 10)
+            assert af['roman']['meta']['product_type'] == 'l2'
+            assert af['roman']['meta']['file_date'] == Time('2023-10-01T00:00:00', format='isot')
+            assert af['roman']['meta']['origin'] == 'STSCI/SOC'
+            # Check file size is smaller than original
             assert Path(asdf_file).stat().st_size < Path(test_images[i]).stat().st_size
 
     # Write cutouts to FITS files on disk
@@ -170,6 +179,26 @@ def test_asdf_cutout_write_to_file(test_images, center_coord, cutout_size, tmpdi
             assert hdul[0].header['NAXIS1'] == 10
             assert hdul[0].header['NAXIS2'] == 10
             assert Path(fits_file).stat().st_size < Path(test_images[i]).stat().st_size
+            assert len(hdul) == 2  # primary HDU + ASDF metadata HDU
+            assert isinstance(hdul[1], fits.BinTableHDU)
+            assert hdul[1].name == 'ASDF'
+
+
+def test_asdf_cutout_lite(test_images, center_coord, cutout_size, tmpdir):
+    # Write cutouts to ASDF objects in lite mode
+    cutout = ASDFCutout(test_images, center_coord, cutout_size, lite=True)
+    for af in cutout.asdf_cutouts:
+        assert 'roman' in af
+        assert 'data' in af['roman']
+        assert 'meta' in af['roman']
+        assert len(af['roman']) == 2  # only data and meta
+        assert len(af['roman']['meta']) == 1  # only wcs
+
+    # Write cutouts to HDUList objects in lite mode
+    cutout = ASDFCutout(test_images, center_coord, cutout_size, lite=True)
+    for hdul in cutout.fits_cutouts:
+        assert len(hdul) == 1  # primary HDU only
+        assert hdul[0].name == 'PRIMARY'
 
 
 def test_asdf_cutout_partial(test_images, center_coord, cutout_size):
