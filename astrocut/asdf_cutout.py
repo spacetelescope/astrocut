@@ -208,14 +208,10 @@ class ASDFCutout(ImageCutout):
                               wcs=wcs,
                               size=(self._cutout_size[1], self._cutout_size[0]),
                               mode='partial',
+                              copy=True,
                               fill_value=self._fill_value)
         
         log.debug('Image cutout shape: %s', img_cutout.shape)
-
-        # Data in the Cutout2D object is a view into the original data. We need to deep copy the 
-        # data in the cutout object to ensure that it is fully independent of the original data 
-        # and that it does not take up the same amount of storage.
-        img_cutout.data = np.array(img_cutout.data, copy=True)
 
         return img_cutout
 
@@ -249,14 +245,14 @@ class ASDFCutout(ImageCutout):
         slices = cutout.slices_original
         xmin, xmax = slices[1].start, slices[1].stop
         ymin, ymax = slices[0].start, slices[0].stop
-        shape = (ymax - ymin, xmax - xmin)
+        shape = (xmax - xmin, ymax - ymin)
         offsets = models.Shift(xmin, name='cutout_offset1') & models.Shift(ymin, name='cutout_offset2')
         tmp.insert_transform('detector', offsets, after=True)
 
         # Modify the gwcs bounding box to the cutout shape
         tmp.bounding_box = ((0, shape[0] - 1), (0, shape[1] - 1))
-        tmp.pixel_shape = shape[::-1]
-        tmp.array_shape = shape
+        tmp.pixel_shape = shape
+        tmp.array_shape = shape[::-1]
         return tmp
     
     def _cutout_file(self, file: Union[str, Path, S3Path]):

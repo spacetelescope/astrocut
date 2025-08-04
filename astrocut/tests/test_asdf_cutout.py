@@ -294,6 +294,20 @@ def test_asdf_cutout_img_output(test_images, center_coord, cutout_size, tmpdir):
     assert img.mode == 'RGB'
 
 
+def test_asdf_cutout_gwcs(test_images, center_coord):
+    """ Test creating a rectangular cutout to make sure cutout gwcs is correct """
+    cutout = ASDFCutout(test_images[0], center_coord, cutout_size=[20, 40])
+    asdf_cutouts = cutout.asdf_cutouts
+    gwcs = asdf_cutouts[0]['roman']['meta']['wcs']
+    assert isinstance(gwcs, wcs.WCS)
+    assert gwcs.pixel_shape == (20, 40)
+    assert gwcs.array_shape == (40, 20)
+    assert gwcs.bounding_box.intervals[0].lower == 0
+    assert gwcs.bounding_box.intervals[0].upper == 19
+    assert gwcs.bounding_box.intervals[1].lower == 0
+    assert gwcs.bounding_box.intervals[1].upper == 39
+
+
 def test_get_center_pixel(fakedata):
     """ Test get_center_pixel function """
     # Get the fake data
