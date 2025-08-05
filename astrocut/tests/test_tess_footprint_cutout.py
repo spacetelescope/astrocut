@@ -138,7 +138,7 @@ def test_tess_footprint_cutout_multi_sequence(coordinates, cutout_size):
     assert len(cutout_tpfs) == 2
 
     for tpf in cutout_tpfs:
-        check_output_tpf(tpf, 'SPOC', sequences)
+        check_output_tpf(tpf, sequences)
 
 
 def test_tess_footprint_cutout_all_sequences(coordinates, cutout_size):
@@ -157,7 +157,7 @@ def test_tess_footprint_cutout_all_sequences(coordinates, cutout_size):
     # Assert non-empty results
     assert len(seq_list) == len(cutout_tpfs)
     for tpf in cutout_tpfs:
-        check_output_tpf(tpf, 'SPOC', sequences)
+        check_output_tpf(tpf, sequences)
 
 
 def test_tess_footprint_cutout_write_as_tpf(coordinates, cutout_size, tmpdir):
