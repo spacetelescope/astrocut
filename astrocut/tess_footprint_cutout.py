@@ -1,4 +1,3 @@
-import re
 from pathlib import Path
 from typing import List, Tuple, Union
 
@@ -168,131 +167,7 @@ class TessFootprintCutout(FootprintCutout):
         """
         return self.tess_cube_cutout.write_as_tpf(output_dir)
 
-    def write_as_zip(self, output_dir: Union[str, Path] = ".", filename: Union[str, Path, None] = None) -> str:
-        """
-        Package the cutout TPF files into a zip archive.
 
-        Parameters
-        ----------
-        output_dir : str | Path, optional
-            Directory where the TPFs are written and where the zip will be created. Default '.'.
-        filename : str | Path | None, optional
-            Name (or path) of the output zip file. If not provided, defaults to
-            'astrocut_{ra}_{dec}_{size}.zip'. If provided without a '.zip' suffix,
-            the suffix is added automatically.
-
-        Returns
-        -------
-        zip_path : str
-            Path to the created zip file.
-        """
-        return self.tess_cube_cutout.write_as_zip(output_dir, filename)
-
-
-def _extract_sequence_information(sector_name: str) -> dict:
-    """
-    Extract the sector, camera, and ccd information from the sector name.
-
-    This is a helper function and should be left private.
-
-    Parameters
-    ----------
-    sector_name : str
-        The name of the sector.
-
-    Returns
-    -------
-    dict
-        A dictionary containing the sector name, sector number, camera number, and CCD number.
-    """
-    # Example sector name format: "tess-s0001-4-4"
-    pattern = re.compile(r"(tess-s)(?P<sector>\d{4})-(?P<camera>\d{1,4})-(?P<ccd>\d{1,4})")
-    sector_match = re.match(pattern, sector_name)
-
-    if not sector_match:
-        # Return an empty dictionary if the name does not match the product pattern
-        return {}
-
-    # Extract the sector, camera, and ccd information
-    sector = sector_match.group("sector")
-    camera = sector_match.group("camera")
-    ccd = sector_match.group("ccd")
-
-    return {"sectorName": sector_name, "sector": sector, "camera": camera, "ccd": ccd}
-
-
-def _create_sequence_list(observations: Table) -> List[dict]:
-    """
-    Extracts sequence information from a list of observations.
-
-    This is a helper function and should be left private.
-
-    Parameters
-    ----------
-    observations : `~astropy.table.Table`
-        A table of FFI observations.
-
-    Returns
-    -------
-    list of dict
-        A list of dictionaries, each containing the sector name, sector number, camera number, and CCD number.
-    """
-    # Filter observations by target name to get only the FFI observations
-    obs_filtered = [obs for obs in observations if obs["target_name"].upper() == "TESS FFI"]
-
-    sequence_results = []
-    for row in obs_filtered:
-        # Extract the sector information for each FFI observation
-        sequence_extraction = _extract_sequence_information(row["obs_id"])
-        if sequence_extraction:
-            sequence_results.append(sequence_extraction)
-
-    return sequence_results
-
-
-def _get_files_from_cone_results(cone_results: Table) -> List[dict]:
-    """
-    Converts a `~astropy.table.Table` of cone search results to a list of dictionaries containing
-    information for each cloud cube file that intersects with the cutout.
-
-    This is a helper function and should be left private.
-
-    Parameters
-    ----------
-    cone_results : `~astropy.table.Table`
-        A table containing observation results, including sector information.
-
-    Returns
-    -------
-    cube_files : list of dict
-        A list of dictionaries, each containing:
-        - "folder": The folder name corresponding to the sector, prefixed with 's' and zero-padded to 4 digits.
-        - "cube": The expected filename for the cube FITS file in the format "{sectorName}-cube.fits".
-        - "sectorName": The sector name.
-    """
-    # Create a list of dictionaries containing the sector information
-    seq_list = _create_sequence_list(cone_results)
-
-    # Create a list of dictionaries containing the cube file information
-    cube_files = [
-        {
-            "folder": "s" + sector["sector"].rjust(4, "0"),
-            "cube": sector["sectorName"] + "-cube.fits",
-            "sectorName": sector["sectorName"],
-        }
-        for sector in seq_list
-    ]
-    return cube_files
-
-
-@deprecated_renamed_argument(
-    "product",
-    None,
-    since="1.1.0",
-    message="Astrocut no longer supports cutouts from "
-    "TESS Image Calibrator (TICA) products. "
-    "The `product` argument is deprecated and will be removed in a future version.",
-)
 def cube_cut_from_footprint(
     coordinates: Union[str, SkyCoord],
     cutout_size,
@@ -325,9 +200,7 @@ def cube_cut_from_footprint(
         cutouts will be generated from all sequences that contain the cutout.
         For the TESS mission, this parameter corresponds to sectors.
     product : str, optional
-        .. deprecated:: 1.1.0
-           This parameter is deprecated and will be removed in a future release.
-           Only "SPOC" products are now supported.
+        Deprecated. Default 'SPOC'. The product type to make the cutouts from.
     memory_only : bool, optional
         Default False. If True, the cutouts are stored in memory and not written to disk.
     output_dir : str, optional
