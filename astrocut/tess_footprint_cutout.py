@@ -6,6 +6,7 @@ import astropy.units as u
 import numpy as np
 from astropy.coordinates import SkyCoord
 from astropy.io.fits import HDUList
+from astropy.utils.decorators import deprecated_renamed_argument
 from astropy.table import Table
 
 from . import log
@@ -62,6 +63,9 @@ class TessFootprintCutout(FootprintCutout):
         Write the cutouts as Target Pixel Files (TPFs) to the specified directory.
     """
 
+    @deprecated_renamed_argument('product', None, since='1.1.0', message='Astrocut no longer supports cutouts from '
+                                 'TESS Image Calibrator (TICA) products. '
+                                 'The `product` argument is deprecated and will be removed in a future version.')
     def __init__(self, coordinates: Union[SkyCoord, str], 
                  cutout_size: Union[int, np.ndarray, u.Quantity, List[int], Tuple[int]] = 25,
                  fill_value: Union[int, float] = np.nan, limit_rounding_method: str = 'round', 
@@ -69,18 +73,14 @@ class TessFootprintCutout(FootprintCutout):
         super().__init__(coordinates, cutout_size, fill_value, limit_rounding_method, sequence, verbose)
         
         # Validate and set the product
-        if product.upper() not in ['SPOC', 'TICA']:
-            raise InvalidInputError('Product for TESS cube cutouts must be either "SPOC" or "TICA".')
-        self._product = product.upper()
+        if product.upper() != 'SPOC':
+            raise InvalidInputError('Product for TESS cube cutouts must be "SPOC".')
+        self._product = 'SPOC'
         self._arcsec_per_px = 21  # Number of arcseconds per pixel in a TESS image
 
-        # Set S3 URIs to footprint cache file and base file path based on product
-        if self._product == 'SPOC':
-            self._s3_footprint_cache = 's3://stpubdata/tess/public/footprints/tess_ffi_footprint_cache.json'
-            self._s3_base_file_path = 's3://stpubdata/tess/public/mast/'
-        else:
-            self._s3_footprint_cache = 's3://stpubdata/tess/public/footprints/tica_ffi_footprint_cache.json'
-            self._s3_base_file_path = 's3://stpubdata/tess/public/mast/tica/'
+        # Set S3 URIs to footprint cache file and base file path
+        self._s3_footprint_cache = 's3://stpubdata/tess/public/footprints/tess_ffi_footprint_cache.json'
+        self._s3_base_file_path = 's3://stpubdata/tess/public/mast/'
 
         # Make the cutouts upon initialization
         self.cutout()
@@ -99,14 +99,8 @@ class TessFootprintCutout(FootprintCutout):
         dict
             A dictionary containing the sector name, sector number, camera number, and CCD number.
         """
-        # Define the pattern based on the product
-        if self._product == 'SPOC':
-            pattern = re.compile(r"(tess-s)(?P<sector>\d{4})-(?P<camera>\d{1,4})-(?P<ccd>\d{1,4})")
-        elif self._product == 'TICA':
-            pattern = re.compile(r"(hlsp_tica_s)(?P<sector>\d{4})-(cam)(?P<camera>\d{1,4})-(ccd)(?P<ccd>\d{1,4})")
-        else:
-            # Return an empty dictionary if the product is not recognized
-            return {}
+        # Example sector name format: "tess-s0001-4-4"
+        pattern = re.compile(r"(tess-s)(?P<sector>\d{4})-(?P<camera>\d{1,4})-(?P<ccd>\d{1,4})")
         sector_match = re.match(pattern, sector_name)
 
         if not sector_match:
@@ -117,10 +111,6 @@ class TessFootprintCutout(FootprintCutout):
         sector = sector_match.group("sector")
         camera = sector_match.group("camera")
         ccd = sector_match.group("ccd")
-
-        # Rename the TICA sector because of the naming convention in Astrocut
-        if self._product == 'TICA':
-            sector_name = f"tica-s{sector}-{camera}-{ccd}"
 
         return {"sectorName": sector_name, "sector": sector, "camera": camera, "ccd": ccd}
     
@@ -139,8 +129,7 @@ class TessFootprintCutout(FootprintCutout):
             A list of dictionaries, each containing the sector name, sector number, camera number, and CCD number.
         """
         # Filter observations by target name to get only the FFI observations
-        target_name = "TESS FFI" if self._product == 'SPOC' else "TICA FFI"
-        obs_filtered = [obs for obs in observations if obs["target_name"].upper() == target_name]
+        obs_filtered = [obs for obs in observations if obs["target_name"].upper() == "TESS FFI"]
 
         sequence_results = []
         for row in obs_filtered:
@@ -220,7 +209,7 @@ class TessFootprintCutout(FootprintCutout):
         input_files = [f"{self._s3_base_file_path}{file['cube']}" for file in files_mapping]
         tess_cube_cutout = TessCubeCutout(input_files, self._coordinates, self._cutout_size, 
                                           self._fill_value, self._limit_rounding_method, threads=8, 
-                                          product=self._product, verbose=self._verbose)
+                                          verbose=self._verbose)
         
         # Assign attributes from the TessCubeCutout object
         self.tess_cube_cutout = tess_cube_cutout
@@ -244,8 +233,11 @@ class TessFootprintCutout(FootprintCutout):
             List of file paths to cutout target pixel files.
         """
         return self.tess_cube_cutout.write_as_tpf(output_dir)
-    
 
+
+@deprecated_renamed_argument('product', None, since='1.1.0', message='Astrocut no longer supports cutouts from '
+                             'TESS Image Calibrator (TICA) products. '
+                             'The `product` argument is deprecated and will be removed in a future version.')
 def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size, 
                             sequence: Union[int, List[int], None] = None, product: str = 'SPOC',
                             memory_only=False, output_dir: str = '.', 
@@ -273,7 +265,7 @@ def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size,
         cutouts will be generated from all sequences that contain the cutout.
         For the TESS mission, this parameter corresponds to sectors.
     product : str, optional
-        Default 'SPOC'. The product type to make the cutouts from.
+        Deprecated. Default 'SPOC'. The product type to make the cutouts from.
     memory_only : bool, optional
         Default False. If True, the cutouts are stored in memory and not written to disk.
     output_dir : str, optional
@@ -295,7 +287,6 @@ def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size,
     ...         coordinates='83.40630967798376 -62.48977125108528',
     ...         cutout_size=64,
     ...         sequence=[1, 2],  # TESS sectors
-    ...         product='SPOC',
     ...         output_dir='./cutouts')
     ['./cutouts/tess-s0001-4-4/tess-s0001-4-4_83.406310_-62.489771_64x64_astrocut.fits',
      './cutouts/tess-s0002-4-1/tess-s0002-4-1_83.406310_-62.489771_64x64_astrocut.fits']
