@@ -4,10 +4,13 @@ from typing import Optional, Union
 
 import numpy as np
 from astropy.io import fits
+from astropy.utils.decorators import deprecated
 
 from .cube_factory import CubeFactory
 
 
+@deprecated(since='1.1.0', message='The `TicaCubeFactory` class is deprecated and will be removed in a future version. ' 
+                                   'Use the `CubeFactory` class for creating image cubes from SPOC product files.')
 class TicaCubeFactory(CubeFactory):
     """
     Class for creating TICA image cubes. 
@@ -25,7 +28,6 @@ class TicaCubeFactory(CubeFactory):
         Note, this is the maximum amount of space to be used for the cube array only,
         so should not be set to the full amount of memory on the system.
     """
-
     def __init__(self, max_memory: int = 50):
         """ Setting up the class members."""
         super().__init__(max_memory=max_memory)

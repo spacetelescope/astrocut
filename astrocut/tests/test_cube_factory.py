@@ -182,8 +182,7 @@ def test_invalid_inputs(tmpdir, ffi_type, img_size, num_images):
     """
     # Assigning some variables
     product = 'TICA' if ffi_type == 'TICA' else 'SPOC'
-    value_error = ('One or more incorrect file types were input. Please input TICA FFI files when using '
-                   '``TicaCubeFactory``, and SPOC FFI files when using ``CubeFactory``.')
+    value_error = ('One or more incorrect file types were input.')
     
     # Create test FFI files
     ffi_files = create_test_ffis(img_size=img_size, 

@@ -36,7 +36,9 @@ class TessFootprintCutout(FootprintCutout):
         cutouts will be generated from all sequences that contain the cutout.
         For the TESS mission, this parameter corresponds to sectors.
     product : str, optional
-        Default 'SPOC'. The product type to make the cutouts from.
+        .. deprecated:: 1.1.0
+           This parameter is deprecated and will be removed in a future release.
+           Only "SPOC" products are now supported.
     verbose : bool
         If True, log messages are printed to the console.
 
@@ -265,7 +267,9 @@ def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size,
         cutouts will be generated from all sequences that contain the cutout.
         For the TESS mission, this parameter corresponds to sectors.
     product : str, optional
-        Deprecated. Default 'SPOC'. The product type to make the cutouts from.
+        .. deprecated:: 1.1.0
+           This parameter is deprecated and will be removed in a future release.
+           Only "SPOC" products are now supported.
     memory_only : bool, optional
         Default False. If True, the cutouts are stored in memory and not written to disk.
     output_dir : str, optional
