@@ -288,14 +288,14 @@ You can also set the prefix of the cutout file paths using the ``cutout_prefix``
 Cube Cutouts
 ============
 
-Astrocut enables the creation of cutouts from image cube files, including TESS full-frame images (FFIs).
+Astrocut enables the creation of cutouts from image cube files, including TESS full-frame images (FFIs). Supported products
+are from the Science Processing Operations Center (`SPOC <https://archive.stsci.edu/missions-and-data/tess>`_).
 
-To begin, the `~astrocut.CubeFactory`` class (for SPOC products) or the `~astrocut.TicaCubeFactory`` class (for TICA FFIs) 
-constructs a large image cube from a list of FFI files, optimizing the writing process for efficiency.
-The `~astrocut.TessCubeCutout` class then extracts the desired cutout and generates a target pixel file (TPF)
+To begin, the `~astrocut.CubeFactory` class constructs a large image cube from a list of FFI files, optimizing the 
+writing process for efficiency. The `~astrocut.TessCubeCutout` class then extracts the desired cutout and generates a target pixel file (TPF)
 similar to those produced by the TESS Mission.
 
-For a small number of cutouts, the `TESSCut web service <mast.stsci.edu/tesscut <https://mast.stsci.edu/tesscut/>_` may suit 
+For a small number of cutouts, the `TESSCut web service <https://mast.stsci.edu/tesscut/>`_ may suit 
 your needs.
 
 Making Image Cubes
@@ -328,14 +328,12 @@ Making Image Cubes
    significantly.
    
 
-Assuming that you have set of calibrated TESS (or TICA) FFI files stored locally, you can
-create a cube using the `~astrocut.CubeFactory.make_cube` method (or 
-`~astrocut.TicaCubeFactory.make_cube` for TICA products). By default, both `~astrocut.CubeFactory.make_cube` 
-and `~astrocut.TicaCubeFactory.make_cube` run in verbose mode and print out progress; setting `verbose` to false will silence
+Assuming that you have set of calibrated TESS FFI files stored locally, you can
+create a cube using the `~astrocut.CubeFactory.make_cube` method. By default, `~astrocut.CubeFactory.make_cube` 
+runs in verbose mode and prints out progress; setting the ``verbose`` parameter to ``False`` will silence
 all output.
 
-Note, you can only make cubes from a set of FFIs with the same product type (i.e., only SPOC *or* 
-only TICA products) that were observed in the same sector, camera, and CCD.
+Note, you can only make cubes from a set of FFIs that were observed in the same sector, camera, and CCD.
 
 The output image cube file format is described in the `Astrocut File Formats <file_formats.html#cube-files>`__ page.
 
@@ -385,7 +383,6 @@ The `astrocut.TessCubeCutout` class takes the following parameters:
 - ``coordinates``: The coordinates at the center of the cutout.
 - ``cutout_size``: The size of the cutout in pixels or angular units.
 - ``fill_value``: If the cutout footprint falls outside of the image, this value will be used to fill the missing pixels.
-- ``product``: The type of TESS product to use. Options are "SPOC" or "TICA". Default is "SPOC".
 
 .. code-block:: python
 
@@ -515,8 +512,7 @@ described in the `Astrocut File Formats <file_formats.html#target-pixel-files>`_
   >>> fp_cutout = TessFootprintCutout(
   ...         coordinates='83.40630967798376 -62.48977125108528',
   ...         cutout_size=10,
-  ...         sequence=[1, 2],  # TESS sectors
-  ...         product='SPOC')
+  ...         sequence=[1, 2])  # TESS sectors
   >>> fp_cutout.write_as_tpf()  #doctest: +SKIP
 
 The resulting `~astrocut.TessFootprintCutout` object can be used to access the cutout data and metadata. The ``cutouts_by_file`` attribute

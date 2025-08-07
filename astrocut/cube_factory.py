@@ -44,8 +44,8 @@ class CubeFactory():
         Updates an existing cube file with new FITS images.
     """
 
-    ERROR_MSG = ('One or more incorrect file types were input. Please input TICA FFI files when using '
-                 '``TicaCubeFactory``, and SPOC FFI files when using ``CubeFactory``.')
+    ERROR_MSG = ('One or more incorrect file types were input. Please input only SPOC FFI files when '
+                 'using ``CubeFactory``.')
 
     def __init__(self, max_memory: int = 50):
         """ Setting up the class members """
