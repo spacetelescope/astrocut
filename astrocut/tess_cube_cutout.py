@@ -8,6 +8,7 @@ import numpy as np
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.time import Time
+from astropy.utils.decorators import deprecated_renamed_argument
 from astropy.wcs import WCS
 from s3path import S3Path
 
@@ -36,8 +37,9 @@ class TessCubeCutout(CubeCutout):
         The number of threads to use for making the cutouts. If 'auto', the number of threads will be set to the number
         of available CPUs.
     product : str
-        The product type to make the cutouts from.
-        Can either be 'SPOC' or 'TICA' (default is 'SPOC').
+        .. deprecated:: 1.1.0
+           This parameter is deprecated and will be removed in a future release.
+           Only "SPOC" products will be supported.
     verbose : bool
         If True, log messages are printed to the console.
 
@@ -60,6 +62,9 @@ class TessCubeCutout(CubeCutout):
         Write the cutouts to target pixel files.
     """
 
+    @deprecated_renamed_argument('product', None, since='1.1.0', message='The `product` argument is deprecated and '
+                                 'will be removed in a future version. Astrocut will only support cutouts from '
+                                 'SPOC products.')
     def __init__(self, input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyCoord, str], 
                  cutout_size: Union[int, np.ndarray, u.Quantity, List[int], Tuple[int]] = 25,
                  fill_value: Union[int, float] = np.nan, limit_rounding_method: str = 'round', 
