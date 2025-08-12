@@ -298,6 +298,12 @@ similar to those produced by the TESS Mission.
 For a small number of cutouts, the `TESSCut web service <https://mast.stsci.edu/tesscut/>`_ may suit 
 your needs.
 
+.. note:: 
+  Starting in version 1.1.0, the ability to create image cubes and cube cutouts using TESS Image Calibration 
+  (`TICA <https://ui.adsabs.harvard.edu/abs/2020RNAAS...4..251F/abstract>`__) full frame images is deprecated and will be removed 
+  in a future release. Individual TICA full-frame images will remain available from the 
+  `MAST TICA homepage <https://archive.stsci.edu/hlsp/tica>`__.
+
 Making Image Cubes
 ------------------
 
