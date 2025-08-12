@@ -63,8 +63,7 @@ Cube Files
 ==========
 
 See the `TESS Science Data Products Description Document <https://archive.stsci.edu/missions/tess/doc/EXP-TESS-ARC-ICD-TM-0014.pdf#page=17>`__
-for detailed information on the TESS full-frame image file format. See the `TESS Image CAlibrator Full Frame Images page <https://archive.stsci.edu/hlsp/tica>`__
-for information on the format of the TICA HLSP full-frame images.
+for detailed information on the TESS full-frame image file format.
 
 
 PrimaryHDU (Extension 0)
@@ -87,36 +86,20 @@ Keyword   Value
  TSTOP    From the ImageHDU (EXT 1) of the Sector's last FFI
 ========= ===================================================
 
-The Primary Header of the TICA cube FITS file is the same as that from
-an individual TICA FFI with the following exceptions:
-
-========= ===================================================
-Keyword   Value
-========= ===================================================
- ORIGIN   STScI/MAST
- DATE     Date the cube was created
- SECTOR   The TESS observing Sector, passed by the user
- STARTTJD From the PrimaryHDU (EXT 0) of the first TICA FFI in the Sector
- MIDTJD   From the PrimaryHDU (EXT 0) of the middle TICA FFI in the Sector
- ENDTJD   From the PrimaryHDU (EXT 0) of the last TICA FFI in the Sector
- MJD-BEG  From the PrimaryHDU (EXT 0) of the first TICA FFI in the Sector
- MJD-END  From the PrimaryHDU (EXT 0) of the last TICA FFI in the Sector
-========= ===================================================
 
 ImageHDU (Extension 1)
 ^^^^^^^^^^^^^^^^^^^^^^
 
-The ImageHDU extension contains the TESS (or TICA) FFI data cube.
+The ImageHDU extension contains the TESS FFI data cube.
 It is 4 dimensional, with two spatial dimensions, time, data and
-error flux values. Note, error flux values are only included in the 
-cubes generated from SPOC products. Pixel values are 32 bit floats.
+error flux values. Pixel values are 32 bit floats.
 The cube dimensions are ordered in the FITS format as follows:
 
 ========= ===================================================
 Keyword   Value
 ========= ===================================================
 NAXIS     4 (number of array dimensions)                    
-NAXIS1    2 (For SPOC products, data value, error value) or 1 (For TICA products, data value only)
+NAXIS1    2 (data value, error value)
 NAXIS2    Total number of FFIs
 NAXIS3    Length of first array dimension (NAXIS1 from FFIs)
 NAXIS4    Length of second array dimension (NAXIS2 from FFIs)
@@ -126,8 +109,8 @@ NAXIS4    Length of second array dimension (NAXIS2 from FFIs)
 BinTableHDU (Extension 2)
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The BinTableHDU extension, in both the SPOC and TICA cubes, contains a table that 
-holds all of the Image extension header keywords from the individual FFIs. There 
+The BinTableHDU extension contains a table that 
+holds all of the image extension header keywords from the individual FFIs. There 
 is one column for each keyword plus one additional column called "FFI_FILE" that 
 contains FFI filename for each row. Each column name keyword also has an entry in the 
 Image extension header, with the value being the keyword value from the FFI header.
@@ -181,7 +164,7 @@ the Mission pipeline TPFs, with one addition: an extra column, ``FFI_FILE``, con
 the name of the FFI file that the row's pixels come from.
 
 While all of the columns present in Mission pipeline TPFs are present in cutouts created
-from SPOC cubes, they do not all contain data. The columns that are empty in Astrocut SPOC TPFs are:
+from SPOC cubes, they do not all contain data. The columns that are empty in Astrocut TPFs are:
 
 ============ ====================================================
 Column       Value
@@ -197,23 +180,6 @@ POS_CORR2    0
 The ``TIME`` column is formed by taking the average of the ``TSTART`` and ``TSTOP`` values
 from the corresponding FFI for each row. The ``QUALITY`` column is taken from the ``DQUALITY``
 image keyword in the individual SPOC FFI files.
-
-For cutouts created from TICA cubes, the ``TIMECORR`` column has been removed from the
-PIXELS BinTableHDU. Similar to cutouts made from SPOC cubes, the other columns (aside from
-the ``TIMECORR`` column) present in Mission pipeline TPFs are present in cutouts created
-from TICA cubes, but do not all contain data. The columns that are empty in Astrocut TICA TPFs are:
-
-============ ====================================================
-Column       Value
-============ ====================================================
-RAW_CNTS     -1 filled array in cutout shape
-FLUX_ERR     0 filled array in cutout shape
-FLUX_BKG     0 filled array in cutout shape
-FLUX_BKG_ERR 0 filled array in cutout shape
-QUALITY      0
-POS_CORR1    0
-POS_CORR2    0
-============ ====================================================
 
 Three keywords have also been added to the PIXELS extension header to give additional information
 about the cutout world coordinate system (WCS). TESS FFIs are large and therefore are described
