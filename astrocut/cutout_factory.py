@@ -26,12 +26,9 @@ class CutoutFactory():
     `~astrocut.TessCubeCutout` class.
     """
 
-    @deprecated_renamed_argument('product', None, since='1.1.0', message='The `product` argument is deprecated and '
-                                 'will be removed in a future version. Astrocut will only support cutouts from '
-                                 'SPOC products.')
     def cube_cut(self, cube_file: Union[str, Path, S3Path], coordinates: Union[SkyCoord, str],
                  cutout_size: Union[int, np.ndarray, u.Quantity, List[int], Tuple[int]], 
-                 product: str = 'SPOC', target_pixel_file: Optional[str] = None, 
+                 target_pixel_file: Optional[str] = None, 
                  output_path: Union[str, Path] = '.', memory_only: bool = False, 
                  threads: Union[int, Literal["auto"]] = 1, verbose: bool = False):
         """
@@ -59,10 +56,6 @@ class CutoutFactory():
             order.  Scalar numbers in ``cutout_size`` are assumed to be in
             units of pixels. `~astropy.units.Quantity` objects must be in pixel or
             angular units.
-        product : str
-            .. deprecated:: 1.1.0
-               This parameter is deprecated and will be removed in a future release.
-               Only "SPOC" products will be supported.
         target_pixel_file : str
             Optional. The name for the output target pixel file.
             If no name is supplied, the file will be named:
@@ -90,7 +83,6 @@ class CutoutFactory():
         cube_cutout = TessCubeCutout(input_files=cube_file,
                                      coordinates=coordinates,
                                      cutout_size=cutout_size,
-                                     product=product,
                                      threads=threads,
                                      verbose=verbose)
         
@@ -108,11 +100,9 @@ class CutoutFactory():
                                         output_file=target_pixel_file)[0]
     
 
-@deprecated_renamed_argument('product', None, since='1.1.0', message='The `product` argument is deprecated and will be '
-                             'removed in a future version. Astrocut will only support cutouts from SPOC products.')
 def cube_cut(cube_file: Union[str, Path, S3Path], coordinates: Union[SkyCoord, str],
              cutout_size: Union[int, np.ndarray, u.Quantity, List[int], Tuple[int]], 
-             product: str = 'SPOC', target_pixel_file: Optional[str] = None, 
+             target_pixel_file: Optional[str] = None, 
              output_path: Union[str, Path] = '.', memory_only: bool = False, 
              threads: Union[int, Literal["auto"]] = 1, verbose: bool = False):
     """
@@ -140,10 +130,6 @@ def cube_cut(cube_file: Union[str, Path, S3Path], coordinates: Union[SkyCoord, s
         order.  Scalar numbers in ``cutout_size`` are assumed to be in
         units of pixels. `~astropy.units.Quantity` objects must be in pixel or
         angular units.
-    product : str
-        .. deprecated:: 1.1.0
-           This parameter is deprecated and will be removed in a future release.
-           Only "SPOC" products will be supported.
     target_pixel_file : str
         Optional. The name for the output target pixel file.
         If no name is supplied, the file will be named:
@@ -171,7 +157,6 @@ def cube_cut(cube_file: Union[str, Path, S3Path], coordinates: Union[SkyCoord, s
     cube_cutout = TessCubeCutout(input_files=cube_file,
                                  coordinates=coordinates,
                                  cutout_size=cutout_size,
-                                 product=product,
                                  threads=threads,
                                  verbose=verbose)
             

@@ -35,10 +35,6 @@ class TessFootprintCutout(FootprintCutout):
         sequence number as an int or a list of sequence numbers. If not specified, 
         cutouts will be generated from all sequences that contain the cutout.
         For the TESS mission, this parameter corresponds to sectors.
-    product : str, optional
-        .. deprecated:: 1.1.0
-           This parameter is deprecated and will be removed in a future release.
-           Only "SPOC" products are now supported.
     verbose : bool
         If True, log messages are printed to the console.
 
@@ -65,19 +61,12 @@ class TessFootprintCutout(FootprintCutout):
         Write the cutouts as Target Pixel Files (TPFs) to the specified directory.
     """
 
-    @deprecated_renamed_argument('product', None, since='1.1.0', message='Astrocut no longer supports cutouts from '
-                                 'TESS Image Calibrator (TICA) products. '
-                                 'The `product` argument is deprecated and will be removed in a future version.')
     def __init__(self, coordinates: Union[SkyCoord, str], 
                  cutout_size: Union[int, np.ndarray, u.Quantity, List[int], Tuple[int]] = 25,
                  fill_value: Union[int, float] = np.nan, limit_rounding_method: str = 'round', 
-                 sequence: Union[int, List[int], None] = None, product: str = 'SPOC', verbose: bool = False):
+                 sequence: Union[int, List[int], None] = None, verbose: bool = False):
         super().__init__(coordinates, cutout_size, fill_value, limit_rounding_method, sequence, verbose)
         
-        # Validate and set the product
-        if product.upper() != 'SPOC':
-            raise InvalidInputError('Product for TESS cube cutouts must be "SPOC".')
-        self._product = 'SPOC'
         self._arcsec_per_px = 21  # Number of arcseconds per pixel in a TESS image
 
         # Set S3 URIs to footprint cache file and base file path
@@ -237,13 +226,8 @@ class TessFootprintCutout(FootprintCutout):
         return self.tess_cube_cutout.write_as_tpf(output_dir)
 
 
-@deprecated_renamed_argument('product', None, since='1.1.0', message='Astrocut no longer supports cutouts from '
-                             'TESS Image Calibrator (TICA) products. '
-                             'The `product` argument is deprecated and will be removed in a future version.')
-def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size, 
-                            sequence: Union[int, List[int], None] = None, product: str = 'SPOC',
-                            memory_only=False, output_dir: str = '.', 
-                            verbose: bool = False) -> Union[List[str], List[HDUList]]:
+def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size, sequence: Union[int, List[int], None] = None, 
+                            memory_only=False, output_dir: str = '.', verbose: bool = False) -> Union[List[str], List[HDUList]]:
     """
     Generates cutouts around `coordinates` of size `cutout_size` from image cube files hosted on the S3 cloud.
 
@@ -266,10 +250,6 @@ def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size,
         sequence number as an int or a list of sequence numbers. If not specified, 
         cutouts will be generated from all sequences that contain the cutout.
         For the TESS mission, this parameter corresponds to sectors.
-    product : str, optional
-        .. deprecated:: 1.1.0
-           This parameter is deprecated and will be removed in a future release.
-           Only "SPOC" products are now supported.
     memory_only : bool, optional
         Default False. If True, the cutouts are stored in memory and not written to disk.
     output_dir : str, optional
@@ -296,7 +276,7 @@ def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size,
      './cutouts/tess-s0002-4-1/tess-s0002-4-1_83.406310_-62.489771_64x64_astrocut.fits']
     """
 
-    cutouts = TessFootprintCutout(coordinates, cutout_size, sequence=sequence, product=product, verbose=verbose)
+    cutouts = TessFootprintCutout(coordinates, cutout_size, sequence=sequence, verbose=verbose)
 
     if memory_only:
         return cutouts.tpf_cutouts

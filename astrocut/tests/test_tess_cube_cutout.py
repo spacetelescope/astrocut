@@ -14,7 +14,6 @@ from astropy.wcs import WCS, FITSFixedWarning
 from .utils_for_test import create_test_ffis
 from ..exceptions import DataWarning, InvalidInputError, InvalidQueryError
 from ..cube_factory import CubeFactory
-from ..tica_cube_factory import TicaCubeFactory
 from ..cube_cutout import CubeCutout
 from ..tess_cube_cutout import TessCubeCutout
 
@@ -51,39 +50,33 @@ def cutout_lims(img_size, cutout_size):
 
 
 @pytest.fixture
-def ffi_files(tmpdir, img_size, num_images, ffi_type: Literal["SPOC", "TICA"]):
+def ffi_files(tmpdir, img_size, num_images):
     """Fixture for creating test ffi files"""
-    return create_test_ffis(img_size, num_images, dir_name=tmpdir, product=ffi_type)
+    return create_test_ffis(img_size, num_images, dir_name=tmpdir)
 
 
 @pytest.fixture
-def cube_file(ffi_files: List[str], tmpdir, ffi_type: Literal['SPOC', "TICA"]):
+def cube_file(ffi_files: List[str], tmpdir):
     """Fixture for creating a cube file"""
     # Making the test cube
-    if ffi_type == "SPOC":
-        cube_maker = CubeFactory()
-    else:
-        cube_maker = TicaCubeFactory()
-
+    cube_maker = CubeFactory()
     cube_file = cube_maker.make_cube(ffi_files, Path(tmpdir, "test_cube.fits"), verbose=False)
 
     return cube_file
 
 
 @pytest.fixture
-def cube_wcs(ffi_files: List[str], tmpdir, ffi_type: Literal["SPOC", "TICA"]):
+def cube_wcs(ffi_files: List[str], tmpdir):
     """Fixture to return the WCS of the cube"""
     # Read one of the input images to get the WCS
-    n = 1 if ffi_type == 'SPOC' else 0
     with warnings.catch_warnings():
         warnings.simplefilter('ignore', FITSFixedWarning)
-        return WCS(fits.getheader(ffi_files[0], n))
+        return WCS(fits.getheader(ffi_files[0], 1))
 
 
-@pytest.mark.parametrize("ffi_type", ["SPOC", "TICA"])
-def test_tess_cube_cutout(cube_file, num_images, ffi_type, cutout_size, coordinates, cutout_lims):
+def test_tess_cube_cutout(cube_file, num_images, cutout_size, coordinates, cutout_lims):
     # Make Cutout
-    cutouts = TessCubeCutout(cube_file, coordinates, cutout_size, product=ffi_type).cutouts
+    cutouts = TessCubeCutout(cube_file, coordinates, cutout_size).cutouts
     cutout = cutouts[0]
 
     # Should return a list of CubeCutoutInstance objects
@@ -100,9 +93,8 @@ def test_tess_cube_cutout(cube_file, num_images, ffi_type, cutout_size, coordina
         data = np.transpose(hdul[1].data, (3, 2, 0, 1))
         assert np.all(data[0, :, cutout_lims[0, 0]:cutout_lims[0, 1], cutout_lims[1, 0]:cutout_lims[1, 1]] == 
                       cutout.data)
-        if ffi_type == 'SPOC':
-            assert np.all(data[1, :, cutout_lims[0, 0]:cutout_lims[0, 1], cutout_lims[1, 0]:cutout_lims[1, 1]] == 
-                          cutout.uncertainty)
+        assert np.all(data[1, :, cutout_lims[0, 0]:cutout_lims[0, 1], cutout_lims[1, 0]:cutout_lims[1, 1]] == 
+                        cutout.uncertainty)
 
     # Check the cutout WCS
     cutout_wcs = cutout.wcs
@@ -113,10 +105,9 @@ def test_tess_cube_cutout(cube_file, num_images, ffi_type, cutout_size, coordina
     assert cutout.wcs_fit['WCS_SIG'][0] == 0
 
 
-@pytest.mark.parametrize("ffi_type", ["SPOC", "TICA"])
-def test_tess_cube_cutout_tpf(cube_file, num_images, ffi_type, cutout_size, coordinates, cutout_lims):
+def test_tess_cube_cutout_tpf(cube_file, num_images, cutout_size, coordinates, cutout_lims):
     # Make Cutout
-    tpfs = TessCubeCutout(cube_file, coordinates, cutout_size, product=ffi_type).tpf_cutouts
+    tpfs = TessCubeCutout(cube_file, coordinates, cutout_size).tpf_cutouts
     tpf = tpfs[0]
 
     # Should return a list of HDUList objects
@@ -127,7 +118,7 @@ def test_tess_cube_cutout_tpf(cube_file, num_images, ffi_type, cutout_size, coor
     primary_header = tpf[0].header
     assert primary_header['RA_OBJ'] == coordinates.ra.deg
     assert primary_header['DEC_OBJ'] == coordinates.dec.deg
-    assert primary_header['FFI_TYPE'] == ffi_type
+    assert primary_header['FFI_TYPE'] == 'SPOC'
     assert primary_header['CREATOR'] == 'astrocut'
     assert primary_header['ORIGIN'] == 'STScI/MAST'
     assert primary_header['TELAPSE'] == primary_header['TSTOP'] - primary_header['TSTART']
@@ -136,28 +127,11 @@ def test_tess_cube_cutout_tpf(cube_file, num_images, ffi_type, cutout_size, coor
     cols = tpf[1].columns.info('name, unit', output=False)
     cols_dict = dict(zip(*cols.values()))
 
-    # Check differences in primary header values and units for SPOC and TICA
-    if ffi_type == 'SPOC':
-        assert primary_header['TIMEREF'] == 'SOLARSYSTEM'
-        assert primary_header['TASSIGN'] == 'SPACECRAFT'
-        assert cols_dict['FLUX'] == 'e-/s'
-        assert tpf[1].data.field('CADENCENO').all() == 0.0
-
-    if ffi_type == 'TICA':
-        assert primary_header['TIMEREF'] is None
-        assert primary_header['TASSIGN'] is None
-        assert cols_dict['FLUX'] == 'e-'
-        assert tpf[1].data.field('CADENCENO').all() != 0.0
-
-        # Verifying DATE-OBS calculation in TICA
-        date_obs = primary_header['DATE-OBS']
-        tstart = Time(date_obs).jd - primary_header['BJDREFI']
-        assert primary_header['TSTART'] == tstart
-
-        # Verifying DATE-END calculation in TICA
-        date_end = primary_header['DATE-END']
-        tstop = Time(date_end).jd - primary_header['BJDREFI']
-        assert primary_header['TSTOP'] == tstop
+    # Primary header values
+    assert primary_header['TIMEREF'] == 'SOLARSYSTEM'
+    assert primary_header['TASSIGN'] == 'SPACECRAFT'
+    assert cols_dict['FLUX'] == 'e-/s'
+    assert tpf[1].data.field('CADENCENO').all() == 0.0
 
     # Check for header keyword propagation in EXT 1 and 2
     ext1_header = tpf[1].header
@@ -172,8 +146,7 @@ def test_tess_cube_cutout_tpf(cube_file, num_images, ffi_type, cutout_size, coor
     assert np.all(table['TIME'] == (np.arange(num_images) + 0.5))
 
     # Check data table columns
-    num_cols = 12 if ffi_type == 'SPOC' else 11
-    assert len(table.columns) == num_cols
+    assert len(table.columns) == 12
     assert 'TIME' in table.columns.names
     assert 'FLUX' in table.columns.names
     assert 'FLUX_ERR' in table.columns.names
@@ -187,16 +160,13 @@ def test_tess_cube_cutout_tpf(cube_file, num_images, ffi_type, cutout_size, coor
     # Check flux error data
     err = table['FLUX_ERR']
     assert err.shape == (num_images, cutout_size, cutout_size)
-    if ffi_type == 'TICA':
-        assert np.mean(err) == 0
     assert err.dtype.type == np.float32
 
     # Compare data with input cube file
     with fits.open(cube_file) as hdul:
         data = np.transpose(hdul[1].data, (3, 2, 0, 1))
         assert np.all(data[0, :, cutout_lims[0, 0]:cutout_lims[0, 1], cutout_lims[1, 0]:cutout_lims[1, 1]] == flux)
-        if ffi_type == 'SPOC':
-            assert np.all(data[1, :, cutout_lims[0, 0]:cutout_lims[0, 1], cutout_lims[1, 0]:cutout_lims[1, 1]] == err)
+        assert np.all(data[1, :, cutout_lims[0, 0]:cutout_lims[0, 1], cutout_lims[1, 0]:cutout_lims[1, 1]] == err)
 
     # Check aperture HDU
     aper = tpf[2].data
@@ -207,57 +177,50 @@ def test_tess_cube_cutout_tpf(cube_file, num_images, ffi_type, cutout_size, coor
     tpf.close()
 
 
-@pytest.mark.parametrize("ffi_type", ["SPOC", "TICA"])
-def test_tess_cutout_partial(cube_file, cutout_size, ffi_type, cube_wcs, img_size, coordinates, num_images):
+def test_tess_cutout_partial(cube_file, cutout_size, cube_wcs, img_size, coordinates, num_images):
     # Off the top
     coord = cube_wcs.pixel_to_world(0, img_size // 2)
-    cutout = TessCubeCutout(cube_file, coord, cutout_size, product=ffi_type).cutouts[0]
+    cutout = TessCubeCutout(cube_file, coord, cutout_size).cutouts[0]
     offset = cutout_size // 2
     assert np.all(np.isnan(cutout.data[:, :, :offset]))
     assert np.all(cutout.aperture[:, :offset] == 0)
-    if ffi_type == 'SPOC':
-        assert np.all(np.isnan(cutout.uncertainty[:, :, :offset]))
+    assert np.all(np.isnan(cutout.uncertainty[:, :, :offset]))
 
     # Off the bottom
     coord = cube_wcs.pixel_to_world(img_size, img_size // 2)
-    cutout = TessCubeCutout(cube_file, coord, cutout_size, product=ffi_type).cutouts[0]
+    cutout = TessCubeCutout(cube_file, coord, cutout_size).cutouts[0]
     assert np.all(np.isnan(cutout.data[:, :, offset:]))
     assert np.all(cutout.aperture[:, offset:] == 0)
-    if ffi_type == 'SPOC':
-        assert np.all(np.isnan(cutout.uncertainty[:, :, offset:]))
+    assert np.all(np.isnan(cutout.uncertainty[:, :, offset:]))
 
     # Off the left, integer fill value
     coord = cube_wcs.pixel_to_world(img_size // 2, 0)
-    cutout = TessCubeCutout(cube_file, coord, cutout_size, product=ffi_type, fill_value=0).cutouts[0]
+    cutout = TessCubeCutout(cube_file, coord, cutout_size, fill_value=0).cutouts[0]
     assert np.all(cutout.data[:, :offset, :] == 0)
     assert np.all(cutout.aperture[:offset, :] == 0)
-    if ffi_type == 'SPOC':
-        assert np.all(cutout.uncertainty[:, :offset, :] == 0)
+    assert np.all(cutout.uncertainty[:, :offset, :] == 0)
 
     # Off the right, float fill value
     coord = cube_wcs.pixel_to_world(img_size // 2, img_size)
-    cutout = TessCubeCutout(cube_file, coord, cutout_size, product=ffi_type, fill_value=1.5).cutouts[0]
+    cutout = TessCubeCutout(cube_file, coord, cutout_size, fill_value=1.5).cutouts[0]
     assert np.all(cutout.data[:, offset:, :] == 1.5)
     assert np.all(cutout.aperture[offset:, :] == 0)
-    if ffi_type == 'SPOC':
-        assert np.all(cutout.uncertainty[:, offset:, :] == 1.5)
+    assert np.all(cutout.uncertainty[:, offset:, :] == 1.5)
 
     # Large cutout that goes off all sides. Use center coordinate
     cutout_size = [120, 140]
     diff_width = (cutout_size[0] - img_size) // 2
     diff_height = (cutout_size[1] - img_size) // 2
-    cutout = TessCubeCutout(cube_file, coordinates, cutout_size, product=ffi_type).cutouts[0]
+    cutout = TessCubeCutout(cube_file, coordinates, cutout_size).cutouts[0]
     cutout_mask = np.zeros((num_images, cutout_size[1], cutout_size[0]), dtype=bool)
     cutout_mask[:, diff_height:diff_height + img_size, diff_width:diff_width + img_size] = True
     aper_mask = np.zeros((cutout_size[1], cutout_size[0]), dtype=bool)
     aper_mask[diff_height:diff_height + img_size, diff_width:diff_width + img_size] = True
     assert np.all(np.isnan(cutout.data[~cutout_mask]))
     assert np.all(cutout.aperture[~aper_mask] == 0)
-    if ffi_type == 'SPOC':
-        assert np.all(np.isnan(cutout.uncertainty[~cutout_mask]))
+    assert np.all(np.isnan(cutout.uncertainty[~cutout_mask]))
 
 
-@pytest.mark.parametrize("ffi_type", ["SPOC"])
 def test_tess_cube_cutout_batching(cube_file, tmpdir, cutout_size, coordinates, num_images):
     # Make copies of cube file
     copy1 = Path(tmpdir, "test_cube_1.fits")
@@ -290,10 +253,9 @@ def test_tess_cube_cutout_batching(cube_file, tmpdir, cutout_size, coordinates, 
     assert np.all(cutouts[0].aperture == cutouts[2].aperture)
 
 
-@pytest.mark.parametrize("ffi_type", ["SPOC", "TICA"])
-def test_tess_cube_cutout_write_to_tpf(cube_file, tmpdir, cutout_size, coordinates, ffi_type):
+def test_tess_cube_cutout_write_to_tpf(cube_file, tmpdir, cutout_size, coordinates):
     # Make cutout
-    cutout = TessCubeCutout(cube_file, coordinates, cutout_size, product=ffi_type)
+    cutout = TessCubeCutout(cube_file, coordinates, cutout_size)
 
     # Write to TPF with output_file specified
     cutout_paths = cutout.write_as_tpf(tmpdir, 'cutout.fits')
@@ -362,7 +324,6 @@ def test_tess_cube_cutout_threads():
             assert np.array_equal(data_no_threads[ext_name], data_threads[ext_name])
 
 
-@pytest.mark.parametrize("ffi_type", ["SPOC"])
 def test_tess_cube_cutout_not_in_footprint(cube_file):
     # Make a cutout with a coordinate outside the image footprint
     warnings.simplefilter('error')
@@ -370,10 +331,3 @@ def test_tess_cube_cutout_not_in_footprint(cube_file):
     with pytest.warns(DataWarning, match='Cutout footprint does not overlap'):
         with pytest.raises(InvalidQueryError, match='Cube cutout contains no data!'):
             TessCubeCutout(cube_file, coord, 3)
-
-
-@pytest.mark.parametrize("ffi_type", ["SPOC"])
-def test_tess_cube_cutout_invalid_product(cube_file):
-    # Error if an invalid product name is input
-    with pytest.raises(InvalidInputError, match='Product for TESS cube cutouts must be'):
-        TessCubeCutout(cube_file, SkyCoord(0, 0, unit='deg'), 3, product='INVALID')

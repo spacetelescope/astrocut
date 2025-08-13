@@ -187,16 +187,6 @@ def test_tess_footprint_cutout_outside_coords(coordinates, cutout_size):
     err = 'The given coordinates were not found within the specified sequence(s).'
     with pytest.raises(InvalidQueryError, match=re.escape(err)):
         TessFootprintCutout(coordinates, cutout_size, sequence=2)
-
-
-def test_tess_footprint_cutout_invalid_product(coordinates, cutout_size):
-    """Test that InvalidQueryError is raised if an invalid product is given"""
-    err = 'Product for TESS cube cutouts must be "SPOC".'
-    with pytest.raises(InvalidInputError, match=err):
-        TessFootprintCutout(coordinates, cutout_size, product='invalid')
-
-    with pytest.raises(InvalidInputError, match=err):
-        TessFootprintCutout(coordinates, cutout_size, product='TICA')
         
 
 def test_cube_cut_from_footprint(coordinates, cutout_size, tmpdir):

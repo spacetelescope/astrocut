@@ -10,7 +10,6 @@ from astrocut.exceptions import DataWarning, InvalidInputError
 
 from .utils_for_test import create_test_ffis
 from ..cube_factory import CubeFactory
-from ..tica_cube_factory import TicaCubeFactory
 
 
 @pytest.fixture
@@ -64,15 +63,15 @@ def test_make_cube(tmpdir, img_size, num_images, tmp_path):
 
 def test_make_and_update_cube(tmpdir, img_size, num_images):
     """
-    Testing the make cube and update cube functionality for TICACubeFactory by making a bunch of test FFIs, 
+    Testing the make cube and update cube functionality for CubeFactory by making a bunch of test FFIs, 
     making the cube with first half of the FFIs, updating the same cube with the second half,
     and checking the results.
     """
-    cube_maker = TicaCubeFactory()
+    cube_maker = CubeFactory()
     tmp_path = Path(tmpdir)
     
     # Create test FFIs
-    ffi_files = create_test_ffis(img_size, num_images, product='TICA', dir_name=tmpdir)
+    ffi_files = create_test_ffis(img_size, num_images, dir_name=tmpdir)
     cube_path = tmp_path / 'out_dir' / 'test_update_cube.fits'
 
     # Generate cube
@@ -82,16 +81,14 @@ def test_make_and_update_cube(tmpdir, img_size, num_images):
         cube = hdu[1].data
 
         # Expected values for cube before update_cube
-        ecube = np.zeros((img_size, img_size, num_images // 2, 1))
+        ecube = np.zeros((img_size, img_size, num_images // 2, 2))
         plane = np.arange(img_size*img_size, dtype=np.float32).reshape((img_size, img_size))
 
         assert cube.shape == ecube.shape, 'Mismatch between cube shape and expected shape'
 
         for i in range(num_images // 2):
             ecube[:, :, i, 0] = -plane
-            # we don't need to test error array because TICA doesnt come with error arrays
-            # so index 1 will always be blank
-            # ecube[:, :, i, 1] = plane
+            ecube[:, :, i, 1] = plane
             plane += img_size * img_size
 
         assert np.all(cube == ecube), 'Cube values do not match expected values'
@@ -105,21 +102,19 @@ def test_make_and_update_cube(tmpdir, img_size, num_images):
         filenames = np.array([Path(x).name for x in ffi_files])
     
         # Expected values for cube after update_cube
-        ecube = np.zeros((img_size, img_size, num_images, 1))
+        ecube = np.zeros((img_size, img_size, num_images, 2))
         plane = np.arange(img_size*img_size, dtype=np.float32).reshape((img_size, img_size))
 
         assert cube.shape == ecube.shape, 'Mismatch between cube shape and expected shape'
 
         for i in range(num_images):
             ecube[:, :, i, 0] = -plane
-            # we don't need to test error array because TICA doesnt come with error arrays
-            # so index 1 will always be blank
-            # ecube[:, :, i, 1] = plane
+            ecube[:, :, i, 1] = plane
             plane += img_size * img_size
 
         assert np.all(cube == ecube), 'Cube values do not match expected values'
-        assert np.all(tab['STARTTJD'] == np.arange(num_images)), 'STARTTJD mismatch in table'
-        assert np.all(tab['ENDTJD'] == np.arange(num_images)+1), 'ENDTJD mismatch in table'
+        assert np.all(tab['TSTART'] == np.arange(num_images)), 'TSTART mismatch in table'
+        assert np.all(tab['TSTOP'] == np.arange(num_images)+1), 'TSTOP mismatch in table'
         assert np.all(tab['FFI_FILE'] == np.array(filenames)), 'FFI_FILE mismatch in table'
 
     # Fail if trying to update a cube with no new files
@@ -175,32 +170,22 @@ def test_iteration(tmpdir, caplog):
         assert np.all(cube_1 == ecube), 'Cube values do not match expected values'
 
 
-@pytest.mark.parametrize('ffi_type', ['TICA', 'SPOC'])
-def test_invalid_inputs(tmpdir, ffi_type, img_size, num_images):
+def test_invalid_inputs(tmpdir, img_size, num_images):
     """
     Test that an error is raised when users attempt to make cubes with an invalid file type.
     """
     # Assigning some variables
-    product = 'TICA' if ffi_type == 'TICA' else 'SPOC'
     value_error = ('One or more incorrect file types were input.')
     
     # Create test FFI files
     ffi_files = create_test_ffis(img_size=img_size, 
                                  num_images=num_images,
-                                 dir_name=tmpdir, 
-                                 product=product)
+                                 dir_name=tmpdir)
     
-    # Create opposite cube factory of input
-    cube_maker = CubeFactory() if ffi_type == 'TICA' else TicaCubeFactory()
-
-    # Should raise a Value Error due to incorrect file type
-    with pytest.raises(ValueError, match=value_error):
-        cube_maker.make_cube(ffi_files)
-
     # Fail if trying to update a cube file that doesn't exist
+    cube_maker = CubeFactory()
     new_ffi_files = create_test_ffis(img_size=10, 
                                      num_images=10,
-                                     dir_name=tmpdir, 
-                                     product=product)
+                                     dir_name=tmpdir)
     with pytest.raises(InvalidInputError, match='Cube file was not found'):
         cube_maker.update_cube(new_ffi_files, 'non_existent_file.fits')
