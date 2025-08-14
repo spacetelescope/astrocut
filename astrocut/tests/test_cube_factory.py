@@ -172,16 +172,8 @@ def test_iteration(tmpdir, caplog):
 
 def test_invalid_inputs(tmpdir, img_size, num_images):
     """
-    Test that an error is raised when users attempt to make cubes with an invalid file type.
-    """
-    # Assigning some variables
-    value_error = ('One or more incorrect file types were input.')
-    
-    # Create test FFI files
-    ffi_files = create_test_ffis(img_size=img_size, 
-                                 num_images=num_images,
-                                 dir_name=tmpdir)
-    
+    Test that an error is raised when users attempt to update a non-existent cube.
+    """    
     # Fail if trying to update a cube file that doesn't exist
     cube_maker = CubeFactory()
     new_ffi_files = create_test_ffis(img_size=10, 

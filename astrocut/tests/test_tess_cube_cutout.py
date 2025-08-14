@@ -4,15 +4,14 @@ import numpy as np
 import pytest
 import warnings
 from pathlib import Path
-from typing import List, Literal
+from typing import List
 
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
-from astropy.time import Time
 from astropy.wcs import WCS, FITSFixedWarning
 
 from .utils_for_test import create_test_ffis
-from ..exceptions import DataWarning, InvalidInputError, InvalidQueryError
+from ..exceptions import DataWarning, InvalidQueryError
 from ..cube_factory import CubeFactory
 from ..cube_cutout import CubeCutout
 from ..tess_cube_cutout import TessCubeCutout
@@ -94,7 +93,7 @@ def test_tess_cube_cutout(cube_file, num_images, cutout_size, coordinates, cutou
         assert np.all(data[0, :, cutout_lims[0, 0]:cutout_lims[0, 1], cutout_lims[1, 0]:cutout_lims[1, 1]] == 
                       cutout.data)
         assert np.all(data[1, :, cutout_lims[0, 0]:cutout_lims[0, 1], cutout_lims[1, 0]:cutout_lims[1, 1]] == 
-                        cutout.uncertainty)
+                      cutout.uncertainty)
 
     # Check the cutout WCS
     cutout_wcs = cutout.wcs

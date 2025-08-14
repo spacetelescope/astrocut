@@ -7,14 +7,12 @@ import astropy.units as u
 import numpy as np
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
-from astropy.time import Time
-from astropy.utils.decorators import deprecated_renamed_argument
 from astropy.wcs import WCS
 from s3path import S3Path
 
 from . import __version__, log
 from .cube_cutout import CubeCutout
-from .exceptions import DataWarning, InvalidInputError, InvalidQueryError
+from .exceptions import DataWarning, InvalidQueryError
 
 
 class TessCubeCutout(CubeCutout):

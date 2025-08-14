@@ -8,7 +8,7 @@ from astropy.table import Table
 from spherical_geometry.polygon import SphericalPolygon
 
 from ..cube_cutout import CubeCutout
-from ..exceptions import InvalidInputError, InvalidQueryError
+from ..exceptions import InvalidQueryError
 from ..footprint_cutout import get_ffis, ra_dec_crossmatch
 from ..tess_footprint_cutout import TessFootprintCutout, cube_cut_from_footprint
 from ..tess_cube_cutout import TessCubeCutout

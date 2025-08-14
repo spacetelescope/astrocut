@@ -338,7 +338,8 @@ class CubeCutout(Cutout, ABC):
             # Fit the cutout WCS
             self._fit_cutout_wcs(self.data.shape[1:])
 
-        def _get_cutout_data(self, transposed_cube: fits.ImageHDU.section, threads: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        def _get_cutout_data(self, transposed_cube: fits.ImageHDU.section, 
+                             threads: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
             """
             Extract a cutout from an image/uncertainty cube that has been transposed to have time on the longest axis.
 

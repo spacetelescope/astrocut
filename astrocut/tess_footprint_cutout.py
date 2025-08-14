@@ -6,11 +6,10 @@ import astropy.units as u
 import numpy as np
 from astropy.coordinates import SkyCoord
 from astropy.io.fits import HDUList
-from astropy.utils.decorators import deprecated_renamed_argument
 from astropy.table import Table
 
 from . import log
-from .exceptions import InvalidQueryError, InvalidInputError
+from .exceptions import InvalidQueryError
 from .footprint_cutout import FootprintCutout, get_ffis, ra_dec_crossmatch
 from .tess_cube_cutout import TessCubeCutout
 
@@ -226,8 +225,9 @@ class TessFootprintCutout(FootprintCutout):
         return self.tess_cube_cutout.write_as_tpf(output_dir)
 
 
-def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size, sequence: Union[int, List[int], None] = None, 
-                            memory_only=False, output_dir: str = '.', verbose: bool = False) -> Union[List[str], List[HDUList]]:
+def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size, 
+                            sequence: Union[int, List[int], None] = None, memory_only=False, 
+                            output_dir: str = '.', verbose: bool = False) -> Union[List[str], List[HDUList]]:
     """
     Generates cutouts around `coordinates` of size `cutout_size` from image cube files hosted on the S3 cloud.
 

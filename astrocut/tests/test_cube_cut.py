@@ -1,7 +1,7 @@
 import warnings
 from os import path
 from pathlib import Path
-from typing import List, Literal
+from typing import List
 
 import astropy.units as u
 import numpy as np
@@ -9,7 +9,6 @@ import pytest
 from astropy import wcs
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
-from astropy.time import Time
 from astropy.wcs import FITSFixedWarning
 
 from ..cutout_factory import CutoutFactory, cube_cut

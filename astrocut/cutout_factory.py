@@ -8,7 +8,6 @@ from typing import Literal, Optional, Union, List, Tuple
 import astropy.units as u
 import numpy as np
 from astropy.coordinates import SkyCoord
-from astropy.utils.decorators import deprecated_renamed_argument
 from s3path import S3Path
 
 from .tess_cube_cutout import TessCubeCutout
