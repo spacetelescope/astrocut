@@ -19,16 +19,16 @@ from .utils_for_test import create_test_imgs
 from ..exceptions import DataWarning, InputWarning, InvalidInputError, InvalidQueryError
 
 
-# Fixture to create test images for both SPOC and TICA
-@pytest.fixture(params=['SPOC', 'TICA'])
-def test_images(request, tmpdir):
-    return create_test_imgs(request.param, 50, 6, dir_name=tmpdir)
+# Fixture to create test images
+@pytest.fixture
+def test_images(tmpdir):
+    return create_test_imgs(50, 6, dir_name=tmpdir)
 
 
-# Fixture to create a test image with bad SIP keywords
-@pytest.fixture(params=['SPOC', 'TICA'])
-def test_image_bad_sip(request, tmpdir):
-    return create_test_imgs(request.param, 50, 1, dir_name=tmpdir,
+# Fixture to create a test image
+@pytest.fixture
+def test_image_bad_sip(tmpdir):
+    return create_test_imgs(50, 1, dir_name=tmpdir,
                             basename="img_badsip_{:04d}.fits", bad_sip_keywords=True)[0]
     
 

@@ -16,10 +16,9 @@ from .. import fits_cut, img_cut, normalize_img
 from ..exceptions import DataWarning, InputWarning, InvalidInputError, InvalidQueryError 
 
 
-@pytest.mark.parametrize('ffi_type', ['SPOC', 'TICA'])
-def test_fits_cut(tmpdir, caplog, ffi_type):
+def test_fits_cut(tmpdir, caplog):
 
-    test_images = create_test_imgs(ffi_type, 50, 6, dir_name=tmpdir)
+    test_images = create_test_imgs(50, 6, dir_name=tmpdir)
 
     # Single file
     center_coord = SkyCoord("150.1163213 2.200973097", unit='deg')
@@ -156,7 +155,7 @@ def test_fits_cut(tmpdir, caplog, ffi_type):
                                    output_dir=tmpdir)
 
     # test single image and also conflicting sip keywords
-    test_image = create_test_imgs(ffi_type, 50, 1, dir_name=tmpdir,
+    test_image = create_test_imgs(50, 1, dir_name=tmpdir,
                                   basename="img_badsip_{:04d}.fits", bad_sip_keywords=True)[0]
 
     center_coord = SkyCoord("150.1163213 2.2007", unit='deg')
@@ -273,10 +272,9 @@ def test_normalize_img():
     assert (test_img == norm_img).all()
 
 
-@pytest.mark.parametrize('ffi_type', ['SPOC', 'TICA'])
-def test_img_cut(tmpdir, caplog, ffi_type):
+def test_img_cut(tmpdir, caplog):
 
-    test_images = create_test_imgs(ffi_type, 50, 6, dir_name=tmpdir)
+    test_images = create_test_imgs(50, 6, dir_name=tmpdir)
     center_coord = SkyCoord("150.1163213 2.200973097", unit='deg')
     cutout_size = 10
 

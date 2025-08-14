@@ -7,13 +7,12 @@ import astropy.units as u
 import numpy as np
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
-from astropy.time import Time
 from astropy.wcs import WCS
 from s3path import S3Path
 
 from . import __version__, log
 from .cube_cutout import CubeCutout
-from .exceptions import DataWarning, InvalidInputError, InvalidQueryError
+from .exceptions import DataWarning, InvalidQueryError
 
 
 class TessCubeCutout(CubeCutout):
@@ -35,9 +34,6 @@ class TessCubeCutout(CubeCutout):
     threads : int | 'auto'
         The number of threads to use for making the cutouts. If 'auto', the number of threads will be set to the number
         of available CPUs.
-    product : str
-        The product type to make the cutouts from.
-        Can either be 'SPOC' or 'TICA' (default is 'SPOC').
     verbose : bool
         If True, log messages are printed to the console.
 
@@ -63,16 +59,8 @@ class TessCubeCutout(CubeCutout):
     def __init__(self, input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyCoord, str], 
                  cutout_size: Union[int, np.ndarray, u.Quantity, List[int], Tuple[int]] = 25,
                  fill_value: Union[int, float] = np.nan, limit_rounding_method: str = 'round', 
-                 threads: Union[int, Literal['auto']] = 1, product: str = 'SPOC', verbose: bool = False):
+                 threads: Union[int, Literal['auto']] = 1, verbose: bool = False):
         super().__init__(input_files, coordinates, cutout_size, fill_value, limit_rounding_method, threads, verbose)
-
-        # Validate and set the product
-        if product.upper() not in ['SPOC', 'TICA']:
-            raise InvalidInputError('Product for TESS cube cutouts must be either "SPOC" or "TICA".')
-        self._product = product.upper()
-
-        # Whether the cube has uncertainty data
-        self._has_uncertainty = self._product == 'SPOC'
 
         # Keyword corresponding to WCS axis
         self._wcs_axes_keyword = 'CTYPE2'
@@ -81,11 +69,10 @@ class TessCubeCutout(CubeCutout):
         self._wcs_axes_value = 'DEC--TAN-SIP'
 
         # Keywords to skip when adding to the cutout WCS header
-        # These are TICA-specific image keywords that are specific to a single FFI or just not helpful
+        # These are image keywords that are specific to a single FFI or just not helpful
         self._skip_kwds = ['TIME', 'EXPTIME', 'FILTER']
 
         # Extra keywords from the FFI image headers in SPOC (TESS-specific)
-        # These are applied to both SPOC and TICA cutouts for consistency.
         self._img_kwds = {
             'BACKAPP': [None, 'background is subtracted'],
             'CDPP0_5': [None, 'RMS CDPP on 0.5-hr time scales'],
@@ -212,52 +199,16 @@ class TessCubeCutout(CubeCutout):
         primary_header.update({
             'CREATOR': ('astrocut', 'software used to produce this file'),
             'PROCVER': (__version__, 'software version'),
-            'FFI_TYPE': (self._product, 'the FFI type used to make the cutouts'),
+            'FFI_TYPE': ('SPOC', 'the FFI type used to make the cutouts'),
             'RA_OBJ': (self._coordinates.ra.deg, '[deg] right ascension'),
             'DEC_OBJ': (self._coordinates.dec.deg, '[deg] declination'),
-            'TIMEREF': ('SOLARSYSTEM' if self._product == 'SPOC' else None, 
-                        'barycentric correction applied to times'),
-            'TASSIGN': ('SPACECRAFT' if self._product == 'SPOC' else None, 
-                        'where time is assigned'),
+            'TIMEREF': ('SOLARSYSTEM', 'barycentric correction applied to times'),
+            'TASSIGN': ('SPACECRAFT', 'where time is assigned'),
             'TIMESYS': ('TDB', 'time system is Barycentric Dynamical Time (TDB)'),
             'BJDREFI': (2457000, 'integer part of BTJD reference date'),
             'BJDREFF': (0.00000000, 'fraction of the day in BTJD reference date'),
             'TIMEUNIT': ('d', 'time unit for TIME, TSTART, and TSTOP')
         })
-
-        # TODO : The name of FIRST_FFI (and LAST_FFI) is too long to be a header kwd value.
-        # Find a way to include these in the headers without breaking astropy (maybe abbreviate?).
-        # primary_header['FIRST_FFI'] = (self.first_ffi, 'the FFI used for the primary header 
-        # keyword values, except TSTOP')
-        # primary_header['LAST_FFI'] = (self.last_ffi, 'the FFI used for the TSTOP keyword value')
-
-        if self._product == 'TICA':
-            # Adding some missing keywords for TICA cutouts
-            primary_header.update({
-                'EXTVER': ('1', 'extension version number (not format version)'),
-                'SIMDATA': (False, 'file is based on simulated data'),
-                'NEXTEND': ('2', 'number of standard extensions'),
-                'TSTART': (primary_header['STARTTJD'], 'observation start time in TJD of first FFI'),
-                'TSTOP': (primary_header['ENDTJD'], 'observation stop time in TJD of last FFI'),
-                'CAMERA': (primary_header['CAMNUM'], 'Camera number'),
-                'CCD': (primary_header['CCDNUM'], 'CCD chip number'),
-                'ASTATE': (None, 'archive state F indicates single orbit processing'),
-                'CRMITEN': (primary_header['CRM'], 'spacecraft cosmic ray mitigation enabled'),
-                'CRBLKSZ': (None, '[exposures] s/c cosmic ray mitigation block siz'),
-                'FFIINDEX': (primary_header['CADENCE'], 'number of FFI cadence interval of first FFI'),
-                'DATA_REL': (None, 'data release version number'),
-                'FILEVER': (None, 'file format version'),
-                'RADESYS': (None, 'reference frame of celestial coordinates'),
-                'SCCONFIG': (None, 'spacecraft configuration ID'),
-                'TIMVERSN': (None, 'OGIP memo number for file format')
-            })
-
-            date_obs = Time(primary_header['TSTART'] + primary_header['BJDREFI'], format='jd').iso
-            date_end = Time(primary_header['TSTOP'] + primary_header['BJDREFI'], format='jd').iso
-            primary_header.update({
-                'DATE-OBS': (date_obs, 'TSTART as Julian Date of first FFI'),
-                'DATE-END': (date_end, 'TSTOP as Julian Date of last FFI'),
-            })
 
         # Remove unnecessary keywords
         # Bulk removal with wildcards. Most of these should only live in EXT 1 header.
@@ -276,20 +227,19 @@ class TessCubeCutout(CubeCutout):
 
         # Compute and update TELAPSE keyword
         telapse = primary_header.get('TSTOP', 0) - primary_header.get('TSTART', 0)
-        primary_header['TELAPSE '] = (telapse, '[d] TSTOP - TSTART')
+        primary_header['TELAPSE'] = (telapse, '[d] TSTOP - TSTART')
 
         # Update DATE comment to be more explicit
         primary_header['DATE'] = (primary_header['DATE'], 'FFI cube creation date')
 
         # Specifying that some of these headers keyword values are inherited from the first FFI
-        if self._product == 'SPOC':
-            primary_header.update({
-                'TSTART': (primary_header['TSTART'], 'observation start time in TJD of first FFI'),
-                'TSTOP': (primary_header['TSTOP'], 'observation stop time in TJD of last FFI'),
-                'DATE-OBS': (primary_header['DATE-OBS'], 'TSTART as UTC calendar date of first FFI'),
-                'DATE-END': (primary_header['DATE-END'], 'TSTOP as UTC calendar date of last FFI'),
-                'FFIINDEX': (primary_header['FFIINDEX'], 'number of FFI cadence interval of first FFI')
-            })
+        primary_header.update({
+            'TSTART': (primary_header['TSTART'], 'observation start time in TJD of first FFI'),
+            'TSTOP': (primary_header['TSTOP'], 'observation stop time in TJD of last FFI'),
+            'DATE-OBS': (primary_header['DATE-OBS'], 'TSTART as UTC calendar date of first FFI'),
+            'DATE-END': (primary_header['DATE-END'], 'TSTOP as UTC calendar date of last FFI'),
+            'FFIINDEX': (primary_header['FFIINDEX'], 'number of FFI cadence interval of first FFI')
+        })
 
         # Add missing target-specific metadata
         primary_header.update({
@@ -337,22 +287,20 @@ class TessCubeCutout(CubeCutout):
         pixel_format = f'{img_cube[0].size}E'
         pixel_dim = f'{img_cube[0].shape[::-1]}'
 
-        # Definte time-related keywords based on product type
-        start, stop = ("TSTART", "TSTOP") if self._product == "SPOC" else ("STARTTJD", "ENDTJD")
+        # Define time-related keywords
+        start, stop = ("TSTART", "TSTOP")
         cols.append(fits.Column(name='TIME', format='D', unit='BJD - 2457000, days', disp='D14.7',
                                 array=(cube_fits[2].columns[start].array + cube_fits[2].columns[stop].array) / 2))
-
-        if self._product == 'SPOC':
-            cols.append(fits.Column(name='TIMECORR', format='E', unit='d', disp='E14.7',
-                                    array=cube_fits[2].columns['BARYCORR'].array))
+        cols.append(fits.Column(name='TIMECORR', format='E', unit='d', disp='E14.7',
+                                array=cube_fits[2].columns['BARYCORR'].array))
 
         # Define cadence number (zero-filled for SPOC)
-        cadence_array = empty_single if self._product == 'SPOC' else cube_fits[2].columns['CADENCE'].array
+        cadence_array = empty_single
         cols.append(fits.Column(name='CADENCENO', format='J', disp='I10', array=cadence_array))
 
         # Define flux-related columns
-        pixel_unit = 'e-/s' if self._product == 'SPOC' else 'e-'
-        flux_err_array = cutout.uncertainty if self._product == 'SPOC' else empty_arr
+        pixel_unit = 'e-/s'
+        flux_err_array = cutout.uncertainty
         cols.extend([
             fits.Column(name='RAW_CNTS', format=pixel_format.replace('E', 'J'), unit='count',
                         dim=pixel_dim, disp='I8', array=empty_arr - 1, null=-1),
@@ -368,7 +316,7 @@ class TessCubeCutout(CubeCutout):
                                     unit=pixel_unit, disp='E14.7', array=empty_arr))
 
         # Add the quality flags
-        data_quality = 'DQUALITY' if self._product == 'SPOC' else 'QUAL_BIT'
+        data_quality = 'DQUALITY'
         cols.append(fits.Column(name='QUALITY', format='J', disp='B16.16',
                                 array=cube_fits[2].columns[data_quality].array))
 
@@ -433,7 +381,7 @@ class TessCubeCutout(CubeCutout):
 
         # Get cutouts
         try:
-            cutout = self.CubeCutoutInstance(cube, file, cube_wcs, self._has_uncertainty, self)
+            cutout = self.CubeCutoutInstance(cube, file, cube_wcs, self)
         except InvalidQueryError:
             warnings.warn(f'Cutout footprint does not overlap with data in {file}, skipping...', DataWarning)
             cube.close()

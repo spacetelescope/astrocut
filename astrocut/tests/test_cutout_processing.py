@@ -337,10 +337,9 @@ def test_default_combine():
     assert np.allclose(combine_func([hdu_1, hdu_2]), [[1, np.nan], [1, 1]], equal_nan=True)
 
 
-@pytest.mark.parametrize('ffi_type', ['SPOC', 'TICA'])
-def test_combiner(tmpdir, ffi_type):
+def test_combiner(tmpdir):
 
-    test_images = create_test_imgs(ffi_type, 50, 6, dir_name=tmpdir)
+    test_images = create_test_imgs(50, 6, dir_name=tmpdir)
     center_coord = SkyCoord("150.1163213 2.200973097", unit='deg')
     cutout_size = 2
 
