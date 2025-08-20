@@ -26,13 +26,12 @@ def coordinates():
     return SkyCoord('350 -80', unit='deg')
 
 
-def check_output_tpf(tpf, ffi_type, sequences=[], cutout_size=5):
+def check_output_tpf(tpf, sequences=[], cutout_size=5):
     """Helper function to check the validity of output cutout files"""
     tpf_table = tpf[1].data
 
     # SPOC cutouts have 1 extra columns in EXT 1
-    ncols = 12 if ffi_type == 'SPOC' else 11
-    assert len(tpf_table.columns) == ncols
+    assert len(tpf_table.columns) == 12
     assert tpf_table[0]['FLUX'].shape == (cutout_size, cutout_size)
 
     # Check that sector matches a provided sequence
@@ -78,10 +77,9 @@ def test_ffi_intersect(lon, lat, center, expected):
     assert intersection.value[0] == expected
 
 
-@pytest.mark.parametrize('ffi_type', ['SPOC', 'TICA'])
-def test_tess_footprint_cutout(cutout_size, caplog, ffi_type):
+def test_tess_footprint_cutout(cutout_size, caplog):
     """Test that a single data cube is created for a given sequence"""
-    cutout = TessFootprintCutout('130 30', cutout_size, product=ffi_type, sequence=44, verbose=True)
+    cutout = TessFootprintCutout('130 30', cutout_size, sequence=44, verbose=True)
 
     # Check cutouts attribute
     cutouts = cutout.cutouts
@@ -101,7 +99,7 @@ def test_tess_footprint_cutout(cutout_size, caplog, ffi_type):
     assert len(tpf_cutouts) == 1
     assert isinstance(tpf_cutouts, list)
     assert isinstance(tpf_cutouts[0], fits.HDUList)
-    check_output_tpf(tpf_cutouts[0], ffi_type, [44])
+    check_output_tpf(tpf_cutouts[0], [44])
 
     # Check tpf_cutouts_by_file
     tpf_cutouts_by_file = cutout.tpf_cutouts_by_file
@@ -109,7 +107,7 @@ def test_tess_footprint_cutout(cutout_size, caplog, ffi_type):
     assert len(tpf_cutouts_by_file) == 1
     assert isinstance(tpf_cutouts_by_file, dict)
     assert isinstance(tpf_cutout, fits.HDUList)
-    check_output_tpf(tpf_cutout, ffi_type, [44])
+    check_output_tpf(tpf_cutout, [44])
 
     # Check tess_cube attribute
     tess_cube = cutout.tess_cube_cutout
@@ -125,8 +123,8 @@ def test_tess_footprint_cutout(cutout_size, caplog, ffi_type):
     assert 'Generating cutouts...' in captured
 
     # Check that _extract_sequence_information works correctly
-    # Should return empty dict if sector name does not match product
-    sector_name = 'hlsp_tica_s' if ffi_type == 'SPOC' else 'tess_s'
+    # Should return empty dict if sector name does not match format
+    sector_name = 'invalid_s'
     sector_name += '0044-4-1'
     info = cutout._extract_sequence_information(sector_name)
     assert info == {}
@@ -135,18 +133,18 @@ def test_tess_footprint_cutout(cutout_size, caplog, ffi_type):
 def test_tess_footprint_cutout_multi_sequence(coordinates, cutout_size):
     """Test that a cube is created for each sequence when multiple are provided"""
     sequences = [1, 13]
-    cutout = TessFootprintCutout(coordinates, cutout_size, product='SPOC', sequence=sequences)
+    cutout = TessFootprintCutout(coordinates, cutout_size, sequence=sequences)
     cutout_tpfs = cutout.tpf_cutouts
     assert len(cutout_tpfs) == 2
 
     for tpf in cutout_tpfs:
-        check_output_tpf(tpf, 'SPOC', sequences)
+        check_output_tpf(tpf, sequences)
 
 
 def test_tess_footprint_cutout_all_sequences(coordinates, cutout_size):
     """Test that cubes are created for all sequences that intersect the cutout"""
     # Create cutouts for all possible sequences
-    cutout = TessFootprintCutout(coordinates, cutout_size, product='SPOC')
+    cutout = TessFootprintCutout(coordinates, cutout_size)
     cutout_tpfs = cutout.tpf_cutouts
     assert len(cutout_tpfs) >= 5
 
@@ -159,7 +157,7 @@ def test_tess_footprint_cutout_all_sequences(coordinates, cutout_size):
     # Assert non-empty results
     assert len(seq_list) == len(cutout_tpfs)
     for tpf in cutout_tpfs:
-        check_output_tpf(tpf, 'SPOC', sequences)
+        check_output_tpf(tpf, sequences)
 
 
 def test_tess_footprint_cutout_write_as_tpf(coordinates, cutout_size, tmpdir):
@@ -193,9 +191,12 @@ def test_tess_footprint_cutout_outside_coords(coordinates, cutout_size):
 
 def test_tess_footprint_cutout_invalid_product(coordinates, cutout_size):
     """Test that InvalidQueryError is raised if an invalid product is given"""
-    err = 'Product for TESS cube cutouts must be either "SPOC" or "TICA".'
+    err = 'Product for TESS cube cutouts must be "SPOC".'
     with pytest.raises(InvalidInputError, match=err):
         TessFootprintCutout(coordinates, cutout_size, product='invalid')
+
+    with pytest.raises(InvalidInputError, match=err):
+        TessFootprintCutout(coordinates, cutout_size, product='TICA')
         
 
 def test_cube_cut_from_footprint(coordinates, cutout_size, tmpdir):
