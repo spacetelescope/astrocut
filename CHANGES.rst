@@ -8,6 +8,10 @@
 - By default, ASDF cutouts now preserve all metadata from the input file. [#158]
 - Add ``lite`` parameter to ``ASDFCutout`` to create minimal cutouts with only the science data and updated world coordinate system. [#158]
 - Add history entry to ASDF cutouts specifying the cutout shape and center coordinates. [#158]
+- Remove TICA (TESS Image Calibration) as an option for the ``product`` parameter in ``TessFootprintCutout``. [#161]
+- Deprecate the ``TicaCubeFactory`` class. [#161]
+- Deprecate the ``product`` parameter in the ``TessCubeCutout`` class, the ``TessFootprintCutout`` class, the ``cube_cut`` function,
+  the ``CutoutFactory.cube_cut`` function, and the ``cube_cutout_from_footprint`` function. [#161]
 
 
 1.0.1 (2025-05-12)
