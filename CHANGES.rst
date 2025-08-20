@@ -1,7 +1,53 @@
-0.12.0 (Unreleased)
+1.1.0 (Unreleased)
+-------------------
+
+- Bugfix for transposed GWCS bounding box for ASDF cutouts. [#160]
+- Bugfix to correct ``array_shape`` and ``pixel_shape`` for GWCS objects. [#160]
+
+
+1.0.1 (2025-05-12)
+-------------------
+
+- Bugfix so ``ASDFCutout.get_center_pixel`` preserves the GWCS bounding box. [#154]
+- Bugfix in ``ASDFCutout`` to use deep copies of data and GWCS to avoid links to original ASDF input.
+
+1.0.0 (2025-04-28)
+-------------------
+
+- Introduce generalized cutout architecture with ``Cutout``, ``ImageCutout``, and ``FITSCutout`` classes. [#136]
+- Deprecate ``correct_wcs`` parameter in ``fits_cut`` as non-operational. [#136]
+- Add ``ASDFCutout`` class as a specialized cutout class for ASDF files. [#137]
+- Allow ``ASDFCutout`` and ``asdf_cut`` to accept multiple input files. [#137]
+- Deprecated ``output_file`` parameter in ``asdf_cut`` in favor of making outputs from a batch of input files.. [#137]
+- Return ASDF cutouts in memory as ``astropy.nddata.Cutout2D`` objects, ``asdf.AsdfFile`` objects, or ``astropy.io.fits.HDUList`` objects. [#137]
+- Enable output of ASDF cutouts in image formats. [#137]
+- Refactor ``TicaCubeFactory`` to inherit from ``CubeFactory``. [#143]
+- Optimize ``CubeFactory._update_info_table`` to open FITS files only once. [#143]
+- Add ``TessCubeCutout`` class as a concrete implementation of abstract ``CubeCutout`` with TESS-specific logic. [#146]
+- Introduce ``TessCubeCutout.CubeCutoutInstance`` inner class for per-cutout attributes. [#146]
+- Enable in-memory output for ``TessCubeCutout`` instances. [#146]
+- Add ``TessFootprintCutout`` class as a concrete implementation of abstract ``FootprintCutout`` with TESS-specific logic. [#149]
+- Enable in-memory output for ``TessFootprintCutout`` instances. [#149]
+- Bugfix so ASDF cutouts store a copy of the cutout data rather than a view into the original data. [#153]
+
+
+0.12.0 (2025-01-21)
 --------------------
 
-- asdf_cut() function now accepts pathlib.Path and s3path.S3Path objects as an input file [#119]
+- Implement and document ``cube_cut_from_footprint`` function to generate cutouts from TESS image cube files hosted on the S3 cloud. [#127]
+- Bugfix to properly catch input TICA product files in ``CubeFactory``. [#129]
+- Add a logging framework. [#131]
+- Improve performance of FITS image cutouts by using the ``section`` attribute of ``ImageHDU`` objects to access data more efficiently. [#132]
+- Bugfix when writing multiple output files to memory in ``fits_cut``. [#132]
+
+
+0.11.1 (2024-07-31)
+--------------------
+
+- ``asdf_cut`` function now accepts `pathlib.Path` and `s3path.S3Path` objects as an input file. [#119]
+- Bugfix for accessing private resources on the cloud in the ``asdf_cut`` function. [#121]
+- Add ``key``, ``secret``, and ``token`` parameters to ``asdf_cut`` for accessing private S3 buckets. [#124]
+
 
 0.11.0 (2024-05-28)
 --------------------
