@@ -3,6 +3,10 @@
 
 - Bugfix for transposed GWCS bounding box for ASDF cutouts. [#160]
 - Bugfix to correct ``array_shape`` and ``pixel_shape`` for GWCS objects. [#160]
+- Remove TICA (TESS Image Calibration) as an option for the ``product`` parameter in ``TessFootprintCutout``. [#161]
+- Deprecate the ``TicaCubeFactory`` class. [#161]
+- Deprecate the ``product`` parameter in the ``TessCubeCutout`` class, the ``TessFootprintCutout`` class, the ``cube_cut`` function,
+  the ``CutoutFactory.cube_cut`` function, and the ``cube_cutout_from_footprint`` function. [#161]
 
 
 1.0.1 (2025-05-12)
