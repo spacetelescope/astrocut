@@ -1,7 +1,7 @@
 import warnings
 from os import path
 from pathlib import Path
-from typing import List, Literal
+from typing import List
 
 import astropy.units as u
 import numpy as np
@@ -9,18 +9,16 @@ import pytest
 from astropy import wcs
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
-from astropy.time import Time
 from astropy.wcs import FITSFixedWarning
 
 from ..cutout_factory import CutoutFactory, cube_cut
 from ..exceptions import InputWarning
 from ..cube_factory import CubeFactory
-from ..tica_cube_factory import TicaCubeFactory
 from .utils_for_test import create_test_ffis
 
 
 @pytest.fixture
-def ffi_files(ffi_type: Literal["SPOC", "TICA"], tmp_path):
+def ffi_files(tmp_path):
     """Pytest fixture for creating test ffi files"""
 
     tmpdir = str(tmp_path)
@@ -28,27 +26,23 @@ def ffi_files(ffi_type: Literal["SPOC", "TICA"], tmp_path):
     img_sz = 10
     num_im = 100
 
-    return create_test_ffis(img_sz, num_im, dir_name=tmpdir, product=ffi_type)
+    return create_test_ffis(img_sz, num_im, dir_name=tmpdir)
 
 
 @pytest.fixture
-def cube_file(ffi_type: Literal["SPOC", "TICA"], ffi_files: List[str], tmp_path):
+def cube_file(ffi_files: List[str], tmp_path):
     """Pytest fixture for creating a cube file"""
 
     tmpdir = str(tmp_path)
 
     # Making the test cube
-    if ffi_type == "SPOC":
-        cube_maker = CubeFactory()
-    else:
-        cube_maker = TicaCubeFactory()
-
+    cube_maker = CubeFactory()
     cube_file = cube_maker.make_cube(ffi_files, path.join(tmpdir, "test_cube.fits"), verbose=False)
 
     return cube_file
 
 
-def check_cutout(product, hdulist, center_pix, center_world, cutout_size, ecube, eps=1.e-7):
+def check_cutout(hdulist, center_pix, center_world, cutout_size, ecube, eps=1.e-7):
     """Check FITS cutout for correctness
     
     Checks RA_OBJ/DEC_OBJ in primary header, and TIME, FLUX, and
@@ -83,13 +77,8 @@ def check_cutout(product, hdulist, center_pix, center_world, cutout_size, ecube,
     assert len(tab) == ntimes, f"Expected {ntimes} entries, found {len(tab)}"
     assert (tab['TIME'] == (np.arange(ntimes)+0.5)).all(), "Some time values are incorrect"
 
-    # Check flux data if product is SPOC
-    if product == 'SPOC':
-        # TODO: Modify check1 to take TICA - adjust for TICA's slightly different WCS
-        # solutions (TICA will usually be ~1 pixel off from SPOC for the same cutout)
-        check_flux(tab['FLUX'], x1, x2, y1, y2, ecube[:, :, :, 0], 'FLUX', hdulist)
-        # Only SPOC propagates errors, so TICA will always have an empty error array
-        check_flux(tab['FLUX_ERR'], x1, x2, y1, y2, ecube[:, :, :, 1], 'FLUX_ERR', hdulist)
+    check_flux(tab['FLUX'], x1, x2, y1, y2, ecube[:, :, :, 0], 'FLUX', hdulist)
+    check_flux(tab['FLUX_ERR'], x1, x2, y1, y2, ecube[:, :, :, 1], 'FLUX_ERR', hdulist)
     
     # Ensure correct data type in third HDU
     assert hdulist[2].data.dtype.type == np.int32
@@ -123,9 +112,8 @@ def check_flux(flux, x1, x2, y1, y2, ecube, label, hdulist):
     assert np.array_equal(expected_flux, cutout_flux)
 
 
-@pytest.mark.parametrize("ffi_type", ["SPOC", "TICA"])
 @pytest.mark.parametrize("use_factory", [True, False])
-def test_cube_cutout(cube_file, ffi_files, ffi_type, use_factory, tmp_path):
+def test_cube_cutout(cube_file, ffi_files, use_factory, tmp_path):
     """
     Testing the cube cutout functionality.
     """
@@ -134,7 +122,7 @@ def test_cube_cutout(cube_file, ffi_files, ffi_type, use_factory, tmp_path):
     num_im = 100
 
     # Read one of the input images to get the WCS
-    n = 1 if ffi_type == 'SPOC' else 0
+    n = 1
     img_header = fits.getheader(ffi_files[0], n)
     with warnings.catch_warnings():
         warnings.simplefilter('ignore', FITSFixedWarning)
@@ -160,10 +148,10 @@ def test_cube_cutout(cube_file, ffi_files, ffi_type, use_factory, tmp_path):
         coord = SkyCoord(v[0], v[1], frame='icrs', unit='deg')
         if use_factory:
             cutout_maker = CutoutFactory()
-            cutout_maker.cube_cut(cube_file, coord, csize[i], ffi_type, target_pixel_file=cutlist[i],
+            cutout_maker.cube_cut(cube_file, coord, csize[i], target_pixel_file=cutlist[i],
                                   output_path=tmpdir, verbose=False)
         else:
-            cube_cut(cube_file, coord, csize[i], ffi_type, target_pixel_file=cutlist[i],
+            cube_cut(cube_file, coord, csize[i], target_pixel_file=cutlist[i],
                      output_path=tmpdir, verbose=False)
 
 
@@ -178,11 +166,10 @@ def test_cube_cutout(cube_file, ffi_files, ffi_type, use_factory, tmp_path):
     # Doing the actual checking
     for i, cutfile in enumerate(cutlist):
         with fits.open(cutfile) as hdulist:
-            check_cutout(ffi_type, hdulist, pixcrd[i], world_coords[i], csize[i], ecube)
+            check_cutout(hdulist, pixcrd[i], world_coords[i], csize[i], ecube)
 
 
-@pytest.mark.parametrize("ffi_type", ["SPOC", "TICA"])
-def test_parse_table_info(cube_file, ffi_type, tmp_path):
+def test_parse_table_info(cube_file, tmp_path):
     """Test _parse_table_info"""
 
     tmpdir = str(tmp_path)
@@ -191,7 +178,7 @@ def test_parse_table_info(cube_file, ffi_type, tmp_path):
     coord = "256.88 6.38"
     cutout_size = [5, 3]
     out_file = cutout_maker.cube_cut(
-        cube_file, coord, cutout_size, ffi_type, output_path=path.join(tmpdir, "out_dir"), verbose=False
+        cube_file, coord, cutout_size, output_path=path.join(tmpdir, "out_dir"), verbose=False
     )
 
     assert "256.880000_6.380000_5x3_astrocut.fits" in out_file
@@ -206,8 +193,7 @@ def test_parse_table_info(cube_file, ffi_type, tmp_path):
     assert cutout_maker.center_coord.separation(coord) == 0
 
 
-@pytest.mark.parametrize("ffi_type", ["SPOC", "TICA"])
-def test_header_keywords_quality(cube_file, ffi_type, tmp_path):
+def test_header_keywords_quality(cube_file, tmp_path):
     """Test header keywords quality"""
 
     tmpdir = str(tmp_path)
@@ -216,27 +202,16 @@ def test_header_keywords_quality(cube_file, ffi_type, tmp_path):
     coord = "256.88 6.38"
     cutout_size = [5, 3]
     out_file = cutout_maker.cube_cut(
-        cube_file, coord, cutout_size, ffi_type, output_path=path.join(tmpdir, "out_dir"), verbose=False
+        cube_file, coord, cutout_size, output_path=path.join(tmpdir, "out_dir"), verbose=False
     )
 
     with fits.open(out_file) as hdulist:
 
         # Primary header checks
         primary_header = hdulist[0].header
-        assert primary_header['FFI_TYPE'] == ffi_type
+        assert primary_header['FFI_TYPE'] == 'SPOC'
         assert primary_header['CREATOR'] == 'astrocut'
         assert primary_header['BJDREFI'] == 2457000
-
-        if ffi_type == 'TICA':
-            # Verifying DATE-OBS calculation in TICA
-            date_obs = primary_header['DATE-OBS']
-            tstart = Time(date_obs).jd - primary_header['BJDREFI']
-            assert primary_header['TSTART'] == tstart
-
-            # Verifying DATE-END calculation in TICA
-            date_end = primary_header['DATE-END']
-            tstop = Time(date_end).jd - primary_header['BJDREFI']
-            assert primary_header['TSTOP'] == tstop
 
         # Checking for header keyword propagation in EXT 1 and 2
         ext1_header = hdulist[1].header
@@ -246,8 +221,7 @@ def test_header_keywords_quality(cube_file, ffi_type, tmp_path):
         assert ext1_header['BJDREFI'] == ext2_header['BJDREFI'] == primary_header['BJDREFI']
 
 
-@pytest.mark.parametrize("ffi_type", ["SPOC", "TICA"])
-def test_header_keywords_diffs(cube_file, ffi_type, tmp_path):
+def test_header_keywords_diffs(cube_file, tmp_path):
     """Test known header keywords differences"""
 
     tmpdir = str(tmp_path)
@@ -256,7 +230,7 @@ def test_header_keywords_diffs(cube_file, ffi_type, tmp_path):
     coord = "256.88 6.38"
     cutout_size = [5, 3]
     out_file = cutout_maker.cube_cut(
-        cube_file, coord, cutout_size, ffi_type, output_path=path.join(tmpdir, "out_dir"), verbose=False
+        cube_file, coord, cutout_size, output_path=path.join(tmpdir, "out_dir"), verbose=False
     )
 
     with fits.open(out_file) as hdulist:
@@ -265,25 +239,14 @@ def test_header_keywords_diffs(cube_file, ffi_type, tmp_path):
         cols = hdulist[1].columns.info('name, unit', output=False)
         cols_dict = dict(zip(*cols.values()))
 
-        ncols = 12 if ffi_type == 'SPOC' else 11
-        assert len(cols_dict) == ncols
-
-        # Checking for known keyword differences
-        if ffi_type == 'SPOC':
-            assert hdulist[0].header['TIMEREF'] == 'SOLARSYSTEM', 'TIMEREF keyword does not match expected'
-            assert hdulist[0].header['TASSIGN'] == 'SPACECRAFT', 'TASSIGN keyword does not match expected'
-            assert cols_dict['FLUX'] == 'e-/s', f'Expected `FLUX` units of "e-/s", got units of "{cols_dict["FLUX"]}"'
-            assert hdulist[1].data.field('CADENCENO').all() == 0.0
-
-        if ffi_type == 'TICA':
-            assert hdulist[0].header['TIMEREF'] is None, 'TIMEREF keyword does not match expected'
-            assert hdulist[0].header['TASSIGN'] is None, 'TASSIGN keyword does not match expected'
-            assert cols_dict['FLUX'] == 'e-', f'Expected `FLUX` units of "e-", got units of "{cols_dict["FLUX"]}"'
-            assert hdulist[1].data.field('CADENCENO').all() != 0.0
+        assert len(cols_dict) == 12
+        assert hdulist[0].header['TIMEREF'] == 'SOLARSYSTEM', 'TIMEREF keyword does not match expected'
+        assert hdulist[0].header['TASSIGN'] == 'SPACECRAFT', 'TASSIGN keyword does not match expected'
+        assert cols_dict['FLUX'] == 'e-/s', f'Expected `FLUX` units of "e-/s", got units of "{cols_dict["FLUX"]}"'
+        assert hdulist[1].data.field('CADENCENO').all() == 0.0
 
 
-@pytest.mark.parametrize("ffi_type", ["SPOC", "TICA"])
-def test_get_cutout_limits(cube_file, ffi_type, tmp_path):
+def test_get_cutout_limits(cube_file, tmp_path):
     """Test _get_cutout_limits"""
 
     tmpdir = str(tmp_path)
@@ -294,7 +257,7 @@ def test_get_cutout_limits(cube_file, ffi_type, tmp_path):
     coord = "256.88 6.38"
     cutout_size = [5, 3]
     out_file = cutout_maker.cube_cut(
-        cube_file, coord, cutout_size, ffi_type, output_path=path.join(tmpdir, "out_dir"), verbose=False
+        cube_file, coord, cutout_size, output_path=path.join(tmpdir, "out_dir"), verbose=False
     )
 
     xmin, xmax = cutout_maker.cutout_lims[0]
@@ -304,7 +267,7 @@ def test_get_cutout_limits(cube_file, ffi_type, tmp_path):
     assert (ymax-ymin) == cutout_size[1]
 
     cutout_size = [5*u.pixel, 7*u.pixel]
-    out_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, ffi_type, verbose=False, output_path=tmpdir)
+    out_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, verbose=False, output_path=tmpdir)
     assert "256.880000_6.380000_5x7_astrocut.fits" in out_file
 
     xmin, xmax = cutout_maker.cutout_lims[0]
@@ -314,7 +277,7 @@ def test_get_cutout_limits(cube_file, ffi_type, tmp_path):
     assert (ymax-ymin) == cutout_size[1].value
 
     cutout_size = [3*u.arcmin, 5*u.arcmin]
-    out_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, ffi_type, verbose=False, output_path=tmpdir)
+    out_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, verbose=False, output_path=tmpdir)
     assert "256.880000_6.380000_8x15_astrocut.fits" in out_file
 
     xmin, xmax = cutout_maker.cutout_lims[0]
@@ -324,8 +287,7 @@ def test_get_cutout_limits(cube_file, ffi_type, tmp_path):
     assert (ymax - ymin) == 15
 
 
-@pytest.mark.parametrize("ffi_type", ["SPOC", "TICA"])
-def test_small_cutout(cube_file, ffi_type, tmp_path):
+def test_small_cutout(cube_file, tmp_path):
 
     tmpdir = str(tmp_path)
 
@@ -333,7 +295,7 @@ def test_small_cutout(cube_file, ffi_type, tmp_path):
     cutout_size = [1 * u.arcsec, 5 * u.arcsec]
     coord = "256.88 6.38"
 
-    out_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, ffi_type, verbose=False, output_path=tmpdir)
+    out_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, verbose=False, output_path=tmpdir)
     assert "256.880000_6.380000_1x1_astrocut.fits" in out_file
 
     xmin, xmax = cutout_maker.cutout_lims[0]
@@ -343,8 +305,7 @@ def test_small_cutout(cube_file, ffi_type, tmp_path):
     assert (ymax - ymin) == 1
 
 
-@pytest.mark.parametrize("ffi_type", ["SPOC", "TICA"])
-def test_get_full_cutout_wcs(cube_file, ffi_type, tmp_path):
+def test_get_full_cutout_wcs(cube_file, tmp_path):
     """Test _get_full_cutout_wcs"""
 
     tmpdir = str(tmp_path)
@@ -353,11 +314,10 @@ def test_get_full_cutout_wcs(cube_file, ffi_type, tmp_path):
     cutout_size = [5, 3]
     coord = "256.88 6.38"
 
-    cutout_maker.cube_cut(cube_file, coord, cutout_size, ffi_type, verbose=False, output_path=tmpdir)
+    cutout_maker.cube_cut(cube_file, coord, cutout_size, verbose=False, output_path=tmpdir)
 
 
-@pytest.mark.parametrize("ffi_type", ["SPOC", "TICA"])
-def test_fit_cutout_wcs(cube_file, ffi_type, tmp_path):
+def test_fit_cutout_wcs(cube_file, tmp_path):
     """Test _fit_cutout_wcs"""
 
     tmpdir = str(tmp_path)
@@ -366,14 +326,13 @@ def test_fit_cutout_wcs(cube_file, ffi_type, tmp_path):
     cutout_size = [5, 3]
     coord = "256.88 6.38"
 
-    cutout_maker.cube_cut(cube_file, coord, cutout_size, ffi_type, verbose=False, output_path=tmpdir)
+    cutout_maker.cube_cut(cube_file, coord, cutout_size, verbose=False, output_path=tmpdir)
     cry, crx = cutout_maker.cutout_wcs.wcs.crpix
     assert round(cry) == 3
     assert round(crx) == 2
 
 
-@pytest.mark.parametrize("ffi_type", ["SPOC", "TICA"])
-def test_target_pixel_file(cube_file, ffi_type, tmp_path):
+def test_target_pixel_file(cube_file, tmp_path):
     """Test target pixel file"""
     
     tmpdir = str(tmp_path)
@@ -382,7 +341,7 @@ def test_target_pixel_file(cube_file, ffi_type, tmp_path):
     cutout_size = [5, 3]
     coord = "256.88 6.38"
 
-    out_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, ffi_type, verbose=False, output_path=tmpdir)
+    out_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, verbose=False, output_path=tmpdir)
 
     # Testing the cutout content is in test_cube_cutout
     # this tests that the format of the tpf is what it should be
@@ -392,8 +351,7 @@ def test_target_pixel_file(cube_file, ffi_type, tmp_path):
 
     tpf_table = tpf[1].data
     # SPOC cutouts have 1 extra columns in EXT 1
-    ncols = 12 if ffi_type == 'SPOC' else 11
-    assert len(tpf_table.columns) == ncols
+    assert len(tpf_table.columns) == 12
     assert "TIME" in tpf_table.columns.names
     assert "FLUX" in tpf_table.columns.names
     assert "FLUX_ERR" in tpf_table.columns.names
@@ -407,8 +365,6 @@ def test_target_pixel_file(cube_file, ffi_type, tmp_path):
     # Check error cutout shape, contents, and data type
     cutout_err = tpf_table[0]['FLUX_ERR']
     assert cutout_err.shape == (3, 5)
-    if ffi_type == "TICA":
-        assert np.mean(cutout_err) == 0
     assert cutout_err.dtype.name == 'float32'
 
     # Check aperture shape and data type
@@ -419,87 +375,17 @@ def test_target_pixel_file(cube_file, ffi_type, tmp_path):
     tpf.close()
 
 
-def test_tica_cutout_error(tmp_path):
-    """
-    Test cutouts created from existing TICA cubes (i.e., those with
-    error arrays)
-
-    Write test to check that cutouts can be made from *both* the TICA
-    cubes that still have the error array, as well as cubes that
-    *have* been updated and no longer have the error array. Needed to
-    verify that CutoutFactory will work on the cubes that have not 
-    been remade yet.
-    """
-
-    tmpdir = str(tmp_path)
-
-    img_sz = 10
-    num_im = 100
-
-    # Create a mock TICA cube that still has the error array
-    # Cube with TICA headers to copy to cube with error array
-    spoc_cube_error = CubeFactory() 
-    spoc_ffi_files = create_test_ffis(img_sz, num_im, dir_name=tmpdir)
-    cube_error_file = spoc_cube_error.make_cube(spoc_ffi_files, 
-                                                path.join(tmpdir, "out_dir", "test_error_cube.fits"), 
-                                                verbose=False)
-
-    # Cube with error array
-    tica_cube_no_error = TicaCubeFactory()
-    tica_ffi_files = create_test_ffis(img_sz, num_im, dir_name=tmpdir, product='TICA')
-    tica_cube_no_error_file = tica_cube_no_error.make_cube(tica_ffi_files, 
-                                                           path.join(tmpdir, "out_dir", "test_add_error_cube.fits"), 
-                                                           verbose=False)
-
-    # Take ImageHDU from the cube with the error array, write into cube with TICA headers
-    with fits.open(tica_cube_no_error_file, mode='update') as hdulist:
-
-        tica_hdr = hdulist[1].header
-        error_hdr = fits.getheader(cube_error_file, 1)
-
-        # Overwrite header keywords
-        for h in error_hdr.keys():
-            tica_hdr[h] = error_hdr[h]
-
-        # Overwrite header data
-        hdulist[1].data = fits.getdata(cube_error_file, 1)
-
-        # Close file, write all changes
-        hdulist.close()
-
-    # Update variable name to reflect addition of error array to TICA cube
-    tica_cube_error_file = tica_cube_no_error_file
-
-    # Verify dimensions of new TICA cube with added error array
-    assert np.shape(fits.getdata(tica_cube_error_file, 1)) == (img_sz, img_sz, num_im, 2)
-
-    ffi_type = 'TICA'
-    # Test cutouts from TICA cube with error array
-    test_cube_cutout(tica_cube_error_file, tica_ffi_files, ffi_type, True, tmp_path)
-    test_header_keywords_quality(tica_cube_error_file, ffi_type, tmp_path)
-    test_header_keywords_diffs(tica_cube_error_file, ffi_type, tmp_path)
-    test_target_pixel_file(tica_cube_error_file, ffi_type, tmp_path)
-
-
-@pytest.mark.parametrize("ffi_type", ["SPOC", "TICA"])
-def test_ffi_cube_header(cube_file, ffi_files, ffi_type):
+def test_ffi_cube_header(cube_file, ffi_files):
     """Test FFI headers versus cube headers"""
 
     ffi_header_keys = list(fits.getheader(ffi_files[0], 0).keys())
     cube_header_keys = list(fits.getheader(cube_file, 0).keys())
 
-    # Lists of expected keys for each product type
-    if ffi_type == 'SPOC':
-        # CHECKSUM in FFI header, not in cube header
-        # SECTOR, DATE, ORIGIN in cube header, not in FFI header
-        effi_keys = ['CHECKSUM']
-        ecube_keys = ['SECTOR', 'DATE', 'ORIGIN']
-
-    else:
-        # CHECKSUM, and image dimensions (NAXIS1, NAXIS2) in FFI header, not in cube header
-        # SECTOR, DATE, EXTNAME, ORIGIN in cube header, not in FFI header
-        effi_keys = ['CHECKSUM', 'NAXIS1', 'NAXIS2']
-        ecube_keys = ['SECTOR', 'DATE', 'EXTNAME', 'ORIGIN']
+    # Lists of expected keys
+    # CHECKSUM in FFI header, not in cube header
+    # SECTOR, DATE, ORIGIN in cube header, not in FFI header
+    effi_keys = ['CHECKSUM']
+    ecube_keys = ['SECTOR', 'DATE', 'ORIGIN']
 
     for k in effi_keys:
         assert k in ffi_header_keys
@@ -510,8 +396,7 @@ def test_ffi_cube_header(cube_file, ffi_files, ffi_type):
         assert k in cube_header_keys
 
 
-@pytest.mark.parametrize("ffi_type", ["SPOC", "TICA"])
-def test_inputs(cube_file, ffi_type, tmp_path, caplog):
+def test_inputs(cube_file, tmp_path, caplog):
     """
     Testing with different user input types/combos. And verbose.
     """
@@ -524,7 +409,7 @@ def test_inputs(cube_file, ffi_type, tmp_path, caplog):
     coord = "256.88 6.38"
 
     cutout_size = [5, 3]*u.pixel
-    cutout_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, ffi_type, output_path=tmpdir, verbose=True)
+    cutout_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, output_path=tmpdir, verbose=True)
     captured = caplog.text
     assert "Image cutout cube shape: (100, 3, 5)" in captured
     assert "Using WCS from row 50 out of 100" in captured
@@ -532,12 +417,12 @@ def test_inputs(cube_file, ffi_type, tmp_path, caplog):
     assert "5x3" in cutout_file
 
     cutout_size = [5, 3]*u.arcmin
-    cutout_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, ffi_type, output_path=tmpdir, verbose=False)
+    cutout_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, output_path=tmpdir, verbose=False)
     assert "14x9" in cutout_file
 
     cutout_size = [5, 3, 9]*u.pixel
     with pytest.warns(InputWarning):
-        cutout_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, ffi_type, output_path=tmpdir, verbose=False)
+        cutout_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, output_path=tmpdir, verbose=False)
     assert "5x3" in cutout_file
     assert "x9" not in cutout_file
 
@@ -578,51 +463,6 @@ def test_s3_cube_cut(tmp_path: Path):
     assert np.isclose(hdulist[1].data["FLUX"][100][0, 0], 2329.8127)
     assert np.isclose(hdulist[1].data["FLUX_ERR"][200][1, 2], 1.1239403)
     assert hdulist[0].header["CAMERA"] == 2
-    hdulist.close()
-
-
-@pytest.mark.xfail
-def test_s3_tica_cube_cut(tmp_path: Path):
-    """Does using an S3-hosted TESS cube yield correct results?
-
-    This test implements a spot check which verifies whether a cutout
-    for Sector 27 obtained from an S3-hosted cube
-    file yields results that are identical to those returned
-    by the Tesscut service.
-
-    To speed up the test and avoid adding astroquery as a dependency,
-    the test uses hard-coded reference values which were obtained
-    as follows:
-
-    >>> from astroquery.mast import Tesscut  # doctest: +SKIP
-    >>> crd = SkyCoord(299.27269, -67.14491, unit="deg")  # doctest: +SKIP
-    >>> cut = Tesscut.get_cutouts(coordinates=crd, size=3, sector=27, product='TICA')  # doctest: +SKIP
-    >>> cut[0][1].data.shape  # doctest: +SKIP
-    (3360,)
-    >>> cut[0][1].data['TIME'][0]  # doctest: +SKIP
-    2036.281565948625
-    >>> cut[0][1].data['FLUX'][500][0, 0]  # doctest: +SKIP
-    59313.523
-    >>> np.sum(cut[0][1].data['FLUX_ERR'])  # doctest: +SKIP
-    0.0
-    >>> cut[0][0].header['CAMERA']  # doctest: +SKIP
-    2
-    >>> cut[0][0].header['CCD']  # doctest: +SKIP
-    1
-
-    TODO: Remove test `test_tica_cutout_error` when this test starts working
-    """
-    # Test case: RR Lyrae star in Sector 27 (Camera 2, CCD 1)
-    coord = SkyCoord(299.27269, -67.14491, unit="deg", frame="icrs")
-    cube_file = "s3://stpubdata/tess/public/mast/tica/tica-s0027-2-1-cube.fits"
-    cutout_file = CutoutFactory().cube_cut(cube_file, coord, 3, output_path=str(tmp_path))
-    hdulist = fits.open(cutout_file)
-    assert hdulist[1].data.shape == (3360,)
-    assert np.isclose(hdulist[1].data["TIME"][0], 2036.281565948625)
-    assert np.isclose(hdulist[1].data["FLUX"][500][0, 0], 59313.523)
-    assert np.sum(hdulist[1].data["FLUX_ERR"]) == 0.0
-    assert hdulist[0].header["CAMERA"] == 2
-    assert hdulist[0].header["CCD"] == 1
     hdulist.close()
 
 

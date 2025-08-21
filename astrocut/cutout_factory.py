@@ -18,9 +18,8 @@ class CutoutFactory():
     Class for creating image cutouts from TESS image cube files.
 
     This class encompasses all of the cutout functionality.  
-    In the current version this means creating cutout target pixel files from both 
-    SPOC (Science Processing Operations Center) and TICA (Tess Image CAlibration) 
-    full frame image cubes.
+    In the current version, this means creating cutout target pixel files from 
+    TESS full frame images cubes.
 
     This class is maintained for backwards compatibility. For maximum flexibility, we recommend using the
     `~astrocut.TessCubeCutout` class.
@@ -28,7 +27,7 @@ class CutoutFactory():
 
     def cube_cut(self, cube_file: Union[str, Path, S3Path], coordinates: Union[SkyCoord, str],
                  cutout_size: Union[int, np.ndarray, u.Quantity, List[int], Tuple[int]], 
-                 product: str = 'SPOC', target_pixel_file: Optional[str] = None, 
+                 target_pixel_file: Optional[str] = None, 
                  output_path: Union[str, Path] = '.', memory_only: bool = False, 
                  threads: Union[int, Literal["auto"]] = 1, verbose: bool = False):
         """
@@ -56,9 +55,6 @@ class CutoutFactory():
             order.  Scalar numbers in ``cutout_size`` are assumed to be in
             units of pixels. `~astropy.units.Quantity` objects must be in pixel or
             angular units.
-        product : str
-            The product type to make the cutouts from.
-            Can either be 'SPOC' or 'TICA' (default is 'SPOC').
         target_pixel_file : str
             Optional. The name for the output target pixel file.
             If no name is supplied, the file will be named:
@@ -86,7 +82,6 @@ class CutoutFactory():
         cube_cutout = TessCubeCutout(input_files=cube_file,
                                      coordinates=coordinates,
                                      cutout_size=cutout_size,
-                                     product=product,
                                      threads=threads,
                                      verbose=verbose)
         
@@ -104,10 +99,9 @@ class CutoutFactory():
                                         output_file=target_pixel_file)[0]
     
 
-
 def cube_cut(cube_file: Union[str, Path, S3Path], coordinates: Union[SkyCoord, str],
              cutout_size: Union[int, np.ndarray, u.Quantity, List[int], Tuple[int]], 
-             product: str = 'SPOC', target_pixel_file: Optional[str] = None, 
+             target_pixel_file: Optional[str] = None, 
              output_path: Union[str, Path] = '.', memory_only: bool = False, 
              threads: Union[int, Literal["auto"]] = 1, verbose: bool = False):
     """
@@ -135,9 +129,6 @@ def cube_cut(cube_file: Union[str, Path, S3Path], coordinates: Union[SkyCoord, s
         order.  Scalar numbers in ``cutout_size`` are assumed to be in
         units of pixels. `~astropy.units.Quantity` objects must be in pixel or
         angular units.
-    product : str
-        The product type to make the cutouts from.
-        Can either be 'SPOC' or 'TICA' (default is 'SPOC').
     target_pixel_file : str
         Optional. The name for the output target pixel file.
         If no name is supplied, the file will be named:
@@ -165,7 +156,6 @@ def cube_cut(cube_file: Union[str, Path, S3Path], coordinates: Union[SkyCoord, s
     cube_cutout = TessCubeCutout(input_files=cube_file,
                                  coordinates=coordinates,
                                  cutout_size=cutout_size,
-                                 product=product,
                                  threads=threads,
                                  verbose=verbose)
             

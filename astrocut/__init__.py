@@ -29,7 +29,6 @@ log = setup_logger()
 # Import key submodules and functions if not in setup mode
 if not _ASTROPY_SETUP_:  # noqa
     from .cube_factory import CubeFactory  # noqa
-    from .tica_cube_factory import TicaCubeFactory  # noqa
     from .cutout_factory import CutoutFactory, cube_cut  # noqa
     from .cutout_processing import (  # noqa
         path_to_footprints, center_on_path, CutoutsCombiner, build_default_combine_function  # noqa

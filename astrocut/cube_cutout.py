@@ -65,7 +65,6 @@ class CubeCutout(Cutout, ABC):
         self._threads = threads
 
         # Populate these in child classes
-        self._has_uncertainty = False  # If the cube has uncertainty data
         self._img_kwds = {}  # Extra keywords to add to the TPF headers
         self._wcs_axes_keyword = None  # Keyword corresponding to WCS axis
         self._wcs_axes_value = None  # Expected value for the WCS axis keyword
@@ -292,8 +291,6 @@ class CubeCutout(Cutout, ABC):
             The input cube filename.
         cube_wcs : `~astropy.wcs.WCS`
             The WCS object for the input cube.
-        has_uncert : bool
-            If the cube has uncertainty data.
         parent : `CubeCutout`
             The parent `CubeCutout` object.
 
@@ -318,7 +315,7 @@ class CubeCutout(Cutout, ABC):
         """
 
         def __init__(self, cube: fits.HDUList, file: Union[str, Path, S3Path], cube_wcs: WCS, 
-                     has_uncert: bool, parent: 'CubeCutout'):
+                     parent: 'CubeCutout'):
             self._parent = parent
             self.cube_filename = file
             self.cube_wcs = cube_wcs
@@ -332,7 +329,7 @@ class CubeCutout(Cutout, ABC):
 
             # Get cutout data
             self.data, self.uncertainty, self.aperture = self._get_cutout_data(cube[1].section, 
-                                                                               self._parent._threads, has_uncert)
+                                                                               self._parent._threads)
             self.shape = self.data.shape
             
             # Get cutout WCS
@@ -341,8 +338,8 @@ class CubeCutout(Cutout, ABC):
             # Fit the cutout WCS
             self._fit_cutout_wcs(self.data.shape[1:])
 
-        def _get_cutout_data(self, transposed_cube: fits.ImageHDU.section, threads: int, 
-                             has_uncert: bool = True) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        def _get_cutout_data(self, transposed_cube: fits.ImageHDU.section, 
+                             threads: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
             """
             Extract a cutout from an image/uncertainty cube that has been transposed to have time on the longest axis.
 
@@ -352,15 +349,13 @@ class CubeCutout(Cutout, ABC):
                 Transposed image/uncertainty array.
             threads : int
                 The number of threads to use for the cutout.
-            has_uncert : bool
-                If the cube has uncertainty data.
 
             Returns
             -------
             img_cutout : `numpy.array`
                 The untransposed image cutout array.
             uncert_cutout : `numpy.array` or `None`
-                The untransposed uncertainty cutout array if `self._product` is 'SPOC'. Otherwise, returns `None`.
+                The untransposed uncertainty cutout array.
             aperture : `numpy.array`
                 The aperture array. This is a 2D array that is the same size as a single cutout that is 1 where 
                 there is image data and 0 where there isn't.
@@ -397,7 +392,7 @@ class CubeCutout(Cutout, ABC):
 
             # Extract image and uncertainty cutouts
             img_cutout = np.moveaxis(cutout[:, :, :, 0], 2, 0)
-            uncert_cutout = np.moveaxis(cutout[:, :, :, 1], 2, 0) if has_uncert else None
+            uncert_cutout = np.moveaxis(cutout[:, :, :, 1], 2, 0)
             
             # Create aperture mask
             aperture = np.ones((xmax - xmin, ymax - ymin), dtype=np.int32)
@@ -405,13 +400,11 @@ class CubeCutout(Cutout, ABC):
             # Apply padding if needed
             if padding.any():
                 img_cutout = np.pad(img_cutout, padding, 'constant', constant_values=self._parent._fill_value)
-                if has_uncert:
-                    uncert_cutout = np.pad(uncert_cutout, padding, 'constant', constant_values=self._parent._fill_value)
+                uncert_cutout = np.pad(uncert_cutout, padding, 'constant', constant_values=self._parent._fill_value)
                 aperture = np.pad(aperture, padding[1:], 'constant', constant_values=0)
 
             log.debug('Image cutout cube shape: %s', img_cutout.shape)
-            if has_uncert:
-                log.debug('Uncertainty cutout cube shape: %s', uncert_cutout.shape)
+            log.debug('Uncertainty cutout cube shape: %s', uncert_cutout.shape)
         
             return img_cutout, uncert_cutout, aperture
 
