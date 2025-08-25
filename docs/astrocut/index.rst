@@ -118,23 +118,46 @@ To make a cutout from an ASDF file or files, use the `~astrocut.ASDFCutout` clas
   cutouts that are more accurately centered on the target coordinates than even values
   for ``cutout_size``.
 
-The resulting `~astrocut.ASDFCutout` object can be used to access the cutout data and metadata. The ``cutouts_by_file`` attribute is a dictionary that
-stores the individual cutouts as a list of `~astropy.nddata.Cutout2D` objects by input filename. The `~astropy.nddata.Cutout2D`
-object contains the cutout data, shape, world coordinate system (WCS) and other helpful properties. The ``cutouts`` attribute is a list of
-cutouts as `~astropy.nddata.Cutout2D` objects, one for each input file.
+The resulting `~astrocut.ASDFCutout` object can be used to access the cutout science data and metadata. The ``cutouts_by_file`` attribute is a dictionary that
+stores the individual science data cutouts as a list of `~astropy.nddata.Cutout2D` objects by input filename. The `~astropy.nddata.Cutout2D`
+object contains the science cutout data, shape, world coordinate system (WCS) and other helpful properties. The ``cutouts`` attribute is a list of
+science data cutouts as `~astropy.nddata.Cutout2D` objects, one for each input file.
 
 The ``asdf_cutouts`` attribute is a list of cutouts as `~asdf.AsdfFile` objects, and the ``fits_cutout`` attribute is a list of cutouts as
 `~astropy.io.fits.HDUList` objects. The cutout objects in these lists can be used to access cutout data and metadata, as shown below.
+
+.. note::
+  Although Astrocut supports writing ASDF cutouts as FITS objects, we recommend using the ASDF output format whenever possible. FITS files may not 
+  accurately represent the ASDF world coordinate system, so saving cutouts in their original format will generally give the most reliable results.
 
 .. code-block:: python
 
   >>> cutout_asdf = asdf_cutout.asdf_cutouts[0] #doctest: +SKIP
   >>> cutout_asdf.info() #doctest: +SKIP
   root (AsdfObject)
-  └─roman (dict)
-    ├─meta (dict)
-    │ └─wcs (WCS)
-    └─data (ndarray): shape=(25, 25), dtype=float32
+  ├─asdf_library (Software)
+  │ ├─author (str): The ASDF Developers
+  │ ├─homepage (str): http://github.com/asdf-format/asdf
+  │ ├─name (str): asdf
+  │ └─version (str): 4.1.0
+  ├─history (dict)
+  │ ├─extensions (list)
+  │ │ ├─[0] (ExtensionMetadata) ...
+  │ │ ├─[1] (ExtensionMetadata) ...
+  │ │ └─6 not shown
+  │ └─entries (list) ...
+  └─roman (TaggedDict)
+    ├─meta (dict) ...
+    ├─data (ndarray) ...
+    ├─context (ndarray) ...
+    ├─err (ndarray) ...
+    ├─weight (ndarray) ...
+    ├─var_poisson (ndarray) ...
+    ├─var_rnoise (ndarray) ...
+    ├─var_flat (ndarray) ...
+    ├─cal_logs (CalLogs) # Calibration Log Messages ...
+    └─individual_image_cal_logs (list) ...
+  Some nodes not shown.
 
   >>> cutout_fits = asdf_cutout.fits_cutouts[0] #doctest: +SKIP
   >>> cutout_fits.info() #doctest: +SKIP
@@ -172,6 +195,32 @@ cutout FITS files.
 
 By default, the cutouts are written to the current working directory. You can specify a different output directory using the ``output_dir`` parameter
 in either of the write functions.
+
+Lite Mode
+^^^^^^^^^
+By default, `~astrocut.ASDFCutout` creates cutouts of all arrays in the input file (e.g., data, error, uncertainty, variance, etc.) where the last
+two dimensions match the shape of the science data array. It also preserves all of the metadata from the input file. These cutout arrays and metadata
+can be accessed through the `asdf_cutouts` attribute.
+
+For large input files, this can result in large output cutouts. If you only require the science data and the updated world coordinate system, you can
+set the ``lite`` parameter to True. With this option enabled, only the science data array is cut out and returned, and metadata is reduced to the sliced
+GWCS object needed to interpret the cutout. This makes the output cutouts smaller and faster to create, while still retaining essential information for 
+science analysis.
+
+.. code-block:: python
+
+  >>> asdf_cutout_lite = ASDFCutout(input_files=input_files, 
+  ...                               coordinates=center_coord, 
+  ...                               cutout_size=cutout_size,
+  ...                               lite=True) #doctest: +SKIP
+  >>> cutout_asdf_lite = asdf_cutout_lite.asdf_cutouts[0] #doctest: +SKIP
+  >>> cutout_asdf_lite.info() #doctest: +SKIP
+  root (AsdfObject)
+  └─roman (dict)
+    ├─meta (dict)
+    │ └─wcs (WCS)
+    └─data (ndarray): shape=(25, 25), dtype=float32
+
 
 Image Outputs
 -------------
