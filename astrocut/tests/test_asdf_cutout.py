@@ -93,7 +93,12 @@ def test_images(tmp_path, fakedata):
             'file_date': Time('2023-10-01T00:00:00', format='isot')}
 
     # create and write the asdf file
-    tree = {'roman': {'data': data, 'meta': meta}}
+    tree = {'roman': {'meta': meta, 
+                      'data': data, 
+                      'dq': data, 
+                      'err': data,
+                      'context': np.expand_dims(data, axis=0),
+                      'invalid_dims': np.ndarray(shape=(10))}}
     af = asdf.AsdfFile(tree)
 
     path = tmp_path / 'roman'
@@ -158,10 +163,11 @@ def test_asdf_cutout_write_to_file(test_images, center_coord, cutout_size, tmpdi
     for i, asdf_file in enumerate(asdf_files):
         with asdf.open(asdf_file) as af:
             assert 'roman' in af
-            assert 'data' in af['roman']
             assert 'meta' in af['roman']
             # Check cutout data and metadata
-            assert np.all(af.tree['roman']['data'] == cutout.cutouts[i].data)
+            for key in ['data', 'dq', 'err', 'context']:
+                assert key in af['roman']
+                assert np.all(af['roman'][key] == cutout.cutouts[i].data)
             assert af['roman']['meta']['wcs'].pixel_shape == (10, 10)
             assert af['roman']['meta']['product_type'] == 'l2'
             assert af['roman']['meta']['file_date'] == Time('2023-10-01T00:00:00', format='isot')
@@ -179,9 +185,6 @@ def test_asdf_cutout_write_to_file(test_images, center_coord, cutout_size, tmpdi
             assert hdul[0].header['NAXIS1'] == 10
             assert hdul[0].header['NAXIS2'] == 10
             assert Path(fits_file).stat().st_size < Path(test_images[i]).stat().st_size
-            assert len(hdul) == 2  # primary HDU + ASDF metadata HDU
-            assert isinstance(hdul[1], fits.BinTableHDU)
-            assert hdul[1].name == 'ASDF'
 
 
 def test_asdf_cutout_lite(test_images, center_coord, cutout_size, tmpdir):

@@ -1,4 +1,3 @@
-import io
 import warnings
 from copy import deepcopy
 from pathlib import Path
@@ -45,9 +44,12 @@ class ASDFCutout(ImageCutout):
     token : str
         Optional, default None. Security token for S3 file system.
     lite : bool
-        Optional, default False. If True, the cutout will be created in "lite" mode,
-        which means that the cutout will not contain the full ASDF metadata. The cutout will
-        only contain the data and an updated world coordinate system.
+        Optional, default False. By default, the class creates cutouts of all arrays in the input
+        file (e.g., data, error, uncertainty, variance, etc.) where the last two dimensions match the 
+        shape of the science data array. It also preserves all of the metadata from the input file.
+
+        If this parameter is True, the cutout will be created in "lite" mode,
+        which means that it will only contain the data and an updated world coordinate system.
     verbose : bool
         If True, log messages are printed to the console.
 
@@ -104,27 +106,13 @@ class ASDFCutout(ImageCutout):
         """
         if not self._fits_cutouts:
             fits_cutouts = []
-            for i, cutout in enumerate(self.cutouts):
-                # Primary HDU: cutout data and wcs
-                image_hdu = fits.PrimaryHDU(data=cutout.data, header=cutout.wcs.to_header(relax=True))
-                if self._lite:
-                    fits_cutouts.append(fits.HDUList([image_hdu]))
-                else:
-                    tree = self._asdf_trees[i]
+            for cutout in self.cutouts:
+                # TODO: Create a FITS object with ASDF extension
+                # Create a primary FITS header to hold data and WCS
+                primary_hdu = fits.PrimaryHDU(data=cutout.data, header=cutout.wcs.to_header(relax=True))
 
-                    # Serialize ASDF tree to a bytes buffer
-                    buffer = io.BytesIO()
-                    with asdf.AsdfFile(tree) as af:
-                        af.write_to(buffer)
-                    asdf_blob = buffer.getvalue()
-
-                    # Store ASDF metadata as binary blob in a BINTABLE extension
-                    col = fits.Column(name='ASDF_METADATA', format='PB()', 
-                                      array=[np.frombuffer(asdf_blob, dtype='uint8')])
-                    asdf_hdu = fits.BinTableHDU.from_columns([col], name='ASDF')
-
-                    # Write to HDUList
-                    fits_cutouts.append(fits.HDUList([image_hdu, asdf_hdu]))
+                # Write to HDUList
+                fits_cutouts.append(fits.HDUList([primary_hdu]))
             self._fits_cutouts = fits_cutouts
         return self._fits_cutouts
     
@@ -190,7 +178,7 @@ class ASDFCutout(ImageCutout):
         with fs.open(input_file, 'rb') as f:
             return f.url()
 
-    def _load_file_data(self, input_file: Union[str, Path, S3Path]) -> Tuple[np.ndarray, gwcs.wcs.WCS, dict]:
+    def _load_file_data(self, input_file: Union[str, Path, S3Path]) -> dict:
         """
         Load relevant data from an input file.
 
@@ -201,12 +189,8 @@ class ASDFCutout(ImageCutout):
 
         Returns
         -------
-        data : array
-            The image data.
-        gwcs : `~gwcs.wcs.WCS`
-            The GWCS of the image.
         tree : dict
-            The ASDF tree of the input file, or None if `lite` mode is enabled.
+            The ASDF tree of the input file.
         """
         # If file comes from AWS cloud bucket, get HTTP URL to open with asdf
         if (isinstance(input_file, str) and input_file.startswith('s3://')) or isinstance(input_file, S3Path):
@@ -215,20 +199,17 @@ class ASDFCutout(ImageCutout):
         # Get data and GWCS object from ASDF input file
         with asdf.open(input_file) as af:
             tree = deepcopy(af.tree)
-            data = tree[self._mission_kwd]['data']
-            gwcs = tree[self._mission_kwd]['meta'].get('wcs', None)
-            tree = None if self._lite else tree
 
-        return (data, gwcs, tree)
+        return tree
     
-    def _get_cutout_data(self, data: np.ndarray, wcs: WCS, pixel_coords: Tuple[int, int]) -> Cutout2D:
+    def _get_cutout_data(self, tree: dict, wcs: WCS, pixel_coords: Tuple[int, int]) -> Cutout2D:
         """
         Get the cutout data from the input image.
 
         Parameters
         ----------
-        data : array
-            The input image data.
+        tree : dict
+            The ASDF tree of the input file.
         wcs : `~astropy.wcs.WCS`
             The approximated WCS of the input image.
         pixel_coords : tuple
@@ -239,24 +220,60 @@ class ASDFCutout(ImageCutout):
         img_cutout : `~astropy.nddata.Cutout2D`
             The cutout object.
         """
-        log.debug('Original image shape: %s', data.shape)
+        def _make_cutout(array, position, wcs):
+            """Helper to generate a Cutout2D and return plain ndarray data."""
+            cutout = Cutout2D(
+                array,
+                position=position,
+                wcs=wcs,
+                size=(self._cutout_size[1], self._cutout_size[0]),
+                mode="partial",
+                fill_value=self._fill_value,
+                copy=True,
+            )
+            if isinstance(cutout.data, Quantity):
+                cutout.data = cutout.data.value
+            # Strip units if present
+            return cutout
 
-        # Using `~astropy.nddata.Cutout2D` to get the cutout data and handle WCS
-        # Passing in pixel coordinates that were calculated using the original GWCS object,
-        # so the approximate WCS object will not be used to calculate the pixel coordinates 
-        # of the cutout center. Approximate WCS will be used in calculation of cutout bounds 
-        # if cutout size is given in angular units.
-        img_cutout = Cutout2D(data,
-                              position=pixel_coords,
-                              wcs=wcs,
-                              size=(self._cutout_size[1], self._cutout_size[0]),
-                              mode='partial',
-                              copy=True,
-                              fill_value=self._fill_value)
-        
-        log.debug('Image cutout shape: %s', img_cutout.shape)
+        keys = list(tree[self._mission_kwd].keys()) if not self._lite else ['data']
+        data_shape = tree[self._mission_kwd]['data'].shape
 
-        return img_cutout
+        data_cutout = None  # Initialize cutout variable
+        for key in keys:
+            obj = tree[self._mission_kwd][key]
+            if not isinstance(obj, np.ndarray):
+                continue
+
+            shape = obj.shape
+            is_data = key == 'data'
+
+            if shape[-2:] != data_shape[-2:]:
+                continue  # Skip arrays not aligned with science data
+
+            log.debug(f'Original {key} shape: {shape}')
+
+            if obj.ndim == 2:
+                # Simple 2D cutout
+                cutout = _make_cutout(obj, pixel_coords, wcs if is_data else None)
+                tree[self._mission_kwd][key] = cutout.data
+                if is_data:
+                    data_cutout = cutout
+                log.debug(f'{key} cutout shape: {cutout.shape}')
+
+            else:
+                # Cube or higher dimension array
+                new_shape = obj.shape[:-2] + (self._cutout_size[1], self._cutout_size[0])
+                cutout_cube = np.full(new_shape, self._fill_value, dtype=obj.dtype)
+
+                for idx in np.ndindex(obj.shape[:-2]):
+                    cutout = _make_cutout(obj[idx], pixel_coords, None)
+                    cutout_cube[idx] = cutout.data
+
+                tree[self._mission_kwd][key] = cutout_cube
+                log.debug(f'{key} cutout shape: {cutout_cube.shape}')
+
+        return data_cutout
 
     def _slice_gwcs(self, cutout: Cutout2D, gwcs: gwcs.wcs.WCS) -> gwcs.wcs.WCS:
         """ 
@@ -308,9 +325,10 @@ class ASDFCutout(ImageCutout):
             The input file to create a cutout from.
         """
         # Load the data from the input file
-        data, gwcs, tree = self._load_file_data(file)
+        tree = self._load_file_data(file)
 
         # Skip if the file does not contain a GWCS object
+        gwcs = tree[self._mission_kwd]['meta'].get('wcs', None)
         if gwcs is None:
             warnings.warn(f'File {file} does not contain a GWCS object. Skipping...',
                           DataWarning)
@@ -321,36 +339,31 @@ class ASDFCutout(ImageCutout):
 
         # Create the cutout
         try:
-            cutout2D = self._get_cutout_data(data, wcs, pixel_coords)
+            data_cutout = self._get_cutout_data(tree, wcs, pixel_coords)
         except NoOverlapError:
             warnings.warn(f'Cutout footprint does not overlap with data in {file}, skipping...',
                           DataWarning)
             return
         
         # Check that there is data in the cutout image
-        if (cutout2D.data == 0).all() or (np.isnan(cutout2D.data)).all():
+        if (data_cutout.data == 0).all() or (np.isnan(data_cutout.data)).all():
             warnings.warn(f'Cutout of {file} contains no data, skipping...',
                           DataWarning)
             return
 
-        # Convert Quantity data to ndarray
-        if isinstance(cutout2D.data, Quantity):
-            cutout2D.data = cutout2D.data.value
-
         # Store the Cutout2D object
-        self.cutouts.append(cutout2D)
+        self.cutouts.append(data_cutout)
 
         # Store the original GWCS to use if creating asdf.AsdfFile objects
         self._gwcs_objects.append(gwcs)
 
         # Store the ASDF tree for this cutout
         if not self._lite:
-            tree[self._mission_kwd]['data'] = cutout2D.data
-            tree[self._mission_kwd]['meta']['wcs'] = self._slice_gwcs(cutout2D, gwcs)
+            tree[self._mission_kwd]['meta']['wcs'] = self._slice_gwcs(data_cutout, gwcs)
             self._asdf_trees.append(tree)
 
         # Store cutout with filename
-        self.cutouts_by_file[file] = [cutout2D]
+        self.cutouts_by_file[file] = [data_cutout]
 
     def cutout(self) -> Union[str, List[str], List[fits.HDUList]]:
         """
@@ -562,9 +575,12 @@ def asdf_cut(input_files: List[Union[str, Path, S3Path]],
         Default None. Security token for S3 file system. Only applicable if `input_file` is a
         cloud resource.
     lite : bool
-        Optional, default False. If True, the cutout will be created in "lite" mode,
-        which means that the cutout will not contain the full ASDF metadata. The cutout will
-        only contain the data and an updated world coordinate system.
+        Optional, default False. By default, the class creates cutouts of all arrays in the input
+        file (e.g., data, error, uncertainty, variance, etc.) where the last two dimensions match the 
+        shape of the science data array. It also preserves all of the metadata from the input file.
+
+        If this parameter is True, the cutout will be created in "lite" mode,
+        which means that it will only contain the data and an updated world coordinate system.
     verbose : bool
         Default False. If True, intermediate information is printed.
 
