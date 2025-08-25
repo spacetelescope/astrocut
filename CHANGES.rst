@@ -3,7 +3,7 @@
 
 - Bugfix for transposed GWCS bounding box for ASDF cutouts. [#160]
 - Bugfix to correct ``array_shape`` and ``pixel_shape`` for GWCS objects. [#160]
-- By default, ASDF cutouts now preserve all arrays in the input file (e.g., data, error, uncertainty, variance, etc.) 
+- By default, ``ASDFCutout`` makes cutouts of all arrays in the input file (e.g., data, error, uncertainty, variance, etc.)
   where the last two dimensions match the shape of the science data array. [#158]
 - By default, ASDF cutouts now preserve all metadata from the input file. [#158]
 - Add ``lite`` parameter to ``ASDFCutout`` to create minimal cutouts with only the science data and updated world coordinate system. [#158]
