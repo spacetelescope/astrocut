@@ -168,10 +168,12 @@ def test_asdf_cutout_write_to_file(test_images, center_coord, cutout_size, tmpdi
             for key in ['data', 'dq', 'err', 'context']:
                 assert key in af['roman']
                 assert np.all(af['roman'][key] == cutout.cutouts[i].data)
-            assert af['roman']['meta']['wcs'].pixel_shape == (10, 10)
-            assert af['roman']['meta']['product_type'] == 'l2'
-            assert af['roman']['meta']['file_date'] == Time('2023-10-01T00:00:00', format='isot')
-            assert af['roman']['meta']['origin'] == 'STSCI/SOC'
+            meta = af['roman']['meta']
+            assert meta['wcs'].pixel_shape == (10, 10)
+            assert meta['product_type'] == 'l2'
+            assert meta['file_date'] == Time('2023-10-01T00:00:00', format='isot')
+            assert meta['origin'] == 'STSCI/SOC'
+            assert meta['orig_file'] == test_images[i].as_posix()
             # Check file size is smaller than original
             assert Path(asdf_file).stat().st_size < Path(test_images[i]).stat().st_size
 
@@ -184,6 +186,7 @@ def test_asdf_cutout_write_to_file(test_images, center_coord, cutout_size, tmpdi
             assert np.all(hdul[0].data == cutout.cutouts[i].data)
             assert hdul[0].header['NAXIS1'] == 10
             assert hdul[0].header['NAXIS2'] == 10
+            assert hdul[0].header['ORIG_FLE'] == test_images[i].as_posix()
             assert Path(fits_file).stat().st_size < Path(test_images[i]).stat().st_size
 
 
@@ -194,8 +197,10 @@ def test_asdf_cutout_lite(test_images, center_coord, cutout_size, tmpdir):
         assert 'roman' in af
         assert 'data' in af['roman']
         assert 'meta' in af['roman']
+        assert 'wcs' in af['roman']['meta']
+        assert 'orig_file' in af['roman']['meta']
         assert len(af['roman']) == 2  # only data and meta
-        assert len(af['roman']['meta']) == 1  # only wcs
+        assert len(af['roman']['meta']) == 2  # only wcs and original filename
 
     # Write cutouts to HDUList objects in lite mode
     cutout = ASDFCutout(test_images, center_coord, cutout_size, lite=True)

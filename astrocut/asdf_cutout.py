@@ -106,10 +106,14 @@ class ASDFCutout(ImageCutout):
         """
         if not self._fits_cutouts:
             fits_cutouts = []
-            for cutout in self.cutouts:
+            for file, cutouts in self.cutouts_by_file.items():
                 # TODO: Create a FITS object with ASDF extension
                 # Create a primary FITS header to hold data and WCS
+                cutout = cutouts[0]
                 primary_hdu = fits.PrimaryHDU(data=cutout.data, header=cutout.wcs.to_header(relax=True))
+
+                # Add original file to header
+                primary_hdu.header['ORIG_FLE'] = str(file)
 
                 # Write to HDUList
                 fits_cutouts.append(fits.HDUList([primary_hdu]))
@@ -123,11 +127,13 @@ class ASDFCutout(ImageCutout):
         """
         if not self._asdf_cutouts:
             asdf_cutouts = []
-            for i, cutout in enumerate(self.cutouts):
+            for i, (file, cutouts) in enumerate(self.cutouts_by_file.items()):
+                cutout = cutouts[0]
                 if self._lite:
                     tree = {
                         self._mission_kwd: {
-                            'meta': {'wcs': self._slice_gwcs(cutout, self._gwcs_objects[i])},
+                            'meta': {'wcs': self._slice_gwcs(cutout, self._gwcs_objects[i]),
+                                     'orig_file': str(file)},
                             'data': cutout.data
                         }
                     }
@@ -202,6 +208,40 @@ class ASDFCutout(ImageCutout):
 
         return tree
     
+    def _make_cutout(self, array, position, wcs):
+        """
+        Helper to generate a Cutout2D and return plain ndarray data.
+
+        Parameters
+        ----------
+        array : np.ndarray
+            The input data array.
+        position : tuple
+            The (x, y) position of the cutout center.
+        wcs : WCS
+            The WCS object associated with the input array.
+
+        Returns
+        -------
+        cutout : Cutout2D
+            The generated cutout.
+        """
+        cutout = Cutout2D(
+            array,
+            position=position,
+            wcs=wcs,
+            size=(self._cutout_size[1], self._cutout_size[0]),
+            mode="partial",
+            fill_value=self._fill_value,
+            copy=True,
+        )
+
+        # Strip units if present
+        if isinstance(cutout.data, Quantity):
+            cutout.data = cutout.data.value
+
+        return cutout
+    
     def _get_cutout_data(self, tree: dict, wcs: WCS, pixel_coords: Tuple[int, int]) -> Cutout2D:
         """
         Get the cutout data from the input image.
@@ -220,22 +260,6 @@ class ASDFCutout(ImageCutout):
         img_cutout : `~astropy.nddata.Cutout2D`
             The cutout object.
         """
-        def _make_cutout(array, position, wcs):
-            """Helper to generate a Cutout2D and return plain ndarray data."""
-            cutout = Cutout2D(
-                array,
-                position=position,
-                wcs=wcs,
-                size=(self._cutout_size[1], self._cutout_size[0]),
-                mode="partial",
-                fill_value=self._fill_value,
-                copy=True,
-            )
-            if isinstance(cutout.data, Quantity):
-                cutout.data = cutout.data.value
-            # Strip units if present
-            return cutout
-
         keys = list(tree[self._mission_kwd].keys()) if not self._lite else ['data']
         data_shape = tree[self._mission_kwd]['data'].shape
 
@@ -255,7 +279,7 @@ class ASDFCutout(ImageCutout):
 
             if obj.ndim == 2:
                 # Simple 2D cutout
-                cutout = _make_cutout(obj, pixel_coords, wcs if is_data else None)
+                cutout = self._make_cutout(obj, pixel_coords, wcs if is_data else None)
                 tree[self._mission_kwd][key] = cutout.data
                 if is_data:
                     data_cutout = cutout
@@ -267,7 +291,7 @@ class ASDFCutout(ImageCutout):
                 cutout_cube = np.full(new_shape, self._fill_value, dtype=obj.dtype)
 
                 for idx in np.ndindex(obj.shape[:-2]):
-                    cutout = _make_cutout(obj[idx], pixel_coords, None)
+                    cutout = self._make_cutout(obj[idx], pixel_coords, None)
                     cutout_cube[idx] = cutout.data
 
                 tree[self._mission_kwd][key] = cutout_cube
@@ -360,6 +384,7 @@ class ASDFCutout(ImageCutout):
         # Store the ASDF tree for this cutout
         if not self._lite:
             tree[self._mission_kwd]['meta']['wcs'] = self._slice_gwcs(data_cutout, gwcs)
+            tree[self._mission_kwd]['meta']['orig_file'] = str(file)
             self._asdf_trees.append(tree)
 
         # Store cutout with filename
