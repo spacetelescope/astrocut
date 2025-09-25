@@ -93,6 +93,7 @@ def test_images(tmp_path, fakedata):
             'file_date': Time('2023-10-01T00:00:00', format='isot')}
 
     # create and write the asdf file
+    # testing changelog
     tree = {'roman': {'meta': meta, 
                       'data': data, 
                       'dq': data, 
