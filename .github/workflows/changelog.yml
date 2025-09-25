@@ -11,7 +11,7 @@ concurrency:
 jobs:
   changelog:
     name: Check changelog entry
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     steps:
     - name: Check change log entry
       uses: scientific-python/action-check-changelogfile@1fc669db9618167166d5a16c10282044f51805c0  # 0.3
