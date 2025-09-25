@@ -121,3 +121,14 @@ jobs:
         run: python -m pip install --upgrade tox codecov
       - name: Run tests
         run: tox ${{ matrix.toxargs }} -e ${{ matrix.toxenv }} -- ${{ matrix.toxposargs }}
+
+  changelog:
+    name: Check changelog entry
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check changelog entry
+        uses: scientific-python/action-check-changelogfile@1fc669db9618167166d5a16c10282044f51805c0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CHANGELOG_FILENAME: CHANGES.rst
+          CHECK_MILESTONE: false
