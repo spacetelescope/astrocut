@@ -1,5 +1,9 @@
-1.1.0 (Unreleased)
--------------------
+Unreleased
+----------
+
+
+1.1.0 (2025-09-15)
+------------------
 
 - Bugfix for transposed GWCS bounding box for ASDF cutouts. [#160]
 - Bugfix to correct ``array_shape`` and ``pixel_shape`` for GWCS objects. [#160]
@@ -19,6 +23,7 @@
 
 - Bugfix so ``ASDFCutout.get_center_pixel`` preserves the GWCS bounding box. [#154]
 - Bugfix in ``ASDFCutout`` to use deep copies of data and GWCS to avoid links to original ASDF input.
+
 
 1.0.0 (2025-04-28)
 -------------------
