@@ -10,6 +10,7 @@ from astropy.coordinates import SkyCoord
 from astropy.table import Table, Column
 from cachetools import TTLCache, cached
 from spherical_geometry.polygon import SphericalPolygon
+from spherical_geometry.vector import radec_to_vector
 
 from .cutout import Cutout
 
@@ -193,7 +194,7 @@ def get_ffis(s3_footprint_cache: str) -> Table:
     return ffis
 
 
-def ra_dec_crossmatch(all_ffis: Table, coordinates: SkyCoord, cutout_size, arcsec_per_px: int = 21) -> Table:
+def ra_dec_crossmatch(all_ffis: Table, coordinates: Union[SkyCoord, str], cutout_size, arcsec_per_px: int = 21) -> Table:
     """
     Returns the Full Frame Images (FFIs) whose footprints overlap with a cutout of a given position and size.
 
@@ -208,7 +209,7 @@ def ra_dec_crossmatch(all_ffis: Table, coordinates: SkyCoord, cutout_size, arcse
     cutout_size : int, array-like, `~astropy.units.Quantity`
         The size of the cutout array. If ``cutout_size``
         is a scalar number or a scalar `~astropy.units.Quantity`,
-        then a square cutout of ``cutout_size`` will be created.  If
+        then a square cutout of ``cutout_size`` will be used.  If
         ``cutout_size`` has two elements, they should be in ``(ny, nx)``
         order.  Scalar numbers in ``cutout_size`` are assumed to be in
         units of pixels. `~astropy.units.Quantity` objects must be in pixel or
@@ -228,27 +229,50 @@ def ra_dec_crossmatch(all_ffis: Table, coordinates: SkyCoord, cutout_size, arcse
         coordinates = SkyCoord(coordinates, unit='deg')
     ra, dec = coordinates.ra, coordinates.dec
 
-    # Parse cutout size
-    cutout_size = Cutout._parse_size_input(cutout_size)
+    px_size = np.zeros(2, dtype=object)
+    for axis, size in enumerate(Cutout._parse_size_input(cutout_size, allow_zero=True)):
+        if isinstance(size, u.Quantity):  # If Quantity, convert to pixels
+            if size.unit == u.pixel:
+                px_size[axis] = size.value
+            else:  # Angular size
+                # Convert angular size to pixels
+                px_size[axis] = (size.to_value(u.arcsec)) / arcsec_per_px
+        else:  # Assume pixels
+            px_size[axis] = size
 
-    # Create polygon for intersection
-    # Convert dimensions from pixels to arcseconds and divide by 2 to get offset from center
-    ra_offset = ((cutout_size[0] * arcsec_per_px) / 2) * u.arcsec
-    dec_offset = ((cutout_size[1] * arcsec_per_px) / 2) * u.arcsec
+    if np.all(px_size == 0):
+        # A single point
+        ffi_inds = []
+        vector_coord = radec_to_vector(ra, dec)
+        for sector in np.unique(all_ffis['sequence_number']):
+            # Returns a 2-long array where the first element is indexes and the 2nd element is empty
+            sector_ffi_inds = np.where(all_ffis['sequence_number'] == sector)[0]
 
-    # Calculate RA and Dec boundaries
-    ra_bounds = [ra - ra_offset, ra + ra_offset]
-    dec_bounds = [dec - dec_offset, dec + dec_offset]
+            for ind in sector_ffi_inds:
+                if all_ffis[ind]["polygon"].contains_point(vector_coord):
+                    ffi_inds.append(ind)
+                    break  # the ra/dec will only be on one ccd per sector
+    else:
+        # Create polygon for intersection
+        # Convert dimensions from pixels to arcseconds and divide by 2 to get offset from center
+        # If one of the dimensions is 0, use a very small value to avoid issues with SphericalPolygon
+        min_offset = 0.1  # pixels
+        ra_offset = ((max(px_size[0], min_offset) * arcsec_per_px) / 2) * u.arcsec
+        dec_offset = ((max(px_size[1], min_offset) * arcsec_per_px) / 2) * u.arcsec
 
-    # Get RA and Dec for four corners of rectangle
-    ras = [ra_bounds[0].value, ra_bounds[1].value, ra_bounds[1].value, ra_bounds[0].value]
-    decs = [dec_bounds[0].value, dec_bounds[0].value, dec_bounds[1].value, dec_bounds[1].value]
+        # Calculate RA and Dec boundaries
+        ra_bounds = [ra - ra_offset, ra + ra_offset]
+        dec_bounds = [dec - dec_offset, dec + dec_offset]
 
-    # Create SphericalPolygon for comparison
-    cutout_fp = SphericalPolygon.from_radec(ras, decs, center=(ra, dec))
+        # Get RA and Dec for four corners of rectangle
+        ras = [ra_bounds[0].value, ra_bounds[1].value, ra_bounds[1].value, ra_bounds[0].value]
+        decs = [dec_bounds[0].value, dec_bounds[0].value, dec_bounds[1].value, dec_bounds[1].value]
 
-    # Find indices of FFIs that intersect with the cutout
-    ffi_inds = np.vectorize(lambda ffi: ffi.intersects_poly(cutout_fp))(all_ffis['polygon'])
-    ffi_inds = FootprintCutout._ffi_intersect(all_ffis, cutout_fp)
+        # Create SphericalPolygon for comparison
+        cutout_fp = SphericalPolygon.from_radec(ras, decs, center=(ra, dec))
+
+        # Find indices of FFIs that intersect with the cutout
+        ffi_inds = np.vectorize(lambda ffi: ffi.intersects_poly(cutout_fp))(all_ffis['polygon'])
+        ffi_inds = FootprintCutout._ffi_intersect(all_ffis, cutout_fp)
 
     return all_ffis[ffi_inds]
