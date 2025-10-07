@@ -194,7 +194,7 @@ def get_ffis(s3_footprint_cache: str) -> Table:
     return ffis
 
 
-def _crossmatch_point(ra: SkyCoord, dec: SkyCoord, all_ffis: Table) -> List[int]:
+def _crossmatch_point(ra: SkyCoord, dec: SkyCoord, all_ffis: Table) -> np.ndarray:
     """
     Returns the indices of the Full Frame Images (FFIs) that contain the given RA and
     Dec coordinates by checking which FFI polygons contain the point.
