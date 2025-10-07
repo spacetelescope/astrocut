@@ -61,7 +61,7 @@ class Cutout(ABC):
         log.debug('Coordinates: %s', self._coordinates)
 
         # Turning the cutout size into an array of two values
-        self._cutout_size = self._parse_size_input(cutout_size)
+        self._cutout_size = self.parse_size_input(cutout_size)
         log.debug('Cutout size: %s', self._cutout_size)
 
         # Assigning other attributes
@@ -150,7 +150,7 @@ class Cutout(ABC):
         raise NotImplementedError('Subclasses must implement this method.')
 
     @staticmethod
-    def _parse_size_input(cutout_size):
+    def parse_size_input(cutout_size, *, allow_zero: bool = False) -> np.ndarray:
         """
         Makes the given cutout size into a length 2 array.
 
@@ -162,6 +162,8 @@ class Cutout(ABC):
             If ``cutout_size`` has two elements, they should be in ``(ny, nx)`` order.  Scalar numbers 
             in ``cutout_size`` are assumed to be in units of pixels. `~astropy.units.Quantity` objects 
             must be in pixel or angular units.
+        allow_zero : bool, optional
+            If True, allows cutout dimensions to be zero. Default is False.
 
         Returns
         -------
@@ -186,7 +188,7 @@ class Cutout(ABC):
         
         for dim in cutout_size:
             # Raise error if either dimension is not a positive number
-            if dim <= 0:
+            if dim < 0 or (not allow_zero and dim == 0):
                 raise InvalidInputError('Cutout size dimensions must be greater than zero. '
                                         f'Provided size: ({cutout_size[0]}, {cutout_size[1]})')
             
