@@ -61,7 +61,7 @@ class Cutout(ABC):
         log.debug('Coordinates: %s', self._coordinates)
 
         # Turning the cutout size into an array of two values
-        self._cutout_size = self._parse_size_input(cutout_size)
+        self._cutout_size = self.parse_size_input(cutout_size)
         log.debug('Cutout size: %s', self._cutout_size)
 
         # Assigning other attributes
@@ -150,7 +150,7 @@ class Cutout(ABC):
         raise NotImplementedError('Subclasses must implement this method.')
 
     @staticmethod
-    def _parse_size_input(cutout_size, *, allow_zero: bool = False) -> np.ndarray:
+    def parse_size_input(cutout_size, *, allow_zero: bool = False) -> np.ndarray:
         """
         Makes the given cutout size into a length 2 array.
 

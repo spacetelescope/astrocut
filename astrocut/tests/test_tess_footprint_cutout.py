@@ -1,6 +1,7 @@
 from pathlib import Path
 import pytest
 import re
+from unittest.mock import MagicMock
 
 import astropy.units as u
 import numpy as np
@@ -9,6 +10,7 @@ from astropy.io import fits
 from astropy.table import Table
 from spherical_geometry.polygon import SphericalPolygon
 
+from .. import footprint_cutout
 from ..cube_cutout import CubeCutout
 from ..exceptions import InvalidInputError, InvalidQueryError
 from ..footprint_cutout import get_ffis, ra_dec_crossmatch
@@ -26,6 +28,27 @@ def cutout_size():
 def coordinates():
     """Fixture to return the coordinates at the center of the images"""
     return SkyCoord('350 -80', unit='deg')
+
+
+@pytest.fixture
+def all_ffis(scope='module'):
+    """Fixture to return the table of all FFIs"""
+    return get_ffis('s3://stpubdata/tess/public/footprints/tess_ffi_footprint_cache.json')
+
+
+@pytest.fixture
+def crossmatch_spies(monkeypatch):
+    # wrap real functions with MagicMocks that call the real implementation
+    real_point = footprint_cutout._crossmatch_point
+    real_poly = footprint_cutout._crossmatch_polygon
+
+    spy_point = MagicMock(side_effect=real_point)
+    spy_poly = MagicMock(side_effect=real_poly)
+
+    monkeypatch.setattr(footprint_cutout, "_crossmatch_point", spy_point)
+    monkeypatch.setattr(footprint_cutout, "_crossmatch_polygon", spy_poly)
+
+    yield spy_point, spy_poly
 
 
 def check_output_tpf(tpf, sequences=[], cutout_size=5):
@@ -79,33 +102,27 @@ def test_ffi_intersect(lon, lat, center, expected):
     assert intersection.value[0] == expected
 
 
-def test_ra_dec_crossmatch(coordinates, cutout_size):
-    all_ffis = get_ffis('s3://stpubdata/tess/public/footprints/tess_ffi_footprint_cache.json')
-
+@pytest.mark.parametrize("cutout_size", [0, 0 * u.arcmin, [0, 0], (0, 0), (0*u.pix, 0*u.pix), 
+                                         [0*u.arcsec, 0*u.arcsec], np.array([0, 0])])
+def test_ra_dec_crossmatch_point(coordinates, all_ffis, cutout_size, crossmatch_spies):
+    spy_point, spy_poly = crossmatch_spies
+    
     # Cutout size of 0 should do a point match
-    point_results = ra_dec_crossmatch(all_ffis, coordinates, 0, 21)
-    len_point_results = len(point_results)
-    assert isinstance(point_results, Table)
+    results = ra_dec_crossmatch(all_ffis, coordinates, cutout_size)
+    assert isinstance(results, Table)
+    spy_point.assert_called_once()
+    spy_poly.assert_not_called()
 
-    # Try cutout size of 0 in different forms
-    zero_sizes = [0 * u.arcmin, [0, 0], (0, 0), (0*u.pix, 0*u.pix), [0*u.arcsec, 0*u.arcsec], np.array([0, 0])]
-    for size in zero_sizes:
-        results = ra_dec_crossmatch(all_ffis, coordinates, size)
-        assert len(results) == len_point_results
 
-    # Coordinates as string
-    str_results = ra_dec_crossmatch(all_ffis, '350 -80', 0)
-    assert len(str_results) == len_point_results
-
-    # Cutout size > 0 should do an intersection match
-    # Should intersect with more sectors than point match
-    intersect_results = ra_dec_crossmatch(all_ffis, coordinates, 100)
-    assert len(intersect_results) > len_point_results
-
-    # Cutout size with one zero axis should check along a rectangle with a small width in that axis
-    # Should intersect with more sectors than point match
-    line_results = ra_dec_crossmatch(all_ffis, coordinates, (0, 100))
-    assert len(line_results) > len_point_results
+@pytest.mark.parametrize("cutout_size", [5, 5 * u.arcmin, [5, 5], [5*u.arcsec, 5*u.arcsec], (5, 0), (5, 0)])
+def test_ra_dec_crossmatch_poly(all_ffis, cutout_size, crossmatch_spies):
+    spy_point, spy_poly = crossmatch_spies
+    
+    # Cutout size of 0 should do a point match
+    results = ra_dec_crossmatch(all_ffis, '350 -80', cutout_size)
+    assert isinstance(results, Table)
+    spy_poly.assert_called_once()
+    spy_point.assert_not_called()
 
 
 def test_tess_footprint_cutout(cutout_size, caplog):

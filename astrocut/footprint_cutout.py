@@ -194,6 +194,89 @@ def get_ffis(s3_footprint_cache: str) -> Table:
     return ffis
 
 
+def _crossmatch_point(ra: SkyCoord, dec: SkyCoord, all_ffis: Table) -> List[int]:
+    """
+    Returns the indices of the Full Frame Images (FFIs) that contain the given RA and
+    Dec coordinates by checking which FFI polygons contain the point.
+    
+    Parameters
+    ----------
+    ra : SkyCoord
+        Right Ascension in degrees.
+    dec : SkyCoord
+        Declination in degrees.
+    all_ffis : `~astropy.table.Table`
+        Table of FFIs to crossmatch with the point.
+        
+    Returns
+    -------
+    ffi_inds : `~numpy.ndarray`
+        Indices of FFIs that contain the given RA and Dec coordinates.
+    """
+    ffi_inds = []
+    vector_coord = radec_to_vector(ra, dec)
+    for sector in np.unique(all_ffis['sequence_number']):
+        # Returns a 2-long array where the first element is indexes and the 2nd element is empty
+        sector_ffi_inds = np.where(all_ffis['sequence_number'] == sector)[0]
+
+        for ind in sector_ffi_inds:
+            if all_ffis[ind]["polygon"].contains_point(vector_coord):
+                ffi_inds.append(ind)
+                break  # the ra/dec will only be on one ccd per sector
+    return np.array(ffi_inds, dtype=int)
+
+
+def _crossmatch_polygon(ra: SkyCoord, dec: SkyCoord, all_ffis: Table, px_size: np.ndarray,
+                        arcsec_per_px: int = 21) -> np.ndarray:
+    """
+    Returns the indices of the Full Frame Images (FFIs) that intersect with the given cutout footprint
+    by checking which FFI polygons intersect with the cutout polygon.
+
+    Parameters
+    ----------
+    ra : SkyCoord
+        Right Ascension in degrees.
+    dec : SkyCoord
+        Declination in degrees.
+    all_ffis : `~astropy.table.Table`
+        Table of FFIs to crossmatch with the point.
+    px_size : array-like
+        Size of the cutout in pixels, in the form [ny, nx].
+    arcsec_per_px : int, optional
+        Default 21. The number of arcseconds per pixel in an image. Used to determine
+        the footprint of the cutout. Default is the number of arcseconds per pixel in
+        a TESS image.
+
+    Returns
+    -------
+    ffi_inds : `~numpy.ndarray`
+        Boolean array indicating whether each FFI intersects with the cutout.
+    """
+    # Create polygon for intersection
+    # Convert dimensions from pixels to arcseconds and divide by 2 to get offset from center
+    # If one of the dimensions is 0, use a very small value to avoid issues with SphericalPolygon
+    min_offset = 0.1  # pixels
+    ra_offset = ((max(px_size[0], min_offset) * arcsec_per_px) / 2) * u.arcsec
+    dec_offset = ((max(px_size[1], min_offset) * arcsec_per_px) / 2) * u.arcsec
+
+    # Calculate RA and Dec boundaries
+    ra_bounds = [ra - ra_offset, ra + ra_offset]
+    dec_bounds = [dec - dec_offset, dec + dec_offset]
+
+    # Get RA and Dec for four corners of rectangle
+    ras = [ra_bounds[0].value, ra_bounds[1].value, ra_bounds[1].value, ra_bounds[0].value]
+    decs = [dec_bounds[0].value, dec_bounds[0].value, dec_bounds[1].value, dec_bounds[1].value]
+
+    # Create SphericalPolygon for comparison
+    cutout_fp = SphericalPolygon.from_radec(ras, decs, center=(ra, dec))
+
+    # Find indices of FFIs that intersect with the cutout
+    ffi_inds = np.vectorize(lambda ffi: ffi.intersects_poly(cutout_fp))(all_ffis['polygon'])
+    ffi_inds = FootprintCutout._ffi_intersect(all_ffis, cutout_fp)
+
+    return ffi_inds
+
+
 def ra_dec_crossmatch(all_ffis: Table, coordinates: Union[SkyCoord, str], cutout_size, 
                       arcsec_per_px: int = 21) -> Table:
     """
@@ -235,7 +318,7 @@ def ra_dec_crossmatch(all_ffis: Table, coordinates: Union[SkyCoord, str], cutout
     ra, dec = coordinates.ra, coordinates.dec
 
     px_size = np.zeros(2, dtype=object)
-    for axis, size in enumerate(Cutout._parse_size_input(cutout_size, allow_zero=True)):
+    for axis, size in enumerate(Cutout.parse_size_input(cutout_size, allow_zero=True)):
         if isinstance(size, u.Quantity):  # If Quantity, convert to pixels
             if size.unit == u.pixel:
                 px_size[axis] = size.value
@@ -246,38 +329,10 @@ def ra_dec_crossmatch(all_ffis: Table, coordinates: Union[SkyCoord, str], cutout
             px_size[axis] = size
 
     if np.all(px_size == 0):
-        # A single point
-        ffi_inds = []
-        vector_coord = radec_to_vector(ra, dec)
-        for sector in np.unique(all_ffis['sequence_number']):
-            # Returns a 2-long array where the first element is indexes and the 2nd element is empty
-            sector_ffi_inds = np.where(all_ffis['sequence_number'] == sector)[0]
-
-            for ind in sector_ffi_inds:
-                if all_ffis[ind]["polygon"].contains_point(vector_coord):
-                    ffi_inds.append(ind)
-                    break  # the ra/dec will only be on one ccd per sector
+        # Cross match with point
+        ffi_inds = _crossmatch_point(ra, dec, all_ffis)
     else:
-        # Create polygon for intersection
-        # Convert dimensions from pixels to arcseconds and divide by 2 to get offset from center
-        # If one of the dimensions is 0, use a very small value to avoid issues with SphericalPolygon
-        min_offset = 0.1  # pixels
-        ra_offset = ((max(px_size[0], min_offset) * arcsec_per_px) / 2) * u.arcsec
-        dec_offset = ((max(px_size[1], min_offset) * arcsec_per_px) / 2) * u.arcsec
-
-        # Calculate RA and Dec boundaries
-        ra_bounds = [ra - ra_offset, ra + ra_offset]
-        dec_bounds = [dec - dec_offset, dec + dec_offset]
-
-        # Get RA and Dec for four corners of rectangle
-        ras = [ra_bounds[0].value, ra_bounds[1].value, ra_bounds[1].value, ra_bounds[0].value]
-        decs = [dec_bounds[0].value, dec_bounds[0].value, dec_bounds[1].value, dec_bounds[1].value]
-
-        # Create SphericalPolygon for comparison
-        cutout_fp = SphericalPolygon.from_radec(ras, decs, center=(ra, dec))
-
-        # Find indices of FFIs that intersect with the cutout
-        ffi_inds = np.vectorize(lambda ffi: ffi.intersects_poly(cutout_fp))(all_ffis['polygon'])
-        ffi_inds = FootprintCutout._ffi_intersect(all_ffis, cutout_fp)
+        # Cross match with polygon
+        ffi_inds = _crossmatch_polygon(ra, dec, all_ffis, px_size, arcsec_per_px)
 
     return all_ffis[ffi_inds]
