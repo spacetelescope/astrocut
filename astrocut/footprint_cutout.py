@@ -194,7 +194,8 @@ def get_ffis(s3_footprint_cache: str) -> Table:
     return ffis
 
 
-def ra_dec_crossmatch(all_ffis: Table, coordinates: Union[SkyCoord, str], cutout_size, arcsec_per_px: int = 21) -> Table:
+def ra_dec_crossmatch(all_ffis: Table, coordinates: Union[SkyCoord, str], cutout_size, 
+                      arcsec_per_px: int = 21) -> Table:
     """
     Returns the Full Frame Images (FFIs) whose footprints overlap with a cutout of a given position and size.
 
@@ -214,6 +215,10 @@ def ra_dec_crossmatch(all_ffis: Table, coordinates: Union[SkyCoord, str], cutout
         order.  Scalar numbers in ``cutout_size`` are assumed to be in
         units of pixels. `~astropy.units.Quantity` objects must be in pixel or
         angular units.
+
+        If a cutout size of zero is provided, the function will return FFIs that contain 
+        the exact RA and Dec position. If a non-zero cutout size is provided, the function 
+        will return FFIs whose footprints overlap with the cutout area.
     arcsec_per_px : int, optional
         Default 21. The number of arcseconds per pixel in an image. Used to determine
         the footprint of the cutout. Default is the number of arcseconds per pixel in
