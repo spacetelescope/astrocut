@@ -13,7 +13,6 @@ from astropy import wcs
 from astropy.io import fits
 from s3path import S3Path
 from astropy.coordinates import SkyCoord
-import numpy as np
 
 from astrocut.exceptions import InputWarning, InvalidInputError, InvalidQueryError
 
