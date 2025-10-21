@@ -389,6 +389,27 @@ class FITSCutout(ImageCutout):
         log.debug('Total time: %.2f sec', monotonic() - start_time)
 
         return self.fits_cutouts
+    
+    def _make_cutout_filename(self, file_stem: str = None) -> str:
+        """
+        Create a cutout filename based on the input file stem, coordinates, and cutout size.
+
+        Parameters
+        ----------
+        file_stem : str
+            The stem of the input file to use in the cutout filename. If None, 'cutout' is used.
+
+        Returns
+        -------
+        filename : str
+            The generated cutout filename.
+        """
+        return '{}_{:.7f}_{:.7f}_{}-x-{}_astrocut.fits'.format(
+            file_stem,
+            self._coordinates.ra.value,
+            self._coordinates.dec.value,
+            str(self._cutout_size[0]).replace(' ', ''),
+            str(self._cutout_size[1]).replace(' ', ''))
 
     def write_as_fits(self, output_dir: Union[str, Path] = '.', cutout_prefix: str = 'cutout') -> List[str]:
         """
@@ -405,12 +426,7 @@ class FITSCutout(ImageCutout):
             log.debug('Returning cutout as a single FITS file.')
 
             cutout_fits = self.fits_cutouts[0]
-            filename = '{}_{:.7f}_{:.7f}_{}-x-{}_astrocut.fits'.format(
-                cutout_prefix,
-                self._coordinates.ra.value,
-                self._coordinates.dec.value,
-                str(self._cutout_size[0]).replace(' ', ''),
-                str(self._cutout_size[1]).replace(' ', ''))
+            filename = self._make_cutout_filename(cutout_prefix)
             cutout_path = Path(output_dir, filename)
             with warnings.catch_warnings():
                 warnings.simplefilter('ignore') 
@@ -424,12 +440,7 @@ class FITSCutout(ImageCutout):
             cutout_paths = []
             for i, file in enumerate(self.hdu_cutouts_by_file):
                 cutout_fits = self.fits_cutouts[i]
-                filename = '{}_{:.7f}_{:.7f}_{}-x-{}_astrocut.fits'.format(
-                    Path(file).stem,
-                    self._coordinates.ra.value,
-                    self._coordinates.dec.value,
-                    str(self._cutout_size[0]).replace(' ', ''), 
-                    str(self._cutout_size[1]).replace(' ', ''))
+                filename = self._make_cutout_filename(Path(file).stem)
                 cutout_path = Path(output_dir, filename)
                 with warnings.catch_warnings():
                     warnings.simplefilter('ignore')
@@ -439,6 +450,39 @@ class FITSCutout(ImageCutout):
 
             log.debug('Cutout filepaths: {}'.format(cutout_paths))
             return cutout_paths
+
+    def write_as_zip(self, output_dir: Union[str, Path] = '.', filename: Union[str, Path, None] = None) -> str:
+        """
+        Package the FITS cutouts into a zip archive without writing intermediate files.
+
+        Parameters
+        ----------
+        output_dir : str | Path, optional
+            Directory where the zip will be created. Default '.'.
+        filename : str | Path | None, optional
+            Name (or path) of the output zip file. If not provided, defaults to
+            'cutouts_{YYYYmmdd_HHMMSS}.zip'. If provided without a '.zip' suffix,
+            the suffix is added automatically.
+
+        Returns
+        -------
+        str
+            Path to the created zip file.
+        """
+        def build_entries():
+            if self._single_outfile:
+                # Mirror the single-file naming used by write_as_fits
+                arcname = self._make_cutout_filename('cutout')
+                hdu = self.fits_cutouts[0]
+                yield arcname, hdu
+            else:
+                # One file per input; mirror write_as_fits naming
+                for i, file in enumerate(self.hdu_cutouts_by_file):
+                    arcname = self._make_cutout_filename(Path(file).stem)
+                    hdu = self.fits_cutouts[i]
+                    yield arcname, hdu
+
+        return super().write_as_zip(output_dir=output_dir, filename=filename, build_entries=build_entries)
         
     class CutoutInstance:
         """

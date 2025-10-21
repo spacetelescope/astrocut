@@ -419,6 +419,31 @@ class ASDFCutout(ImageCutout):
         log.debug('Total time: %.2f sec', monotonic() - start_time)
 
         return self.cutouts
+    
+    def _make_cutout_filename(self, file: Union[str, Path], output_format: str) -> str:
+        """
+        Generate a standardized filename for the cutout.
+
+        Parameters
+        ----------
+        file : str | Path
+            The input file name.
+        output_format : str
+            The output format to write the cutout to. Options are '.fits' and '.asdf'.
+
+        Returns
+        -------
+        filename : str
+            The generated filename for the cutout.
+        """
+        return '{}_{:.7f}_{:.7f}_{}-x-{}{}_astrocut{}'.format(
+            Path(file).stem,
+            self._coordinates.ra.value,
+            self._coordinates.dec.value,
+            str(self._cutout_size[0]).replace(' ', ''), 
+            str(self._cutout_size[1]).replace(' ', ''),
+            '_lite' if self._lite else '',
+            output_format)
 
     def _write_as_format(self, output_format: str, output_dir: Union[str, Path] = '.') -> List[str]:
         """
@@ -440,14 +465,7 @@ class ASDFCutout(ImageCutout):
         cutout_paths = []  # List to store paths to cutout files
         for i, file in enumerate(self.cutouts_by_file):
             # Determine the output path
-            filename = '{}_{:.7f}_{:.7f}_{}-x-{}{}_astrocut{}'.format(
-                Path(file).stem,
-                self._coordinates.ra.value,
-                self._coordinates.dec.value,
-                str(self._cutout_size[0]).replace(' ', ''), 
-                str(self._cutout_size[1]).replace(' ', ''),
-                '_lite' if self._lite else '',
-                output_format)
+            filename = self._make_cutout_filename(file, output_format)
             cutout_path = Path(output_dir, filename)
 
             if output_format == '.fits':
@@ -496,6 +514,42 @@ class ASDFCutout(ImageCutout):
             A list of paths to the cutout ASDF files.
         """
         return self._write_as_format(output_format='.asdf', output_dir=output_dir)
+
+    def write_as_zip(self, output_dir: Union[str, Path] = '.', filename: Union[str, Path, None] = None,
+                     *, format: str = '.asdf') -> str:
+        """
+        Package the ASDF or FITS cutouts into a zip archive without writing intermediates.
+
+        Parameters
+        ----------
+        output_dir : str | Path, optional
+            Directory where the zip will be created. Default '.'.
+        filename : str | Path | None, optional
+            Name (or path) of the output zip file. If not provided, defaults to
+            'cutouts_{YYYYmmdd_HHMMSS}.zip'. If provided without a '.zip' suffix,
+            the suffix is added automatically.
+        format : str, optional
+            Either '.asdf' (default) or '.fits'. Determines which in-memory representation is zipped.
+
+        Returns
+        -------
+        str
+            Path to the created zip file.
+        """
+        fmt = format.lower().strip()
+        fmt = '.' + fmt if not fmt.startswith('.') else fmt
+        if fmt not in ('.asdf', '.fits'):
+            raise InvalidInputError("File format must be either 'asdf' or 'fits'")
+
+        def build_entries():
+            use_fits = fmt == '.fits'
+            objs = self.fits_cutouts if use_fits else self.asdf_cutouts
+
+            for i, file in enumerate(self.cutouts_by_file):
+                arcname = self._make_cutout_filename(file, fmt)
+                yield arcname, objs[i]
+
+        return super().write_as_zip(output_dir=output_dir, filename=filename, build_entries=build_entries)
     
 
 def get_center_pixel(gwcsobj: gwcs.wcs.WCS, ra: float, dec: float) -> Tuple[Tuple[int, int], WCS]:
