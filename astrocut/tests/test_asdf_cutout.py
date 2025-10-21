@@ -191,6 +191,7 @@ def test_asdf_cutout_write_to_file(test_images, center_coord, cutout_size, tmpdi
             assert hdul[0].header['ORIG_FLE'] == test_images[i].as_posix()
             assert Path(fits_file).stat().st_size < Path(test_images[i]).stat().st_size
 
+
 @pytest.mark.parametrize('output_format', ['.asdf', '.fits'])
 def test_asdf_cutout_write_to_zip(tmpdir, test_images, center_coord, cutout_size, output_format):
     # Zip ASDF representations
