@@ -459,6 +459,29 @@ class TessCubeCutout(CubeCutout):
         # Store cutouts with filename
         self.cutouts_by_file[file] = cutout
     
+    def _make_cutout_filename(self, file):
+        """
+        Generate a filename for the cutout based on the original file and cutout parameters.
+
+        Parameters
+        ----------
+        file : str or Path
+            The original cube file path.
+        cutout : CubeCutoutInstance
+            The cutout object.
+
+        Returns
+        -------
+        filename : str
+            The generated cutout filename.
+        """
+        return '{}_{:7f}_{:7f}_{}-x-{}_astrocut.fits'.format(
+            Path(file).stem.rstrip('-cube'),
+            self._coordinates.ra.value,
+            self._coordinates.dec.value,
+            str(self._cutout_size[0]).replace(' ', ''),
+            str(self._cutout_size[1]).replace(' ', ''))
+    
     def write_as_tpf(self, output_dir: Union[str, Path] = '.', output_file: str = None):
         """
         Write the cutouts to disk as target pixel files.
@@ -487,15 +510,7 @@ class TessCubeCutout(CubeCutout):
         for file, cutout in self.cutouts_by_file.items():
             # Determine file name
             if not output_file or len(self._input_files) > 1:
-                cutout_lims = cutout.cutout_lims
-                width = cutout_lims[0, 1] - cutout_lims[0, 0]
-                height = cutout_lims[1, 1] - cutout_lims[1, 0]
-                filename = '{}_{:7f}_{:7f}_{}x{}_astrocut.fits'.format(
-                    Path(file).stem.rstrip('-cube'),
-                    self._coordinates.ra.value,
-                    self._coordinates.dec.value,
-                    width,
-                    height)
+                filename = self._make_cutout_filename(file)
             else:
                 filename = output_file
 
@@ -517,6 +532,31 @@ class TessCubeCutout(CubeCutout):
 
         log.debug('Write time: %.2f sec', (monotonic() - write_time))
         return cutout_paths
+
+    def write_as_zip(self, output_dir: Union[str, Path] = '.', filename: Union[str, Path, None] = None) -> str:
+        """
+        Package the cutout TPF files into a zip archive without writing intermediate files.
+
+        Parameters
+        ----------
+        output_dir : str | Path, optional
+            Directory where the zip will be created. Default '.'.
+        filename : str | Path | None, optional
+            Name (or path) of the output zip file. If not provided, defaults to
+            'cutouts_{YYYYmmdd_HHMMSS}.zip'. If provided without a '.zip' suffix,
+            the suffix is added automatically.
+
+        Returns
+        -------
+        str
+            Path to the created zip file.
+        """
+        def build_entries():
+            for file, tpf in self.tpf_cutouts_by_file.items():
+                arcname = self._make_cutout_filename(file)
+                yield arcname, tpf
+
+        return super().write_as_zip(output_dir=output_dir, filename=filename, build_entries=build_entries)
     
     class CubeCutoutInstance(CubeCutout.CubeCutoutInstance):
         """
