@@ -3,6 +3,10 @@ Unreleased
 
 - Added support in `ra_dec_crossmatch` for a cutout size of zero, enabling single-point matching to FFIs that contain
   the specified coordinates. [#166]
+- Added `write_as_zip` method to `ASDFCutout`, `FITSCutout`, `TessCubeCutout`, and `TessFootprintCutout` classes to facilitate 
+  writing multiple cutouts into a single ZIP archive. [#167]
+- Updated the format of cube cutout filenames to include a hyphen between the dimensions (e.g., `10-x-10` instead of `10x10`)
+  for improved readability and consistency with other classes. [#167]
 - Added ``get_tess_sectors`` function to return TESS sector information for sectors whose footprints overlap with 
   the given sky coordinates and cutout size. [#168]
 

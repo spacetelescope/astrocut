@@ -548,11 +548,11 @@ returns a list of paths to the cutout TPF files.
 
   >>> path = fp_cutout.write_as_tpf()[0]
   >>> print(path)
-  tess-s0001-4-4_83.406310_-62.489771_10x10_astrocut.fits
+  tess-s0001-4-4_83.406310_-62.489771_10-x-10_astrocut.fits
 
   >>> with fits.open(path) as hdul:
   ...     hdul.info()
-  Filename: tess-s0001-4-4_83.406310_-62.489771_10x10_astrocut.fits
+  Filename: tess-s0001-4-4_83.406310_-62.489771_10-x-10_astrocut.fits
   No.    Name      Ver    Type      Cards   Dimensions   Format
     0  PRIMARY       1 PrimaryHDU      57   ()      
     1  PIXELS        1 BinTableHDU    146   1282R x 12C   [D, E, J, 100J, 100E, 100E, 100E, 100E, J, E, E, 38A]   
