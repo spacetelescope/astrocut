@@ -219,6 +219,13 @@ def test_asdf_cutout_write_to_zip(tmpdir, test_images, center_coord, cutout_size
                 assert hdul[0].data.shape == (cutout_size, cutout_size)
 
 
+def test_asdf_cutout_write_to_zip_invalid_format(tmpdir, test_images, center_coord, cutout_size):
+    # Invalid output format for zip
+    cutout = ASDFCutout(test_images, center_coord, cutout_size)
+    with pytest.raises(InvalidInputError, match="File format must be either '.asdf' or '.fits'"):
+        cutout.write_as_zip(output_dir=tmpdir, format='.invalid')
+
+
 def test_asdf_cutout_lite(test_images, center_coord, cutout_size, tmpdir):
     # Write cutouts to ASDF objects in lite mode
     cutout = ASDFCutout(test_images, center_coord, cutout_size, lite=True)
