@@ -306,7 +306,6 @@ def test_get_cutout_limits(cube_file, ffi_type, tmp_path):
     cutout_size = [5*u.pixel, 7*u.pixel]
     out_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, ffi_type, verbose=False, output_path=tmpdir)
     assert "256.880000_6.380000_5.0pix-x-7.0pix_astrocut.fits" in out_file
-    print(out_file)
 
     xmin, xmax = cutout_maker.cutout_lims[0]
     ymin, ymax = cutout_maker.cutout_lims[1]
