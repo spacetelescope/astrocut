@@ -461,14 +461,12 @@ class TessCubeCutout(CubeCutout):
     
     def _make_cutout_filename(self, file: Union[str, Path]) -> str:
         """
-        Generate a filename for the cutout based on the original file and cutout parameters.
+        Generate a filename for the cutout based on the input cube filename and cutout parameters.
 
         Parameters
         ----------
         file : str or Path
             The original cube file path.
-        cutout : CubeCutoutInstance
-            The cutout object.
 
         Returns
         -------
