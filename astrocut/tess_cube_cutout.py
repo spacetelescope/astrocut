@@ -459,27 +459,6 @@ class TessCubeCutout(CubeCutout):
         # Store cutouts with filename
         self.cutouts_by_file[file] = cutout
     
-    def _make_cutout_filename(self, file: Union[str, Path]) -> str:
-        """
-        Generate a filename for the cutout based on the input cube filename and cutout parameters.
-
-        Parameters
-        ----------
-        file : str or Path
-            The original cube file path.
-
-        Returns
-        -------
-        filename : str
-            The generated cutout filename.
-        """
-        return '{}_{:7f}_{:7f}_{}-x-{}_astrocut.fits'.format(
-            Path(file).stem.rstrip('-cube'),
-            self._coordinates.ra.value,
-            self._coordinates.dec.value,
-            str(self._cutout_size[0]).replace(' ', ''),
-            str(self._cutout_size[1]).replace(' ', ''))
-    
     def write_as_tpf(self, output_dir: Union[str, Path] = '.', output_file: str = None):
         """
         Write the cutouts to disk as target pixel files.
@@ -508,7 +487,7 @@ class TessCubeCutout(CubeCutout):
         for file, cutout in self.cutouts_by_file.items():
             # Determine file name
             if not output_file or len(self._input_files) > 1:
-                filename = self._make_cutout_filename(file)
+                filename = self._make_cutout_filename(Path(file).stem.rstrip('-cube'))
             else:
                 filename = output_file
 
