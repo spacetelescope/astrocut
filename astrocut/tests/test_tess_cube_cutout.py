@@ -321,8 +321,8 @@ def test_tess_cube_cutout_write_to_tpf(cube_file, tmpdir, cutout_size, coordinat
     assert Path(cutout_path).exists()
     assert str(tmpdir) in cutout_path
     assert 'test' in cutout_path
-    assert f'{coordinates.ra.value:7f}' in cutout_path
-    assert f'{coordinates.dec.value:7f}' in cutout_path
+    assert f'{coordinates.ra.value:.7f}' in cutout_path
+    assert f'{coordinates.dec.value:.7f}' in cutout_path
     assert f'{cutout_size}-x-{cutout_size}' in cutout_path
     assert 'astrocut' in cutout_path
 

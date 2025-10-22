@@ -389,27 +389,6 @@ class FITSCutout(ImageCutout):
         log.debug('Total time: %.2f sec', monotonic() - start_time)
 
         return self.fits_cutouts
-    
-    def _make_cutout_filename(self, file_stem: str = None) -> str:
-        """
-        Create a cutout filename based on the input file stem, coordinates, and cutout size.
-
-        Parameters
-        ----------
-        file_stem : str
-            The stem of the input file to use in the cutout filename. If None, 'cutout' is used.
-
-        Returns
-        -------
-        filename : str
-            The generated cutout filename.
-        """
-        return '{}_{:.7f}_{:.7f}_{}-x-{}_astrocut.fits'.format(
-            file_stem,
-            self._coordinates.ra.value,
-            self._coordinates.dec.value,
-            str(self._cutout_size[0]).replace(' ', ''),
-            str(self._cutout_size[1]).replace(' ', ''))
 
     def write_as_fits(self, output_dir: Union[str, Path] = '.', cutout_prefix: str = 'cutout') -> List[str]:
         """

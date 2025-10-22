@@ -424,6 +424,8 @@ class ASDFCutout(ImageCutout):
         """
         Generate a standardized filename for the cutout.
 
+        Overrides the superclass method to include the '_lite' tag if applicable and the output format.
+
         Parameters
         ----------
         file : str | Path

@@ -153,6 +153,27 @@ class Cutout(ABC):
         """
         raise NotImplementedError('Subclasses must implement this method.')
     
+    def _make_cutout_filename(self, file_stem: str = None) -> str:
+        """
+        Create a cutout filename based on a file stem, coordinates, and cutout size.
+
+        Parameters
+        ----------
+        file_stem : str
+            The stem of the input file to use in the cutout filename.
+
+        Returns
+        -------
+        filename : str
+            The generated cutout filename.
+        """
+        return '{}_{:.7f}_{:.7f}_{}-x-{}_astrocut.fits'.format(
+            file_stem,
+            self._coordinates.ra.value,
+            self._coordinates.dec.value,
+            str(self._cutout_size[0]).replace(' ', ''),
+            str(self._cutout_size[1]).replace(' ', ''))
+    
     def _obj_to_bytes(self, obj: Union[fits.HDUList, asdf.AsdfFile]) -> bytes:
         """
         Convert a supported object into bytes for writing into a zip stream.
