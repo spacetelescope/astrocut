@@ -8,7 +8,6 @@ from typing import List, Union, Tuple, Iterable, Callable, Any, Optional
 import asdf
 import astropy.units as u
 import numpy as np
-from PIL import Image
 from astropy import wcs
 from astropy.io import fits
 from s3path import S3Path
@@ -154,13 +153,13 @@ class Cutout(ABC):
         """
         raise NotImplementedError('Subclasses must implement this method.')
     
-    def _obj_to_bytes(self, obj: Union[fits.HDUList, asdf.AsdfFile, Image.Image]) -> bytes:
+    def _obj_to_bytes(self, obj: Union[fits.HDUList, asdf.AsdfFile]) -> bytes:
         """
         Convert a supported object into bytes for writing into a zip stream.
 
         Parameters
         ----------
-        obj : `astropy.io.fits.HDUList` | `asdf.AsdfFile` | `PIL.Image.Image`
+        obj : `astropy.io.fits.HDUList` | `asdf.AsdfFile`
             The object to convert to bytes.
 
         Returns
@@ -181,14 +180,9 @@ class Cutout(ABC):
         elif isinstance(obj, asdf.AsdfFile):
             buf = io.BytesIO()
             obj.write_to(buf)
-        # PIL Image to bytes
-        elif isinstance(obj, Image.Image):
-            buf = io.BytesIO()
-            fmt = getattr(obj, 'format', None) or 'PNG'
-            obj.save(buf, format=fmt)
         else:
             raise TypeError(
-                'Unsupported payload type for zip entry. Expected HDUList, AsdfFile, or PIL.Image.'
+                'Unsupported payload type for zip entry. Expected `HDUList` or `AsdfFile`.'
             )
         
         return buf.getvalue()

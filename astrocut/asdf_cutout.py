@@ -287,7 +287,6 @@ class ASDFCutout(ImageCutout):
 
             else:
                 # Cube or higher dimension array
-                # THIS IS A WRONG!!! YOU NEED TO THINK ABOUT IF THE CUTOUT SIZE IS ANGULAR!!
                 new_shape = obj.shape[:-2] + (self._cutout_size[1], self._cutout_size[0])
                 cutout_cube = np.full(new_shape, self._fill_value, dtype=obj.dtype)
 
