@@ -459,7 +459,7 @@ class TessCubeCutout(CubeCutout):
         # Store cutouts with filename
         self.cutouts_by_file[file] = cutout
     
-    def _make_cutout_filename(self, file):
+    def _make_cutout_filename(self, file: Union[str, Path]) -> str:
         """
         Generate a filename for the cutout based on the original file and cutout parameters.
 
