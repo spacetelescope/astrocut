@@ -518,7 +518,7 @@ class ASDFCutout(ImageCutout):
         return self._write_as_format(output_format='.asdf', output_dir=output_dir)
 
     def write_as_zip(self, output_dir: Union[str, Path] = '.', filename: Union[str, Path, None] = None,
-                     *, format: str = '.asdf') -> str:
+                     *, output_format: str = '.asdf') -> str:
         """
         Package the ASDF or FITS cutouts into a zip archive without writing intermediates.
 
@@ -530,7 +530,7 @@ class ASDFCutout(ImageCutout):
             Name (or path) of the output zip file. If not provided, defaults to
             'cutouts_{YYYYmmdd_HHMMSS}.zip'. If provided without a '.zip' suffix,
             the suffix is added automatically.
-        format : str, optional
+        output_format : str, optional
             Either '.asdf' (default) or '.fits'. Determines which in-memory representation is zipped.
 
         Returns
@@ -538,7 +538,7 @@ class ASDFCutout(ImageCutout):
         str
             Path to the created zip file.
         """
-        fmt = format.lower().strip()
+        fmt = output_format.lower().strip()
         fmt = '.' + fmt if not fmt.startswith('.') else fmt
         if fmt not in ('.asdf', '.fits'):
             raise InvalidInputError("File format must be either '.asdf' or '.fits'")
@@ -551,7 +551,7 @@ class ASDFCutout(ImageCutout):
                 arcname = self._make_cutout_filename(file, fmt)
                 yield arcname, objs[i]
 
-        return super().write_as_zip(output_dir=output_dir, filename=filename, build_entries=build_entries)
+        return self._write_cutouts_to_zip(output_dir=output_dir, filename=filename, build_entries=build_entries)
     
 
 def get_center_pixel(gwcsobj: gwcs.wcs.WCS, ra: float, dec: float) -> Tuple[Tuple[int, int], WCS]:

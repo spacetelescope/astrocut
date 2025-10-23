@@ -461,7 +461,7 @@ class FITSCutout(ImageCutout):
                     hdu = self.fits_cutouts[i]
                     yield arcname, hdu
 
-        return super().write_as_zip(output_dir=output_dir, filename=filename, build_entries=build_entries)
+        return self._write_cutouts_to_zip(output_dir=output_dir, filename=filename, build_entries=build_entries)
         
     class CutoutInstance:
         """

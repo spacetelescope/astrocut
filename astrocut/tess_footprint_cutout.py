@@ -167,11 +167,6 @@ class TessFootprintCutout(FootprintCutout):
         -------
         zip_path : str
             Path to the created zip file.
-
-        Notes
-        -----
-        This method will call `write_as_tpf` to ensure the cutout files exist on disk,
-        then archive those files into a single zip.
         """
         return self.tess_cube_cutout.write_as_zip(output_dir, filename)
 

@@ -5,10 +5,20 @@ Unreleased
   the specified coordinates. [#166]
 - Added ``write_as_zip`` method to ``ASDFCutout``, ``FITSCutout``, ``TessCubeCutout``, and ``TessFootprintCutout`` classes to facilitate 
   writing multiple cutouts into a single ZIP archive. [#167]
-- Updated the format of cube cutout filenames to include a hyphen between the dimensions (e.g., `10-x-10` instead of `10x10`)
-  for improved readability and consistency with other classes. [#167]
-- Added ``get_tess_sectors`` function to return TESS sector information for sectors whose footprints overlap with 
-  the given sky coordinates and cutout size. [#168]
+
+Breaking Changes
+^^^^^^^^^^^^^^^^
+
+- Cube cutout filenames now use a hyphen between dimensions (e.g., ``10-x-10`` instead of ``10x10``). They also include unit suffixes when 
+  users request sizes as an `astropy.units.Quantity` object (e.g., ``5arcmin-x-4arcmin`` or ``30arcsec-x-20arcsec``). This change may break 
+  code that parses filenames or relies on old glob patterns. [#167]
+
+  Migration:
+
+  - Update glob patterns from ``*_<ra>_<dec>_<ny>x<nx>_astrocut.fits`` to ``*_<ra>_<dec>_*-x-*_astrocut.fits``.
+  - If parsing filenames, adjust regex accordingly (e.g., replace ``(?P<ny>\d+)x(?P<nx>\d+)`` with 
+    ``(?P<ny>\d+(?:\.\d+)?)(?P<ny_unit>arcsec|arcmin|deg|pixel|pix)?-x-(?P<nx>\d+(?:\.\d+)?)(?P<nx_unit>arcsec|arcmin|deg|pixel|pix)?``).
+  - Prefer reading dimensions from file metadata (e.g., FITS headers) when possible to avoid filename coupling.
 
 
 1.1.0 (2025-09-15)
