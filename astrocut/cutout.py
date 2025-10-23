@@ -193,10 +193,7 @@ class Cutout(ABC):
             buf = io.BytesIO()
             with warnings.catch_warnings():
                 warnings.simplefilter('ignore', fits.verify.VerifyWarning)
-                try:
-                    obj.writeto(buf, overwrite=True, checksum=True)
-                except TypeError:
-                    obj.writeto(buf)
+                obj.writeto(buf, overwrite=True, checksum=True)
         # `AsdfFile` to bytes
         elif isinstance(obj, asdf.AsdfFile):
             buf = io.BytesIO()
@@ -208,11 +205,11 @@ class Cutout(ABC):
         
         return buf.getvalue()
 
-    def write_as_zip(
+    def _write_cutouts_to_zip(
         self,
         output_dir: Union[str, Path] = ".",
         filename: Optional[Union[str, Path]] = None,
-        build_entries: Optional[Callable[[], Iterable[Tuple[str, Any]]]] = None,
+        build_entries: Optional[Callable[[], Iterable[Tuple[str, Any]]]] = None
     ) -> str:
         """
         Create a zip archive containing all cutout files without writing intermediate files.

@@ -530,10 +530,10 @@ class TessCubeCutout(CubeCutout):
         """
         def build_entries():
             for file, tpf in self.tpf_cutouts_by_file.items():
-                arcname = self._make_cutout_filename(file)
+                arcname = self._make_cutout_filename(Path(file).stem.rstrip('-cube'))
                 yield arcname, tpf
 
-        return super().write_as_zip(output_dir=output_dir, filename=filename, build_entries=build_entries)
+        return self._write_cutouts_to_zip(output_dir=output_dir, filename=filename, build_entries=build_entries)
     
     class CubeCutoutInstance(CubeCutout.CubeCutoutInstance):
         """

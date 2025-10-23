@@ -196,7 +196,7 @@ def test_asdf_cutout_write_to_file(test_images, center_coord, cutout_size, tmpdi
 def test_asdf_cutout_write_to_zip(tmpdir, test_images, center_coord, cutout_size, output_format):
     # Zip ASDF representations
     cutout = ASDFCutout(test_images, center_coord, cutout_size)
-    zip_path = cutout.write_as_zip(output_dir=tmpdir, format=output_format)
+    zip_path = cutout.write_as_zip(output_dir=tmpdir, output_format=output_format)
     assert Path(zip_path).exists()
 
     with zipfile.ZipFile(zip_path, 'r') as zf:
@@ -223,7 +223,7 @@ def test_asdf_cutout_write_to_zip_invalid_format(tmpdir, test_images, center_coo
     # Invalid output format for zip
     cutout = ASDFCutout(test_images, center_coord, cutout_size)
     with pytest.raises(InvalidInputError, match="File format must be either '.asdf' or '.fits'"):
-        cutout.write_as_zip(output_dir=tmpdir, format='.invalid')
+        cutout.write_as_zip(output_dir=tmpdir, output_format='.invalid')
 
 
 def test_asdf_cutout_lite(test_images, center_coord, cutout_size, tmpdir):
