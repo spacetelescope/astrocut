@@ -18,10 +18,12 @@ Breaking Changes
 
   - Update glob patterns from ``*_<ra>_<dec>_<ny>x<nx>_astrocut.fits`` to ``*_<ra>_<dec>_*-x-*_astrocut.fits``.
   - If parsing filenames, switch to flexible regex patterns:
+
     - RA/Dec: ``_(?P<ra>[-+]?\\d+(?:\\.\\d+)?)_(?P<dec>[-+]?\\d+(?:\\.\\d+)?)_``
     - Dimensions (with optional units): ``(?P<ny>\\d+(?:\\.\\d+)?)(?P<ny_unit>arcsec|arcmin|deg|pixel|pix)?-x-(?P<nx>\\d+(?:\\.\\d+)?)(?P<nx_unit>arcsec|arcmin|deg|pixel|pix)?``
   - Prefer reading RA/Dec, dimensions, and scales from file metadata (FITS headers/WCS) instead of relying on filenames.
   - Example transition:
+
     - Old: ``..._83.406310_-62.489771_64x64_astrocut.fits``
     - New (no unit - pixels assumed): ``..._83.4063100_-62.4897710_64-x-64_astrocut.fits``
     - New (with units): ``..._83.4063100_-62.4897710_5arcmin-x-4arcmin_astrocut.fits``
