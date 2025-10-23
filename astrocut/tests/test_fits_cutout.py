@@ -1,5 +1,7 @@
 from pathlib import Path
 import pytest
+import zipfile
+import io
 
 import numpy as np
 from os import path
@@ -150,6 +152,50 @@ def test_fits_cutout_return_paths(test_images, center_coord, cutout_size, tmpdir
         assert path.exists(cutout_file)
         assert str(tmpdir) in cutout_file
         assert Path(test_images[i]).stem in cutout_file
+
+
+def test_fits_cutout_write_to_zip_single(tmpdir, test_images, center_coord, cutout_size):
+    # Single-outfile FITS cutout zipped
+    cutout = FITSCutout(test_images, center_coord, cutout_size, single_outfile=True)
+    zip_path = cutout.write_as_zip(output_dir=tmpdir)
+    assert Path(zip_path).exists()
+
+    with zipfile.ZipFile(zip_path, 'r') as zf:
+        # Expect exactly one FITS entry inside
+        names = zf.namelist()
+        assert len(names) == 1
+        arcname = names[0]
+        assert arcname.endswith('_astrocut.fits')
+        assert '10-x-10' in arcname
+        # Open the FITS from the zip bytes
+        data = zf.read(arcname)
+        with fits.open(io.BytesIO(data)) as hdul:
+            assert isinstance(hdul, fits.HDUList)
+            # primary + one extension per input file
+            assert len(hdul) == len(test_images) + 1
+            assert hdul[1].data.shape == (cutout_size, cutout_size)
+
+
+def test_fits_cutout_write_to_zip_multiple(tmpdir, test_images, center_coord, cutout_size):
+    # Per-file FITS cutouts zipped
+    cutout = FITSCutout(test_images, center_coord, cutout_size, single_outfile=False)
+    zip_path = cutout.write_as_zip(output_dir=tmpdir)
+    assert Path(zip_path).exists()
+
+    with zipfile.ZipFile(zip_path, 'r') as zf:
+        names = zf.namelist()
+        # One entry per input file
+        assert len(names) == len(test_images)
+        # Names should include each input stem and suffix
+        stems = [Path(p).stem for p in test_images]
+        for name in names:
+            assert name.endswith('_astrocut.fits')
+            assert any(stem in name for stem in stems)
+        # Spot-check opening one member
+        data = zf.read(names[0])
+        with fits.open(io.BytesIO(data)) as hdul:
+            assert len(hdul) == 2
+            assert hdul[1].data.shape == (cutout_size, cutout_size)
 
 
 def test_fits_cutout_off_edge(test_images, cutout_size):
