@@ -55,20 +55,6 @@ class FootprintCutout(Cutout, ABC):
             sequence = [sequence]  # Convert to list
         self._sequence = sequence
 
-        # Populate these in child classes 
-        self._s3_footprint_cache = None  # S3 URI to footprint cache file
-        self._arcsec_per_px = None  # Number of arcseconds per pixel in an image
-    
-    @abstractmethod
-    def _get_files_from_cone_results(self, cone_results: Table) -> dict:
-        """
-        Converts a `~astropy.table.Table` of cone search results to a list of dictionaries containing
-        metadata for each cloud file that intersects with the cutout.
-        
-        This method is abstract and should be implemented in subclasses.
-        """
-        raise NotImplementedError('Subclasses must implement this method.')
-
     @abstractmethod
     def cutout(self):
         """
