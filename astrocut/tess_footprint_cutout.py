@@ -318,11 +318,21 @@ def get_tess_sectors(coordinates: Union[str, SkyCoord],
 
     Parameters
     ----------
-    coordinates : str or `astropy.coordinates.SkyCoord`
-        The center position of the cutout ("ra dec" in degrees) or a SkyCoord.
+    coordinates : str or `astropy.coordinates.SkyCoord` object
+        The position around which to cutout. It may be specified as a string ("ra dec" in degrees)
+        or as the appropriate `~astropy.coordinates.SkyCoord` object.
     cutout_size : int, array-like, or `~astropy.units.Quantity`
-        Size of the cutout. Scalars make a square cutout; two elements imply (ny, nx).
-        Pixel or angular quantities are supported.
+        The size of the cutout array. If ``cutout_size``
+        is a scalar number or a scalar `~astropy.units.Quantity`,
+        then a square cutout of ``cutout_size`` will be used.  If
+        ``cutout_size`` has two elements, they should be in ``(ny, nx)``
+        order.  Scalar numbers in ``cutout_size`` are assumed to be in
+        units of pixels. `~astropy.units.Quantity` objects must be in pixel or
+        angular units.
+
+        If a cutout size of zero is provided, the function will return sectors that contain 
+        the exact RA and Dec position. If a non-zero cutout size is provided, the function 
+        will return sectors whose footprints overlap with the cutout area.
 
     Returns
     -------

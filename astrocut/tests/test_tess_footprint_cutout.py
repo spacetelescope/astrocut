@@ -270,12 +270,12 @@ def test_cube_cut_from_footprint(coordinates, cutout_size, tmpdir):
     assert str(tmpdir) in cutouts[0]
 
 
-def test_get_tess_sectors(coordinates, cutout_size):
-    """Test that get_tess_sectors returns correct sector list"""
-    sector_table = get_tess_sectors(coordinates, cutout_size)
+def test_get_tess_sectors(coordinates):
+    """Test that get_tess_sectors returns sector list"""
+    sector_table = get_tess_sectors(coordinates, 0)
     assert isinstance(sector_table, Table)
     assert 'sectorName' in sector_table.colnames
     assert 'sector' in sector_table.colnames
     assert 'camera' in sector_table.colnames
     assert 'ccd' in sector_table.colnames
-    assert len(sector_table) >= 4
+    assert len(sector_table) >= 7
