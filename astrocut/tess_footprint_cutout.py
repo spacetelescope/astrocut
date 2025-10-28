@@ -155,6 +155,8 @@ def _extract_sequence_information(sector_name: str) -> dict:
     """
     Extract the sector, camera, and ccd information from the sector name.
 
+    This is a helper function and should be left private.
+
     Parameters
     ----------
     sector_name : str
@@ -185,6 +187,8 @@ def _create_sequence_list(observations: Table) -> List[dict]:
     """
     Extracts sequence information from a list of observations.
 
+    This is a helper function and should be left private.
+
     Parameters
     ----------
     observations : `~astropy.table.Table`
@@ -212,6 +216,8 @@ def _get_files_from_cone_results(cone_results: Table) -> List[dict]:
     """
     Converts a `~astropy.table.Table` of cone search results to a list of dictionaries containing 
     information for each cloud cube file that intersects with the cutout.
+
+    This is a helper function and should be left private.
 
     Parameters
     ----------
