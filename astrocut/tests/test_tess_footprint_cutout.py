@@ -270,12 +270,28 @@ def test_cube_cut_from_footprint(coordinates, cutout_size, tmpdir):
     assert str(tmpdir) in cutouts[0]
 
 
-def test_get_tess_sectors(coordinates):
+@pytest.mark.parametrize("cutout_size", [0, 5, 1 * u.arcmin, [5, 5], (3*u.arcsec, 3*u.arcsec)])
+def test_get_tess_sectors(coordinates, cutout_size):
     """Test that get_tess_sectors returns sector list"""
-    sector_table = get_tess_sectors(coordinates, 0)
+    sector_table = get_tess_sectors(coordinates, cutout_size)
     assert isinstance(sector_table, Table)
     assert 'sectorName' in sector_table.colnames
     assert 'sector' in sector_table.colnames
     assert 'camera' in sector_table.colnames
     assert 'ccd' in sector_table.colnames
     assert len(sector_table) >= 7
+
+
+def test_get_tess_sectors_invalid_coordinates():
+    """Test that InvalidInputError is raised for invalid coordinates input"""
+    with pytest.raises(InvalidInputError, match='Invalid coordinates input'):
+        get_tess_sectors('400 -120', 0)
+
+
+def test_get_tess_sectors_no_matches(monkeypatch, coordinates):
+    """When no FFIs overlap the cutout, the sectors table should be empty."""
+    monkeypatch.setattr('astrocut.tess_footprint_cutout.ra_dec_crossmatch', lambda *_a, **_k: Table())
+
+    sector_table = get_tess_sectors(coordinates, 0)
+    assert isinstance(sector_table, Table)
+    assert len(sector_table) == 0

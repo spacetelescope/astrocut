@@ -13,6 +13,7 @@ from spherical_geometry.polygon import SphericalPolygon
 from spherical_geometry.vector import radec_to_vector
 
 from .cutout import Cutout
+from .exceptions import InvalidInputError
 
 FFI_TTLCACHE = TTLCache(maxsize=10, ttl=900)  # Cache for FFI footprint files
 
@@ -300,7 +301,10 @@ def ra_dec_crossmatch(all_ffis: Table, coordinates: Union[SkyCoord, str], cutout
     """
     # Convert coordinates to SkyCoord
     if not isinstance(coordinates, SkyCoord):
-        coordinates = SkyCoord(coordinates, unit='deg')
+        try:
+            coordinates = SkyCoord(coordinates, unit='deg')
+        except ValueError as e:
+            raise InvalidInputError(f'Invalid coordinates input: {e}')
     ra, dec = coordinates.ra, coordinates.dec
 
     px_size = np.zeros(2, dtype=object)
