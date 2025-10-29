@@ -290,7 +290,8 @@ def test_get_tess_sectors_invalid_coordinates():
 
 def test_get_tess_sectors_no_matches(monkeypatch, coordinates):
     """When no FFIs overlap the cutout, the sectors table should be empty."""
-    monkeypatch.setattr('astrocut.tess_footprint_cutout.ra_dec_crossmatch', lambda *_a, **_k: Table())
+    empty_table = Table(names=['sectorName', 'sector', 'camera', 'ccd'], dtype=['S10', 'i4', 'i4', 'i4'])
+    monkeypatch.setattr('astrocut.tess_footprint_cutout.ra_dec_crossmatch', lambda *_a, **_k: empty_table)
 
     sector_table = get_tess_sectors(coordinates, 0)
     assert isinstance(sector_table, Table)
