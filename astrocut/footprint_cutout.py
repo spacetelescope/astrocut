@@ -13,6 +13,7 @@ from spherical_geometry.polygon import SphericalPolygon
 from spherical_geometry.vector import radec_to_vector
 
 from .cutout import Cutout
+from .exceptions import InvalidInputError
 
 FFI_TTLCACHE = TTLCache(maxsize=10, ttl=900)  # Cache for FFI footprint files
 
@@ -54,20 +55,6 @@ class FootprintCutout(Cutout, ABC):
         if isinstance(sequence, int):
             sequence = [sequence]  # Convert to list
         self._sequence = sequence
-
-        # Populate these in child classes 
-        self._s3_footprint_cache = None  # S3 URI to footprint cache file
-        self._arcsec_per_px = None  # Number of arcseconds per pixel in an image
-    
-    @abstractmethod
-    def _get_files_from_cone_results(self, cone_results: Table) -> dict:
-        """
-        Converts a `~astropy.table.Table` of cone search results to a list of dictionaries containing
-        metadata for each cloud file that intersects with the cutout.
-        
-        This method is abstract and should be implemented in subclasses.
-        """
-        raise NotImplementedError('Subclasses must implement this method.')
 
     @abstractmethod
     def cutout(self):
@@ -314,7 +301,10 @@ def ra_dec_crossmatch(all_ffis: Table, coordinates: Union[SkyCoord, str], cutout
     """
     # Convert coordinates to SkyCoord
     if not isinstance(coordinates, SkyCoord):
-        coordinates = SkyCoord(coordinates, unit='deg')
+        try:
+            coordinates = SkyCoord(coordinates, unit='deg')
+        except ValueError as e:
+            raise InvalidInputError(f'Invalid coordinates input: {e}')
     ra, dec = coordinates.ra, coordinates.dec
 
     px_size = np.zeros(2, dtype=object)
