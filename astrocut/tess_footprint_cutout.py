@@ -346,11 +346,16 @@ def get_tess_sectors(coordinates: Union[str, SkyCoord],
         A table containing the sector name, sector number, camera number, and CCD number
         for each sector that contains the specified coordinates within the cutout size.
     """
+    column_names = ['sectorName', 'sector', 'camera', 'ccd']
+    column_dtypes = ['S20', 'i4', 'i4', 'i4']
+
     # Get footprints from the cloud
     ffis = get_ffis(TessFootprintCutout.S3_FOOTPRINT_CACHE)
 
     # Crossmatch to find matching FFIs
     matched_ffis = ra_dec_crossmatch(ffis, coordinates, cutout_size, TessFootprintCutout.ARCSEC_PER_PX)
+    if len(matched_ffis) == 0:  # Return empty table if no matches
+        return Table(names=column_names, dtype=column_dtypes)
 
     # Create a list of unique sector entries
     sector_list = _create_sequence_list(matched_ffis)
@@ -358,4 +363,4 @@ def get_tess_sectors(coordinates: Union[str, SkyCoord],
     return Table(rows=[
         (entry['sectorName'], int(entry['sector']), int(entry['camera']), int(entry['ccd']))
         for entry in sector_list
-    ], names=['sectorName', 'sector', 'camera', 'ccd'])
+    ], names=column_names, dtype=column_dtypes)
