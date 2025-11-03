@@ -3,6 +3,8 @@ Unreleased
 
 - Added support in `ra_dec_crossmatch` for a cutout size of zero, enabling single-point matching to FFIs that contain
   the specified coordinates. [#166]
+- Added ``get_tess_sectors`` function to return TESS sector information for sectors whose footprints overlap with 
+  the given sky coordinates and cutout size. [#168]
 
 
 1.1.0 (2025-09-15)

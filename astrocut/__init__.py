@@ -39,4 +39,4 @@ if not _ASTROPY_SETUP_:  # noqa
     from .asdf_cutout import ASDFCutout, asdf_cut, get_center_pixel  # noqa
     from .tess_cube_cutout import TessCubeCutout  # noqa
     from .footprint_cutout import ra_dec_crossmatch # noqa
-    from .tess_footprint_cutout import TessFootprintCutout, cube_cut_from_footprint  # noqa
+    from .tess_footprint_cutout import TessFootprintCutout, cube_cut_from_footprint, get_tess_sectors  # noqa
