@@ -153,7 +153,7 @@ class Cutout(ABC):
         """
         raise NotImplementedError('Subclasses must implement this method.')
     
-    def _make_cutout_filename(self, file_stem: str = None) -> str:
+    def _make_cutout_filename(self, file_stem: str) -> str:
         """
         Create a cutout filename based on a file stem, coordinates, and cutout size.
 
@@ -220,7 +220,7 @@ class Cutout(ABC):
             Directory where the zip will be created. Default '.'
         filename : str | Path | None, optional
             Name (or path) of the output zip file. If not provided, defaults to
-            'cutouts_{YYYYmmdd_HHMMSS}.zip'. If provided without a '.zip' suffix,
+            'astrocut_{ra}_{dec}_{size}.zip'. If provided without a '.zip' suffix,
             the suffix is added automatically.
         build_entries : callable -> iterable of (arcname, payload), optional
             Function that yields entries lazily. Useful to build streams on demand.
