@@ -1,6 +1,7 @@
 from pathlib import Path
 import pytest
 import re
+import zipfile
 from unittest.mock import MagicMock
 
 import astropy.units as u
@@ -222,6 +223,24 @@ def test_tess_footprint_cutout_write_as_tpf(coordinates, cutout_size, tmpdir):
         # Check that file can be opened
         with fits.open(path) as hdu:
             hdu.info()
+
+
+def test_tess_footprint_cutout_write_to_zip(coordinates, cutout_size, tmpdir):
+    """Test that TPF cutouts are written to a ZIP archive"""
+    cutout = TessFootprintCutout(coordinates, cutout_size, sequence=[1, 13])
+    zip_path = cutout.write_as_zip(output_dir=tmpdir, filename='tess_cutouts')
+
+    path = Path(zip_path)
+    assert path.exists()
+    assert path.name == 'tess_cutouts.zip'
+    assert path.suffix == '.zip'
+
+    # Check contents of ZIP file
+    with zipfile.ZipFile(path, 'r') as zf:
+        namelist = zf.namelist()
+        assert len(namelist) == 2  # Two sequences
+        for name in namelist:
+            assert name.endswith('.fits')
 
 
 def test_tess_footprint_cutout_invalid_sequence(coordinates, cutout_size):

@@ -1,13 +1,17 @@
+import warnings
+import io
+import zipfile
 from abc import abstractmethod, ABC
 from pathlib import Path
-from typing import List, Union, Tuple
-import warnings
+from typing import List, Union, Tuple, Iterable, Callable, Any, Optional
 
-from astropy import wcs
+import asdf
 import astropy.units as u
+import numpy as np
+from astropy import wcs
+from astropy.io import fits
 from s3path import S3Path
 from astropy.coordinates import SkyCoord
-import numpy as np
 
 from astrocut.exceptions import InputWarning, InvalidInputError, InvalidQueryError
 
@@ -148,6 +152,107 @@ class Cutout(ABC):
         This method is abstract and should be defined in subclasses.
         """
         raise NotImplementedError('Subclasses must implement this method.')
+    
+    def _make_cutout_filename(self, file_stem: str) -> str:
+        """
+        Create a cutout filename based on a file stem, coordinates, and cutout size.
+
+        Parameters
+        ----------
+        file_stem : str
+            The stem of the input file to use in the cutout filename.
+
+        Returns
+        -------
+        filename : str
+            The generated cutout filename.
+        """
+        return '{}_{:.7f}_{:.7f}_{}-x-{}_astrocut.fits'.format(
+            file_stem,
+            self._coordinates.ra.value,
+            self._coordinates.dec.value,
+            str(self._cutout_size[0]).replace(' ', ''),
+            str(self._cutout_size[1]).replace(' ', ''))
+    
+    def _obj_to_bytes(self, obj: Union[fits.HDUList, asdf.AsdfFile]) -> bytes:
+        """
+        Convert a supported object into bytes for writing into a zip stream.
+
+        Parameters
+        ----------
+        obj : `astropy.io.fits.HDUList` | `asdf.AsdfFile`
+            The object to convert to bytes.
+
+        Returns
+        -------
+        bytes
+            The byte representation of the object.
+        """
+        # HDUList to bytes
+        if isinstance(obj, fits.HDUList):
+            buf = io.BytesIO()
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore', fits.verify.VerifyWarning)
+                obj.writeto(buf, overwrite=True, checksum=True)
+        # `AsdfFile` to bytes
+        elif isinstance(obj, asdf.AsdfFile):
+            buf = io.BytesIO()
+            obj.write_to(buf)
+        else:
+            raise TypeError(
+                'Unsupported payload type for zip entry. Expected `HDUList` or `AsdfFile`.'
+            )
+        
+        return buf.getvalue()
+
+    def _write_cutouts_to_zip(
+        self,
+        output_dir: Union[str, Path] = ".",
+        filename: Optional[Union[str, Path]] = None,
+        build_entries: Optional[Callable[[], Iterable[Tuple[str, Any]]]] = None
+    ) -> str:
+        """
+        Create a zip archive containing all cutout files without writing intermediate files.
+
+        Parameters
+        ----------
+        output_dir : str | Path, optional
+            Directory where the zip will be created. Default '.'
+        filename : str | Path | None, optional
+            Name (or path) of the output zip file. If not provided, defaults to
+            'astrocut_{ra}_{dec}_{size}.zip'. If provided without a '.zip' suffix,
+            the suffix is added automatically.
+        build_entries : callable -> iterable of (arcname, payload), optional
+            Function that yields entries lazily. Useful to build streams on demand.
+
+        Returns
+        -------
+        str
+            Path to the created zip file.
+        """
+        # Resolve zip path and ensure directory exists
+        if filename is None:
+            filename = 'astrocut_{:.7f}_{:.7f}_{}-x-{}.zip'.format(
+                self._coordinates.ra.value,
+                self._coordinates.dec.value,
+                str(self._cutout_size[0]).replace(' ', ''),
+                str(self._cutout_size[1]).replace(' ', ''))
+        filename = Path(filename)
+        if filename.suffix.lower() != '.zip':
+            filename = filename.with_suffix('.zip')
+
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        zip_path = filename if filename.is_absolute() else output_dir / filename
+
+        # Stream entries directly into the zip
+        with zipfile.ZipFile(zip_path, mode='w', compression=zipfile.ZIP_DEFLATED) as zf:
+            for arcname, payload in build_entries():
+                data = self._obj_to_bytes(payload)
+                zf.writestr(arcname, data)
+
+        return zip_path.as_posix()
 
     @staticmethod
     def parse_size_input(cutout_size, *, allow_zero: bool = False) -> np.ndarray:

@@ -1,10 +1,34 @@
 Unreleased
 ----------
 
-- Added support in `ra_dec_crossmatch` for a cutout size of zero, enabling single-point matching to FFIs that contain
+- Added support in ``ra_dec_crossmatch`` for a cutout size of zero, enabling single-point matching to FFIs that contain
   the specified coordinates. [#166]
+- Added ``write_as_zip`` method to ``ASDFCutout``, ``FITSCutout``, ``TessCubeCutout``, and ``TessFootprintCutout`` classes to facilitate 
+  writing multiple cutouts into a single ZIP archive. [#167]
 - Added ``get_tess_sectors`` function to return TESS sector information for sectors whose footprints overlap with 
   the given sky coordinates and cutout size. [#168]
+
+Breaking Changes
+^^^^^^^^^^^^^^^^
+
+- Cube cutout filenames now use a hyphen between dimensions (e.g., ``10-x-10`` instead of ``10x10``). They also include unit suffixes when 
+  users request sizes as an ``astropy.units.Quantity`` object (e.g., ``5arcmin-x-4arcmin`` or ``30arcsec-x-20arcsec``). RA/Dec formatting within
+  filenames now uses 7 decimal places (``{:.7f}``) for consistency across classes. These changes may break code that parses filenames or relies on
+  old glob patterns. [#167]
+
+  Migration:
+
+  - Update glob patterns from ``*_<ra>_<dec>_<ny>x<nx>_astrocut.fits`` to ``*_<ra>_<dec>_*-x-*_astrocut.fits``.
+  - If parsing filenames, switch to flexible regex patterns:
+
+    - RA/Dec: ``_(?P<ra>[-+]?\\d+(?:\\.\\d+)?)_(?P<dec>[-+]?\\d+(?:\\.\\d+)?)_``
+    - Dimensions (with optional units): ``(?P<ny>\\d+(?:\\.\\d+)?)(?P<ny_unit>arcsec|arcmin|deg|pixel|pix)?-x-(?P<nx>\\d+(?:\\.\\d+)?)(?P<nx_unit>arcsec|arcmin|deg|pixel|pix)?``
+  - Prefer reading RA/Dec, dimensions, and scales from file metadata (FITS headers/WCS) instead of relying on filenames.
+  - Example transition:
+
+    - Old: ``..._83.406310_-62.489771_64x64_astrocut.fits``
+    - New (no unit - pixels assumed): ``..._83.4063100_-62.4897710_64-x-64_astrocut.fits``
+    - New (with units): ``..._83.4063100_-62.4897710_5arcmin-x-4arcmin_astrocut.fits``
 
 
 1.1.0 (2025-09-15)

@@ -149,6 +149,26 @@ class TessFootprintCutout(FootprintCutout):
             List of file paths to cutout target pixel files.
         """
         return self.tess_cube_cutout.write_as_tpf(output_dir)
+    
+    def write_as_zip(self, output_dir: Union[str, Path] = '.', filename: Union[str, Path, None] = None) -> str:
+        """
+        Package the cutout TPF files into a zip archive.
+
+        Parameters
+        ----------
+        output_dir : str | Path, optional
+            Directory where the TPFs are written and where the zip will be created. Default '.'.
+        filename : str | Path | None, optional
+            Name (or path) of the output zip file. If not provided, defaults to
+            'astrocut_{ra}_{dec}_{size}.zip'. If provided without a '.zip' suffix,
+            the suffix is added automatically.
+
+        Returns
+        -------
+        zip_path : str
+            Path to the created zip file.
+        """
+        return self.tess_cube_cutout.write_as_zip(output_dir, filename)
 
 
 def _extract_sequence_information(sector_name: str) -> dict:

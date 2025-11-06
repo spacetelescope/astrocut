@@ -1,6 +1,8 @@
 from pathlib import Path
 import numpy as np
 import pytest
+import zipfile
+import io
 
 import asdf
 from astropy import coordinates as coord
@@ -188,6 +190,40 @@ def test_asdf_cutout_write_to_file(test_images, center_coord, cutout_size, tmpdi
             assert hdul[0].header['NAXIS2'] == 10
             assert hdul[0].header['ORIG_FLE'] == test_images[i].as_posix()
             assert Path(fits_file).stat().st_size < Path(test_images[i]).stat().st_size
+
+
+@pytest.mark.parametrize('output_format', ['.asdf', '.fits'])
+def test_asdf_cutout_write_to_zip(tmpdir, test_images, center_coord, cutout_size, output_format):
+    # Zip ASDF representations
+    cutout = ASDFCutout(test_images, center_coord, cutout_size)
+    zip_path = cutout.write_as_zip(output_dir=tmpdir, output_format=output_format)
+    assert Path(zip_path).exists()
+
+    with zipfile.ZipFile(zip_path, 'r') as zf:
+        names = zf.namelist()
+        assert len(names) == len(test_images)
+        for name in names:
+            assert name.endswith(f'_astrocut{output_format}')
+
+        # Open one file and check contents
+        data = zf.read(names[0])
+        if output_format == '.asdf':
+            with asdf.open(io.BytesIO(data)) as af:
+                assert 'roman' in af
+                assert 'data' in af['roman']
+                assert af['roman']['data'].shape == (cutout_size, cutout_size)
+        else:
+            with fits.open(io.BytesIO(data)) as hdul:
+                assert isinstance(hdul, fits.HDUList)
+                assert len(hdul) == 1
+                assert hdul[0].data.shape == (cutout_size, cutout_size)
+
+
+def test_asdf_cutout_write_to_zip_invalid_format(tmpdir, test_images, center_coord, cutout_size):
+    # Invalid output format for zip
+    cutout = ASDFCutout(test_images, center_coord, cutout_size)
+    with pytest.raises(InvalidInputError, match="File format must be either '.asdf' or '.fits'"):
+        cutout.write_as_zip(output_dir=tmpdir, output_format='.invalid')
 
 
 def test_asdf_cutout_lite(test_images, center_coord, cutout_size, tmpdir):

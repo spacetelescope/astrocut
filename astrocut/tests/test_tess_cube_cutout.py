@@ -3,6 +3,8 @@ import shutil
 import numpy as np
 import pytest
 import warnings
+import zipfile
+import io
 from pathlib import Path
 from typing import List, Literal
 
@@ -319,10 +321,32 @@ def test_tess_cube_cutout_write_to_tpf(cube_file, tmpdir, cutout_size, coordinat
     assert Path(cutout_path).exists()
     assert str(tmpdir) in cutout_path
     assert 'test' in cutout_path
-    assert f'{coordinates.ra.value:7f}' in cutout_path
-    assert f'{coordinates.dec.value:7f}' in cutout_path
-    assert f'{cutout_size}x{cutout_size}' in cutout_path
+    assert f'{coordinates.ra.value:.7f}' in cutout_path
+    assert f'{coordinates.dec.value:.7f}' in cutout_path
+    assert f'{cutout_size}-x-{cutout_size}' in cutout_path
     assert 'astrocut' in cutout_path
+
+
+@pytest.mark.parametrize("ffi_type", ["SPOC"])
+def test_tess_cube_cutout_write_to_zip(cube_file, cutout_size, coordinates, tmpdir):
+    # Single cube input; expect one TPF member in zip
+    cutout = TessCubeCutout(cube_file, coordinates, cutout_size)
+    zip_path = cutout.write_as_zip(output_dir=tmpdir)
+    assert Path(zip_path).exists()
+
+    with zipfile.ZipFile(zip_path, 'r') as zf:
+        names = zf.namelist()
+        assert len(names) == 1
+        name = names[0]
+        assert name.endswith('_astrocut.fits')
+        # Open the TPF from the zip
+        data = zf.read(name)
+        with fits.open(io.BytesIO(data)) as hdul:
+            assert isinstance(hdul, fits.HDUList)
+            # Primary + PIXELS + APERTURE
+            assert len(hdul) == 3
+            assert hdul[1].header.get('EXTNAME') == 'PIXELS'
+            assert hdul[2].header.get('EXTNAME') == 'APERTURE'
 
 
 def test_tess_cube_cutout_s3():

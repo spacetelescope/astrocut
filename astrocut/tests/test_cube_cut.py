@@ -194,7 +194,7 @@ def test_parse_table_info(cube_file, ffi_type, tmp_path):
         cube_file, coord, cutout_size, ffi_type, output_path=path.join(tmpdir, "out_dir"), verbose=False
     )
 
-    assert "256.880000_6.380000_5x3_astrocut.fits" in out_file
+    assert "256.8800000_6.3800000_5-x-3_astrocut.fits" in out_file
 
     assert isinstance(cutout_maker.cube_wcs, wcs.WCS)
     ra, dec = cutout_maker.cube_wcs.wcs.crval
@@ -305,7 +305,7 @@ def test_get_cutout_limits(cube_file, ffi_type, tmp_path):
 
     cutout_size = [5*u.pixel, 7*u.pixel]
     out_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, ffi_type, verbose=False, output_path=tmpdir)
-    assert "256.880000_6.380000_5x7_astrocut.fits" in out_file
+    assert "256.8800000_6.3800000_5.0pix-x-7.0pix_astrocut.fits" in out_file
 
     xmin, xmax = cutout_maker.cutout_lims[0]
     ymin, ymax = cutout_maker.cutout_lims[1]
@@ -315,7 +315,7 @@ def test_get_cutout_limits(cube_file, ffi_type, tmp_path):
 
     cutout_size = [3*u.arcmin, 5*u.arcmin]
     out_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, ffi_type, verbose=False, output_path=tmpdir)
-    assert "256.880000_6.380000_8x15_astrocut.fits" in out_file
+    assert "256.8800000_6.3800000_3.0arcmin-x-5.0arcmin_astrocut.fits" in out_file
 
     xmin, xmax = cutout_maker.cutout_lims[0]
     ymin, ymax = cutout_maker.cutout_lims[1]
@@ -334,7 +334,7 @@ def test_small_cutout(cube_file, ffi_type, tmp_path):
     coord = "256.88 6.38"
 
     out_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, ffi_type, verbose=False, output_path=tmpdir)
-    assert "256.880000_6.380000_1x1_astrocut.fits" in out_file
+    assert "256.8800000_6.3800000_1.0arcsec-x-5.0arcsec_astrocut.fits" in out_file
 
     xmin, xmax = cutout_maker.cutout_lims[0]
     ymin, ymax = cutout_maker.cutout_lims[1]
@@ -529,17 +529,17 @@ def test_inputs(cube_file, ffi_type, tmp_path, caplog):
     assert "Image cutout cube shape: (100, 3, 5)" in captured
     assert "Using WCS from row 50 out of 100" in captured
     assert "Cutout center coordinate: 256.88, 6.38" in captured
-    assert "5x3" in cutout_file
+    assert "5.0pix-x-3.0pix" in cutout_file
 
     cutout_size = [5, 3]*u.arcmin
     cutout_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, ffi_type, output_path=tmpdir, verbose=False)
-    assert "14x9" in cutout_file
-
+    assert "5.0arcmin-x-3.0arcmin" in cutout_file
+    
     cutout_size = [5, 3, 9]*u.pixel
     with pytest.warns(InputWarning):
         cutout_file = cutout_maker.cube_cut(cube_file, coord, cutout_size, ffi_type, output_path=tmpdir, verbose=False)
-    assert "5x3" in cutout_file
-    assert "x9" not in cutout_file
+    assert "5.0pix-x-3.0pix" in cutout_file
+    assert "9.0pix" not in cutout_file
 
 
 def test_s3_cube_cut(tmp_path: Path):
