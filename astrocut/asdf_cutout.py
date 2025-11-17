@@ -114,8 +114,9 @@ class ASDFCutout(ImageCutout):
                 try:
                     from stdatamodels import asdf_in_fits
                 except ModuleNotFoundError:
-                    warnings.warn('The `stdatamodels` package is required for ASDF-in-FITS embedding. Skipping embedding for these cutouts. '
-                                  'To install astrocut with optional `stdatamodels` support, run: pip install "astrocut[all]"', ModuleWarning)
+                    warnings.warn('The `stdatamodels` package is required for ASDF-in-FITS embedding. '
+                                  'Skipping embedding for these cutouts. To install astrocut with optional '
+                                  '`stdatamodels` support, run: pip install "astrocut[all]"', ModuleWarning)
                     self._supports_stdatamodels = False
             else:
                 warnings.warn('ASDF-in-FITS embedding requires Python 3.11 or higher. '
@@ -131,7 +132,7 @@ class ASDFCutout(ImageCutout):
 
                 # Create a primary FITS header to hold data and WCS
                 primary_hdu = fits.PrimaryHDU(data=cutout.data, header=cutout.wcs.to_header(relax=True))
-                primary_hdu.header['ORIG_FLE'] = file  # Add original file to header
+                primary_hdu.header['ORIG_FLE'] = str(file)  # Add original file to header
                 hdul = fits.HDUList([primary_hdu])
 
                 if self._supports_stdatamodels:
