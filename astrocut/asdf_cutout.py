@@ -126,7 +126,7 @@ class ASDFCutout(ImageCutout):
             for i, (file, cutouts) in enumerate(self.cutouts_by_file.items()):                
                 cutout = cutouts[0]
                 if self._lite:
-                    tree = self._get_lite_tree(file, cutout, self._gwcs_objects[i])
+                    tree = self._get_lite_tree(str(file), cutout, self._gwcs_objects[i])
                 else:
                     tree = self._asdf_trees[i]
 
@@ -153,7 +153,7 @@ class ASDFCutout(ImageCutout):
             for i, (file, cutouts) in enumerate(self.cutouts_by_file.items()):
                 cutout = cutouts[0]
                 if self._lite:
-                    tree = self._get_lite_tree(file, cutout, self._gwcs_objects[i])
+                    tree = self._get_lite_tree(str(file), cutout, self._gwcs_objects[i])
                 else:
                     tree = self._asdf_trees[i]
 
@@ -174,14 +174,14 @@ class ASDFCutout(ImageCutout):
             self._asdf_cutouts = asdf_cutouts
         return self._asdf_cutouts
     
-    def _get_lite_tree(self, file: str, cutout: Cutout2D, gwcs: gwcs.wcs.WCS) -> dict:
+    def _get_lite_tree(self, file_str: str, cutout: Cutout2D, gwcs: gwcs.wcs.WCS) -> dict:
         """
         Helper function to create an ASDF tree in lite mode.
 
         Parameters
         ----------
-        file : str
-            The input filename.
+        file_str : str
+            The input filename as a string.
         cutout : `~astropy.nddata.Cutout2D`
             The cutout object.
         gwcs : gwcs.wcs.WCS
@@ -195,7 +195,7 @@ class ASDFCutout(ImageCutout):
         return {
             self._mission_kwd: {
                 'meta': {'wcs': self._slice_gwcs(cutout, gwcs),
-                         'orig_file': file},
+                         'orig_file': file_str},
                 'data': cutout.data
             }
         }
@@ -432,7 +432,7 @@ class ASDFCutout(ImageCutout):
             self._asdf_trees.append(tree)
 
         # Store cutout with filename
-        self.cutouts_by_file[file_str] = [data_cutout]
+        self.cutouts_by_file[file] = [data_cutout]
 
     def cutout(self) -> Union[str, List[str], List[fits.HDUList]]:
         """
