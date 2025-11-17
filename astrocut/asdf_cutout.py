@@ -177,7 +177,7 @@ class ASDFCutout(ImageCutout):
         return {
             self._mission_kwd: {
                 'meta': {'wcs': self._slice_gwcs(cutout, gwcs),
-                        'orig_file': file},
+                         'orig_file': file},
                 'data': cutout.data
             }
         }
