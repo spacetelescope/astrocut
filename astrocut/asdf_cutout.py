@@ -1,3 +1,4 @@
+import sys
 import warnings
 from copy import deepcopy
 from pathlib import Path
@@ -17,11 +18,10 @@ from astropy.units import Quantity
 from astropy.utils.decorators import deprecated_renamed_argument
 from astropy.wcs import WCS
 from s3path import S3Path
-from stdatamodels import asdf_in_fits
 
 from . import log, __version__
 from .image_cutout import ImageCutout
-from .exceptions import DataWarning, InvalidQueryError, InvalidInputError
+from .exceptions import DataWarning, ModuleWarning, InvalidQueryError, InvalidInputError
 
 
 class ASDFCutout(ImageCutout):
@@ -84,6 +84,9 @@ class ASDFCutout(ImageCutout):
         # Superclass constructor 
         super().__init__(input_files, coordinates, cutout_size, fill_value, verbose=verbose)
 
+        # Must be using Python 3.11 or higher to support stdatamodels and ASDF-in-FITS embedding
+        self._supports_stdatamodels = sys.version_info >= (3, 11)
+
         # Assign AWS credential attributes
         self._key = key
         self._secret = secret
@@ -106,6 +109,18 @@ class ASDFCutout(ImageCutout):
         Return the cutouts as a list `astropy.io.fits.HDUList` objects.
         """
         if not self._fits_cutouts:
+            # Try to import stdatamodels for ASDF-in-FITS embedding
+            if self._supports_stdatamodels:
+                try:
+                    from stdatamodels import asdf_in_fits
+                except ModuleNotFoundError:
+                    warnings.warn('The `stdatamodels` package is required for ASDF-in-FITS embedding. Skipping embedding for these cutouts. '
+                                  'To install astrocut with optional `stdatamodels` support, run: pip install "astrocut[all]"', ModuleWarning)
+                    self._supports_stdatamodels = False
+            else:
+                warnings.warn('ASDF-in-FITS embedding requires Python 3.11 or higher. '
+                              'Skipping embedding for these cutouts.')
+
             fits_cutouts = []
             for i, (file, cutouts) in enumerate(self.cutouts_by_file.items()):                
                 cutout = cutouts[0]
@@ -119,8 +134,10 @@ class ASDFCutout(ImageCutout):
                 primary_hdu.header['ORIG_FLE'] = file  # Add original file to header
                 hdul = fits.HDUList([primary_hdu])
 
-                # Embed ASDF into FITS
-                hdul_embed = asdf_in_fits.to_hdulist(tree, hdul)
+                if self._supports_stdatamodels:
+                    hdul_embed = asdf_in_fits.to_hdulist(tree, hdul)
+                else:
+                    hdul_embed = hdul
                 fits_cutouts.append(hdul_embed)
             self._fits_cutouts = fits_cutouts
         return self._fits_cutouts

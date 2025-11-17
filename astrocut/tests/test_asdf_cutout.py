@@ -3,6 +3,7 @@ import numpy as np
 import pytest
 import zipfile
 import io
+import importlib.util
 
 import asdf
 from astropy import coordinates as coord
@@ -14,7 +15,6 @@ from astropy.nddata import Cutout2D
 from astropy.io import fits
 from gwcs import wcs, coordinate_frames
 from PIL import Image
-from stdatamodels import asdf_in_fits
 
 from astrocut.asdf_cutout import ASDFCutout, asdf_cut, get_center_pixel
 from astrocut.exceptions import DataWarning, InvalidInputError, InvalidQueryError
@@ -196,9 +196,11 @@ def test_asdf_cutout_write_to_file(test_images, center_coord, cutout_size, tmpdi
             assert hdul[0].header['ORIG_FLE'] == test_images[i].as_posix()
             assert Path(fits_file).stat().st_size < Path(test_images[i]).stat().st_size
 
-        # Check ASDF extension contents
-        with asdf_in_fits.open(fits_file) as af:
-            check_asdf_metadata(af, test_images[i], cutout.cutouts[i].data)
+        # Check ASDF extension contents (stdatamodels optional)
+        if importlib.util.find_spec('stdatamodels') is not None:
+            from stdatamodels import asdf_in_fits
+            with asdf_in_fits.open(fits_file) as af:
+                check_asdf_metadata(af, test_images[i], cutout.cutouts[i].data)
 
 
 @pytest.mark.parametrize('output_format', ['.asdf', '.fits'])
@@ -224,7 +226,7 @@ def test_asdf_cutout_write_to_zip(tmpdir, test_images, center_coord, cutout_size
         else:
             with fits.open(io.BytesIO(data)) as hdul:
                 assert isinstance(hdul, fits.HDUList)
-                assert len(hdul) == 2  # primary + embedded ASDF extension
+                assert len(hdul) == 2 if importlib.util.find_spec('stdatamodels') is not None else 1
                 assert hdul[0].data.shape == (cutout_size, cutout_size)
 
 
@@ -254,13 +256,16 @@ def test_asdf_cutout_lite(test_images, center_coord, cutout_size):
     # Write cutouts to HDUList objects in lite mode
     cutout = ASDFCutout(test_images, center_coord, cutout_size, lite=True)
     for hdul in cutout.fits_cutouts:
-        assert len(hdul) == 2  # primary HDU + embedded ASDF extension
+        has_stdatamodels = importlib.util.find_spec('stdatamodels') is not None
+        assert len(hdul) == 2 if has_stdatamodels else 1  # primary HDU + embedded ASDF extension
         assert hdul[0].name == 'PRIMARY'
-        assert hdul[1].name == 'ASDF'
 
-        # Check ASDF extension contents
-        with asdf_in_fits.open(hdul) as af:
-            check_lite_metadata(af)
+        # Check ASDF extension contents (stdatamodels optional)
+        if has_stdatamodels:
+            assert hdul[1].name == 'ASDF'
+            from stdatamodels import asdf_in_fits
+            with asdf_in_fits.open(hdul) as af:
+                check_lite_metadata(af)
 
 
 def test_asdf_cutout_partial(test_images, center_coord, cutout_size):
