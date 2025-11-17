@@ -3,6 +3,7 @@ import numpy as np
 import pytest
 import zipfile
 import io
+import importlib.util
 
 import asdf
 from astropy import coordinates as coord
@@ -158,24 +159,28 @@ def test_asdf_cutout(test_images, center_coord, cutout_size):
 
 
 def test_asdf_cutout_write_to_file(test_images, center_coord, cutout_size, tmpdir):
+    def check_asdf_metadata(af, original_file, cutout_data):
+        """Check that ASDF file contains correct metadata"""
+        assert 'roman' in af
+        assert 'meta' in af['roman']
+        # Check cutout data and metadata
+        for key in ['data', 'dq', 'err', 'context']:
+            assert key in af['roman']
+            assert np.all(af['roman'][key] == cutout_data)
+        meta = af['roman']['meta']
+        assert meta['wcs'].pixel_shape == (10, 10)
+        assert meta['product_type'] == 'l2'
+        assert meta['file_date'] == Time('2023-10-01T00:00:00', format='isot')
+        assert meta['origin'] == 'STSCI/SOC'
+        assert meta['orig_file'] == original_file.as_posix()
+    
     # Write cutouts to ASDF files on disk
     cutout = ASDFCutout(test_images, center_coord, cutout_size)
     asdf_files = cutout.write_as_asdf(output_dir=tmpdir)
     assert len(asdf_files) == 3
     for i, asdf_file in enumerate(asdf_files):
         with asdf.open(asdf_file) as af:
-            assert 'roman' in af
-            assert 'meta' in af['roman']
-            # Check cutout data and metadata
-            for key in ['data', 'dq', 'err', 'context']:
-                assert key in af['roman']
-                assert np.all(af['roman'][key] == cutout.cutouts[i].data)
-            meta = af['roman']['meta']
-            assert meta['wcs'].pixel_shape == (10, 10)
-            assert meta['product_type'] == 'l2'
-            assert meta['file_date'] == Time('2023-10-01T00:00:00', format='isot')
-            assert meta['origin'] == 'STSCI/SOC'
-            assert meta['orig_file'] == test_images[i].as_posix()
+            check_asdf_metadata(af, test_images[i], cutout.cutouts[i].data)
             # Check file size is smaller than original
             assert Path(asdf_file).stat().st_size < Path(test_images[i]).stat().st_size
 
@@ -190,6 +195,12 @@ def test_asdf_cutout_write_to_file(test_images, center_coord, cutout_size, tmpdi
             assert hdul[0].header['NAXIS2'] == 10
             assert hdul[0].header['ORIG_FLE'] == test_images[i].as_posix()
             assert Path(fits_file).stat().st_size < Path(test_images[i]).stat().st_size
+
+        # Check ASDF extension contents (stdatamodels optional)
+        if importlib.util.find_spec('stdatamodels') is not None:
+            from stdatamodels import asdf_in_fits
+            with asdf_in_fits.open(fits_file) as af:
+                check_asdf_metadata(af, test_images[i], cutout.cutouts[i].data)
 
 
 @pytest.mark.parametrize('output_format', ['.asdf', '.fits'])
@@ -215,7 +226,7 @@ def test_asdf_cutout_write_to_zip(tmpdir, test_images, center_coord, cutout_size
         else:
             with fits.open(io.BytesIO(data)) as hdul:
                 assert isinstance(hdul, fits.HDUList)
-                assert len(hdul) == 1
+                assert len(hdul) == 2 if importlib.util.find_spec('stdatamodels') is not None else 1
                 assert hdul[0].data.shape == (cutout_size, cutout_size)
 
 
@@ -226,10 +237,9 @@ def test_asdf_cutout_write_to_zip_invalid_format(tmpdir, test_images, center_coo
         cutout.write_as_zip(output_dir=tmpdir, output_format='.invalid')
 
 
-def test_asdf_cutout_lite(test_images, center_coord, cutout_size, tmpdir):
-    # Write cutouts to ASDF objects in lite mode
-    cutout = ASDFCutout(test_images, center_coord, cutout_size, lite=True)
-    for af in cutout.asdf_cutouts:
+def test_asdf_cutout_lite(test_images, center_coord, cutout_size):
+    def check_lite_metadata(af):
+        """Check that ASDF file contains only lite metadata"""
         assert 'roman' in af
         assert 'data' in af['roman']
         assert 'meta' in af['roman']
@@ -238,11 +248,24 @@ def test_asdf_cutout_lite(test_images, center_coord, cutout_size, tmpdir):
         assert len(af['roman']) == 2  # only data and meta
         assert len(af['roman']['meta']) == 2  # only wcs and original filename
 
+    # Write cutouts to ASDF objects in lite mode
+    cutout = ASDFCutout(test_images, center_coord, cutout_size, lite=True)
+    for af in cutout.asdf_cutouts:
+        check_lite_metadata(af)
+
     # Write cutouts to HDUList objects in lite mode
     cutout = ASDFCutout(test_images, center_coord, cutout_size, lite=True)
     for hdul in cutout.fits_cutouts:
-        assert len(hdul) == 1  # primary HDU only
+        has_stdatamodels = importlib.util.find_spec('stdatamodels') is not None
+        assert len(hdul) == 2 if has_stdatamodels else 1  # primary HDU + embedded ASDF extension
         assert hdul[0].name == 'PRIMARY'
+
+        # Check ASDF extension contents (stdatamodels optional)
+        if has_stdatamodels:
+            assert hdul[1].name == 'ASDF'
+            from stdatamodels import asdf_in_fits
+            with asdf_in_fits.open(hdul) as af:
+                check_lite_metadata(af)
 
 
 def test_asdf_cutout_partial(test_images, center_coord, cutout_size):

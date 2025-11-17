@@ -7,6 +7,8 @@ Unreleased
   writing multiple cutouts into a single ZIP archive. [#167]
 - Added ``get_tess_sectors`` function to return TESS sector information for sectors whose footprints overlap with 
   the given sky coordinates and cutout size. [#168]
+- Cutouts of ASDF data in FITS format now include embedded ASDF metadata and cutout data in an "ASDF" extension within the FITS file for 
+  Python versions greater than or equal to 3.11. [#170]
 
 Breaking Changes
 ^^^^^^^^^^^^^^^^

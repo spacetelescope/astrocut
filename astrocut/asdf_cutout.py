@@ -1,3 +1,4 @@
+import sys
 import warnings
 from copy import deepcopy
 from pathlib import Path
@@ -20,7 +21,7 @@ from s3path import S3Path
 
 from . import log, __version__
 from .image_cutout import ImageCutout
-from .exceptions import DataWarning, InvalidQueryError, InvalidInputError
+from .exceptions import DataWarning, ModuleWarning, InvalidQueryError, InvalidInputError
 
 
 class ASDFCutout(ImageCutout):
@@ -83,6 +84,9 @@ class ASDFCutout(ImageCutout):
         # Superclass constructor 
         super().__init__(input_files, coordinates, cutout_size, fill_value, verbose=verbose)
 
+        # Must be using Python 3.11 or higher to support stdatamodels and ASDF-in-FITS embedding
+        self._supports_stdatamodels = sys.version_info >= (3, 11)
+
         # Assign AWS credential attributes
         self._key = key
         self._secret = secret
@@ -105,18 +109,37 @@ class ASDFCutout(ImageCutout):
         Return the cutouts as a list `astropy.io.fits.HDUList` objects.
         """
         if not self._fits_cutouts:
+            # Try to import stdatamodels for ASDF-in-FITS embedding
+            if self._supports_stdatamodels:
+                try:
+                    from stdatamodels import asdf_in_fits
+                except ModuleNotFoundError:
+                    warnings.warn('The `stdatamodels` package is required for ASDF-in-FITS embedding. '
+                                  'Skipping embedding for these cutouts. To install astrocut with optional '
+                                  '`stdatamodels` support, run: pip install "astrocut[all]"', ModuleWarning)
+                    self._supports_stdatamodels = False
+            else:
+                warnings.warn('ASDF-in-FITS embedding requires Python 3.11 or higher. '
+                              'Skipping embedding for these cutouts.', ModuleWarning)
+
             fits_cutouts = []
-            for file, cutouts in self.cutouts_by_file.items():
-                # TODO: Create a FITS object with ASDF extension
-                # Create a primary FITS header to hold data and WCS
+            for i, (file, cutouts) in enumerate(self.cutouts_by_file.items()):                
                 cutout = cutouts[0]
+                if self._lite:
+                    tree = self._get_lite_tree(str(file), cutout, self._gwcs_objects[i])
+                else:
+                    tree = self._asdf_trees[i]
+
+                # Create a primary FITS header to hold data and WCS
                 primary_hdu = fits.PrimaryHDU(data=cutout.data, header=cutout.wcs.to_header(relax=True))
+                primary_hdu.header['ORIG_FLE'] = str(file)  # Add original file to header
+                hdul = fits.HDUList([primary_hdu])
 
-                # Add original file to header
-                primary_hdu.header['ORIG_FLE'] = str(file)
-
-                # Write to HDUList
-                fits_cutouts.append(fits.HDUList([primary_hdu]))
+                if self._supports_stdatamodels:
+                    hdul_embed = asdf_in_fits.to_hdulist(tree, hdul)
+                else:
+                    hdul_embed = hdul
+                fits_cutouts.append(hdul_embed)
             self._fits_cutouts = fits_cutouts
         return self._fits_cutouts
     
@@ -130,13 +153,7 @@ class ASDFCutout(ImageCutout):
             for i, (file, cutouts) in enumerate(self.cutouts_by_file.items()):
                 cutout = cutouts[0]
                 if self._lite:
-                    tree = {
-                        self._mission_kwd: {
-                            'meta': {'wcs': self._slice_gwcs(cutout, self._gwcs_objects[i]),
-                                     'orig_file': str(file)},
-                            'data': cutout.data
-                        }
-                    }
+                    tree = self._get_lite_tree(str(file), cutout, self._gwcs_objects[i])
                 else:
                     tree = self._asdf_trees[i]
 
@@ -156,6 +173,32 @@ class ASDFCutout(ImageCutout):
 
             self._asdf_cutouts = asdf_cutouts
         return self._asdf_cutouts
+    
+    def _get_lite_tree(self, file_str: str, cutout: Cutout2D, gwcs: gwcs.wcs.WCS) -> dict:
+        """
+        Helper function to create an ASDF tree in lite mode.
+
+        Parameters
+        ----------
+        file_str : str
+            The input filename as a string.
+        cutout : `~astropy.nddata.Cutout2D`
+            The cutout object.
+        gwcs : gwcs.wcs.WCS
+            The original GWCS object.
+
+        Returns
+        -------
+        tree : dict
+            The ASDF tree in lite mode. The tree contains only the cutout data and the sliced GWCS.
+        """
+        return {
+            self._mission_kwd: {
+                'meta': {'wcs': self._slice_gwcs(cutout, gwcs),
+                         'orig_file': file_str},
+                'data': cutout.data
+            }
+        }
 
     def _get_cloud_http(self, input_file: Union[str, S3Path]) -> str:
         """ 
@@ -208,7 +251,7 @@ class ASDFCutout(ImageCutout):
 
         return tree
     
-    def _make_cutout(self, array, position, wcs):
+    def _make_cutout(self, array: np.ndarray, position: tuple, wcs: WCS) -> Cutout2D:
         """
         Helper to generate a Cutout2D and return plain ndarray data.
 
@@ -382,9 +425,10 @@ class ASDFCutout(ImageCutout):
         self._gwcs_objects.append(gwcs)
 
         # Store the ASDF tree for this cutout
+        file_str = str(file)
         if not self._lite:
             tree[self._mission_kwd]['meta']['wcs'] = self._slice_gwcs(data_cutout, gwcs)
-            tree[self._mission_kwd]['meta']['orig_file'] = str(file)
+            tree[self._mission_kwd]['meta']['orig_file'] = file_str
             self._asdf_trees.append(tree)
 
         # Store cutout with filename
@@ -420,7 +464,7 @@ class ASDFCutout(ImageCutout):
 
         return self.cutouts
     
-    def _make_cutout_filename(self, file: Union[str, Path], output_format: str) -> str:
+    def _make_cutout_filename(self, file: str, output_format: str) -> str:
         """
         Generate a standardized filename for the cutout.
 
@@ -428,7 +472,7 @@ class ASDFCutout(ImageCutout):
 
         Parameters
         ----------
-        file : str | Path
+        file : str
             The input file name.
         output_format : str
             The output format to write the cutout to. Options are '.fits' and '.asdf'.

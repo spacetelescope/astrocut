@@ -50,3 +50,10 @@ class DataWarning(AstropyWarning):
     Warnings to do with data content.
     """
     pass
+
+
+class ModuleWarning(AstropyWarning):
+    """
+    Warnings to do with optional modules.
+    """
+    pass
