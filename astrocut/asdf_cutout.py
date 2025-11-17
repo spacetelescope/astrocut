@@ -17,6 +17,7 @@ from astropy.units import Quantity
 from astropy.utils.decorators import deprecated_renamed_argument
 from astropy.wcs import WCS
 from s3path import S3Path
+from stdatamodels import asdf_in_fits
 
 from . import log, __version__
 from .image_cutout import ImageCutout
@@ -106,17 +107,21 @@ class ASDFCutout(ImageCutout):
         """
         if not self._fits_cutouts:
             fits_cutouts = []
-            for file, cutouts in self.cutouts_by_file.items():
-                # TODO: Create a FITS object with ASDF extension
-                # Create a primary FITS header to hold data and WCS
+            for i, (file, cutouts) in enumerate(self.cutouts_by_file.items()):                
                 cutout = cutouts[0]
+                if self._lite:
+                    tree = self._get_lite_tree(file, cutout, self._gwcs_objects[i])
+                else:
+                    tree = self._asdf_trees[i]
+
+                # Create a primary FITS header to hold data and WCS
                 primary_hdu = fits.PrimaryHDU(data=cutout.data, header=cutout.wcs.to_header(relax=True))
+                primary_hdu.header['ORIG_FLE'] = file  # Add original file to header
+                hdul = fits.HDUList([primary_hdu])
 
-                # Add original file to header
-                primary_hdu.header['ORIG_FLE'] = str(file)
-
-                # Write to HDUList
-                fits_cutouts.append(fits.HDUList([primary_hdu]))
+                # Embed ASDF into FITS
+                hdul_embed = asdf_in_fits.to_hdulist(tree, hdul)
+                fits_cutouts.append(hdul_embed)
             self._fits_cutouts = fits_cutouts
         return self._fits_cutouts
     
@@ -130,13 +135,7 @@ class ASDFCutout(ImageCutout):
             for i, (file, cutouts) in enumerate(self.cutouts_by_file.items()):
                 cutout = cutouts[0]
                 if self._lite:
-                    tree = {
-                        self._mission_kwd: {
-                            'meta': {'wcs': self._slice_gwcs(cutout, self._gwcs_objects[i]),
-                                     'orig_file': str(file)},
-                            'data': cutout.data
-                        }
-                    }
+                    tree = self._get_lite_tree(file, cutout, self._gwcs_objects[i])
                 else:
                     tree = self._asdf_trees[i]
 
@@ -156,6 +155,32 @@ class ASDFCutout(ImageCutout):
 
             self._asdf_cutouts = asdf_cutouts
         return self._asdf_cutouts
+    
+    def _get_lite_tree(self, file: str, cutout: Cutout2D, gwcs: gwcs.wcs.WCS) -> dict:
+        """
+        Helper function to create an ASDF tree in lite mode.
+
+        Parameters
+        ----------
+        file : str
+            The input filename.
+        cutout : `~astropy.nddata.Cutout2D`
+            The cutout object.
+        gwcs : gwcs.wcs.WCS
+            The original GWCS object.
+
+        Returns
+        -------
+        tree : dict
+            The ASDF tree in lite mode. The tree contains only the cutout data and the sliced GWCS.
+        """
+        return {
+            self._mission_kwd: {
+                'meta': {'wcs': self._slice_gwcs(cutout, gwcs),
+                        'orig_file': file},
+                'data': cutout.data
+            }
+        }
 
     def _get_cloud_http(self, input_file: Union[str, S3Path]) -> str:
         """ 
@@ -208,7 +233,7 @@ class ASDFCutout(ImageCutout):
 
         return tree
     
-    def _make_cutout(self, array, position, wcs):
+    def _make_cutout(self, array: np.ndarray, position: tuple, wcs: WCS) -> Cutout2D:
         """
         Helper to generate a Cutout2D and return plain ndarray data.
 
