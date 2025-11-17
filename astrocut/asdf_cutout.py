@@ -425,13 +425,14 @@ class ASDFCutout(ImageCutout):
         self._gwcs_objects.append(gwcs)
 
         # Store the ASDF tree for this cutout
+        file_str = str(file)
         if not self._lite:
             tree[self._mission_kwd]['meta']['wcs'] = self._slice_gwcs(data_cutout, gwcs)
-            tree[self._mission_kwd]['meta']['orig_file'] = str(file)
+            tree[self._mission_kwd]['meta']['orig_file'] = file_str
             self._asdf_trees.append(tree)
 
         # Store cutout with filename
-        self.cutouts_by_file[file] = [data_cutout]
+        self.cutouts_by_file[file_str] = [data_cutout]
 
     def cutout(self) -> Union[str, List[str], List[fits.HDUList]]:
         """
@@ -463,7 +464,7 @@ class ASDFCutout(ImageCutout):
 
         return self.cutouts
     
-    def _make_cutout_filename(self, file: Union[str, Path], output_format: str) -> str:
+    def _make_cutout_filename(self, file: str, output_format: str) -> str:
         """
         Generate a standardized filename for the cutout.
 
@@ -471,7 +472,7 @@ class ASDFCutout(ImageCutout):
 
         Parameters
         ----------
-        file : str | Path
+        file : str
             The input file name.
         output_format : str
             The output format to write the cutout to. Options are '.fits' and '.asdf'.
