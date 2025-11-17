@@ -120,7 +120,7 @@ class ASDFCutout(ImageCutout):
                     self._supports_stdatamodels = False
             else:
                 warnings.warn('ASDF-in-FITS embedding requires Python 3.11 or higher. '
-                              'Skipping embedding for these cutouts.')
+                              'Skipping embedding for these cutouts.', ModuleWarning)
 
             fits_cutouts = []
             for i, (file, cutouts) in enumerate(self.cutouts_by_file.items()):                
