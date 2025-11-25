@@ -4,6 +4,7 @@ from copy import deepcopy
 from pathlib import Path
 from time import monotonic
 from typing import List, Tuple, Union, Optional
+from datetime import date
 
 import asdf
 import gwcs
@@ -85,7 +86,7 @@ class ASDFCutout(ImageCutout):
         super().__init__(input_files, coordinates, cutout_size, fill_value, verbose=verbose)
 
         # Must be using Python 3.11 or higher to support stdatamodels and ASDF-in-FITS embedding
-        self._supports_stdatamodels = sys.version_info >= (3, 11)
+        self._py311_or_higher = sys.version_info >= (3, 11)
 
         # Assign AWS credential attributes
         self._key = key
@@ -110,32 +111,62 @@ class ASDFCutout(ImageCutout):
         """
         if not self._fits_cutouts:
             # Try to import stdatamodels for ASDF-in-FITS embedding
-            if self._supports_stdatamodels:
+            if self._py311_or_higher:
                 try:
-                    from stdatamodels import asdf_in_fits
-                except ModuleNotFoundError:
-                    warnings.warn('The `stdatamodels` package is required for ASDF-in-FITS embedding. '
-                                  'Skipping embedding for these cutouts. To install astrocut with optional '
-                                  '`stdatamodels` support, run: pip install "astrocut[all]"', ModuleWarning)
-                    self._supports_stdatamodels = False
+                    # Check version of stdatamodels
+                    from stdatamodels import __version__ as stdata_version, asdf_in_fits
+                    if stdata_version < '4.1.0':
+                        warnings.warn(
+                            'The `stdatamodels` package is not available in the correct version (>=4.1.0); '
+                            'ASDF-in-FITS embedding will be skipped for these cutouts. Install the optional '
+                            'dependency with: pip install "astrocut[all]" or pip install stdatamodels>=4.1.0',
+                            ModuleWarning
+                        )
+                        self._can_embed_asdf_in_fits = False
+                    else:
+                        self._can_embed_asdf_in_fits = True
+                except ImportError:
+                    warnings.warn(
+                        'The `stdatamodels` package cannot be imported; ASDF-in-FITS embedding will be '
+                        'skipped for these cutouts. Install the optional dependency with: '
+                        'pip install "astrocut[all]" or pip install stdatamodels>=4.1.0',
+                        ModuleWarning
+                    )
+                    self._can_embed_asdf_in_fits = False
             else:
                 warnings.warn('ASDF-in-FITS embedding requires Python 3.11 or higher. '
                               'Skipping embedding for these cutouts.', ModuleWarning)
+                self._can_embed_asdf_in_fits = False
 
             fits_cutouts = []
             for i, (file, cutouts) in enumerate(self.cutouts_by_file.items()):                
                 cutout = cutouts[0]
                 if self._lite:
-                    tree = self._get_lite_tree(str(file), cutout, self._gwcs_objects[i])
+                    tree = {
+                        # Tree should only include sliced WCS and original filename
+                        self._mission_kwd: {
+                            'meta': {'wcs': self._slice_gwcs(cutout, self._gwcs_objects[i]),
+                                     'orig_file': str(file)}
+                        }
+                    }
                 else:
                     tree = self._asdf_trees[i]
+                    # Tree should only include meta
+                    tree[self._mission_kwd] = {'meta': tree[self._mission_kwd]['meta']}
 
-                # Create a primary FITS header to hold data and WCS
-                primary_hdu = fits.PrimaryHDU(data=cutout.data, header=cutout.wcs.to_header(relax=True))
-                primary_hdu.header['ORIG_FLE'] = str(file)  # Add original file to header
-                hdul = fits.HDUList([primary_hdu])
+                # Build the PrimaryHDU with keywords
+                primary_hdu = fits.PrimaryHDU()
+                primary_hdu.header.extend([('ORIGIN', 'STScI/MAST', 'institution responsible for creating this file'),
+                                           ('DATE', str(date.today()), 'file creation date'),
+                                           ('PROCVER', __version__, 'software version')])
+                
+                # Build ImageHDU with cutout data and WCS
+                image_hdu = fits.ImageHDU(data=cutout.data, header=cutout.wcs.to_header(relax=True))
+                image_hdu.header['ORIG_FLE'] = str(file)  # Add original file to header
+                image_hdu.header['EXTNAME'] = 'CUTOUT'
+                hdul = fits.HDUList([primary_hdu, image_hdu])
 
-                if self._supports_stdatamodels:
+                if self._can_embed_asdf_in_fits:
                     hdul_embed = asdf_in_fits.to_hdulist(tree, hdul)
                 else:
                     hdul_embed = hdul
