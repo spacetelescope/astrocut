@@ -423,11 +423,12 @@ def test_asdf_cutout_stdatamodels(test_images, center_coord, cutout_size, is_ins
     patch_dict = {'stdatamodels': mock_stdatamodels}
 
     with patch.dict('sys.modules', patch_dict):
-        with pytest.warns(ModuleWarning, match=warn_msg):
-            cutout = ASDFCutout(test_images, center_coord, cutout_size)
-            fits_cutouts = cutout.fits_cutouts
-        assert cutout._can_embed_asdf_in_fits is False
-        assert len(fits_cutouts[0]) == 2  # primary + cutout HDU only
+        with patch('sys.version_info', (3, 11, 0)):
+            with pytest.warns(ModuleWarning, match=warn_msg):
+                cutout = ASDFCutout(test_images, center_coord, cutout_size)
+                fits_cutouts = cutout.fits_cutouts
+            assert cutout._can_embed_asdf_in_fits is False
+            assert len(fits_cutouts[0]) == 2  # primary + cutout HDU only
 
 
 def test_asdf_cutout_python_version(test_images, center_coord, cutout_size):

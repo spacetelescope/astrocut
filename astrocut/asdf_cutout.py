@@ -158,7 +158,9 @@ class ASDFCutout(ImageCutout):
                 primary_hdu = fits.PrimaryHDU()
                 primary_hdu.header.extend([('ORIGIN', 'STScI/MAST', 'institution responsible for creating this file'),
                                            ('DATE', str(date.today()), 'file creation date'),
-                                           ('PROCVER', __version__, 'software version')])
+                                           ('PROCVER', __version__, 'software version'),
+                                           ('RA_OBJ', self._coordinates.ra.value, 'right ascension of cutout center (deg)'),
+                                           ('DEC_OBJ', self._coordinates.dec.value, 'declination of cutout center (deg)')])
                 
                 # Build ImageHDU with cutout data and WCS
                 image_hdu = fits.ImageHDU(data=cutout.data, header=cutout.wcs.to_header(relax=True))
