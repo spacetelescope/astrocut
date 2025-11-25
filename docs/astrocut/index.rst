@@ -163,7 +163,9 @@ The ``asdf_cutouts`` attribute is a list of cutouts as `~asdf.AsdfFile` objects,
   >>> cutout_fits.info() #doctest: +SKIP
   Filename: (No file associated with this HDUList)
   No.    Name      Ver    Type      Cards   Dimensions   Format
-    0  PRIMARY       1 PrimaryHDU      25   (25, 25)   float32  
+    0  PRIMARY       1 PrimaryHDU      11   ()      
+    1  CUTOUT        1 ImageHDU        67   (25, 25)   float32   
+    2  ASDF          1 BinTableHDU     13   1R x 1C   ['36470B']   
 
 To write the cutouts and their metadata to ASDF files, use the `~astrocut.ASDFCutout.write_as_asdf` method. This method returns a list of paths to the
 cutout ASDF files. 
@@ -191,7 +193,9 @@ cutout FITS files.
   ...     hdul.info() #doctest: +SKIP
   Filename: r0099101001001001001_F158_visit_r274dp63x31y81_i2d_269.6970000_66.0450000_25-x-25_astrocut.fits
   No.    Name      Ver    Type      Cards   Dimensions   Format
-    0  PRIMARY       1 PrimaryHDU      27   (25, 25)   float32  
+    0  PRIMARY       1 PrimaryHDU      11   ()      
+    1  CUTOUT        1 ImageHDU        67   (25, 25)   float32   
+    2  ASDF          1 BinTableHDU     13   1R x 1C   [36470B]   
 
 By default, the cutouts are written to the current working directory. You can specify a different output directory using the ``output_dir`` parameter
 in either of the write functions.
