@@ -98,7 +98,7 @@ jobs:
             python: 3.x
             toxenv: codestyle
 
-          - name: (Allowed Failure) Python 3.11 with dev version of key dependencies
+          - name: (Allowed Failure) Python 3.12 with dev version of key dependencies
             os: ubuntu-latest
             python: 3.12
             toxenv: py312-test-devdeps
