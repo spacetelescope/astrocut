@@ -100,8 +100,8 @@ jobs:
 
           - name: (Allowed Failure) Python 3.11 with dev version of key dependencies
             os: ubuntu-latest
-            python: 3.11
-            toxenv: py311-test-devdeps
+            python: 3.12
+            toxenv: py312-test-devdeps
 
     steps:
       - name: Checkout code
