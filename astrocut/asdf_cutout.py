@@ -669,7 +669,7 @@ def get_center_pixel(gwcsobj: gwcs.wcs.WCS, ra: float, dec: float) -> Tuple[Tupl
     coordinates = SkyCoord(ra, dec, unit='deg')
 
     # Map the coordinates to a pixel's location on the Roman 2d array (row, col)
-    row, col = gwcsobj.invert(coordinates, with_bounding_box=False)
+    row, col = gwcsobj.invert(coordinates.ra.deg, coordinates.dec.deg, with_bounding_box=False)
 
     return (row, col), wcs_updated
 
