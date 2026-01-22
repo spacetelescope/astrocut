@@ -19,7 +19,27 @@ from . import log
 from .utils.utils import _handle_verbose
 
 
-class Cutout(ABC):
+class BaseCutout(ABC):
+    """
+    Abstract base class for cutouts.
+    """
+    
+    def __init__(self, verbose: bool = False):
+        # Log messages according to verbosity
+        _handle_verbose(verbose)
+        self._verbose = verbose
+
+    @abstractmethod
+    def cutout(self):
+        """
+        Generate the cutout(s).
+
+        This method is abstract and should be defined in subclasses.
+        """
+        raise NotImplementedError('Subclasses must implement this method.')
+
+
+class Cutout(BaseCutout, ABC):
     """
     Abstract class for creating cutouts. This class defines attributes and methods that are common to all
     cutout classes.
@@ -50,8 +70,7 @@ class Cutout(ABC):
                  fill_value: Union[int, float] = np.nan, limit_rounding_method: str = 'round', 
                  verbose: bool = False):
         
-        # Log messages according to verbosity
-        _handle_verbose(verbose)
+        super().__init__(verbose=verbose)
 
         # Ensure that input files are in a list
         if isinstance(input_files, str) or isinstance(input_files, Path):
@@ -143,15 +162,6 @@ class Cutout(ABC):
                 lims[axis, 0] = int(np.floor(center_pixel[axis]))
                 lims[axis, 1] = lims[axis, 0] + 1
         return lims
-
-    @abstractmethod
-    def cutout(self):
-        """
-        Generate the cutout(s).
-
-        This method is abstract and should be defined in subclasses.
-        """
-        raise NotImplementedError('Subclasses must implement this method.')
     
     def _make_cutout_filename(self, file_stem: str) -> str:
         """
