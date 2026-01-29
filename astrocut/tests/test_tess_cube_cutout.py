@@ -389,7 +389,6 @@ def test_tess_cube_cutout_threads():
 @pytest.mark.parametrize("ffi_type", ["SPOC"])
 def test_tess_cube_cutout_not_in_footprint(cube_file):
     # Make a cutout with a coordinate outside the image footprint
-    warnings.simplefilter('error')
     coord = SkyCoord(10, 10, unit="deg", frame="icrs")
     with pytest.warns(DataWarning, match='Cutout footprint does not overlap'):
         with pytest.raises(InvalidQueryError, match='Cube cutout contains no data!'):
