@@ -665,13 +665,10 @@ def get_center_pixel(gwcsobj: gwcs.wcs.WCS, ra: float, dec: float) -> Tuple[Tupl
         warnings.simplefilter('ignore')
         wcs_updated = WCS(header)
 
-    # Turn input RA, Dec into a SkyCoord object
-    coordinates = SkyCoord(ra, dec, unit='deg')
-
-    # Map the coordinates to a pixel's location on the Roman 2d array (row, col)
-    row, col = gwcsobj.invert(coordinates.ra.deg, coordinates.dec.deg, with_bounding_box=False)
-
-    return (row, col), wcs_updated
+    # Map the coordinates to a pixel's location on the 2d image
+    row, col = gwcsobj.invert(np.atleast_1d(ra), np.atleast_1d(dec), with_bounding_box=False)
+    pixel_coords = (float(row[0]), float(col[0]))
+    return pixel_coords, wcs_updated
 
 
 @deprecated_renamed_argument('output_file', None, '1.0.0', warning_type=DeprecationWarning,

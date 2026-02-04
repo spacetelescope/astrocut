@@ -9,6 +9,7 @@ Unreleased
   the given sky coordinates and cutout size. [#168]
 - Cutouts of ASDF data in FITS format now include embedded ASDF metadata in an "ASDF" extension within the FITS file for 
   Python versions greater than or equal to 3.11. [#170]
+- Bugfix for getting the pixel location of given coordinates in ``ASDFCutout``. [#175]
 
 Breaking Changes
 ^^^^^^^^^^^^^^^^
