@@ -40,3 +40,4 @@ if not _ASTROPY_SETUP_:  # noqa
     from .tess_cube_cutout import TessCubeCutout  # noqa
     from .footprint_cutout import ra_dec_crossmatch # noqa
     from .tess_footprint_cutout import TessFootprintCutout, cube_cut_from_footprint, get_tess_sectors  # noqa
+    from .roman_spectral_cutout import RomanSpectralCutout  # noqa
