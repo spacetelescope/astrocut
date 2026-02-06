@@ -2,12 +2,9 @@ from abc import ABC
 from pathlib import Path
 from typing import Union, List, Optional
 
-import asdf
 from s3path import S3Path
 
-from . import __version__
 from .cutout import BaseCutout
-from .exceptions import InvalidQueryError
 
 
 class SpectralCutout(BaseCutout, ABC):

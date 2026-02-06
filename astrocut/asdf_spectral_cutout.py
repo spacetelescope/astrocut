@@ -24,31 +24,36 @@ class ASDFSpectralCutout(SpectralCutout, ABC):
                  verbose: bool = False):
         super().__init__(file, source_ids, wl_range, lite, verbose)
 
-        self._asdf_cutouts = {}
-        self._fits_cutouts = {}
         self._out_trees = {}  # Store ASDF tree for the cutout
         self._mission_keyword = None  # To be set in subclass
+    
+    def get_asdf_cutout(self, source_id: Union[str, int]) -> asdf.AsdfFile:
+        """
+        Get the ASDF cutout for a specific source ID.
 
-    @property
-    def asdf_cutouts(self) -> asdf.AsdfFile:
+        Parameters
+        ----------
+        source_id : str or int
+            The source ID for which to retrieve the ASDF cutout.
+
+        Returns
+        -------
+        asdf.AsdfFile
+            The ASDF file containing the cutout for the specified source ID.
         """
-        Return the ASDF file containing the spectral cutout(s).
-        """
-        if not self._asdf_cutouts:
-            for sid, tree in self._out_trees.items():
-                af = asdf.AsdfFile(tree)
-                af.add_history_entry(
-                    f"Spectral cutout created for source ID {sid} "
-                    f"with wavelength range {self._wl_range}.",
-                    software={
-                        "name": "astrocut",
-                        "author": "Space Telescope Science Institute",
-                        "version": __version__,
-                        "homepage": "https://astrocut.readthedocs.io/en/latest/",
-                    },
-                )
-                self._asdf_cutouts[sid] = af
-        return self._asdf_cutouts
+        tree = self._out_trees[source_id]
+        af = asdf.AsdfFile(tree)
+        af.add_history_entry(
+            f"Spectral cutout created for source ID {source_id} "
+            f"with wavelength range {self._wl_range}.",
+            software={
+                "name": "astrocut",
+                "author": "Space Telescope Science Institute",
+                "version": __version__,
+                "homepage": "https://astrocut.readthedocs.io/en/latest/",
+            },
+        )
+        return af
 
     def cutout(self):
         """
@@ -71,7 +76,7 @@ class ASDFSpectralCutout(SpectralCutout, ABC):
             }
 
             for sid in self._source_ids:
-                #sid = str(sid)
+                # sid = str(sid)
                 if sid not in mission_data:
                     raise InvalidQueryError(f'Source ID {sid} not found in the data.')
                 
@@ -114,7 +119,8 @@ class ASDFSpectralCutout(SpectralCutout, ABC):
 
                 self._out_trees[sid] = out_tree
 
-    def write_as_asdf(self, output_dir: Union[str, Path] = '.') -> List[str]:
+    def write_as_asdf(self, output_dir: Union[str, Path] = '.', 
+                      source_ids: Union[str, int, List[Union[str, int]]] = None) -> List[str]:
         """
         Write the ASDF cutout(s) to files in the specified output directory.
 
@@ -122,19 +128,28 @@ class ASDFSpectralCutout(SpectralCutout, ABC):
         ----------
         output_dir : str or Path
             Directory where the ASDF cutout files will be saved.
+        source_ids : str or int or list, optional
+            Specific source IDs to write. If None, all source IDs will be written.
 
         Returns
         -------
         List[str]
             List of file paths where the ASDF cutouts were saved.
         """
+        out_trees = self._out_trees
+        if source_ids is not None:
+            if not isinstance(source_ids, list):
+                source_ids = [source_ids]
+            out_trees = {sid: self._out_trees[sid] for sid in source_ids}
+
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
         cutout_paths = []  # List to store paths to cutout files
-        for sid, af in self.asdf_cutouts.items():
+        for sid in out_trees.keys():
             filename = f'{Path(self._file).stem}_cutout_{sid}{ "_lite" if self._lite else ""}.asdf'
             cutout_path = output_dir / filename
+            af = self.get_asdf_cutout(sid)
             af.write_to(cutout_path)
             cutout_paths.append(str(cutout_path))
 
