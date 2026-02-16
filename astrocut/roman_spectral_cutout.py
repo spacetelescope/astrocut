@@ -16,8 +16,8 @@ class RomanSpectralCutout(ASDFSpectralCutout):
     def __init__(self, 
                  file: Union[str, Path, S3Path], 
                  source_ids: Union[str, int, List[Union[str, int]]], 
-                 wl_range: Union[tuple, list],
-                 lite: Optional[bool] = False,
+                 wl_range: Union[tuple, list] = None,
+                 lite: Optional[bool] = True,
                  verbose: bool = False):
         super().__init__(file, source_ids, wl_range, lite, verbose)
         self._mission_keyword = 'roman'
@@ -78,14 +78,14 @@ def _parallel_roman_spectral_cutout_worker(
     return cutout.write_as_asdf(output_dir)
 
 
-def roman_spectral_cutout(
+def roman_spectral_cut(
     file: Union[str, Path, S3Path],
     source_ids: Union[List[str], List[int]],
     wl_range: tuple,
     *,
     lite: bool = True,
     output_dir: Union[str, Path] = ".",
-    batch_size: int = 100,
+    batch_size: int = 128,
     workers: Optional[int] = None,
 ) -> List[str]:
     """

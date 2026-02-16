@@ -16,7 +16,7 @@ class SpectralCutout(BaseCutout, ABC):
     def __init__(self, 
                  file: Union[str, Path, S3Path], 
                  source_ids: Union[str, int, List[Union[str, int]]], 
-                 wl_range: Union[tuple, list],
+                 wl_range: Union[tuple, list] = None,
                  lite: Optional[bool] = False,
                  verbose: bool = False):
         super().__init__(verbose=verbose)
