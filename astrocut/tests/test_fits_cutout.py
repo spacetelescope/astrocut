@@ -236,8 +236,12 @@ def test_fits_cutout_cloud():
     test_s3_uri = "s3://stpubdata/hst/public/j8pu/j8pu0y010/j8pu0y010_drc.fits"
     center_coord = SkyCoord("150.4275416667 2.42155", unit='deg')
     cutout_size = [10, 15]
-    cutout = FITSCutout(test_s3_uri, center_coord, cutout_size).fits_cutouts[0]
-    assert cutout[1].data.shape == (15, 10)
+    with patch('astrocut.fits_cutout.fits.open', wraps=fits.open) as mock_open:
+        cutout = FITSCutout(test_s3_uri, center_coord, cutout_size).fits_cutouts[0]
+        assert cutout[1].data.shape == (15, 10)
+        # Verify fsspec_kwargs was passed with anonymous access
+        call_fsspec_kwargs = mock_open.call_args.kwargs['fsspec_kwargs']
+        assert call_fsspec_kwargs['anon'] is True
 
 
 def test_fits_cutout_cloud_fsspec_kwargs():
@@ -245,13 +249,14 @@ def test_fits_cutout_cloud_fsspec_kwargs():
     test_s3_uri = "s3://stpubdata/hst/public/j8pu/j8pu0y010/j8pu0y010_drc.fits"
     center_coord = SkyCoord("150.4275416667 2.42155", unit='deg')
     cutout_size = [10, 15]
-    fsspec_kwargs = {'default_block_size': 1 * 1024 * 1024}
+    new_default_block_size = 1 * 1024 * 1024
+    fsspec_kwargs = {'default_block_size': new_default_block_size}
     with patch('astrocut.fits_cutout.fits.open', wraps=fits.open) as mock_open:
         FITSCutout(test_s3_uri, center_coord, cutout_size, fsspec_kwargs=fsspec_kwargs).fits_cutouts[0]
         # Verify fsspec_kwargs was passed with user's kwargs merged in
         call_fsspec_kwargs = mock_open.call_args.kwargs['fsspec_kwargs']
         assert call_fsspec_kwargs['anon'] is True
-        assert call_fsspec_kwargs['default_block_size'] == 1 * 1024 * 1024
+        assert call_fsspec_kwargs['default_block_size'] == new_default_block_size
 
 
 def test_fits_cutout_rounding(test_images, cutout_size):
