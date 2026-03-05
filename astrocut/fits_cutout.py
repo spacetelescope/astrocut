@@ -42,6 +42,8 @@ class FITSCutout(ImageCutout):
         Optional, default True. If True, all cutouts are written to a single file or HDUList.
     verbose : bool
         If True, log messages are printed to the console.
+    fsspec_kwargs : dict
+        Optional, default None. Keyword arguments to pass through to `s3fs` for cloud-hosted files.
 
     Attributes
     ----------
@@ -619,7 +621,7 @@ def fits_cut(input_files: List[Union[str, Path, S3Path]], coordinates: Union[Sky
              correct_wcs: bool = False, extension: Optional[Union[int, List[int], Literal['all']]] = None,
              single_outfile: bool = True, cutout_prefix: str = 'cutout', output_dir: Union[str, Path] = '.',
              memory_only: bool = False, fill_value: Union[int, float] = np.nan, limit_rounding_method: str = 'round',
-             verbose=False) -> Union[str, List[str], List[HDUList]]:
+             verbose=False, fsspec_kwargs: Optional[dict] = None) -> Union[str, List[str], List[HDUList]]:
     """
     Takes one or more FITS files with the same WCS/pointing, makes the same cutout in each file,
     and returns the result either in a single FITS file with one cutout per extension or in
@@ -669,6 +671,8 @@ def fits_cut(input_files: List[Union[str, Path, S3Path]], coordinates: Union[Sky
         Method to use for rounding the cutout limits. Options are 'round', 'ceil', and 'floor'.
     verbose : bool
         Default False. If true intermediate information is printed.
+    fsspec_kwargs : dict
+        Optional, default None. Keyword arguments to pass through to `s3fs` for cloud-hosted files.
 
     Returns
     -------
@@ -679,7 +683,7 @@ def fits_cut(input_files: List[Union[str, Path, S3Path]], coordinates: Union[Sky
         file name(s).
     """
     fits_cutout = FITSCutout(input_files, coordinates, cutout_size, fill_value, limit_rounding_method,
-                             extension, single_outfile, verbose)
+                             extension, single_outfile, verbose, fsspec_kwargs)
 
     if memory_only:
         return fits_cutout.fits_cutouts
