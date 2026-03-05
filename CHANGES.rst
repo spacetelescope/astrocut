@@ -1,5 +1,9 @@
 Unreleased
-----------
+-----------
+
+
+1.2.0 (2026-02-04)
+-------------------
 
 - Added support in ``ra_dec_crossmatch`` for a cutout size of zero, enabling single-point matching to FFIs that contain
   the specified coordinates. [#166]
