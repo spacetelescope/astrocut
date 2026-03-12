@@ -42,6 +42,8 @@ class FITSCutout(ImageCutout):
         Optional, default True. If True, all cutouts are written to a single file or HDUList.
     verbose : bool
         If True, log messages are printed to the console.
+    fsspec_kwargs : dict
+        Optional, default None. Keyword arguments to pass through to `s3fs` for cloud-hosted files.
 
     Attributes
     ----------
@@ -59,15 +61,15 @@ class FITSCutout(ImageCutout):
     write_as_fits(output_dir, cutout_prefix)
         Write the cutouts to files in FITS format.
     """
-        
-    def __init__(self, input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyCoord, str], 
+
+    def __init__(self, input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyCoord, str],
                  cutout_size: Union[int, np.ndarray, Quantity, List[int], Tuple[int]] = 25,
                  fill_value: Union[int, float] = np.nan, limit_rounding_method: str = 'round',
-                 extension: Optional[Union[int, List[int], Literal['all']]] = None, 
-                 single_outfile: bool = True, verbose: bool = False):
-        # Superclass constructor 
+                 extension: Optional[Union[int, List[int], Literal['all']]] = None,
+                 single_outfile: bool = True, verbose: bool = False, *, fsspec_kwargs: Optional[dict] = None):
+        # Superclass constructor
         super().__init__(input_files, coordinates, cutout_size, fill_value, limit_rounding_method, verbose)
-               
+
         # If a single extension is given, make it a list
         if isinstance(extension, int):
             extension = [extension]
@@ -77,6 +79,7 @@ class FITSCutout(ImageCutout):
         self._single_outfile = single_outfile
         self._fits_cutouts = None
         self.hdu_cutouts_by_file = {}
+        self._fsspec_kwargs = fsspec_kwargs
 
         # Make the cutouts upon initialization
         self.cutout()
@@ -94,7 +97,7 @@ class FITSCutout(ImageCutout):
         -------
         response : `~astropy.io.fits.HDUList`
             The HDUList object.
-        """        
+        """
         # Setting up the Primary HDU
         keywords = dict()
         if self._coordinates:
@@ -148,7 +151,7 @@ class FITSCutout(ImageCutout):
         if len(infile_exts) == 0:
             warnings.warn(f'No image extensions with data found in {input_file}, skipping...', DataWarning)
             return []
-                
+
         if self._extension is None:
             cutout_exts = infile_exts[:1]  # Take the first image extension
         elif self._extension == 'all':
@@ -179,7 +182,11 @@ class FITSCutout(ImageCutout):
             The indices of the extension(s) to cutout from.
         """
         # Account for cloud-hosted files
-        fsspec_kwargs = {'anon': True} if 's3://' in input_file else None
+        fsspec_kwargs = None
+        if 's3://' in input_file:
+            fsspec_kwargs = {'anon': True}
+            if self._fsspec_kwargs:
+                fsspec_kwargs.update(self._fsspec_kwargs)
 
         # Open the file
         hdulist = fits.open(input_file, mode='denywrite', memmap=True, fsspec_kwargs=fsspec_kwargs)
@@ -189,7 +196,7 @@ class FITSCutout(ImageCutout):
         cutout_inds = self._parse_extensions(input_file, infile_exts)
 
         return (hdulist, cutout_inds)
-    
+
     def _get_img_wcs(self, hdu_header: fits.Header) -> Tuple[WCS, bool]:
         """
         Get the WCS for an image.
@@ -198,7 +205,7 @@ class FITSCutout(ImageCutout):
         ----------
         hdu_header : `~astropy.io.fits.Header`
             The header for the image HDU.
-        
+
         Returns
         --------
         img_wcs : `~astropy.wcs.WCS`
@@ -213,7 +220,7 @@ class FITSCutout(ImageCutout):
         # correct and adjusting the header keywords to match.
         hdlrs = astropy_log.handlers
         astropy_log.handlers = []
-        with astropy_log.log_to_list() as log_list:        
+        with astropy_log.log_to_list() as log_list:
             img_wcs = WCS(hdu_header, relax=True)
 
         for hd in hdlrs:
@@ -244,7 +251,7 @@ class FITSCutout(ImageCutout):
             The WCS for the image.
         hdu_header : `~astropy.io.fits.Header`
             The header for the image HDU.
-        no_sip : bool   
+        no_sip : bool
             Whether the image WCS has no SIP information.
         ind : int
             The index of the extension in the original file.
@@ -309,7 +316,7 @@ class FITSCutout(ImageCutout):
         for ind in cutout_inds:
             try:
                 # Get HDU, header, and WCS
-                img_hdu = hdulist[ind] 
+                img_hdu = hdulist[ind]
                 hdu_header = fits.Header(img_hdu.header, copy=True)
                 img_wcs, no_sip = self._get_img_wcs(hdu_header)
                 primary_filename = hdulist[0].header.get('FILENAME')
@@ -327,7 +334,7 @@ class FITSCutout(ImageCutout):
                     cutouts.append(cutout)
 
                 # Also save the cutouts as ImageHDU objects for FITS output
-                fits_cutouts.append(self._hducut(cutout.data, cutout.wcs, hdu_header, no_sip, ind, 
+                fits_cutouts.append(self._hducut(cutout.data, cutout.wcs, hdu_header, no_sip, ind,
                                                  primary_filename, is_empty))
 
             except OSError as err:
@@ -349,7 +356,7 @@ class FITSCutout(ImageCutout):
                     num_empty += 1
                 else:
                     raise
-        
+
         # Close HDUList
         hdulist.close()
 
@@ -381,7 +388,7 @@ class FITSCutout(ImageCutout):
         for file in self._input_files:
             self._cutout_file(file)
 
-        # If no cutouts contain data, raise exception        
+        # If no cutouts contain data, raise exception
         if not self.cutouts_by_file:
             raise InvalidQueryError('Cutout contains no data! (Check image footprint.)')
 
@@ -408,11 +415,11 @@ class FITSCutout(ImageCutout):
             filename = self._make_cutout_filename(cutout_prefix)
             cutout_path = Path(output_dir, filename)
             with warnings.catch_warnings():
-                warnings.simplefilter('ignore') 
+                warnings.simplefilter('ignore')
                 cutout_fits.writeto(cutout_path, overwrite=True, checksum=True)
             # Return file path or memory object
             return [cutout_path.as_posix()]
-    
+
         else:  # one output file per input file
             log.debug('Returning cutouts as individual FITS files.')
 
@@ -462,7 +469,7 @@ class FITSCutout(ImageCutout):
                     yield arcname, hdu
 
         return self._write_cutouts_to_zip(output_dir=output_dir, filename=filename, build_entries=build_entries)
-        
+
     class CutoutInstance:
         """
         Represents an individual cutout with its own data and WCS. Eventually, this will be replaced
@@ -509,8 +516,8 @@ class FITSCutout(ImageCutout):
             self.shape_input = img_data.shape
 
             self.wcs = self._get_cutout_wcs(img_wcs, cutout_lims)
-        
-        def _get_cutout_data(self, data: fits.Section, cutout_lims: np.ndarray, 
+
+        def _get_cutout_data(self, data: fits.Section, cutout_lims: np.ndarray,
                              parent: 'FITSCutout') -> np.ndarray:
             """
             Extract the cutout data from an image.
@@ -549,7 +556,7 @@ class FITSCutout(ImageCutout):
                 (max(0, -ymin), max(0, ymax - ymax_img)),  # (top, bottom)
                 (max(0, -xmin), max(0, xmax - xmax_img))   # (left, right)
             ])
-            
+
             # Extract the cutout
             img_cutout = data[ymin_clipped:ymax_clipped, xmin_clipped:xmax_clipped]
 
@@ -584,7 +591,7 @@ class FITSCutout(ImageCutout):
                 The cutout WCS object including SIP distortions if present.
             """
             # relax = True is important when the WCS has sip distortions, otherwise it has no effect
-            wcs_header = img_wcs.to_header(relax=True) 
+            wcs_header = img_wcs.to_header(relax=True)
 
             # Adjusting the CRPIX values
             wcs_header['CRPIX1'] -= cutout_lims[0, 0]
@@ -603,22 +610,22 @@ class FITSCutout(ImageCutout):
             wcs_header.set('CRPIX2P', 1, 'reference CCD row')
             wcs_header.set('CRVAL2P', cutout_lims[1, 0] + 1, 'value at reference CCD row')
             wcs_header.set('CDELT2P', 1.0, 'physical WCS axis 2 step')
-            
+
             return WCS(wcs_header)
-        
+
 
 @deprecated_renamed_argument('correct_wcs', None, '1.0.0', warning_type=DeprecationWarning,
                              message='`correct_wcs` is non-operational and will be removed in a future version.')
-def fits_cut(input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyCoord, str], 
+def fits_cut(input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyCoord, str],
              cutout_size: Union[int, np.ndarray, Quantity, List[int], Tuple[int]] = 25,
              correct_wcs: bool = False, extension: Optional[Union[int, List[int], Literal['all']]] = None,
-             single_outfile: bool = True, cutout_prefix: str = 'cutout', output_dir: Union[str, Path] = '.', 
+             single_outfile: bool = True, cutout_prefix: str = 'cutout', output_dir: Union[str, Path] = '.',
              memory_only: bool = False, fill_value: Union[int, float] = np.nan, limit_rounding_method: str = 'round',
-             verbose=False) -> Union[str, List[str], List[HDUList]]:
+             verbose=False, *, fsspec_kwargs: Optional[dict] = None) -> Union[str, List[str], List[HDUList]]:
     """
     Takes one or more FITS files with the same WCS/pointing, makes the same cutout in each file,
-    and returns the result either in a single FITS file with one cutout per extension or in 
-    individual fits files. The memory_only flag allows the cutouts to be returned as 
+    and returns the result either in a single FITS file with one cutout per extension or in
+    individual fits files. The memory_only flag allows the cutouts to be returned as
     `~astropy.io.fits.HDUList` objects rather than saving to disk.
 
     Note: No checking is done on either the WCS pointing or pixel scale. If images don't line up
@@ -632,25 +639,25 @@ def fits_cut(input_files: List[Union[str, Path, S3Path]], coordinates: Union[Sky
     input_files : list
         List of fits image files to cutout from. The image is assumed to be in the first extension.
     coordinates : str or `~astropy.coordinates.SkyCoord` object
-        The position around which to cutout. It may be specified as a string ("ra dec" in degrees) 
+        The position around which to cutout. It may be specified as a string ("ra dec" in degrees)
         or as the appropriate `~astropy.coordinates.SkyCoord` object.
     cutout_size : int, array-like, `~astropy.units.Quantity`
-        The size of the cutout array. If ``cutout_size`` is a scalar number or a scalar 
-        `~astropy.units.Quantity`, then a square cutout of ``cutout_size`` will be created.  
-        If ``cutout_size`` has two elements, they should be in ``(ny, nx)`` order.  Scalar numbers 
-        in ``cutout_size`` are assumed to be in units of pixels. `~astropy.units.Quantity` objects 
+        The size of the cutout array. If ``cutout_size`` is a scalar number or a scalar
+        `~astropy.units.Quantity`, then a square cutout of ``cutout_size`` will be created.
+        If ``cutout_size`` has two elements, they should be in ``(ny, nx)`` order.  Scalar numbers
+        in ``cutout_size`` are assumed to be in units of pixels. `~astropy.units.Quantity` objects
         must be in pixel or angular units.
     extension : int, list of ints, None, or 'all'
        Optional, default None. Default is to cutout the first extension that has image data.
        The user can also supply one or more extensions to cutout from (integers), or 'all'.
-    single_outfile : bool 
+    single_outfile : bool
         Default True. If true return all cutouts in a single fits file with one cutout per extension,
-        if False return cutouts in individual fits files. If returing a single file the filename will 
+        if False return cutouts in individual fits files. If returing a single file the filename will
         have the form: <cutout_prefix>_<ra>_<dec>_<size x>_<size y>.fits. If returning multiple files
         each will be named: <original filemame base>_<ra>_<dec>_<size x>_<size y>.fits.
-    cutout_prefix : str 
-        Default value "cutout". Only used if single_outfile is True. A prefix to prepend to the cutout 
-        filename. 
+    cutout_prefix : str
+        Default value "cutout". Only used if single_outfile is True. A prefix to prepend to the cutout
+        filename.
     output_dir : str
         Default value '.'. The directory to save the cutout file(s) to.
     memory_only : bool
@@ -664,32 +671,35 @@ def fits_cut(input_files: List[Union[str, Path, S3Path]], coordinates: Union[Sky
         Method to use for rounding the cutout limits. Options are 'round', 'ceil', and 'floor'.
     verbose : bool
         Default False. If true intermediate information is printed.
+    fsspec_kwargs : dict
+        Optional, default None. Keyword arguments to pass through to `s3fs` for cloud-hosted files.
 
     Returns
     -------
     response : str or list
-        If single_outfile is True, returns the single output filepath. Otherwise, returns a list of all 
+        If single_outfile is True, returns the single output filepath. Otherwise, returns a list of all
         the output filepaths.
         If memory_only is True, a list of `~astropy.io.fit.HDUList` objects is returned instead of
         file name(s).
     """
-    fits_cutout = FITSCutout(input_files, coordinates, cutout_size, fill_value, limit_rounding_method, 
-                             extension, single_outfile, verbose)
-    
+    fits_cutout = FITSCutout(input_files, coordinates, cutout_size, fill_value, limit_rounding_method,
+                             extension, single_outfile, verbose=verbose, fsspec_kwargs=fsspec_kwargs)
+
     if memory_only:
         return fits_cutout.fits_cutouts
-    
+
     cutout_paths = fits_cutout.write_as_fits(output_dir, cutout_prefix)
     return cutout_paths[0] if len(cutout_paths) == 1 else cutout_paths
 
 
-def img_cut(input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyCoord, str], 
-            cutout_size: Union[int, np.ndarray, Quantity, List[int], Tuple[int]] = 25, stretch: str = 'asinh', 
-            minmax_percent: Optional[List[int]] = None, minmax_value: Optional[List[int]] = None, 
+def img_cut(input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyCoord, str],
+            cutout_size: Union[int, np.ndarray, Quantity, List[int], Tuple[int]] = 25, stretch: str = 'asinh',
+            minmax_percent: Optional[List[int]] = None, minmax_value: Optional[List[int]] = None,
             invert: bool = False, img_format: str = '.jpg', colorize: bool = False,
-            cutout_prefix: str = 'cutout', output_dir: Union[str, Path] = '.', 
+            cutout_prefix: str = 'cutout', output_dir: Union[str, Path] = '.',
             extension: Optional[Union[int, List[int], Literal['all']]] = None, fill_value: Union[int, float] = np.nan,
-            limit_rounding_method: str = 'round', verbose=False) -> Union[str, List[str]]:
+            limit_rounding_method: str = 'round', verbose=False, *, fsspec_kwargs: Optional[dict] = None
+            ) -> Union[str, List[str]]:
     """
     Takes one or more fits files with the same WCS/pointing, makes the same cutout in each file,
     and returns the result either as a single color image or in individual image files.
@@ -705,20 +715,20 @@ def img_cut(input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyC
     input_files : list
         List of fits image files to cutout from. The image is assumed to be in the first extension.
     coordinates : str or `~astropy.coordinates.SkyCoord` object
-        The position around which to cutout. It may be specified as a string ("ra dec" in degrees) 
+        The position around which to cutout. It may be specified as a string ("ra dec" in degrees)
         or as the appropriate `~astropy.coordinates.SkyCoord` object.
     cutout_size : int, array-like, `~astropy.units.Quantity`
-        The size of the cutout array. If ``cutout_size`` is a scalar number or a scalar 
-        `~astropy.units.Quantity`, then a square cutout of ``cutout_size`` will be created.  
-        If ``cutout_size`` has two elements, they should be in ``(ny, nx)`` order.  Scalar numbers 
-        in ``cutout_size`` are assumed to be in units of pixels. `~astropy.units.Quantity` objects 
+        The size of the cutout array. If ``cutout_size`` is a scalar number or a scalar
+        `~astropy.units.Quantity`, then a square cutout of ``cutout_size`` will be created.
+        If ``cutout_size`` has two elements, they should be in ``(ny, nx)`` order.  Scalar numbers
+        in ``cutout_size`` are assumed to be in units of pixels. `~astropy.units.Quantity` objects
         must be in pixel or angular units.
     stretch : str
         Optional, default 'asinh'. The stretch to apply to the image array.
         Valid values are: asinh, sinh, sqrt, log, linear
     minmax_percent : array
-        Optional, default [0.5,99.5]. Interval based on a keeping a specified fraction of pixels 
-        (can be asymmetric) when scaling the image. The format is [lower percentile, upper percentile], 
+        Optional, default [0.5,99.5]. Interval based on a keeping a specified fraction of pixels
+        (can be asymmetric) when scaling the image. The format is [lower percentile, upper percentile],
         where pixel values below the lower percentile and above the upper percentile are clipped.
         Only one of minmax_percent and minmax_value should be specified.
     minmax_value : array
@@ -733,9 +743,9 @@ def img_cut(input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyC
     colorize : bool
         Optional, default False.  If True a single color image is produced as output, and it is expected
         that three files are given as input.
-    cutout_prefix : str 
-        Default value "cutout". Only used when producing a color image. A prefix to prepend to the 
-        cutout filename. 
+    cutout_prefix : str
+        Default value "cutout". Only used when producing a color image. A prefix to prepend to the
+        cutout filename.
     output_dir : str
         Defaul value '.'. The directory to save the cutout file(s) to.
     fill_value : int | float
@@ -747,17 +757,19 @@ def img_cut(input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyC
         The user can also supply one or more extensions to cutout from (integers), or "all".
     verbose : bool
         Default False. If true intermediate information is printed.
+    fsspec_kwargs : dict
+        Optional, default None. Keyword arguments to pass through to `s3fs` for cloud-hosted files.
 
     Returns
     -------
     response : str or list
-        If colorize is True, returns the single output filepath. Otherwise, returns a list of all 
+        If colorize is True, returns the single output filepath. Otherwise, returns a list of all
         the output filepaths.
     """
 
-    fits_cutout = FITSCutout(input_files, coordinates, cutout_size, fill_value, limit_rounding_method, 
-                             extension, verbose=verbose)
-    
+    fits_cutout = FITSCutout(input_files, coordinates, cutout_size, fill_value, limit_rounding_method,
+                             extension, verbose=verbose, fsspec_kwargs=fsspec_kwargs)
+
     cutout_paths = fits_cutout.write_as_img(stretch, minmax_percent, minmax_value, invert, colorize, img_format,
                                             output_dir, cutout_prefix)
     return cutout_paths
