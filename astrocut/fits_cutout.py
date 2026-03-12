@@ -66,7 +66,7 @@ class FITSCutout(ImageCutout):
                  cutout_size: Union[int, np.ndarray, Quantity, List[int], Tuple[int]] = 25,
                  fill_value: Union[int, float] = np.nan, limit_rounding_method: str = 'round',
                  extension: Optional[Union[int, List[int], Literal['all']]] = None,
-                 single_outfile: bool = True, verbose: bool = False, fsspec_kwargs: Optional[dict] = None):
+                 single_outfile: bool = True, verbose: bool = False, *, fsspec_kwargs: Optional[dict] = None):
         # Superclass constructor
         super().__init__(input_files, coordinates, cutout_size, fill_value, limit_rounding_method, verbose)
 
@@ -621,7 +621,7 @@ def fits_cut(input_files: List[Union[str, Path, S3Path]], coordinates: Union[Sky
              correct_wcs: bool = False, extension: Optional[Union[int, List[int], Literal['all']]] = None,
              single_outfile: bool = True, cutout_prefix: str = 'cutout', output_dir: Union[str, Path] = '.',
              memory_only: bool = False, fill_value: Union[int, float] = np.nan, limit_rounding_method: str = 'round',
-             verbose=False, fsspec_kwargs: Optional[dict] = None) -> Union[str, List[str], List[HDUList]]:
+             verbose=False, *, fsspec_kwargs: Optional[dict] = None) -> Union[str, List[str], List[HDUList]]:
     """
     Takes one or more FITS files with the same WCS/pointing, makes the same cutout in each file,
     and returns the result either in a single FITS file with one cutout per extension or in
@@ -683,7 +683,7 @@ def fits_cut(input_files: List[Union[str, Path, S3Path]], coordinates: Union[Sky
         file name(s).
     """
     fits_cutout = FITSCutout(input_files, coordinates, cutout_size, fill_value, limit_rounding_method,
-                             extension, single_outfile, verbose, fsspec_kwargs)
+                             extension, single_outfile, verbose=verbose, fsspec_kwargs=fsspec_kwargs)
 
     if memory_only:
         return fits_cutout.fits_cutouts
@@ -698,7 +698,7 @@ def img_cut(input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyC
             invert: bool = False, img_format: str = '.jpg', colorize: bool = False,
             cutout_prefix: str = 'cutout', output_dir: Union[str, Path] = '.',
             extension: Optional[Union[int, List[int], Literal['all']]] = None, fill_value: Union[int, float] = np.nan,
-            limit_rounding_method: str = 'round', verbose=False, fsspec_kwargs: Optional[dict] = None
+            limit_rounding_method: str = 'round', verbose=False, *, fsspec_kwargs: Optional[dict] = None
             ) -> Union[str, List[str]]:
     """
     Takes one or more fits files with the same WCS/pointing, makes the same cutout in each file,
