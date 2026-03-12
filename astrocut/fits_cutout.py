@@ -698,7 +698,8 @@ def img_cut(input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyC
             invert: bool = False, img_format: str = '.jpg', colorize: bool = False,
             cutout_prefix: str = 'cutout', output_dir: Union[str, Path] = '.',
             extension: Optional[Union[int, List[int], Literal['all']]] = None, fill_value: Union[int, float] = np.nan,
-            limit_rounding_method: str = 'round', verbose=False, fsspec_kwargs: Optional[dict] = None) -> Union[str, List[str]]:
+            limit_rounding_method: str = 'round', verbose=False, fsspec_kwargs: Optional[dict] = None
+            ) -> Union[str, List[str]]:
     """
     Takes one or more fits files with the same WCS/pointing, makes the same cutout in each file,
     and returns the result either as a single color image or in individual image files.
