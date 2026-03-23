@@ -14,16 +14,16 @@ class SpectralCutout(BaseCutout, ABC):
     """
 
     def __init__(self, 
-                 file: Union[str, Path, S3Path], 
+                 spectral_files: Union[str, Path, S3Path, List[Union[str, Path, S3Path]]], 
                  source_ids: Union[str, int, List[Union[str, int]]], 
                  wl_range: Union[tuple, list] = None,
                  lite: Optional[bool] = False,
                  verbose: bool = False):
         super().__init__(verbose=verbose)
 
-        self._file = file
+        self._spectral_files = spectral_files if isinstance(spectral_files, list) else [spectral_files]
         self._source_ids = source_ids if isinstance(source_ids, list) else [source_ids]
         self._wl_range = wl_range
         self._lite = lite
 
-        self.cutout_data = dict()  # To store cutout data for each source ID
+        self.cutout_data = dict()

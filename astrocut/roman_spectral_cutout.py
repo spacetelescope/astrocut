@@ -5,6 +5,8 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from s3path import S3Path
 
+from astrocut.exceptions import InvalidQueryError
+
 from .asdf_spectral_cutout import ASDFSpectralCutout
 
 
@@ -14,12 +16,12 @@ class RomanSpectralCutout(ASDFSpectralCutout):
     Inherits from ASDFSpectralCutout.
     """
     def __init__(self, 
-                 file: Union[str, Path, S3Path], 
+                 spectral_files: Union[str, Path, S3Path, List[Union[str, Path, S3Path]]], 
                  source_ids: Union[str, int, List[Union[str, int]]], 
                  wl_range: Union[tuple, list] = None,
                  lite: Optional[bool] = True,
                  verbose: bool = False):
-        super().__init__(file, source_ids, wl_range, lite, verbose)
+        super().__init__(spectral_files, source_ids, wl_range, lite, verbose)
         self._mission_keyword = 'roman'
 
         # Make cutouts
@@ -44,7 +46,7 @@ class RomanSpectralCutout(ASDFSpectralCutout):
             A new RomanSpectralCutout instance with the specified parameters.
         """
         return RomanSpectralCutout(
-            self._file,
+            self._spectral_files,
             source_ids or self._source_ids,
             wl_range or self._wl_range,
             lite or self._lite,
@@ -65,21 +67,21 @@ def _parallel_roman_spectral_cutout_worker(
     Worker function for parallel Roman spectral cutouts.
     Opens the file, generates cutouts, writes them to disk, and returns paths.
     """
-    filepath, source_ids, wl_range, lite, output_dir = args
+    filepath, source_id_batch, wl_range, lite, output_dir = args
 
     cutout = RomanSpectralCutout(
-        file=filepath,
-        source_ids=source_ids,
+        spectral_files=filepath,
+        source_ids=source_id_batch,
         wl_range=wl_range,
         lite=lite,
         verbose=False,
     )
 
-    return cutout.write_as_asdf(output_dir)
+    return cutout.write_as_asdf(output_dir, group_by='source_file')
 
 
 def roman_spectral_cut(
-    file: Union[str, Path, S3Path],
+    spectral_files: Union[str, Path, S3Path, List[Union[str, Path, S3Path]]],
     source_ids: Union[List[str], List[int]],
     wl_range: tuple,
     *,
@@ -93,8 +95,8 @@ def roman_spectral_cut(
 
     Parameters
     ----------
-    file : str or Path or S3Path
-        Input spectral ASDF file.
+    spectral_files : str or Path or S3Path or List[Union[str, Path, S3Path]]
+        Input spectral ASDF file(s).
     source_ids : list
         Source IDs to extract.
     wl_range : tuple
@@ -116,32 +118,33 @@ def roman_spectral_cut(
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # source_ids = [str(sid) for sid in source_ids]
+    spectral_files = spectral_files if isinstance(spectral_files, list) else [spectral_files]
 
     if workers is None:
         workers = max(1, os.cpu_count() - 1)
 
-    jobs = [
-        (
-            file,
-            source_ids[i: i + batch_size],
-            wl_range,
-            lite,
-            output_dir,
-        )
-        for i in range(0, len(source_ids), batch_size)
-    ]
+    jobs = []
+    for filepath in spectral_files:
+        for i in range(0, len(source_ids), batch_size):
+            jobs.append(
+                (
+                    filepath,
+                    source_ids[i:i + batch_size],
+                    wl_range,
+                    lite,
+                    output_dir,
+                )
+            )
 
-    written_paths: List[str] = []
+    written_paths = []
 
     with ProcessPoolExecutor(max_workers=workers) as executor:
-        futures = {
-            executor.submit(_parallel_roman_spectral_cutout_worker, job): job
-            for job in jobs
-        }
+        futures = [executor.submit(_parallel_roman_spectral_cutout_worker, job) for job in jobs]
 
         for future in as_completed(futures):
-            written_paths.extend(future.result())
+            try:
+                written_paths.extend(future.result())
+            except InvalidQueryError:
+                continue
 
     return written_paths
-
