@@ -1,13 +1,12 @@
 import os
-from pathlib import Path
-from typing import Union, List, Optional, Tuple
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from pathlib import Path
+from typing import List, Literal, Optional, Tuple, Union
 
 from s3path import S3Path
 
-from astrocut.exceptions import InvalidQueryError
-
 from .asdf_spectral_cutout import ASDFSpectralCutout
+from .exceptions import InvalidQueryError
 
 
 class RomanSpectralCutout(ASDFSpectralCutout):
@@ -15,69 +14,43 @@ class RomanSpectralCutout(ASDFSpectralCutout):
     Class for creating spectral cutouts specifically from Roman ASDF data.
     Inherits from ASDFSpectralCutout.
     """
-    def __init__(self, 
-                 spectral_files: Union[str, Path, S3Path, List[Union[str, Path, S3Path]]], 
-                 source_ids: Union[str, int, List[Union[str, int]]], 
-                 wl_range: Union[tuple, list] = None,
-                 lite: Optional[bool] = True,
-                 verbose: bool = False):
+
+    def __init__(
+        self,
+        spectral_files: Union[str, Path, S3Path, List[Union[str, Path, S3Path]]],
+        source_ids: Union[str, int, List[Union[str, int]]],
+        wl_range: Union[tuple, list] = None,
+        lite: Optional[bool] = True,
+        verbose: bool = False,
+    ):
         super().__init__(spectral_files, source_ids, wl_range, lite, verbose)
-        self._mission_keyword = 'roman'
+        self._mission_keyword = "roman"
 
         # Make cutouts
         self.cutout()
 
-    def with_params(self, *, wl_range=None, source_ids=None, lite=None):
-        """
-        Create a new RomanSpectralCutout instance based on this one with modified parameters.
-        
-        Parameters
-        ----------
-        wl_range : tuple or list, optional
-            New wavelength range for the cutout. If None, uses the existing range.
-        source_ids : list, optional
-            New list of source IDs for the cutout. If None, uses the existing source IDs.
-        lite : bool, optional
-            Whether to create a lite version of the cutout. If None, uses the existing setting.
-
-        Returns
-        -------
-        RomanSpectralCutout
-            A new RomanSpectralCutout instance with the specified parameters.
-        """
-        return RomanSpectralCutout(
-            self._spectral_files,
-            source_ids or self._source_ids,
-            wl_range or self._wl_range,
-            lite or self._lite,
-            verbose=self._verbose
-        )
-    
 
 def _parallel_roman_spectral_cutout_worker(
     args: Tuple[
         Union[str, Path, S3Path],  # filepath
-        List[str],                 # source_ids
-        tuple,                     # wl_range
-        bool,                      # lite
-        Path                       # output_dir
-    ]
+        List[str],  # source_ids
+        tuple,  # wl_range
+        bool,  # lite
+        Path,  # output_dir
+        str,  # group_by
+    ],
 ) -> List[str]:
     """
     Worker function for parallel Roman spectral cutouts.
     Opens the file, generates cutouts, writes them to disk, and returns paths.
     """
-    filepath, source_id_batch, wl_range, lite, output_dir = args
+    filepath, source_id_batch, wl_range, lite, output_dir, group_by = args
 
     cutout = RomanSpectralCutout(
-        spectral_files=filepath,
-        source_ids=source_id_batch,
-        wl_range=wl_range,
-        lite=lite,
-        verbose=False,
+        spectral_files=filepath, source_ids=source_id_batch, wl_range=wl_range, lite=lite, verbose=False
     )
 
-    return cutout.write_as_asdf(output_dir, group_by='source_file')
+    return cutout.write_as_asdf(output_dir, group_by=group_by)
 
 
 def roman_spectral_cut(
@@ -87,6 +60,7 @@ def roman_spectral_cut(
     *,
     lite: bool = True,
     output_dir: Union[str, Path] = ".",
+    group_by: Literal["source_file", "file", "combined"] = "file",
     batch_size: int = 128,
     workers: Optional[int] = None,
 ) -> List[str]:
@@ -105,6 +79,8 @@ def roman_spectral_cut(
         Whether to produce lite cutouts (default True).
     output_dir : str or Path, optional
         Output directory for cutout files.
+    group_by : {'source_file', 'file', 'combined'}, optional
+        How to group cutouts into output files (default 'file').
     batch_size : int, optional
         Number of sources per worker batch.
     workers : int, optional
@@ -126,15 +102,7 @@ def roman_spectral_cut(
     jobs = []
     for filepath in spectral_files:
         for i in range(0, len(source_ids), batch_size):
-            jobs.append(
-                (
-                    filepath,
-                    source_ids[i:i + batch_size],
-                    wl_range,
-                    lite,
-                    output_dir,
-                )
-            )
+            jobs.append((filepath, source_ids[i : i + batch_size], wl_range, lite, output_dir, group_by))
 
     written_paths = []
 
