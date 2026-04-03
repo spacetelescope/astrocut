@@ -18,10 +18,11 @@ class SpectralCutout(BaseCutout, ABC):
     source_ids : str, int, or list
         Source ID(s) to cut out. Can be a single ID or a list of IDs.
     wl_range : tuple or list, optional
-        Wavelength range to cut out, specified as (min_wavelength, max_wavelength). If None, the full wavelength range will be used.
+        Wavelength range to cut out, specified as (min_wavelength, max_wavelength). If None, the full wavelength
+        range will be used.
     lite : bool, optional
-        If True, only a subset of the data and metadata will be included in the cutouts to reduce memory usage. Default is False
-        (include all data and metadata).
+        If True, only a subset of the data and metadata will be included in the cutouts to reduce memory usage.
+        Default is False (include all data and metadata).
     verbose : bool, optional
         If True, log messages will be printed during cutout generation. Default is False.
     """

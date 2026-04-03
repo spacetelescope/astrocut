@@ -15,8 +15,9 @@ from .spectral_cutout import SpectralCutout
 
 class ASDFSpectralCutout(SpectralCutout, ABC):
     """
-    Abstract class for creating cutouts from ASDF spectral data. This class is designed to handle cutouts from ASDF files
-    that follow a specific structure, where the spectral data is organized under a mission-specific keyword.
+    Abstract class for creating cutouts from ASDF spectral data. This class is designed to
+    handle cutouts from ASDF files that follow a specific structure, where the spectral data
+    is organized under a mission-specific keyword.
 
     Parameters
     ----------
@@ -25,9 +26,11 @@ class ASDFSpectralCutout(SpectralCutout, ABC):
     source_ids : str, int, or list
         Source ID(s) to cut out. Can be a single ID or a list of IDs.
     wl_range : tuple or list, optional
-        Wavelength range to cut out, specified as (min_wavelength, max_wavelength). If None, the full wavelength range will be used.
+        Wavelength range to cut out, specified as (min_wavelength, max_wavelength). If None,
+        the full wavelength range will be used.
     lite : bool, optional
-        If True, only a subset of the data and metadata will be included in the cutouts to reduce memory usage. Default is True.
+        If True, only a subset of the data and metadata will be included in the cutouts to
+        reduce memory usage. Default is True.
     verbose : bool, optional
         If True, log messages will be printed during cutout generation. Default is False.
 
@@ -39,11 +42,14 @@ class ASDFSpectralCutout(SpectralCutout, ABC):
     Methods
     -------
     get_asdf_cutouts(group_by=group_by, source_ids=source_ids, spectral_files=spectral_files)
-        Get ASDF cutout(s) for specified source IDs and input files, grouped by source and file, file, or combined.
+        Get ASDF cutout(s) for specified source IDs and input files, grouped by source and file,
+        file, or combined.
     write_as_asdf(output_dir=output_dir, group_by=group_by, source_ids=source_ids, spectral_files=spectral_files)
-        Write the ASDF cutout(s) to files in the specified output directory, grouped by source and file, file, or combined.
+        Write the ASDF cutout(s) to files in the specified output directory, grouped by source
+        and file, file, or combined.
     cutout()
-        Generate the spectral cutout(s) from the input ASDF files based on the specified source IDs and wavelength range.
+        Generate the spectral cutout(s) from the input ASDF files based on the specified
+        source IDs and wavelength range.
     """
 
     def __init__(
@@ -65,13 +71,14 @@ class ASDFSpectralCutout(SpectralCutout, ABC):
 
     def cutout(self):
         """
-        Generate the spectral cutout(s) from the input ASDF files based on the specified source IDs and wavelength range.
+        Generate the spectral cutout(s) from the input ASDF files based on the specified
+        source IDs and wavelength range.
 
         Raises
         ------
         InvalidQueryError
-            If no cutouts were created, which may occur if the specified source IDs are not present in the input spectral files
-            or if the specified wavelength range does not overlap with the data.
+            If no cutouts were created, which may occur if the specified source IDs are not present in
+            the input spectral files or if the specified wavelength range does not overlap with the data.
         """
         for file in self._spectral_files:
             self._cutout_file(file)
@@ -103,15 +110,15 @@ class ASDFSpectralCutout(SpectralCutout, ABC):
             Specific spectral files to include in the output. If None, all input spectral files will be included.
             Can be a single file or a list of files.
         source_ids : str or int or list, optional
-            Specific source IDs to include in the output. If None, all source IDs from the cutout results will be included.
-            Can be a single ID or a list of IDs.
+            Specific source IDs to include in the output. If None, all source IDs from the cutout
+            results will be included. Can be a single ID or a list of IDs.
 
         Returns
         -------
         dict or asdf.AsdfFile
             Depending on the value of `group_by`, this method returns either a dictionary of ASDF cutout objects keyed
-            by source ID and input file combination ('source_file'), a dictionary of ASDF cutout objects keyed by input file ('file'),
-            or a single ASDF cutout object containing all cutouts ('combined').
+            by source ID and input file combination ('source_file'), a dictionary of ASDF cutout objects
+            keyed by input file ('file'), or a single ASDF cutout object containing all cutouts ('combined').
         """
         # Determine which spectral files to include
         if spectral_files is None:
@@ -278,7 +285,8 @@ class ASDFSpectralCutout(SpectralCutout, ABC):
         source_ids: Union[str, int, List[Union[str, int]]] = None,
     ) -> List[str]:
         """
-        Write the ASDF cutout(s) to files in the specified output directory, grouped by source and file, file, or combined.
+        Write the ASDF cutout(s) to files in the specified output directory, grouped by source
+        and file, file, or combined.
 
         Parameters
         ----------
@@ -293,8 +301,8 @@ class ASDFSpectralCutout(SpectralCutout, ABC):
             Specific spectral files to include in the output. If None, all input spectral files will be included.
             Can be a single file or a list of files.
         source_ids : str or int or list, optional
-            Specific source IDs to include in the output. If None, all source IDs from the cutout results will be included.
-            Can be a single ID or a list of IDs.
+            Specific source IDs to include in the output. If None, all source IDs from the
+            cutout results will be included. Can be a single ID or a list of IDs.
 
         Returns
         -------
@@ -333,7 +341,8 @@ class ASDFSpectralCutout(SpectralCutout, ABC):
 
     def _cutout_file(self, file: str):
         """
-        Generate cutouts for a single input spectral file and store the results in the internal cutout_data and _out_trees attributes.
+        Generate cutouts for a single input spectral file and store the results in the
+        internal cutout_data and _out_trees attributes.
 
         Parameters
         ----------

@@ -11,8 +11,8 @@ from .exceptions import InvalidQueryError
 
 class RomanSpectralCutout(ASDFSpectralCutout):
     """
-    Class for creating cutouts from Roman spectral data. Inherits from `ASDFSpectralCutout` and implements the same interface,
-    but is optimized for Roman data.
+    Class for creating cutouts from Roman spectral data. Inherits from `ASDFSpectralCutout`
+    and implements the same interface, but is designed for Roman data.
 
     Parameters
     ----------
@@ -21,9 +21,11 @@ class RomanSpectralCutout(ASDFSpectralCutout):
     source_ids : str, int, or list
         Source ID(s) to cut out. Can be a single ID or a list of IDs.
     wl_range : tuple or list, optional
-        Wavelength range to cut out, specified as (min_wavelength, max_wavelength). If None, the full wavelength range will be used.
+        Wavelength range to cut out, specified as (min_wavelength, max_wavelength). If None,
+        the full wavelength range will be used.
     lite : bool, optional
-        If True, only a subset of the data and metadata will be included in the cutouts to reduce memory usage. Default is True.
+        If True, only a subset of the data and metadata will be included in the cutouts to
+        reduce memory usage. Default is True.
     verbose : bool, optional
         If True, log messages will be printed during cutout generation. Default is False.
     """
@@ -87,10 +89,11 @@ def roman_spectral_cut(
     source_ids : str, int, or list
         Source ID(s) to cut out. Can be a single ID or a list of IDs.
     wl_range : tuple or list, optional
-        Wavelength range to cut out, specified as (min_wavelength, max_wavelength). If None, the full wavelength range will be used.
+        Wavelength range to cut out, specified as (min_wavelength, max_wavelength). If None,
+        the full wavelength range will be used.
     lite : bool, optional
-        If True, only a subset of the data and metadata will be included in the cutouts to reduce memory usage. Default is False
-        (include all data and metadata).
+        If True, only a subset of the data and metadata will be included in the cutouts to reduce memory usage.
+        Default is False (include all data and metadata).
     output_dir : str or Path, optional
         Directory where the output ASDF files will be saved. Default is the current directory.
     group_by : {'source_file', 'file', 'combined'}, optional
@@ -101,8 +104,8 @@ def roman_spectral_cut(
     batch_size : int, optional
         Number of source IDs to process in each batch for parallel cutout generation. Default is 128.
     workers : int, optional
-        Number of worker processes to use for parallel cutout generation. If None, the number of CPU cores minus one will be used.
-        Default is None.
+        Number of worker processes to use for parallel cutout generation. If None, the number of CPU
+        cores minus one will be used. Default is None.
 
     Returns
     -------
