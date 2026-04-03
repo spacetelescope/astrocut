@@ -225,7 +225,6 @@ science analysis.
     │ └─wcs (WCS)
     └─data (ndarray): shape=(25, 25), dtype=float32
 
-
 Image Outputs
 -------------
 
@@ -287,6 +286,100 @@ To specify the output format of the cutout images, use the ``output_format`` par
 
 By default, the cutouts are written to the current working directory. You can specify a different output directory using the ``output_dir`` parameter.
 You can also set the prefix of the cutout file paths using the ``cutout_prefix`` parameter. The default value is "cutout".
+
+
+Spectral Cutouts
+================
+
+Astrocut can generate spectral cutouts from Roman ASDF spectral files using the
+`~astrocut.RomanSpectralCutout` class. This class is intended for extracting wavelength-limited
+spectral data for one or more source IDs.
+
+To create a spectral cutout, provide the input spectral file or files, the source IDs
+to extract, and an optional wavelength range:
+
+.. code-block:: python
+
+  >>> from astrocut import RomanSpectralCutout
+
+  >>> spectral_files = ["/path/to/roman_spectral.asdf"]  # Path(s) to local ASDF file, URL, or S3 URI
+  >>> spectral_cutout = RomanSpectralCutout(spectral_files=spectral_files,
+  ...                                       source_ids=[420007, 420022],
+  ...                                       wl_range=(1.0, 2.0),
+  ...                                       lite=True) #doctest: +SKIP
+
+The ``lite`` parameter controls the size of the cutout and how much of the original ASDF tree is preserved:
+
+- ``lite=True`` keeps only the extracted spectral arrays needed for the cutout and the
+  minimal metadata required to interpret them.
+- ``lite=False`` preserves the broader ASDF tree structure and mission-level metadata,
+  while still slicing the spectral arrays to the requested wavelength range.
+
+The resulting `~astrocut.RomanSpectralCutout` object can be used to access the cutout data and metadata.
+The ``cutout_data`` attribute is a dictionary that stores the cutout data keyed by input filename and source ID.
+
+The `~astrocut.RomanSpectralCutout.get_asdf_cutouts` method returns the cutouts as `~asdf.AsdfFile` objects in memory, 
+and the `~astrocut.RomanSpectralCutout.write_as_asdf` method writes the cutouts to ASDF files on disk and returns a list 
+of paths to the output files. Both methods support filtering the cutouts by source ID and input file, as well as grouping the 
+cutouts in different ways. They accept the following parameters:
+
+- ``source_ids``: A list of source IDs to include in the output. If None, all source IDs will be included.
+- ``spectral_files``: A list of input spectral files to include in the output. If None, all input files will be included.
+- ``group_by``: Controls how cutouts are grouped in an `~asdf.AsdfFile` object in memory or in an output file.
+
+  - ``group_by='source_file'``: Groups cutouts by source ID and input file, resulting in one cutout object per source ID per input file.
+  - ``group_by='file'``: Groups all cutouts from each input file together, resulting in one cutout object per input file.
+  - ``group_by='combined'``: Combines all cutouts from all input files into a single cutout object.
+
+See the `Spectral Cutout File Formats <file_formats.html#spectral-cutouts>`__ for more details on the structure of cutout objects.
+
+.. code-block:: python
+
+  >>> asdf_cut = spectral_cutout.get_asdf_cutouts(source_ids=[420007, 420022], group_by='file')[spectral_files[0]] #doctest: +SKIP
+  >>> asdf_cut.info() #doctest: +SKIP
+  root (AsdfObject)
+  ├─roman (dict)
+  │ ├─data (dict)
+  │ │ ├─420007 (dict)
+  │ │ │ ├─flux (ndarray)
+  │ │ │ │ ├─shape (tuple) ...
+  │ │ │ │ └─dtype (Float64DType): float64
+  │ │ │ └─wl (ndarray)
+  │ │ │   ├─shape (tuple) ...
+  │ │ │   └─dtype (Float64DType): float64
+  │ │ └─420022 (dict)
+  │ │   ├─flux (ndarray) ...
+  │ │   └─wl (ndarray) ...
+  │ └─meta (dict)
+  │   └─source_ids (list)
+  │     ├─[0] (int): 420007
+  │     └─[1] (int): 420022
+  └─history (dict)
+    └─entries (list)
+      └─[0] (HistoryEntry)
+        ├─description (str): Spectral cutout created for source IDs [420007, 420022] from file Roman/large_wfi (truncated)
+        ├─time (datetime): 2026-04-03 20:09:26+00:00
+        └─software (Software) ...
+  Some nodes not shown.
+
+Multiprocessing
+----------------
+
+The `~astrocut.roman_spectral_cut` convenience function provides the same behavior as the `~astrocut.RomanSpectralCutout` class, but it is designed 
+for multiprocessing and writing cutouts to disk. Because it can generate and write cutouts in parallel, this method is preferred when generating a 
+very large number of cutouts, or when generating cutouts from many different input files. It is not recommended to use `~astrocut.roman_spectral_cut` 
+when you only need a small number of cutouts, as the overhead of multiprocessing may outweigh any performance benefits.
+
+.. code-block:: python
+
+  >>> from astrocut import roman_spectral_cut
+
+  >>> output_paths = roman_spectral_cut(spectral_files=["/path/to/roman_spectral.asdf"],
+  ...                                   source_ids=[id for id in range(400000, 500000)],
+  ...                                   wl_range=(1.0, 2.0),
+  ...                                   lite=False,
+  ...                                   group_by="source_file",
+  ...                                   output_dir="/path/to/output") #doctest: +SKIP
 
 
 Cube Cutouts
@@ -585,65 +678,65 @@ cutout location/size(s) necesary to cover the entire path.
 
 .. code-block:: python
   
-                >>> import astrocut
+  >>> import astrocut
 
-                >>> import requests  #doctest: +SKIP
+  >>> import requests  #doctest: +SKIP
 
-                >>> from astropy.table import Table
-                >>> from astropy.coordinates import SkyCoord
-                >>> from astropy.time import Time
-                >>> from astropy.io import fits
-                >>> from astropy import wcs
+  >>> from astropy.table import Table
+  >>> from astropy.coordinates import SkyCoord
+  >>> from astropy.time import Time
+  >>> from astropy.io import fits
+  >>> from astropy import wcs
 
-                >>> from astroquery.mast import Tesscut  #doctest: +SKIP
+  >>> from astroquery.mast import Tesscut  #doctest: +SKIP
 
-                >>> # The moving target path
-                >>> path_table = Table({"time": Time([2458468.275827604, 2458468.900827604, 2458469.525827604,
-                ...                                   2458470.150827604, 2458470.775827604], format="jd"),
-                ...                     "position": SkyCoord([82.22813, 82.07676, 81.92551, 81.7746, 81.62425], 
-                ...                                          [-1.5821,- 1.54791, -1.5117, -1.47359, -1.43369], unit="deg")
-                ...                    })
+  >>> # The moving target path
+  >>> path_table = Table({"time": Time([2458468.275827604, 2458468.900827604, 2458469.525827604,
+  ...                                   2458470.150827604, 2458470.775827604], format="jd"),
+  ...                     "position": SkyCoord([82.22813, 82.07676, 81.92551, 81.7746, 81.62425], 
+  ...                                          [-1.5821,- 1.54791, -1.5117, -1.47359, -1.43369], unit="deg")
+  ...                    })
 
-                >>> # Getting the FFI WCS
-                >>> resp = requests.get(f"https://mast.stsci.edu/tesscut/api/v0.1/ffi_wcs?sector=6&camera=1&ccd=1")  #doctest: +SKIP
-                >>> ffi_wcs = wcs.WCS(resp.json()["wcs"], relax=True)  #doctest: +SKIP
-                >>> print(ffi_wcs)  #doctest: +SKIP
-                WCS Keywords
+  >>> # Getting the FFI WCS
+  >>> resp = requests.get(f"https://mast.stsci.edu/tesscut/api/v0.1/ffi_wcs?sector=6&camera=1&ccd=1")  #doctest: +SKIP
+  >>> ffi_wcs = wcs.WCS(resp.json()["wcs"], relax=True)  #doctest: +SKIP
+  >>> print(ffi_wcs)  #doctest: +SKIP
+  WCS Keywords
 
-                Number of WCS axes: 2
-                CTYPE : 'RA---TAN-SIP'  'DEC--TAN-SIP'  
-                CRVAL : 86.239936828613  -0.87476283311844  
-                CRPIX : 1045.0  1001.0  
-                PC1_1 PC1_2  : 0.0057049915194511  7.5332427513786e-06  
-                PC2_1 PC2_2  : -0.00015248404815793  0.005706631578505  
-                CDELT : 1.0  1.0  
-                NAXIS : 2136  2078
+  Number of WCS axes: 2
+  CTYPE : 'RA---TAN-SIP'  'DEC--TAN-SIP'  
+  CRVAL : 86.239936828613  -0.87476283311844  
+  CRPIX : 1045.0  1001.0  
+  PC1_1 PC1_2  : 0.0057049915194511  7.5332427513786e-06  
+  PC2_1 PC2_2  : -0.00015248404815793  0.005706631578505  
+  CDELT : 1.0  1.0  
+  NAXIS : 2136  2078
 
-                >>> # Making the regular cutout (using astroquery)
-                >>> size = [15,15]
-                >>> footprints = astrocut.path_to_footprints(path_table["position"], size, ffi_wcs)  #doctest: +SKIP
-                >>> print(footprints)  #doctest: +SKIP
-                [{'coordinates': <SkyCoord (ICRS): (ra, dec) in deg
-                     (81.92560877, -1.50880833)>, 'size': (37, 125)}]
+  >>> # Making the regular cutout (using astroquery)
+  >>> size = [15,15]
+  >>> footprints = astrocut.path_to_footprints(path_table["position"], size, ffi_wcs)  #doctest: +SKIP
+  >>> print(footprints)  #doctest: +SKIP
+  [{'coordinates': <SkyCoord (ICRS): (ra, dec) in deg
+        (81.92560877, -1.50880833)>, 'size': (37, 125)}]
 
-                >>> manifest = Tesscut.download_cutouts(**footprints[0], sector=6)  #doctest: +SKIP
-                Downloading URL https://mast.stsci.edu/tesscut/api/v0.1/astrocut?ra=81.92560876541987&dec=-1.5088083330171362&y=37&x=125&units=px&sector=6 to ./tesscut_20210707103901.zip ... [Done]
-                Inflating...
-                
-                >>> print(manifest["Local Path"][0])  #doctest: +SKIP
-                ./tess-s0006-1-1_81.925609_-1.508808_125x37_astrocut.fits
+  >>> manifest = Tesscut.download_cutouts(**footprints[0], sector=6)  #doctest: +SKIP
+  Downloading URL https://mast.stsci.edu/tesscut/api/v0.1/astrocut?ra=81.92560876541987&dec=-1.5088083330171362&y=37&x=125&units=px&sector=6 to ./tesscut_20210707103901.zip ... [Done]
+  Inflating...
+  
+  >>> print(manifest["Local Path"][0])  #doctest: +SKIP
+  ./tess-s0006-1-1_81.925609_-1.508808_125x37_astrocut.fits
 
-                # Centering on the moving target
-                >>> mt_cutout_fle = astrocut.center_on_path(path_table, size, manifest["Local Path"], target="my_asteroid", 
-                ...                                         img_wcs=ffi_wcs, verbose=False)  #doctest: +SKIP
+  # Centering on the moving target
+  >>> mt_cutout_fle = astrocut.center_on_path(path_table, size, manifest["Local Path"], target="my_asteroid", 
+  ...                                         img_wcs=ffi_wcs, verbose=False)  #doctest: +SKIP
 
-                >>> cutout_hdu = fits.open(mt_cutout_fle)  #doctest: +SKIP
-                >>> cutout_hdu.info()  #doctest: +SKIP
-                Filename: ./my_asteroid_1468.9120483398438-1470.1412353515625_15-x-15_astrocut.fits
-                No.    Name      Ver    Type      Cards   Dimensions   Format
-                  0  PRIMARY       1 PrimaryHDU      56   ()      
-                  1  PIXELS        1 BinTableHDU    152   60R x 16C   [D, E, J, 225J, 225E, 225E, 225E, 225E, J, E, E, 38A, D, D, D, D]   
-                  2  APERTURE      1 ImageHDU        97   (2136, 2078)   int32  
+  >>> cutout_hdu = fits.open(mt_cutout_fle)  #doctest: +SKIP
+  >>> cutout_hdu.info()  #doctest: +SKIP
+  Filename: ./my_asteroid_1468.9120483398438-1470.1412353515625_15-x-15_astrocut.fits
+  No.    Name      Ver    Type      Cards   Dimensions   Format
+    0  PRIMARY       1 PrimaryHDU      56   ()      
+    1  PIXELS        1 BinTableHDU    152   60R x 16C   [D, E, J, 225J, 225E, 225E, 225E, 225E, J, E, E, 38A, D, D, D, D]   
+    2  APERTURE      1 ImageHDU        97   (2136, 2078)   int32  
 
 
 Combining Cutouts
@@ -668,35 +761,35 @@ function. See the `~astrocut.build_default_combine_function` for an example of h
 
 .. code-block:: python
   
-                >>> import astrocut
-                
-                >>> from astropy.coordinates import SkyCoord
+  >>> import astrocut
+  
+  >>> from astropy.coordinates import SkyCoord
 
-                >>> fle_1 = 'hst_skycell-p2381x05y09_wfc3_uvis_f275w-all-all_drc.fits'
-                >>> fle_2 = 'hst_skycell-p2381x06y09_wfc3_uvis_f275w-all-all_drc.fits'
+  >>> fle_1 = 'hst_skycell-p2381x05y09_wfc3_uvis_f275w-all-all_drc.fits'
+  >>> fle_2 = 'hst_skycell-p2381x06y09_wfc3_uvis_f275w-all-all_drc.fits'
 
-                >>> center_coord = SkyCoord("211.27128477 53.66062066", unit='deg')
-                >>> size = [30,50]
+  >>> center_coord = SkyCoord("211.27128477 53.66062066", unit='deg')
+  >>> size = [30,50]
 
-                >>> cutout_1 = astrocut.fits_cut(fle_1, center_coord, size, extension='all',
-                ...                     cutout_prefix="cutout_p2381x05y09", verbose=False)  #doctest: +SKIP
-                >>> cutout_2 = astrocut.fits_cut(fle_2, center_coord, size, extension='all', 
-                ...                     cutout_prefix="cutout_p2381x06y09", verbose=False)  #doctest: +SKIP
+  >>> cutout_1 = astrocut.fits_cut(fle_1, center_coord, size, extension='all',
+  ...                     cutout_prefix="cutout_p2381x05y09", verbose=False)  #doctest: +SKIP
+  >>> cutout_2 = astrocut.fits_cut(fle_2, center_coord, size, extension='all', 
+  ...                     cutout_prefix="cutout_p2381x06y09", verbose=False)  #doctest: +SKIP
 
-                >>> plt.imshow(fits.getdata(cutout_1, 1))  #doctest: +SKIP
+  >>> plt.imshow(fits.getdata(cutout_1, 1))  #doctest: +SKIP
                 
 .. image:: imgs/hapcut_left.png
 
 .. code-block:: python
                 
-                >>> plt.imshow(fits.getdata(cutout_2, 1))  #doctest: +SKIP
+  >>> plt.imshow(fits.getdata(cutout_2, 1))  #doctest: +SKIP
                 
 .. image:: imgs/hapcut_right.png
 
 .. code-block:: python
 
-                >>> combined_cutout = astrocut.CutoutsCombiner([cutout_1, cutout_2]).combine("combined_cut.fits")  #doctest: +SKIP
-                >>> plt.imshow(fits.getdata(combined_cutout, 1))  #doctest: +SKIP
+  >>> combined_cutout = astrocut.CutoutsCombiner([cutout_1, cutout_2]).combine("combined_cut.fits")  #doctest: +SKIP
+  >>> plt.imshow(fits.getdata(combined_cutout, 1))  #doctest: +SKIP
                 
 .. image:: imgs/hapcut_combined.png        
 
@@ -705,34 +798,34 @@ All of the combining can be done in memory, without writing FITS files to disk a
 
 .. code-block:: python
   
-                >>> import astrocut
-                
-                >>> from astropy.coordinates import SkyCoord
+  >>> import astrocut
+  
+  >>> from astropy.coordinates import SkyCoord
 
-                >>> fle_1 = 'hst_skycell-p2381x05y09_wfc3_uvis_f275w-all-all_drc.fits'
-                >>> fle_2 = 'hst_skycell-p2381x06y09_wfc3_uvis_f275w-all-all_drc.fits'
+  >>> fle_1 = 'hst_skycell-p2381x05y09_wfc3_uvis_f275w-all-all_drc.fits'
+  >>> fle_2 = 'hst_skycell-p2381x06y09_wfc3_uvis_f275w-all-all_drc.fits'
 
-                >>> center_coord = SkyCoord("211.27128477 53.66062066", unit='deg')
-                >>> size = [30,50]
+  >>> center_coord = SkyCoord("211.27128477 53.66062066", unit='deg')
+  >>> size = [30,50]
 
-                >>> cutout_1 = astrocut.fits_cut(fle_1, center_coord, size, extension='all',
-                ...                     cutout_prefix="cutout_p2381x05y09", memory_only=True)[0]  #doctest: +SKIP
-                >>> cutout_2 = astrocut.fits_cut(fle_2, center_coord, size, extension='all', 
-                ...                     cutout_prefix="cutout_p2381x06y09", memory_only=True)[0]  #doctest: +SKIP
+  >>> cutout_1 = astrocut.fits_cut(fle_1, center_coord, size, extension='all',
+  ...                     cutout_prefix="cutout_p2381x05y09", memory_only=True)[0]  #doctest: +SKIP
+  >>> cutout_2 = astrocut.fits_cut(fle_2, center_coord, size, extension='all', 
+  ...                     cutout_prefix="cutout_p2381x06y09", memory_only=True)[0]  #doctest: +SKIP
 
-                >>> plt.imshow(cutout_1[1].data)  #doctest: +SKIP
+  >>> plt.imshow(cutout_1[1].data)  #doctest: +SKIP
                 
 .. image:: imgs/hapcut_left.png
 
 .. code-block:: python
                 
-                >>> plt.imshow(cutout_2[1].data)  #doctest: +SKIP
+  >>> plt.imshow(cutout_2[1].data)  #doctest: +SKIP
                 
 .. image:: imgs/hapcut_right.png
 
 .. code-block:: python
 
-                >>> combined_cutout = astrocut.CutoutsCombiner([cutout_1, cutout_2]).combine(memory_only=True)  #doctest: +SKIP
-                >>> plt.imshow(combined_cutout[1].data)  #doctest: +SKIP
+  >>> combined_cutout = astrocut.CutoutsCombiner([cutout_1, cutout_2]).combine(memory_only=True)  #doctest: +SKIP
+  >>> plt.imshow(combined_cutout[1].data)  #doctest: +SKIP
                 
 .. image:: imgs/hapcut_combined.png        

@@ -42,21 +42,288 @@ it contains the name of the file the cutout comes from.
 ASDF Cutout Files
 ==================
 
-ASDF files output by `~astrocut.ASDFCutout` are a minimal tree structure that mirrors the format of the original Roman image file.
+Image Cutouts
+^^^^^^^^^^^^^
 
-.. code-block:: python
+ASDF and FITS image cutout files are output by the `~astrocut.ASDFCutout` class.
+The output format (ASDF vs FITS) impacts the structure of the cutout file. Additionally, the ``lite`` parameter controls 
+whether the cutout contains only essential data or all data and metadata from the original file.
+The ``lite`` parameter has the following effects on the cutout content:
+
+- ``lite=False`` (default): When ``lite=False``, the cutout includes all data and metadata from the original ASDF file, with all
+  arrays (and higher-dimensional cubes) that match the spatial dimensions of the science data sliced to
+  the cutout shape. The full tree structure and metadata from the original file are preserved.
+
+- ``lite=True``: When ``lite=True``, only the essential cutout data and minimal metadata are included:
+  the cutout world coordinate system (WCS) and the original filename. This mode produces significantly
+  smaller files and is makes for faster processing.
+
+ASDF Format Output
+-------------------
+
+When writing to ASDF format, the cutout file structure depends on the value of the ``lite`` parameter.
+
+**Lite ASDF Cutout Structure:**
+
+.. code-block:: none
 
     asdf_cutout = {
-        "roman": {
-            "meta": {
-                "wcs" - the gwcs of the cutout
+        'history': [...],
+        'roman': {
+            'meta': {
+                'wcs': <sliced gwcs object>,
+                'orig_file': <original filename>
             },
-            "data" - the cutout data
+            'data': <cutout data array>
         }
     }
 
-``wcs`` is the original ``gwcs`` object from the input ASDF file that has been sliced into the shape of the cutout.
+**Full ASDF Cutout Structure:**
 
+.. code-block:: none
+
+    asdf_cutout = {
+        'asdf_library': [...],
+        'history': [...],
+        'roman': {
+            'meta': {
+                'wcs': <sliced gwcs object>,
+                'orig_file': <original filename>,
+                <other metadata keys preserved from original file>
+            },
+            'data': <cutout data array>,
+            'err': <cutout error array>,
+            <other mission data arrays>
+        }
+    }
+
+In both cases, the ``wcs`` is the original ``gwcs`` object from the input ASDF file that has been
+sliced and adjusted to account for the cutout's position and shape.
+
+FITS Format Output
+-------------------
+
+When writing to FITS format, the output structure differs from ASDF. The cutout data is stored in an ``ImageHDU`` extension, 
+with WCS information encoded in standard FITS headers. With Python 3.11+, the ASDF metadata tree is embedded in the FITS file. 
+When ``lite=True``, the embedded ASDF tree contains only the cutout WCS and original filename; when ``lite=False``, the full 
+ASDF metadata is embedded.
+
+Note that FITS output files only contain the cutout image data in the ``ImageHDU`` extension, and do not include any additional 
+data arrays from the original ASDF file, even when ``lite=False``. This is a key difference from ASDF output.
+
+**FITS Structure:**
+
+.. code-block:: none
+
+    PrimaryHDU (Extension 0)
+    ├── ORIGIN: "STScI/MAST"
+    ├── DATE: <file creation date>
+    ├── PROCVER: <astrocut version>
+    ├── RA_OBJ: <center RA in degrees>
+    └── DEC_OBJ: <center declination in degrees>
+
+    ImageHDU (Extension 1) - CUTOUT
+    ├── Data: <cutout image array>
+    ├── WCS keywords: <updated from original WCS>
+    └── ORIG_FLE: <name of original ASDF file>
+
+    BinTableHDU (Extension 2, Python 3.11+) - ASDF
+    └── Data: <ASDF metadata tree (lite or full) embedded as binary table>
+
+Spectral Cutouts
+^^^^^^^^^^^^^^^^
+
+ASDF spectral cutouts are produced by the `~astrocut.RomanSpectralCutout` class.
+The amount of information in each cutout file is controlled by the ``lite`` parameter, which determines whether only essential data 
+or all data and metadata from the original file are included in the cutout. The ``lite`` parameter has the following effects on the cutout content:
+
+- ``lite=True`` (default): Only the ``flux`` and ``wl`` arrays for each source are included in the data, alond with minimal metadata.
+
+- ``lite=False``: The cutout includes all data and metadata from the original ASDF file(s), with all arrays that match the 
+  dimensions of the ``wl`` array being sliced to the cutout shape if a ``wl_range`` was specified.
+  The full tree structure and metadata from the original file(s) are preserved.
+
+The cutout output structure is also determined by the ``group_by`` parameter in the ``get_asdf_cutouts`` and ``write_as_asdf`` methods.
+This parameter has three options and controls how the cutout data is organized and how many ASDF files are written.
+
+
+Group by Source ID and Input File
+----------------------------------
+
+Setting ``group_by='source_file'`` writes one ASDF file per unique combination of input file and source ID. 
+This means that if multiple source IDs are selected from the same input file, each will be written to a separate ASDF file. 
+The output filename pattern for this grouping is: ``<input_stem>_cutout_<source_id>[_lite].asdf``
+
+**Lite Structure:**
+
+.. code-block:: none
+
+    asdf_cutout = {
+        'history': [...],
+        'roman': {
+            'meta': {
+                'source_id': <source id>
+            },
+            'data': {
+                'flux': <cutout flux array>,
+                'wl': <cutout wavelength array>
+            }
+        }
+    }
+
+**Full Structure:**
+
+.. code-block:: none
+
+    asdf_cutout = {
+        'asdf_library': [...],
+        'history': [...],
+        'roman': {
+            'meta': {
+                'source_id': <source id>,
+                <other metadata keys>
+            },
+            'data': {
+                'flux': <cutout flux array>,
+                'wl': <cutout wavelength array>,
+                <other data arrays and values>
+            }
+        }
+    }
+
+Group by Input File
+---------------------
+
+Setting ``group_by='file'`` writes one ASDF file per input spectral file, combining selected source IDs from that file into a single ASDF file.
+The output filename pattern for this grouping is: ``<input_stem>_cutout[_lite].asdf``
+
+**Lite Structure:**
+
+.. code-block:: none
+
+    asdf_cutout = {
+        'history': [...],
+        'roman': {
+            'meta': {
+                'source_ids': <list of source ids>
+            },
+            'data': {
+                <source_id_1>: {
+                    'flux': <cutout flux array>,
+                    'wl': <cutout wavelength array>
+                },
+                <source_id_2>: {
+                    'flux': <cutout flux array>,
+                    'wl': <cutout wavelength array>
+                }
+            }
+        }
+    }
+
+**Full Structure:**
+
+.. code-block:: none
+
+    asdf_cutout = {
+        'asdf_library': [...],
+        'history': [...],
+        'roman': {
+            'meta': {
+                'source_ids': <list of source ids>
+                <other metadata keys>
+            },
+            'data': {
+                <source_id_1>: {
+                    'flux': <cutout flux array>,
+                    'wl': <cutout wavelength array>
+                    <other data arrays and values>
+                },
+                <source_id_2>: {
+                    'flux': <cutout flux array>,
+                    'wl': <cutout wavelength array>
+                    <other data arrays and values>
+                }
+            }
+        }
+    }
+
+
+Combined File for All Sources and Input Files
+----------------------------------------------
+
+Setting ``group_by='combined'`` writes one ASDF file containing all requested files and sources. 
+The output filename pattern for this grouping is: ``combined_cutout[_lite].asdf``
+
+**Lite Structure:**
+
+.. code-block:: none
+
+    asdf_cutout = {
+        'history': [...],
+        'roman': {
+            'meta': {
+                'source_ids': <list of source ids>
+            },
+            'data': {
+                <input_file_1>: {
+                    <source_id_1>: {
+                        'flux': <cutout flux array>,
+                        'wl': <cutout wavelength array>
+                    }
+                },
+                <input_file_2>: {
+                    <source_id_2>: {
+                        'flux': <cutout flux array>,
+                        'wl': <cutout wavelength array>
+                    }
+                }
+            }
+        }
+    }
+
+**Full Structure:**
+
+.. code-block:: none
+
+    asdf_cutout = {
+        'asdf_library_combined': {
+            <input_file_1>: {...},
+            <input_file_2>: {...}
+        },
+        'history': [...],
+        'history_combined': {
+            <input_file_1>: {...},
+            <input_file_2>: {...}
+        },
+        'roman': {
+            'meta': {
+                <input_file_1>: {
+                    'source_ids': <list of source ids>,
+                    <other metadata keys>
+                },
+                <input_file_2>: {
+                    'source_ids': <list of source ids>
+                    <other metadata keys>
+                }
+            },
+            'data': {
+                <input_file_1>: {
+                    <source_id_1>: {
+                        'flux': <cutout flux array>,
+                        'wl': <cutout wavelength array>,
+                        <other data arrays and values>
+                    }
+                },
+                <input_file_2>: {
+                    <source_id_2>: {
+                        'flux': <cutout flux array>,
+                        'wl': <cutout wavelength array>,
+                        <other data arrays and values>
+                    }
+                }
+            }
+        }
+    }
 
 
 Cube Files
