@@ -15,8 +15,35 @@ from .spectral_cutout import SpectralCutout
 
 class ASDFSpectralCutout(SpectralCutout, ABC):
     """
-    Class for creating spectral cutouts from multi-dimensional data.
-    This class inherits from BaseCutout and implements methods specific to spectral data.
+    Abstract class for creating cutouts from ASDF spectral data. This class is designed to handle cutouts from ASDF files
+    that follow a specific structure, where the spectral data is organized under a mission-specific keyword.
+
+    Parameters
+    ----------
+    spectral_files : str, Path, S3Path, or list
+        Path(s) to the input spectral files. Can be a single file or a list of files.
+    source_ids : str, int, or list
+        Source ID(s) to cut out. Can be a single ID or a list of IDs.
+    wl_range : tuple or list, optional
+        Wavelength range to cut out, specified as (min_wavelength, max_wavelength). If None, the full wavelength range will be used.
+    lite : bool, optional
+        If True, only a subset of the data and metadata will be included in the cutouts to reduce memory usage. Default is True.
+    verbose : bool, optional
+        If True, log messages will be printed during cutout generation. Default is False.
+
+    Attributes
+    ----------
+    cutout_data : dict
+        A dictionary to store the cutout data for each source ID and input file combination.
+
+    Methods
+    -------
+    get_asdf_cutouts(group_by=group_by, source_ids=source_ids, spectral_files=spectral_files)
+        Get ASDF cutout(s) for specified source IDs and input files, grouped by source and file, file, or combined.
+    write_as_asdf(output_dir=output_dir, group_by=group_by, source_ids=source_ids, spectral_files=spectral_files)
+        Write the ASDF cutout(s) to files in the specified output directory, grouped by source and file, file, or combined.
+    cutout()
+        Generate the spectral cutout(s) from the input ASDF files based on the specified source IDs and wavelength range.
     """
 
     def __init__(
@@ -34,26 +61,57 @@ class ASDFSpectralCutout(SpectralCutout, ABC):
         self._base_trees = {}  # To store base ASDF tree without mission data
         self._base_missions = {}  # To store base mission data without source-specific data
 
+        self.cutout_data = dict()  # Store cutout data for each source ID and input file combination
+
+    def cutout(self):
+        """
+        Generate the spectral cutout(s) from the input ASDF files based on the specified source IDs and wavelength range.
+
+        Raises
+        ------
+        InvalidQueryError
+            If no cutouts were created, which may occur if the specified source IDs are not present in the input spectral files
+            or if the specified wavelength range does not overlap with the data.
+        """
+        for file in self._spectral_files:
+            self._cutout_file(file)
+
+        if not self._out_trees:
+            raise InvalidQueryError(
+                "No cutouts were created. Please verify that the source IDs are present in "
+                "the spectral files and that the wavelength range overlaps with the data."
+            )
+
     def get_asdf_cutouts(
         self,
         *,
-        group_by: Literal["source_file", "file", "combined"] = "file",
-        source_ids: Union[str, int, List[Union[str, int]]] = None,
+        group_by: Literal["source_file", "file", "combined"] = "source_file",
         spectral_files: Union[str, Path, S3Path, List[Union[str, Path, S3Path]]] = None,
+        source_ids: Union[str, int, List[Union[str, int]]] = None,
     ) -> dict:
         """
-        Get a combined ASDF cutout containing all sources or a subset of sources.
+        Get ASDF cutout objects for specified source IDs and input files, grouped by source and file, file, or combined.
 
         Parameters
         ----------
+        group_by : {'source_file', 'file', 'combined'}, optional
+            Determines how the cutouts are grouped in the output ASDF objects. Default is 'source_file'.
+            - 'source_file': Separate ASDF object for each source ID and input file combination.
+            - 'file': One ASDF object per input file, containing all specified source IDs from that file.
+            - 'combined': A single ASDF object containing all specified source IDs from all input files.
+        spectral_files : str or Path or S3Path or list, optional
+            Specific spectral files to include in the output. If None, all input spectral files will be included.
+            Can be a single file or a list of files.
         source_ids : str or int or list, optional
-            Specific source IDs to include in the combined cutout.
-            If None, all sources will be included.
+            Specific source IDs to include in the output. If None, all source IDs from the cutout results will be included.
+            Can be a single ID or a list of IDs.
 
         Returns
         -------
-        asdf.AsdfFile
-            The ASDF file containing cutouts for the specified sources.
+        dict or asdf.AsdfFile
+            Depending on the value of `group_by`, this method returns either a dictionary of ASDF cutout objects keyed
+            by source ID and input file combination ('source_file'), a dictionary of ASDF cutout objects keyed by input file ('file'),
+            or a single ASDF cutout object containing all cutouts ('combined').
         """
         # Determine which spectral files to include
         if spectral_files is None:
@@ -211,13 +269,79 @@ class ASDFSpectralCutout(SpectralCutout, ABC):
 
         return asdf_cutouts
 
+    def write_as_asdf(
+        self,
+        output_dir: Union[str, Path] = ".",
+        *,
+        group_by: Literal["source_file", "file", "combined"] = "file",
+        spectral_files: List[Union[str, Path]] = None,
+        source_ids: Union[str, int, List[Union[str, int]]] = None,
+    ) -> List[str]:
+        """
+        Write the ASDF cutout(s) to files in the specified output directory, grouped by source and file, file, or combined.
+
+        Parameters
+        ----------
+        output_dir : str or Path, optional
+            Output directory for cutout files. Default is the current directory.
+        group_by : {'source_file', 'file', 'combined'}, optional
+            Determines how the cutouts are grouped in the output ASDF files. Default is 'source_file'.
+            - 'source_file': Separate ASDF file for each source ID and input file combination.
+            - 'file': One ASDF file per input file, containing all specified source IDs from that file.
+            - 'combined': A single ASDF file containing all specified source IDs from all input files.
+        spectral_files : str or Path or S3Path or list, optional
+            Specific spectral files to include in the output. If None, all input spectral files will be included.
+            Can be a single file or a list of files.
+        source_ids : str or int or list, optional
+            Specific source IDs to include in the output. If None, all source IDs from the cutout results will be included.
+            Can be a single ID or a list of IDs.
+
+        Returns
+        -------
+        List[str]
+            List of file paths to the written ASDF cutout files.
+        """
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        cutout_paths = []  # List to store paths to cutout files
+
+        if group_by == "source_file":
+            af_by_source_file = self.get_asdf_cutouts(
+                group_by="source_file", source_ids=source_ids, spectral_files=spectral_files
+            )
+            for (file, sid), af in af_by_source_file.items():
+                filename = f'{Path(file).stem}_cutout_{sid}{"_lite" if self._lite else ""}.asdf'
+                cutout_path = output_dir / filename
+                af.write_to(cutout_path)
+                cutout_paths.append(str(cutout_path))
+        elif group_by == "file":
+            af_by_file = self.get_asdf_cutouts(group_by="file", source_ids=source_ids, spectral_files=spectral_files)
+            for file, af in af_by_file.items():
+                filename = f'{Path(file).stem}_cutout{"_lite" if self._lite else ""}.asdf'
+                cutout_path = output_dir / filename
+                af.write_to(cutout_path)
+                cutout_paths.append(str(cutout_path))
+        else:
+            af = self.get_asdf_cutouts(group_by="combined", source_ids=source_ids, spectral_files=spectral_files)
+            filename = f'combined_spectral_cutout{"_lite" if self._lite else ""}.asdf'
+            cutout_path = output_dir / filename
+            af.write_to(cutout_path)
+            cutout_paths.append(str(cutout_path))
+
+        return cutout_paths
+
     def _cutout_file(self, file: str):
         """
-        Internal method to perform cutout on a single file.
-        This is a placeholder for potential future use if we want to support multiple files.
+        Generate cutouts for a single input spectral file and store the results in the internal cutout_data and _out_trees attributes.
+
+        Parameters
+        ----------
+        file : str
+            The path to the input spectral file for which to generate cutouts.
         """
         with asdf.open(file) as af:
-            in_tree = af.tree  # Load the entire tree lazily
+            in_tree = af.tree
             mission_data = in_tree[self._mission_keyword]["data"]
 
             self._base_trees[file] = {k: v for k, v in in_tree.items() if k != self._mission_keyword}
@@ -286,78 +410,5 @@ class ASDFSpectralCutout(SpectralCutout, ABC):
                             "meta": {**self._base_missions[file].get("meta", {}), "source_id": sid},
                         },
                     }
-
                 self._out_trees.setdefault(file, {})
                 self._out_trees[file][sid] = out_tree
-
-    def cutout(self):
-        """
-        Generate the spectral cutout(s).
-        This method should be implemented to handle spectral data specifically.
-        """
-        for file in self._spectral_files:
-            self._cutout_file(file)
-
-        if not self._out_trees:
-            raise InvalidQueryError(
-                "No cutouts were created. Please verify that the source IDs are present in "
-                "the spectral files and that the wavelength range overlaps with the data."
-            )
-
-    def write_as_asdf(
-        self,
-        output_dir: Union[str, Path] = ".",
-        *,
-        group_by: Literal["source_file", "file", "combined"] = "file",
-        source_ids: Union[str, int, List[Union[str, int]]] = None,
-        spectral_files: List[Union[str, Path]] = None,
-    ) -> List[str]:
-        """
-        Write the ASDF cutout(s) to files in the specified output directory.
-
-        Parameters
-        ----------
-        output_dir : str or Path
-            Directory where the ASDF cutout files will be saved.
-        source_ids : str or int or list, optional
-            Specific source IDs to write. If None, all source IDs will be written.
-            When single_outfile is True, these sources will be combined into one file.
-            When single_outfile is False, separate files will be created for each source.
-        single_outfile : bool, optional
-            If True (default), writes all sources to a single combined file.
-            If False, writes separate files for each source.
-
-        Returns
-        -------
-        List[str]
-            List of file paths where the ASDF cutouts were saved.
-        """
-        output_dir = Path(output_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        cutout_paths = []  # List to store paths to cutout files
-
-        if group_by == "source_file":
-            af_by_source_file = self.get_asdf_cutouts(
-                group_by="source_file", source_ids=source_ids, spectral_files=spectral_files
-            )
-            for (file, sid), af in af_by_source_file.items():
-                filename = f'{Path(file).stem}_cutout_{sid}{"_lite" if self._lite else ""}.asdf'
-                cutout_path = output_dir / filename
-                af.write_to(cutout_path)
-                cutout_paths.append(str(cutout_path))
-        elif group_by == "file":
-            af_by_file = self.get_asdf_cutouts(group_by="file", source_ids=source_ids, spectral_files=spectral_files)
-            for file, af in af_by_file.items():
-                filename = f'{Path(file).stem}_cutout{"_lite" if self._lite else ""}.asdf'
-                cutout_path = output_dir / filename
-                af.write_to(cutout_path)
-                cutout_paths.append(str(cutout_path))
-        else:
-            af = self.get_asdf_cutouts(group_by="combined", source_ids=source_ids, spectral_files=spectral_files)
-            filename = f'combined_spectral_cutout{"_lite" if self._lite else ""}.asdf'
-            cutout_path = output_dir / filename
-            af.write_to(cutout_path)
-            cutout_paths.append(str(cutout_path))
-
-        return cutout_paths

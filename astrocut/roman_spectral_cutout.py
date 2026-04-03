@@ -11,8 +11,21 @@ from .exceptions import InvalidQueryError
 
 class RomanSpectralCutout(ASDFSpectralCutout):
     """
-    Class for creating spectral cutouts specifically from Roman ASDF data.
-    Inherits from ASDFSpectralCutout.
+    Class for creating cutouts from Roman spectral data. Inherits from `ASDFSpectralCutout` and implements the same interface,
+    but is optimized for Roman data.
+
+    Parameters
+    ----------
+    spectral_files : str, Path, S3Path, or list
+        Path(s) to the input spectral files. Can be a single file or a list of files.
+    source_ids : str, int, or list
+        Source ID(s) to cut out. Can be a single ID or a list of IDs.
+    wl_range : tuple or list, optional
+        Wavelength range to cut out, specified as (min_wavelength, max_wavelength). If None, the full wavelength range will be used.
+    lite : bool, optional
+        If True, only a subset of the data and metadata will be included in the cutouts to reduce memory usage. Default is True.
+    verbose : bool, optional
+        If True, log messages will be printed during cutout generation. Default is False.
     """
 
     def __init__(
@@ -60,31 +73,36 @@ def roman_spectral_cut(
     *,
     lite: bool = True,
     output_dir: Union[str, Path] = ".",
-    group_by: Literal["source_file", "file", "combined"] = "file",
+    group_by: Literal["source_file", "file", "combined"] = "source_file",
     batch_size: int = 128,
     workers: Optional[int] = None,
 ) -> List[str]:
     """
-    Extract spectral cutouts in parallel and write them to ASDF files.
+    Generate and write Roman spectral cutouts in parallel using multiprocessing.
 
     Parameters
     ----------
-    spectral_files : str or Path or S3Path or List[Union[str, Path, S3Path]]
-        Input spectral ASDF file(s).
-    source_ids : list
-        Source IDs to extract.
-    wl_range : tuple
-        Wavelength range.
+    spectral_files : str, Path, S3Path, or list
+        Path(s) to the input spectral files. Can be a single file or a list of files.
+    source_ids : str, int, or list
+        Source ID(s) to cut out. Can be a single ID or a list of IDs.
+    wl_range : tuple or list, optional
+        Wavelength range to cut out, specified as (min_wavelength, max_wavelength). If None, the full wavelength range will be used.
     lite : bool, optional
-        Whether to produce lite cutouts (default True).
+        If True, only a subset of the data and metadata will be included in the cutouts to reduce memory usage. Default is False
+        (include all data and metadata).
     output_dir : str or Path, optional
-        Output directory for cutout files.
+        Directory where the output ASDF files will be saved. Default is the current directory.
     group_by : {'source_file', 'file', 'combined'}, optional
-        How to group cutouts into output files (default 'file').
+        Determines how the cutouts are grouped in the output ASDF files. Default is 'source_file'.
+        - 'source_file': Separate ASDF file for each source ID and input file combination.
+        - 'file': One ASDF file per input file, containing all specified source IDs from that file.
+        - 'combined': A single ASDF file containing all specified source IDs from all input files.
     batch_size : int, optional
-        Number of sources per worker batch.
+        Number of source IDs to process in each batch for parallel cutout generation. Default is 128.
     workers : int, optional
-        Number of worker processes.
+        Number of worker processes to use for parallel cutout generation. If None, the number of CPU cores minus one will be used.
+        Default is None.
 
     Returns
     -------
@@ -99,6 +117,7 @@ def roman_spectral_cut(
     if workers is None:
         workers = max(1, os.cpu_count() - 1)
 
+    # Create jobs for parallel processing
     jobs = []
     for filepath in spectral_files:
         for i in range(0, len(source_ids), batch_size):
