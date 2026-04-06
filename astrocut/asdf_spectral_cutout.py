@@ -232,11 +232,21 @@ class ASDFSpectralCutout(SpectralCutout, ABC):
                     }
                 }
             else:
-                # TODO: Right now, this doesn't work with the original key because of ASDF validation errors
-                # due to required keys not being present
+                # TODO: Right now, this doesn't work with the original key (asdf_library, history, etc.) because of ASDF
+                # validation errors due to required keys not being present. So, we rename the keys and append
+                # "_combined" to indicate that they are combined from multiple files. This is not ideal, but
+                # it allows us to include all the data in a single ASDF file without validation errors.
+                combined_keys = set()
+                for file in files_to_include:
+                    combined_keys.update(self._base_trees[file].keys())
+
                 base_tree = {}
-                for key in self._base_trees[file].keys():
-                    key_by_file = {str(file): self._base_trees[file][key] for file in files_to_include}
+                for key in combined_keys:
+                    key_by_file = {
+                        str(file): self._base_trees[file][key]
+                        for file in files_to_include
+                        if key in self._base_trees[file]
+                    }
                     base_tree[f"{key}_combined"] = key_by_file
 
                 meta_by_file = {}
@@ -280,7 +290,7 @@ class ASDFSpectralCutout(SpectralCutout, ABC):
         self,
         output_dir: Union[str, Path] = ".",
         *,
-        group_by: Literal["source_file", "file", "combined"] = "file",
+        group_by: Literal["source_file", "file", "combined"] = "source_file",
         spectral_files: List[Union[str, Path]] = None,
         source_ids: Union[str, int, List[Union[str, int]]] = None,
     ) -> List[str]:

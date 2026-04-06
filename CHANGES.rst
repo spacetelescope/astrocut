@@ -9,6 +9,7 @@ Unreleased
   the given sky coordinates and cutout size. [#168]
 - Cutouts of ASDF data in FITS format now include embedded ASDF metadata in an "ASDF" extension within the FITS file for 
   Python versions greater than or equal to 3.11. [#170]
+- New ``RomanSpectralCutout`` class and ``roman_spectral_cut`` function for creating spectral cutouts from Roman Space Telescope ASDF data. [#179]
 
 Breaking Changes
 ^^^^^^^^^^^^^^^^

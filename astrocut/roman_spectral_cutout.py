@@ -1,7 +1,7 @@
 import os
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
-from typing import List, Literal, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 from s3path import S3Path
 
@@ -52,35 +52,37 @@ def _parallel_roman_spectral_cutout_worker(
         tuple,  # wl_range
         bool,  # lite
         Path,  # output_dir
-        str,  # group_by
     ],
 ) -> List[str]:
     """
     Worker function for parallel Roman spectral cutouts.
     Opens the file, generates cutouts, writes them to disk, and returns paths.
     """
-    filepath, source_id_batch, wl_range, lite, output_dir, group_by = args
+    filepath, source_id_batch, wl_range, lite, output_dir = args
 
     cutout = RomanSpectralCutout(
         spectral_files=filepath, source_ids=source_id_batch, wl_range=wl_range, lite=lite, verbose=False
     )
 
-    return cutout.write_as_asdf(output_dir, group_by=group_by)
+    return cutout.write_as_asdf(output_dir)
 
 
 def roman_spectral_cut(
     spectral_files: Union[str, Path, S3Path, List[Union[str, Path, S3Path]]],
-    source_ids: Union[List[str], List[int]],
-    wl_range: tuple,
+    source_ids: Union[str, int, List[Union[str, int]]],
+    wl_range: Union[tuple, list] = None,
     *,
     lite: bool = True,
     output_dir: Union[str, Path] = ".",
-    group_by: Literal["source_file", "file", "combined"] = "source_file",
     batch_size: int = 128,
     workers: Optional[int] = None,
 ) -> List[str]:
     """
     Generate and write Roman spectral cutouts in parallel using multiprocessing.
+
+    This function divides the source IDs into batches and processes them in parallel across multiple worker processes.
+    Cutouts are grouped by source ID and file so that each output ASDF file contains cutouts for a single source ID
+    from a single input file.
 
     Parameters
     ----------
@@ -93,14 +95,9 @@ def roman_spectral_cut(
         the full wavelength range will be used.
     lite : bool, optional
         If True, only a subset of the data and metadata will be included in the cutouts to reduce memory usage.
-        Default is False (include all data and metadata).
+        Default is True.
     output_dir : str or Path, optional
         Directory where the output ASDF files will be saved. Default is the current directory.
-    group_by : {'source_file', 'file', 'combined'}, optional
-        Determines how the cutouts are grouped in the output ASDF files. Default is 'source_file'.
-        - 'source_file': Separate ASDF file for each source ID and input file combination.
-        - 'file': One ASDF file per input file, containing all specified source IDs from that file.
-        - 'combined': A single ASDF file containing all specified source IDs from all input files.
     batch_size : int, optional
         Number of source IDs to process in each batch for parallel cutout generation. Default is 128.
     workers : int, optional
@@ -118,13 +115,14 @@ def roman_spectral_cut(
     spectral_files = spectral_files if isinstance(spectral_files, list) else [spectral_files]
 
     if workers is None:
-        workers = max(1, os.cpu_count() - 1)
+        cpu_count = os.cpu_count() or 1
+        workers = max(1, cpu_count - 1)
 
     # Create jobs for parallel processing
     jobs = []
     for filepath in spectral_files:
         for i in range(0, len(source_ids), batch_size):
-            jobs.append((filepath, source_ids[i : i + batch_size], wl_range, lite, output_dir, group_by))
+            jobs.append((filepath, source_ids[i : i + batch_size], wl_range, lite, output_dir))
 
     written_paths = []
 

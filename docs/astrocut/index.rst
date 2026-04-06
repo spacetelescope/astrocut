@@ -378,7 +378,6 @@ when you only need a small number of cutouts, as the overhead of multiprocessing
   ...                                   source_ids=[id for id in range(400000, 500000)],
   ...                                   wl_range=(1.0, 2.0),
   ...                                   lite=False,
-  ...                                   group_by="source_file",
   ...                                   output_dir="/path/to/output") #doctest: +SKIP
 
 

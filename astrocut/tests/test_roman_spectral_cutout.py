@@ -33,9 +33,9 @@ def spectral_files(tmp_path):
         # Add slightly more data to a second file
         af_copy = asdf.AsdfFile(deepcopy(af.tree))
         af_copy["roman"]["data"]["430000"] = {
-            "flag": np.array([False, True, False, True, False, True]),
+            "flag": np.array([False, True, False, True]),
             "wl": np.array([500, 600, 700, 800]),
-            "flux": np.array([15, 25, 35, 45, 55, 65]),
+            "flux": np.array([15, 25, 35, 45]),
         }
         temp_file2 = tmp_path / "temp_spectral_copy.asdf"
         af_copy.write_to(temp_file2)
@@ -398,7 +398,6 @@ def test_roman_spectral_cut(spectral_files, tmp_path):
         wl_range=(550, 850),
         lite=True,
         output_dir=tmp_path,
-        group_by="source_file",
     )
 
     # Check that the cutout files were created
@@ -415,5 +414,9 @@ def test_roman_spectral_cut(spectral_files, tmp_path):
         wl_range=(550, 850),
         lite=True,
         output_dir=tmp_path,
-        group_by="source_file",
     )
+    assert len(cutout_files) == 1  # Should only create a cutout for the file that contains the source ID
+    cutout_file = cutout_files[0]
+    assert cutout_file.endswith(".asdf")
+    assert spectral_files[1].stem in cutout_file  # Check that the cutout file corresponds to the correct input file
+    assert (tmp_path / cutout_file).exists()

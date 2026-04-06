@@ -56,7 +56,7 @@ The ``lite`` parameter has the following effects on the cutout content:
 
 - ``lite=True``: When ``lite=True``, only the essential cutout data and minimal metadata are included:
   the cutout world coordinate system (WCS) and the original filename. This mode produces significantly
-  smaller files and is makes for faster processing.
+  smaller files and makes for faster processing.
 
 ASDF Format Output
 -------------------
@@ -104,7 +104,7 @@ FITS Format Output
 -------------------
 
 When writing to FITS format, the output structure differs from ASDF. The cutout data is stored in an ``ImageHDU`` extension, 
-with WCS information encoded in standard FITS headers. With Python 3.11+, the ASDF metadata tree is embedded in the FITS file. 
+with WCS information encoded in standard FITS headers. With Python 3.11+ and ``stdatamodels>=4.1.0``, the ASDF metadata tree is embedded in the FITS file. 
 When ``lite=True``, the embedded ASDF tree contains only the cutout WCS and original filename; when ``lite=False``, the full 
 ASDF metadata is embedded.
 
@@ -127,7 +127,7 @@ data arrays from the original ASDF file, even when ``lite=False``. This is a key
     ├── WCS keywords: <updated from original WCS>
     └── ORIG_FLE: <name of original ASDF file>
 
-    BinTableHDU (Extension 2, Python 3.11+) - ASDF
+    BinTableHDU (Extension 2, Python 3.11+ and stdatamodels>=4.1.0) - ASDF
     └── Data: <ASDF metadata tree (lite or full) embedded as binary table>
 
 Spectral Cutouts
@@ -137,7 +137,7 @@ ASDF spectral cutouts are produced by the `~astrocut.RomanSpectralCutout` class.
 The amount of information in each cutout file is controlled by the ``lite`` parameter, which determines whether only essential data 
 or all data and metadata from the original file are included in the cutout. The ``lite`` parameter has the following effects on the cutout content:
 
-- ``lite=True`` (default): Only the ``flux`` and ``wl`` arrays for each source are included in the data, alond with minimal metadata.
+- ``lite=True`` (default): Only the ``flux`` and ``wl`` arrays for each source are included in the data, along with minimal metadata.
 
 - ``lite=False``: The cutout includes all data and metadata from the original ASDF file(s), with all arrays that match the 
   dimensions of the ``wl`` array being sliced to the cutout shape if a ``wl_range`` was specified.
@@ -252,7 +252,7 @@ Combined File for All Sources and Input Files
 ----------------------------------------------
 
 Setting ``group_by='combined'`` writes one ASDF file containing all requested files and sources. 
-The output filename pattern for this grouping is: ``combined_cutout[_lite].asdf``
+The output filename pattern for this grouping is: ``combined_spectral_cutout[_lite].asdf``
 
 **Lite Structure:**
 
