@@ -1,20 +1,27 @@
 Unreleased
-----------
+-----------
+
+- Added ``fsspec_kwargs`` parameter to ``FITSCutout`` to pass through to ``s3fs`` for cloud-hosted files. [#177]
+
+
+1.2.0 (2026-02-04)
+-------------------
 
 - Added support in ``ra_dec_crossmatch`` for a cutout size of zero, enabling single-point matching to FFIs that contain
   the specified coordinates. [#166]
-- Added ``write_as_zip`` method to ``ASDFCutout``, ``FITSCutout``, ``TessCubeCutout``, and ``TessFootprintCutout`` classes to facilitate 
+- Added ``write_as_zip`` method to ``ASDFCutout``, ``FITSCutout``, ``TessCubeCutout``, and ``TessFootprintCutout`` classes to facilitate
   writing multiple cutouts into a single ZIP archive. [#167]
-- Added ``get_tess_sectors`` function to return TESS sector information for sectors whose footprints overlap with 
+- Added ``get_tess_sectors`` function to return TESS sector information for sectors whose footprints overlap with
   the given sky coordinates and cutout size. [#168]
-- Cutouts of ASDF data in FITS format now include embedded ASDF metadata in an "ASDF" extension within the FITS file for 
+- Cutouts of ASDF data in FITS format now include embedded ASDF metadata in an "ASDF" extension within the FITS file for
   Python versions greater than or equal to 3.11. [#170]
+- Bugfix for getting the pixel location of given coordinates in ``ASDFCutout``. [#175]
 - New ``RomanSpectralCutout`` class and ``roman_spectral_cut`` function for creating spectral cutouts from Roman Space Telescope ASDF data. [#179]
 
 Breaking Changes
 ^^^^^^^^^^^^^^^^
 
-- Cube cutout filenames now use a hyphen between dimensions (e.g., ``10-x-10`` instead of ``10x10``). They also include unit suffixes when 
+- Cube cutout filenames now use a hyphen between dimensions (e.g., ``10-x-10`` instead of ``10x10``). They also include unit suffixes when
   users request sizes as an ``astropy.units.Quantity`` object (e.g., ``5arcmin-x-4arcmin`` or ``30arcsec-x-20arcsec``). RA/Dec formatting within
   filenames now uses 7 decimal places (``{:.7f}``) for consistency across classes. These changes may break code that parses filenames or relies on
   old glob patterns. [#167]
@@ -33,7 +40,7 @@ Breaking Changes
     - New (no unit - pixels assumed): ``..._83.4063100_-62.4897710_64-x-64_astrocut.fits``
     - New (with units): ``..._83.4063100_-62.4897710_5arcmin-x-4arcmin_astrocut.fits``
 
-  - ASDF cutouts in FITS format now include cutout data in an ``ImageHDU`` extension called "CUTOUT". Code that reads ASDF cutouts from FITS files 
+  - ASDF cutouts in FITS format now include cutout data in an ``ImageHDU`` extension called "CUTOUT". Code that reads ASDF cutouts from FITS files
     should be updated to access the "CUTOUT" extension for cutout data rather than the "PRIMARY" extension. [#170]
 
 
@@ -146,7 +153,7 @@ Breaking Changes
 ----------------
 
 - Add moving target cutout functionality [#40]
-  
+
 
 0.7 (2020-08-19)
 ----------------
