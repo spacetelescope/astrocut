@@ -5,13 +5,14 @@ from typing import List, Optional, Tuple, Union
 
 from s3path import S3Path
 
-from .asdf_spectral_cutout import ASDFSpectralCutout
+from . import log
+from .asdf_spectral_subset import ASDFSpectralSubset
 from .exceptions import InvalidQueryError
 
 
-class RomanSpectralCutout(ASDFSpectralCutout):
+class RomanSpectralSubset(ASDFSpectralSubset):
     """
-    Class for creating cutouts from Roman spectral data. Inherits from `ASDFSpectralCutout`
+    Class for creating subsets from Roman spectral data. Inherits from `ASDFSpectralSubset`
     and implements the same interface, but is designed for Roman data.
 
     Parameters
@@ -24,10 +25,10 @@ class RomanSpectralCutout(ASDFSpectralCutout):
         Wavelength range to cut out, specified as (min_wavelength, max_wavelength). If None,
         the full wavelength range will be used.
     lite : bool, optional
-        If True, only a subset of the data and metadata will be included in the cutouts to
+        If True, only a subset of the data and metadata will be included in the subsets to
         reduce memory usage. Default is True.
     verbose : bool, optional
-        If True, log messages will be printed during cutout generation. Default is False.
+        If True, log messages will be printed during subset generation. Default is False.
     """
 
     def __init__(
@@ -41,11 +42,11 @@ class RomanSpectralCutout(ASDFSpectralCutout):
         super().__init__(spectral_files, source_ids, wl_range, lite, verbose)
         self._mission_keyword = "roman"
 
-        # Make cutouts
-        self.cutout()
+        # Make subsets
+        self.subset()
 
 
-def _parallel_roman_spectral_cutout_worker(
+def _parallel_roman_spectral_subset_worker(
     args: Tuple[
         Union[str, Path, S3Path],  # filepath
         List[str],  # source_ids
@@ -55,19 +56,19 @@ def _parallel_roman_spectral_cutout_worker(
     ],
 ) -> List[str]:
     """
-    Worker function for parallel Roman spectral cutouts.
-    Opens the file, generates cutouts, writes them to disk, and returns paths.
+    Worker function for parallel Roman spectral subsets.
+    Opens the file, generates subsets, writes them to disk, and returns paths.
     """
     filepath, source_id_batch, wl_range, lite, output_dir = args
 
-    cutout = RomanSpectralCutout(
+    subset = RomanSpectralSubset(
         spectral_files=filepath, source_ids=source_id_batch, wl_range=wl_range, lite=lite, verbose=False
     )
 
-    return cutout.write_as_asdf(output_dir)
+    return subset.write_as_asdf(output_dir, group_by="source_file")
 
 
-def roman_spectral_cut(
+def roman_spectral_subset(
     spectral_files: Union[str, Path, S3Path, List[Union[str, Path, S3Path]]],
     source_ids: Union[str, int, List[Union[str, int]]],
     wl_range: Union[tuple, list] = None,
@@ -78,10 +79,10 @@ def roman_spectral_cut(
     workers: Optional[int] = None,
 ) -> List[str]:
     """
-    Generate and write Roman spectral cutouts in parallel using multiprocessing.
+    Generate and write Roman spectral subsets in parallel using multiprocessing.
 
     This function divides the source IDs into batches and processes them in parallel across multiple worker processes.
-    Cutouts are grouped by source ID and file so that each output ASDF file contains cutouts for a single source ID
+    subsets are grouped by source ID and file so that each output ASDF file contains subsets for a single source ID
     from a single input file.
 
     Parameters
@@ -94,14 +95,14 @@ def roman_spectral_cut(
         Wavelength range to cut out, specified as (min_wavelength, max_wavelength). If None,
         the full wavelength range will be used.
     lite : bool, optional
-        If True, only a subset of the data and metadata will be included in the cutouts to reduce memory usage.
+        If True, only a subset of the data and metadata will be included in the subsets to reduce memory usage.
         Default is True.
     output_dir : str or Path, optional
         Directory where the output ASDF files will be saved. Default is the current directory.
     batch_size : int, optional
-        Number of source IDs to process in each batch for parallel cutout generation. Default is 128.
+        Number of source IDs to process in each batch for parallel subset generation. Default is 128.
     workers : int, optional
-        Number of worker processes to use for parallel cutout generation. If None, the number of CPU
+        Number of worker processes to use for parallel subset generation. If None, the number of CPU
         cores minus one will be used. Default is None.
 
     Returns
@@ -127,12 +128,13 @@ def roman_spectral_cut(
     written_paths = []
 
     with ProcessPoolExecutor(max_workers=workers) as executor:
-        futures = [executor.submit(_parallel_roman_spectral_cutout_worker, job) for job in jobs]
+        futures = [executor.submit(_parallel_roman_spectral_subset_worker, job) for job in jobs]
 
         for future in as_completed(futures):
             try:
                 written_paths.extend(future.result())
-            except InvalidQueryError:
+            except InvalidQueryError as e:
+                log.warning(e)
                 continue
 
     return written_paths

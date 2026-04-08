@@ -7,9 +7,9 @@ from s3path import S3Path
 from .cutout import BaseCutout
 
 
-class SpectralCutout(BaseCutout, ABC):
+class SpectralSubset(BaseCutout, ABC):
     """
-    Abstract class for creating cutouts from spectral data.
+    Abstract class for creating subsets of spectral data.
 
     Parameters
     ----------
@@ -21,10 +21,10 @@ class SpectralCutout(BaseCutout, ABC):
         Wavelength range to cut out, specified as (min_wavelength, max_wavelength). If None, the full wavelength
         range will be used.
     lite : bool, optional
-        If True, only a subset of the data and metadata will be included in the cutouts to reduce memory usage.
+        If True, only a subset of the data and metadata will be included in the subsets to reduce memory usage.
         Default is False (include all data and metadata).
     verbose : bool, optional
-        If True, log messages will be printed during cutout generation. Default is False.
+        If True, log messages will be printed during subset generation. Default is False.
     """
 
     def __init__(

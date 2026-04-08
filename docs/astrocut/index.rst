@@ -288,97 +288,84 @@ By default, the cutouts are written to the current working directory. You can sp
 You can also set the prefix of the cutout file paths using the ``cutout_prefix`` parameter. The default value is "cutout".
 
 
-Spectral Cutouts
+Spectral Subsets
 ================
 
-Astrocut can generate spectral cutouts from Roman ASDF spectral files using the
-`~astrocut.RomanSpectralCutout` class. This class is intended for extracting wavelength-limited
+Astrocut can generate spectral subsets from Roman ASDF spectral files using the
+`~astrocut.RomanSpectralSubset` class. This class is intended for extracting wavelength-limited
 spectral data for one or more source IDs.
 
-To create a spectral cutout, provide the input spectral file or files, the source IDs
+To create a spectral subset, provide the input spectral file or files, the source IDs
 to extract, and an optional wavelength range:
 
 .. code-block:: python
 
-  >>> from astrocut import RomanSpectralCutout
+  >>> from astrocut import RomanSpectralSubset
+  >>> from pprint import pprint
 
   >>> spectral_files = ["/path/to/roman_spectral.asdf"]  # Path(s) to local ASDF file, URL, or S3 URI
-  >>> spectral_cutout = RomanSpectralCutout(spectral_files=spectral_files,
+  >>> spectral_subset = RomanSpectralSubset(spectral_files=spectral_files,
   ...                                       source_ids=[420007, 420022],
   ...                                       wl_range=(1.0, 2.0),
   ...                                       lite=True) #doctest: +SKIP
 
-The ``lite`` parameter controls the size of the cutout and how much of the original ASDF tree is preserved:
+The ``lite`` parameter controls the size of the subset and how much of the original ASDF tree is preserved:
 
-- ``lite=True`` keeps only the extracted spectral arrays needed for the cutout and the
-  minimal metadata required to interpret them.
-- ``lite=False`` preserves the broader ASDF tree structure and mission-level metadata,
-  while still slicing the spectral arrays to the requested wavelength range.
+- ``lite=True`` preserves original metadata and only the "wl", "flux", and "flux_error" arrays in the subset data.
+- ``lite=False`` preserves all of the original metadata, data, and top-level keys in the subset.
 
-The resulting `~astrocut.RomanSpectralCutout` object can be used to access the cutout data and metadata.
-The ``cutout_data`` attribute is a dictionary that stores the cutout data keyed by input filename and source ID.
+The resulting `~astrocut.RomanSpectralSubset` object can be used to access the subset data and metadata.
+The ``subset_data`` attribute is a dictionary that stores the subset data keyed by input filename and source ID.
 
-The `~astrocut.RomanSpectralCutout.get_asdf_cutouts` method returns the cutouts as `~asdf.AsdfFile` objects in memory, 
-and the `~astrocut.RomanSpectralCutout.write_as_asdf` method writes the cutouts to ASDF files on disk and returns a list 
-of paths to the output files. Both methods support filtering the cutouts by source ID and input file, as well as grouping the 
-cutouts in different ways. They accept the following parameters:
+The `~astrocut.RomanSpectralSubset.get_asdf_subsets` method returns the subsets as `~asdf.AsdfFile` objects in memory, 
+and the `~astrocut.RomanSpectralSubset.write_as_asdf` method writes the subsets to ASDF files on disk and returns a list 
+of paths to the output files. Both methods support filtering the subsets by source ID and input file, as well as grouping the 
+subsets in different ways. They accept the following parameters:
 
 - ``source_ids``: A list of source IDs to include in the output. If None, all source IDs will be included.
 - ``spectral_files``: A list of input spectral files to include in the output. If None, all input files will be included.
-- ``group_by``: Controls how cutouts are grouped in an `~asdf.AsdfFile` object in memory or in an output file.
+- ``group_by``: Controls how subsets are grouped in an `~asdf.AsdfFile` object in memory or in an output file.
 
-  - ``group_by='source_file'``: Groups cutouts by source ID and input file, resulting in one cutout object per source ID per input file.
-  - ``group_by='file'``: Groups all cutouts from each input file together, resulting in one cutout object per input file.
-  - ``group_by='combined'``: Combines all cutouts from all input files into a single cutout object.
+  - ``group_by='source_file'``: Groups subsets by source ID and input file, resulting in one subset object per source ID per input file.
+  - ``group_by='file'``: Groups all subsets from each input file together, resulting in one subset object per input file.
+  - ``group_by='combined'``: Combines all subsets from all input files into a single subset object.
 
-See the `Spectral Cutout File Formats <file_formats.html#spectral-cutouts>`__ for more details on the structure of cutout objects.
+See the `Spectral Subset File Formats <file_formats.html#spectral-subsets>`__ for more details on the structure of subset objects.
 
 .. code-block:: python
 
-  >>> asdf_cut = spectral_cutout.get_asdf_cutouts(source_ids=[420007, 420022], group_by='file')[spectral_files[0]] #doctest: +SKIP
-  >>> asdf_cut.info() #doctest: +SKIP
-  root (AsdfObject)
-  ├─roman (dict)
-  │ ├─data (dict)
-  │ │ ├─420007 (dict)
-  │ │ │ ├─flux (ndarray)
-  │ │ │ │ ├─shape (tuple) ...
-  │ │ │ │ └─dtype (Float64DType): float64
-  │ │ │ └─wl (ndarray)
-  │ │ │   ├─shape (tuple) ...
-  │ │ │   └─dtype (Float64DType): float64
-  │ │ └─420022 (dict)
-  │ │   ├─flux (ndarray) ...
-  │ │   └─wl (ndarray) ...
-  │ └─meta (dict)
-  │   └─source_ids (list)
-  │     ├─[0] (int): 420007
-  │     └─[1] (int): 420022
-  └─history (dict)
-    └─entries (list)
-      └─[0] (HistoryEntry)
-        ├─description (str): Spectral cutout created for source IDs [420007, 420022] from file Roman/large_wfi (truncated)
-        ├─time (datetime): 2026-04-03 20:09:26+00:00
-        └─software (Software) ...
-  Some nodes not shown.
+  >>> asdf_cut = spectral_subset.get_asdf_subsets(source_ids=[420007, 420022], group_by='file')[spectral_files[0]] #doctest: +SKIP
+  >>> pprint(asdf_cut['roman']['data']) #doctest: +SKIP
+   {420007: {'flux': array([5.37157113e-17, 5.27060112e-17, 5.25740574e-17, 5.26136996e-17,
+          5.16123888e-17, 4.95479633e-17, 4.80292887e-17]),
+              'flux_error': array([2.50778703e-20, 2.46148251e-20, 2.43618767e-20, 2.41538018e-20,
+          2.37139925e-20, 2.30359954e-20, 2.24894059e-20]),
+              'wl': array([881.42062338, 884.32981611, 887.24861084, 890.17703926,
+          893.11513318, 896.06292449, 899.0204452 ])},
+    420022: {'flux': array([5.37157113e-17, 5.27060112e-17, 5.25740574e-17, 5.26136996e-17,
+          5.16123888e-17, 4.95479633e-17, 4.80292887e-17]),
+              'flux_error': array([2.50778703e-20, 2.46148251e-20, 2.43618767e-20, 2.41538018e-20,
+          2.37139925e-20, 2.30359954e-20, 2.24894059e-20]),
+              'wl': array([881.42062338, 884.32981611, 887.24861084, 890.17703926,
+          893.11513318, 896.06292449, 899.0204452 ])}}
 
 Multiprocessing
 ----------------
 
-The `~astrocut.roman_spectral_cut` convenience function provides the same behavior as the `~astrocut.RomanSpectralCutout` class, but it is designed 
-for multiprocessing and writing cutouts to disk. Because it can generate and write cutouts in parallel, this method is preferred when generating a 
-very large number of cutouts, or when generating cutouts from many different input files. It is not recommended to use `~astrocut.roman_spectral_cut` 
-when you only need a small number of cutouts, as the overhead of multiprocessing may outweigh any performance benefits.
+The `~astrocut.roman_spectral_subset` convenience function provides the same behavior as the `~astrocut.RomanSpectralSubset` class, but it is designed 
+for multiprocessing and writing subsets to disk. Because it can generate and write subsets in parallel, this method is preferred when generating a 
+very large number of subsets, or when generating subsets from many different input files. It is not recommended to use `~astrocut.roman_spectral_subset` 
+when you only need a small number of subsets, as the overhead of multiprocessing may outweigh any performance benefits.
 
 .. code-block:: python
 
-  >>> from astrocut import roman_spectral_cut
+  >>> from astrocut import roman_spectral_subset
 
-  >>> output_paths = roman_spectral_cut(spectral_files=["/path/to/roman_spectral.asdf"],
-  ...                                   source_ids=[id for id in range(400000, 500000)],
-  ...                                   wl_range=(1.0, 2.0),
-  ...                                   lite=False,
-  ...                                   output_dir="/path/to/output") #doctest: +SKIP
+  >>> output_paths = roman_spectral_subset(spectral_files=["/path/to/roman_spectral.asdf"],
+  ...                                      source_ids=[id for id in range(400000, 500000)],
+  ...                                      wl_range=(1.0, 2.0),
+  ...                                      lite=False,
+  ...                                      output_dir="/path/to/output") #doctest: +SKIP
 
 
 Cube Cutouts

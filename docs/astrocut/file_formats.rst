@@ -130,21 +130,21 @@ data arrays from the original ASDF file, even when ``lite=False``. This is a key
     BinTableHDU (Extension 2, Python 3.11+ and stdatamodels>=4.1.0) - ASDF
     └── Data: <ASDF metadata tree (lite or full) embedded as binary table>
 
-Spectral Cutouts
+Spectral Subsets
 ^^^^^^^^^^^^^^^^
 
-ASDF spectral cutouts are produced by the `~astrocut.RomanSpectralCutout` class.
-The amount of information in each cutout file is controlled by the ``lite`` parameter, which determines whether only essential data 
-or all data and metadata from the original file are included in the cutout. The ``lite`` parameter has the following effects on the cutout content:
+ASDF spectral subsets are produced by the `~astrocut.RomanSpectralsubset` class.
+The amount of information in each subset file is controlled by the ``lite`` parameter, which determines whether only essential data 
+or all data and metadata from the original file are included in the subset. The ``lite`` parameter has the following effects on the subset content:
 
-- ``lite=True`` (default): Only the ``flux`` and ``wl`` arrays for each source are included in the data, along with minimal metadata.
+- ``lite=True`` (default): The subset data only includes the "wl", "flux", and "flux_error" arrays.
 
-- ``lite=False``: The cutout includes all data and metadata from the original ASDF file(s), with all arrays that match the 
-  dimensions of the ``wl`` array being sliced to the cutout shape if a ``wl_range`` was specified.
+- ``lite=False``: The subset includes all data and metadata from the original ASDF file(s), with all arrays that match the 
+  dimensions of the ``wl`` array being sliced to the subset shape if a ``wl_range`` was specified.
   The full tree structure and metadata from the original file(s) are preserved.
 
-The cutout output structure is also determined by the ``group_by`` parameter in the ``get_asdf_cutouts`` and ``write_as_asdf`` methods.
-This parameter has three options and controls how the cutout data is organized and how many ASDF files are written.
+The subset output structure is also determined by the ``group_by`` parameter in the ``get_asdf_subsets`` and ``write_as_asdf`` methods.
+This parameter has three options and controls how the subset data is organized and how many ASDF files are written.
 
 
 Group by Source ID and Input File
@@ -152,21 +152,23 @@ Group by Source ID and Input File
 
 Setting ``group_by='source_file'`` writes one ASDF file per unique combination of input file and source ID. 
 This means that if multiple source IDs are selected from the same input file, each will be written to a separate ASDF file. 
-The output filename pattern for this grouping is: ``<input_stem>_cutout_<source_id>[_lite].asdf``
+The output filename pattern for this grouping is: ``<input_stem>_subset_<source_id>[_lite].asdf``
 
 **Lite Structure:**
 
 .. code-block:: none
 
-    asdf_cutout = {
+    asdf_subset = {
         'history': [...],
         'roman': {
             'meta': {
-                'source_id': <source id>
+                'source_id': <source id>,
+                <other metadata keys>
             },
             'data': {
-                'flux': <cutout flux array>,
-                'wl': <cutout wavelength array>
+                'wl': <subset wavelength array>,
+                'flux': <subset flux array>,
+                'flux_error': <subset flux error array>
             }
         }
     }
@@ -175,7 +177,7 @@ The output filename pattern for this grouping is: ``<input_stem>_cutout_<source_
 
 .. code-block:: none
 
-    asdf_cutout = {
+    asdf_subset = {
         'asdf_library': [...],
         'history': [...],
         'roman': {
@@ -184,8 +186,9 @@ The output filename pattern for this grouping is: ``<input_stem>_cutout_<source_
                 <other metadata keys>
             },
             'data': {
-                'flux': <cutout flux array>,
-                'wl': <cutout wavelength array>,
+                'wl': <subset wavelength array>,
+                'flux': <subset flux array>,
+                'flux_error': <subset flux error array>,
                 <other data arrays and values>
             }
         }
@@ -195,26 +198,29 @@ Group by Input File
 ---------------------
 
 Setting ``group_by='file'`` writes one ASDF file per input spectral file, combining selected source IDs from that file into a single ASDF file.
-The output filename pattern for this grouping is: ``<input_stem>_cutout[_lite].asdf``
+The output filename pattern for this grouping is: ``<input_stem>_subset[_lite].asdf``
 
 **Lite Structure:**
 
 .. code-block:: none
 
-    asdf_cutout = {
+    asdf_subset = {
         'history': [...],
         'roman': {
             'meta': {
-                'source_ids': <list of source ids>
+                'source_ids': <list of source ids>,
+                <other metadata keys>
             },
             'data': {
                 <source_id_1>: {
-                    'flux': <cutout flux array>,
-                    'wl': <cutout wavelength array>
+                    'wl': <subset wavelength array>,
+                    'flux': <subset flux array>,
+                    'flux_error': <subset flux error array>
                 },
                 <source_id_2>: {
-                    'flux': <cutout flux array>,
-                    'wl': <cutout wavelength array>
+                    'wl': <subset wavelength array>,
+                    'flux': <subset flux array>,
+                    'flux_error': <subset flux error array>
                 }
             }
         }
@@ -224,23 +230,25 @@ The output filename pattern for this grouping is: ``<input_stem>_cutout[_lite].a
 
 .. code-block:: none
 
-    asdf_cutout = {
+    asdf_subset = {
         'asdf_library': [...],
         'history': [...],
         'roman': {
             'meta': {
-                'source_ids': <list of source ids>
+                'source_ids': <list of source ids>,
                 <other metadata keys>
             },
             'data': {
                 <source_id_1>: {
-                    'flux': <cutout flux array>,
-                    'wl': <cutout wavelength array>
+                    'wl': <subset wavelength array>,
+                    'flux': <subset flux array>,
+                    'flux_error': <subset flux error array>,
                     <other data arrays and values>
                 },
                 <source_id_2>: {
-                    'flux': <cutout flux array>,
-                    'wl': <cutout wavelength array>
+                    'wl': <subset wavelength array>,
+                    'flux': <subset flux array>,
+                    'flux_error': <subset flux error array>,
                     <other data arrays and values>
                 }
             }
@@ -252,29 +260,38 @@ Combined File for All Sources and Input Files
 ----------------------------------------------
 
 Setting ``group_by='combined'`` writes one ASDF file containing all requested files and sources. 
-The output filename pattern for this grouping is: ``combined_spectral_cutout[_lite].asdf``
+The output filename pattern for this grouping is: ``combined_spectral_subset[_lite].asdf``
 
 **Lite Structure:**
 
 .. code-block:: none
 
-    asdf_cutout = {
+    asdf_subset = {
         'history': [...],
         'roman': {
             'meta': {
-                'source_ids': <list of source ids>
+                <input_file_1>: {
+                    'source_ids': <list of source ids>,
+                    <other metadata keys>
+                },
+                <input_file_2>: {
+                    'source_ids': <list of source ids>,
+                    <other metadata keys>
+                }
             },
             'data': {
                 <input_file_1>: {
                     <source_id_1>: {
-                        'flux': <cutout flux array>,
-                        'wl': <cutout wavelength array>
+                        'wl': <subset wavelength array>,
+                        'flux': <subset flux array>,
+                        'flux_error': <subset flux error array>
                     }
                 },
                 <input_file_2>: {
                     <source_id_2>: {
-                        'flux': <cutout flux array>,
-                        'wl': <cutout wavelength array>
+                        'wl': <subset wavelength array>,
+                        'flux': <subset flux array>,
+                        'flux_error': <subset flux error array>
                     }
                 }
             }
@@ -285,7 +302,7 @@ The output filename pattern for this grouping is: ``combined_spectral_cutout[_li
 
 .. code-block:: none
 
-    asdf_cutout = {
+    asdf_subset = {
         'asdf_library_combined': {
             <input_file_1>: {...},
             <input_file_2>: {...}
@@ -302,22 +319,24 @@ The output filename pattern for this grouping is: ``combined_spectral_cutout[_li
                     <other metadata keys>
                 },
                 <input_file_2>: {
-                    'source_ids': <list of source ids>
+                    'source_ids': <list of source ids>,
                     <other metadata keys>
                 }
             },
             'data': {
                 <input_file_1>: {
                     <source_id_1>: {
-                        'flux': <cutout flux array>,
-                        'wl': <cutout wavelength array>,
+                        'wl': <subset wavelength array>,
+                        'flux': <subset flux array>,
+                        'flux_error': <subset flux error array>,
                         <other data arrays and values>
                     }
                 },
                 <input_file_2>: {
                     <source_id_2>: {
-                        'flux': <cutout flux array>,
-                        'wl': <cutout wavelength array>,
+                        'wl': <subset wavelength array>,
+                        'flux': <subset flux array>,
+                        'flux_error': <subset flux error array>,
                         <other data arrays and values>
                     }
                 }
