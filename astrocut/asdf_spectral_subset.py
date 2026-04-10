@@ -2,14 +2,14 @@ import warnings
 from abc import ABC
 from copy import deepcopy
 from pathlib import Path
-from typing import List, Literal, Optional, Union
+from typing import Dict, List, Literal, Optional, Tuple, Union
 
 import asdf
 import numpy as np
 from s3path import S3Path
 
 from . import __version__
-from .exceptions import DataWarning, InvalidQueryError
+from .exceptions import DataWarning, InvalidInputError, InvalidQueryError
 from .spectral_subset import SpectralSubset
 
 
@@ -52,6 +52,8 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
         source IDs and wavelength range.
     """
 
+    _invalid_group_by_msg = "Invalid group_by value: '{}'. Must be one of 'source_file', 'file', or 'combined'."
+
     def __init__(
         self,
         spectral_files: Union[str, Path, S3Path, List[Union[str, Path, S3Path]]],
@@ -68,6 +70,109 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
         self._base_missions = {}  # To store base mission data without source-specific data
 
         self.subset_data = dict()  # Store subset data for each source ID and input file combination
+        self.source_file_keys = {}  # Map string source/file keys to (file, source_id) tuples
+
+    @staticmethod
+    def make_source_file_key(file: Union[str, Path, S3Path], source_id: Union[str, int]) -> str:
+        """
+        Create a stable string key for a source ID and input spectral file combination.
+
+        Parameters
+        ----------
+        file : str or Path or S3Path
+            The input spectral file path.
+        source_id : str or int
+            The source ID.
+
+        Returns
+        -------
+        str
+            A string key combining the source ID and the input file name, suitable for use as a dictionary key
+        """
+        return f"{source_id}_{Path(str(file)).stem}"
+
+    def _resolve_selection(
+        self,
+        spectral_files: Union[str, Path, S3Path, List[Union[str, Path, S3Path]]] = None,
+        source_ids: Union[str, int, List[Union[str, int]]] = None,
+    ) -> Tuple[List[str], List[str]]:
+        """
+        Resolve and validate file/source selections against available subset results.
+
+        Parameters
+        ----------
+        spectral_files : str or Path or S3Path or list, optional
+            Specific spectral files to include. If None, all available files are included.
+        source_ids : str or int or list, optional
+            Specific source IDs to include. If None, all available source IDs are included.
+
+        Returns
+        -------
+        tuple
+            A tuple containing two lists: (files_to_include, sources_to_include), where each list contains the
+            validated string keys for the selected files and source IDs, respectively.
+        """
+        if spectral_files is None:
+            files_to_include = list(self._out_trees.keys())
+        else:
+            files_to_include = spectral_files if isinstance(spectral_files, list) else [spectral_files]
+            files_to_include = [str(file) for file in files_to_include]
+
+            for file in files_to_include:
+                if file not in self._out_trees:
+                    raise InvalidQueryError(f"Spectral file {file} not found in subset results.")
+
+        all_source_ids = set()
+        for file in files_to_include:
+            all_source_ids.update(str(sid) for sid in self._out_trees[file].keys())
+        all_source_ids = sorted(all_source_ids)
+
+        if source_ids is None:
+            sources_to_include = all_source_ids
+        else:
+            sources_to_include = source_ids if isinstance(source_ids, list) else [source_ids]
+            sources_to_include = [str(sid) for sid in sources_to_include]
+
+            for sid in sources_to_include:
+                if sid not in all_source_ids:
+                    raise InvalidQueryError(f"Source ID {sid} not found in subset results.")
+
+        return files_to_include, sources_to_include
+
+    def get_source_file_keys(
+        self,
+        *,
+        spectral_files: Union[str, Path, S3Path, List[Union[str, Path, S3Path]]] = None,
+        source_ids: Union[str, int, List[Union[str, int]]] = None,
+    ) -> Dict[str, Tuple[str, str]]:
+        """
+        Get valid string keys for source/file subset selection.
+
+        Parameters
+        ----------
+        spectral_files : str or Path or S3Path or list, optional
+            Specific spectral files to include. If None, all available files are included.
+        source_ids : str or int or list, optional
+            Specific source IDs to include. If None, all available source IDs are included.
+
+        Returns
+        -------
+        dict
+            Mapping from a user-friendly key string to ``(file, source_id)`` tuples.
+        """
+        files_to_include, sources_to_include = self._resolve_selection(
+            spectral_files=spectral_files, source_ids=source_ids
+        )
+
+        keys = {}
+        for file in files_to_include:
+            for sid in sources_to_include:
+                if sid not in self._out_trees[file]:
+                    continue
+                keys[self.make_source_file_key(file, sid)] = (file, sid)
+
+        self.source_file_keys = keys
+        return keys
 
     def subset(self):
         """
@@ -120,37 +225,14 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
             by source ID and input file combination ('source_file'), a dictionary of ASDF subset objects
             keyed by input file ('file'), or a single ASDF subset object containing all subsets ('combined').
         """
-        # Determine which spectral files to include
-        if spectral_files is None:
-            files_to_include = self._out_trees.keys()
-        else:
-            files_to_include = spectral_files if isinstance(spectral_files, list) else [spectral_files]
-            files_to_include = [str(file) for file in files_to_include]  # Ensure all file paths are strings
-
-            for file in files_to_include:
-                if file not in self._out_trees:
-                    raise InvalidQueryError(f"Spectral file {file} not found in subset results.")
-
-        # Determine which sources to include
-        all_source_ids = set()
-        for file in files_to_include:
-            all_source_ids.update(self._out_trees[file].keys())
-
-        # Sort source IDs for consistent ordering in output
-        all_source_ids = sorted(all_source_ids)
-
-        if source_ids is None:
-            sources_to_include = all_source_ids
-        else:
-            sources_to_include = source_ids if isinstance(source_ids, list) else [source_ids]
-
-            for sid in sources_to_include:
-                if sid not in all_source_ids:
-                    raise InvalidQueryError(f"Source ID {sid} not found in subset results.")
+        files_to_include, sources_to_include = self._resolve_selection(
+            spectral_files=spectral_files, source_ids=source_ids
+        )
 
         asdf_subsets = {}
         if group_by == "source_file":
             # Group by source and file
+            self.source_file_keys = {}
             for file in files_to_include:
                 for sid in sources_to_include:
                     if sid not in self._out_trees[file]:
@@ -171,7 +253,9 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
                             "homepage": "https://astrocut.readthedocs.io/en/latest/",
                         },
                     )
-                    asdf_subsets[(file, sid)] = af
+                    string_key = self.make_source_file_key(file, sid)
+                    self.source_file_keys[string_key] = (file, sid)
+                    asdf_subsets[string_key] = af
         elif group_by == "file":
             # Group by file, combining all sources in each file
             for file in files_to_include:
@@ -213,7 +297,7 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
                     },
                 )
                 asdf_subsets[file] = af
-        else:
+        elif group_by == "combined":
             # Group all sources and spectral files into a single ASDF file
             # ASDF data should be keyed by file and then source_id to avoid key collisions
             # meta should also be keyed by file
@@ -283,6 +367,8 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
                 },
             )
             asdf_subsets = af
+        else:
+            raise InvalidInputError(self._invalid_group_by_msg.format(group_by))
 
         return asdf_subsets
 
@@ -326,9 +412,12 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
 
         if group_by == "source_file":
             af_by_source_file = self.get_asdf_subsets(
-                group_by="source_file", source_ids=source_ids, spectral_files=spectral_files
+                group_by="source_file",
+                source_ids=source_ids,
+                spectral_files=spectral_files,
             )
-            for (file, sid), af in af_by_source_file.items():
+            for source_file_key, af in af_by_source_file.items():
+                file, sid = self.source_file_keys[source_file_key]
                 filename = f'{Path(file).stem}_subset_{sid}{"_lite" if self._lite else ""}.asdf'
                 subset_path = output_dir / filename
                 af.write_to(subset_path)
@@ -340,12 +429,14 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
                 subset_path = output_dir / filename
                 af.write_to(subset_path)
                 subset_paths.append(str(subset_path))
-        else:
+        elif group_by == "combined":
             af = self.get_asdf_subsets(group_by="combined", source_ids=source_ids, spectral_files=spectral_files)
             filename = f'combined_spectral_subset{"_lite" if self._lite else ""}.asdf'
             subset_path = output_dir / filename
             af.write_to(subset_path)
             subset_paths.append(str(subset_path))
+        else:
+            raise InvalidInputError(self._invalid_group_by_msg.format(group_by))
 
         return subset_paths
 
@@ -368,15 +459,24 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
 
             for sid in self._source_ids:
                 sid = str(sid)
-                if sid not in mission_data:
-                    if self._verbose:
-                        warnings.warn(
-                            f"Source ID {sid} not found in file {file}. " "Skipping this source for this file.",
-                            DataWarning,
-                        )
-                    continue
+                mission_key = sid
+                if mission_key not in mission_data:
+                    try:
+                        sid_int = int(sid)
+                    except (TypeError, ValueError):
+                        sid_int = None
 
-                source = mission_data[sid]
+                    if sid_int in mission_data:
+                        mission_key = sid_int
+                    else:
+                        if self._verbose:
+                            warnings.warn(
+                                f"Source ID {sid} not found in file {file}. " "Skipping this source for this file.",
+                                DataWarning,
+                            )
+                        continue
+
+                source = mission_data[mission_key]
                 wl = source["wl"]
 
                 # Apply wavelength range filter if specified

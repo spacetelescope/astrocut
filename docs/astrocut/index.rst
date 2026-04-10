@@ -292,8 +292,8 @@ Spectral Subsets
 ================
 
 Astrocut can generate spectral subsets from Roman ASDF spectral files using the
-`~astrocut.RomanSpectralSubset` class. This class is intended for extracting wavelength-limited
-spectral data for one or more source IDs.
+`~astrocut.RomanSpectralSubset` class. This class is intended for extracting optionally wavelength-limited
+spectral data for one or more source IDs in a Roman spectral file.
 
 To create a spectral subset, provide the input spectral file or files, the source IDs
 to extract, and an optional wavelength range:
@@ -311,8 +311,12 @@ to extract, and an optional wavelength range:
 
 The ``lite`` parameter controls the size of the subset and how much of the original ASDF tree is preserved:
 
-- ``lite=True`` preserves original metadata and only the "wl", "flux", and "flux_error" arrays in the subset data.
-- ``lite=False`` preserves all of the original metadata, data, and top-level keys in the subset.
+- ``lite=True`` (default): The subset data only includes the "wl", "flux", and "flux_error" arrays. All original
+  metadata is preserved, but all other data arrays and top-level keys from the original file are omitted from the subset.
+
+- ``lite=False``: The subset includes all data and metadata from the original ASDF file(s), with all arrays that match the 
+  dimensions of the ``wl`` array being sliced to the subset shape if a ``wl_range`` was specified.
+  The full tree structure and metadata from the original file(s) are preserved.
 
 The resulting `~astrocut.RomanSpectralSubset` object can be used to access the subset data and metadata.
 The ``subset_data`` attribute is a dictionary that stores the subset data keyed by input filename and source ID.
@@ -328,9 +332,7 @@ subsets in different ways. They accept the following parameters:
 
   - ``group_by='source_file'``: Groups subsets by source ID and input file, resulting in one subset object per source ID per input file.
   - ``group_by='file'``: Groups all subsets from each input file together, resulting in one subset object per input file.
-  - ``group_by='combined'``: Combines all subsets from all input files into a single subset object.
-
-See the `Spectral Subset File Formats <file_formats.html#spectral-subsets>`__ for more details on the structure of subset objects.
+  - ``group_by='combined'``: Combines all subsets from all input files into a single subset object.See the `Spectral Subset File Formats <file_formats.html#spectral-subsets>`__ for more details on the structure of subset objects.
 
 .. code-block:: python
 
@@ -354,8 +356,9 @@ Multiprocessing
 
 The `~astrocut.roman_spectral_subset` convenience function provides the same behavior as the `~astrocut.RomanSpectralSubset` class, but it is designed 
 for multiprocessing and writing subsets to disk. Because it can generate and write subsets in parallel, this method is preferred when generating a 
-very large number of subsets, or when generating subsets from many different input files. It is not recommended to use `~astrocut.roman_spectral_subset` 
-when you only need a small number of subsets, as the overhead of multiprocessing may outweigh any performance benefits.
+very large number of subset files, or when generating subsets from many different input files. It is not recommended to use 
+`~astrocut.roman_spectral_subset` when generating a small number of subsets from a small number of input files, as the overhead of 
+multiprocessing will likely outweigh any performance benefits.
 
 .. code-block:: python
 

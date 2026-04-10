@@ -2,6 +2,7 @@ Unreleased
 -----------
 
 - Added ``fsspec_kwargs`` parameter to ``FITSCutout`` to pass through to ``s3fs`` for cloud-hosted files. [#177]
+- New ``RomanSpectralSubset`` class and ``roman_spectral_subset`` function for creating spectral subsets from Roman Space Telescope ASDF data. [#179]
 
 
 1.2.0 (2026-02-04)
@@ -16,7 +17,6 @@ Unreleased
 - Cutouts of ASDF data in FITS format now include embedded ASDF metadata in an "ASDF" extension within the FITS file for
   Python versions greater than or equal to 3.11. [#170]
 - Bugfix for getting the pixel location of given coordinates in ``ASDFCutout``. [#175]
-- New ``RomanSpectralSubset`` class and ``roman_spectral_subset`` function for creating spectral subsets from Roman Space Telescope ASDF data. [#179]
 
 Breaking Changes
 ^^^^^^^^^^^^^^^^

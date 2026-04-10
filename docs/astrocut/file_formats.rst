@@ -137,7 +137,8 @@ ASDF spectral subsets are produced by the `~astrocut.RomanSpectralsubset` class.
 The amount of information in each subset file is controlled by the ``lite`` parameter, which determines whether only essential data 
 or all data and metadata from the original file are included in the subset. The ``lite`` parameter has the following effects on the subset content:
 
-- ``lite=True`` (default): The subset data only includes the "wl", "flux", and "flux_error" arrays.
+- ``lite=True`` (default): The subset data only includes the "wl", "flux", and "flux_error" arrays. All original
+  metadata is preserved, but all other data arrays and top-level keys from the original file are omitted from the subset.
 
 - ``lite=False``: The subset includes all data and metadata from the original ASDF file(s), with all arrays that match the 
   dimensions of the ``wl`` array being sliced to the subset shape if a ``wl_range`` was specified.
