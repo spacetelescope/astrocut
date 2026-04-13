@@ -1,6 +1,11 @@
+import os
 import warnings
 from abc import ABC
+from collections.abc import Mapping
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from copy import deepcopy
+from datetime import datetime, timezone
+from hashlib import blake2s
 from pathlib import Path
 from typing import Dict, List, Literal, Optional, Tuple, Union
 
@@ -8,9 +13,248 @@ import asdf
 import numpy as np
 from s3path import S3Path
 
-from . import __version__
+from . import __version__, log
 from .exceptions import DataWarning, InvalidInputError, InvalidQueryError
 from .spectral_subset import SpectralSubset
+
+
+def _make_pickle_safe(value):
+    """
+    Convert a value to a form that can be pickled and sent between processes. This is needed for the results returned
+    by the worker function when using ProcessPoolExecutor, since ASDF trees can contain complex objects that may not
+    be directly pickleable. This function recursively processes the data structure, converting numpy arrays to lists,
+    and handling other non-pickleable types as needed.
+
+    Parameters
+    ----------
+    value : any
+        The value to convert to a pickle-safe form.
+
+    Returns
+    -------
+    any
+        A version of the input value that can be safely pickled and sent between processes.
+    """
+    if isinstance(value, Mapping):
+        return {key: _make_pickle_safe(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_make_pickle_safe(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_make_pickle_safe(item) for item in value)
+    if isinstance(value, np.generic):
+        return value.item()
+    return value
+
+
+def _subset_file_worker(
+    file: str,
+    mission_keyword: str,
+    source_ids,
+    wl_range,
+    lite: bool,
+    verbose: bool,
+) -> Tuple[str, Dict, Dict, Dict, Dict, List[str]]:
+    """
+    Worker function to subset a single ASDF file for the specified source IDs and wavelength range. This function is
+    designed to be run in a separate process when using ProcessPoolExecutor for parallel processing of multiple files.
+
+    Parameters
+    ----------
+    file : str
+        The path to the ASDF file to subset.
+    mission_keyword : str
+        The keyword for the mission-specific data in the ASDF file.
+    source_ids : list
+        The list of source IDs to include in the subset.
+    wl_range : tuple
+        The wavelength range to include in the subset.
+    lite : bool
+        Whether to include only essential data in the subset.
+    verbose : bool
+        Whether to emit warnings for sources that are not found or out of bounds.
+
+    Returns
+    -------
+    tuple
+        (file, base_tree, base_mission, subset_data_for_file, out_trees_for_file, emitted_warnings)
+    """
+    base_tree, base_mission, subset_data_for_file, out_trees_for_file, emitted_warnings = _subset_single_file(
+        file=file,
+        mission_keyword=mission_keyword,
+        source_ids=source_ids,
+        wl_range=wl_range,
+        lite=lite,
+        verbose=verbose,
+    )
+
+    return (
+        file,
+        _make_pickle_safe(base_tree),
+        _make_pickle_safe(base_mission),
+        _make_pickle_safe(subset_data_for_file),
+        _make_pickle_safe(out_trees_for_file),
+        emitted_warnings,
+    )
+
+
+def _subset_single_file(
+    file: str,
+    mission_keyword: str,
+    source_ids,
+    wl_range,
+    lite: bool,
+    verbose: bool,
+) -> Tuple[Dict, Dict, Dict, Dict, List[str]]:
+    """
+    Subset a single ASDF file for the specified source IDs and wavelength range. This function is called by the worker
+    function and performs the actual subsetting logic for one file.
+
+    Parameters
+    ----------
+    file : str
+        The path to the ASDF file to subset.
+    mission_keyword : str
+        The keyword for the mission-specific data in the ASDF file.
+    source_ids : list
+        The list of source IDs to include in the subset.
+    wl_range : tuple
+        The wavelength range to include in the subset.
+    lite : bool
+        Whether to include only essential data in the subset.
+    verbose : bool
+        Whether to emit warnings for sources that are not found or out of bounds.
+
+    Returns
+    -------
+    tuple
+        (base_tree, base_mission, subset_data_for_file, out_trees_for_file, emitted_warnings)
+    """
+    subset_data_for_file = {}
+    out_trees_for_file = {}
+    emitted_warnings = []
+
+    with asdf.open(file) as af:
+        in_tree = af.tree
+        mission_data = in_tree[mission_keyword]["data"]
+
+        base_tree = {k: v for k, v in in_tree.items() if k not in {mission_keyword, "history"}}
+        base_mission = {k: v for k, v in in_tree[mission_keyword].items() if k != "data"}
+
+        for sid in source_ids:
+            sid = str(sid)
+            mission_key = sid
+
+            # First try the source ID as a string key, then as an integer key if the string key is not found
+            if mission_key not in mission_data:
+                try:
+                    sid_int = int(sid)
+                except (TypeError, ValueError):
+                    sid_int = None
+
+                if sid_int in mission_data:
+                    mission_key = sid_int
+                else:
+                    if verbose:
+                        emitted_warnings.append(
+                            f"Source ID {sid} not found in file {file}. Skipping this source for this file."
+                        )
+                    continue
+
+            source = mission_data[mission_key]
+            wl = source["wl"]
+
+            # Cut out the wavelength range if specified, and emit warnings if the source is out of bounds or not found
+            if wl_range is not None:
+                wl_min = wl.min()
+                wl_max = wl.max()
+
+                if wl_range[0] > wl_max or wl_range[1] < wl_min:
+                    emitted_warnings.append(
+                        f"Wavelength range {wl_range} is out of bounds for source ID {sid} and file {file}. "
+                        f"Available wavelength range: [{wl_min}, {wl_max}]. Skipping this source for this file."
+                    )
+                    continue
+
+                mask = (wl >= wl_range[0]) & (wl <= wl_range[1])
+            else:
+                mask = slice(None)
+
+            keys = ["wl", "flux", "flux_error"] if lite else source.keys()
+            spectral_keys = {k for k, v in source.items() if hasattr(v, "__len__") and len(v) == len(wl)}
+
+            new_source = {}
+            for key in keys:
+                value = source[key]
+                if key in spectral_keys:
+                    # For array-like data that matches the wavelength dimension, apply the wavelength mask to
+                    # cut out the specified range
+                    arr = np.asarray(value)
+                    new_source[key] = arr[mask].copy()
+                else:
+                    try:
+                        new_source[key] = deepcopy(value)
+                    except Exception:
+                        new_source[key] = value
+
+            subset_data_for_file[sid] = new_source
+
+            meta = {**base_mission.get("meta", {}), "source_id": sid}
+            if lite:
+                out_tree = {mission_keyword: {"data": new_source, "meta": meta}}
+            else:
+                out_tree = {
+                    **base_tree,
+                    mission_keyword: {
+                        **base_mission,
+                        "data": new_source,
+                        "meta": meta,
+                    },
+                }
+
+            out_trees_for_file[sid] = out_tree
+
+    return base_tree, base_mission, subset_data_for_file, out_trees_for_file, emitted_warnings
+
+
+def _append_history_entry(history_tree: Optional[Mapping], description: str) -> Dict[str, object]:
+    """
+    Append a new entry to an ASDF history tree with the given description and metadata about the software used.
+
+    Parameters
+    ----------
+    history_tree : Mapping or None
+        The existing ASDF history tree to which the new entry will be appended. If None, a new history
+        tree will be created.
+    description : str
+        A description of the operation that generated the new history entry, which will be included
+        in the entry's metadata.
+
+    Returns
+    -------
+    dict
+        A new ASDF history tree containing all existing entries from the input history tree (if any)
+        plus a new entry with the provided description and software metadata.
+    """
+    merged_history = {}
+    entries = []
+    if isinstance(history_tree, Mapping):
+        entries = list(history_tree.get("entries", []))
+
+    # Create a new history entry for this subset operation and append it to the existing history entries
+    history_entry = {
+        "description": description,
+        "time": datetime.now(timezone.utc),
+        "software": {
+            "name": "astrocut",
+            "author": "Space Telescope Science Institute",
+            "version": __version__,
+            "homepage": "https://astrocut.readthedocs.io/en/latest/",
+        },
+    }
+    entries.append(history_entry)
+
+    merged_history["entries"] = entries
+    return merged_history
 
 
 class ASDFSpectralSubset(SpectralSubset, ABC):
@@ -31,6 +275,12 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
     lite : bool, optional
         If True, only metadata and a subset of the data will be included in the subsets to
         reduce memory usage. Default is True.
+    max_workers : int, optional
+        Maximum number of worker processes to use when generating subsets in parallel. Default is 1 (no parallelism).
+        If None, the number of workers will be set based on the number of CPUs and input files. It is recommended to use
+        parallel processing when generating subsets from multiple large input files. For a single input file, or for
+        multiple small input files, multiprocessing may not provide a significant speedup and may even slow
+        down execution due to the overhead of parallelization.
     verbose : bool, optional
         If True, log messages will be printed during subset generation. Default is False.
 
@@ -60,6 +310,7 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
         source_ids: Union[str, int, List[Union[str, int]]],
         wl_range: Union[tuple, list] = None,
         lite: Optional[bool] = True,
+        max_workers: Optional[int] = 1,
         verbose: bool = False,
     ):
         super().__init__(spectral_files, source_ids, wl_range, lite, verbose)
@@ -69,75 +320,95 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
         self._base_trees = {}  # To store base ASDF tree without mission data
         self._base_missions = {}  # To store base mission data without source-specific data
 
+        self._max_workers = max_workers
+
         self.subset_data = dict()  # Store subset data for each source ID and input file combination
         self.source_file_keys = {}  # Map string source/file keys to (file, source_id) tuples
 
-    @staticmethod
-    def make_source_file_key(file: Union[str, Path, S3Path], source_id: Union[str, int]) -> str:
+    def subset(self):
         """
-        Create a stable string key for a source ID and input spectral file combination.
+        Generate the spectral subset(s) from the input ASDF files based on the specified
+        source IDs and wavelength range.
 
-        Parameters
-        ----------
-        file : str or Path or S3Path
-            The input spectral file path.
-        source_id : str or int
-            The source ID.
-
-        Returns
-        -------
-        str
-            A string key combining the source ID and the input file name, suitable for use as a dictionary key
+        Raises
+        ------
+        InvalidQueryError
+            If no subsets were created, which may indicate that the source IDs are not present in the spectral files
+            or that the wavelength range does not overlap with the data.
         """
-        return f"{source_id}_{Path(str(file)).stem}"
+        # Reset outputs in case subset() is called more than once
+        self._out_trees = {}
+        self._base_trees = {}
+        self._base_missions = {}
+        self.subset_data = {}
+        self.source_file_keys = {}
 
-    def _resolve_selection(
-        self,
-        spectral_files: Union[str, Path, S3Path, List[Union[str, Path, S3Path]]] = None,
-        source_ids: Union[str, int, List[Union[str, int]]] = None,
-    ) -> Tuple[List[str], List[str]]:
-        """
-        Resolve and validate file/source selections against available subset results.
+        files = [str(f) for f in self._spectral_files]
 
-        Parameters
-        ----------
-        spectral_files : str or Path or S3Path or list, optional
-            Specific spectral files to include. If None, all available files are included.
-        source_ids : str or int or list, optional
-            Specific source IDs to include. If None, all available source IDs are included.
+        # If max_workers is not specified, default to min(file count, CPU count, 8) to avoid
+        # oversubscription on large file counts
+        max_workers = self._max_workers
+        if max_workers is None:
+            max_workers = min(len(files), (os.cpu_count() or 4), 8)
 
-        Returns
-        -------
-        tuple
-            A tuple containing two lists: (files_to_include, sources_to_include), where each list contains the
-            validated string keys for the selected files and source IDs, respectively.
-        """
-        if spectral_files is None:
-            files_to_include = list(self._out_trees.keys())
+        def _apply_worker_result(result):
+            # Helper function to apply the results from the worker function to the internal attributes of the class
+            (
+                file,
+                base_tree,
+                base_mission,
+                subset_data_for_file,
+                out_trees_for_file,
+                emitted_warnings,
+            ) = result
+
+            for warning_message in emitted_warnings:
+                warnings.warn(warning_message, DataWarning)
+
+            if out_trees_for_file:
+                self._base_trees[file] = base_tree
+                self._base_missions[file] = base_mission
+                self.subset_data[file] = subset_data_for_file
+                self._out_trees[file] = out_trees_for_file
+
+        if len(files) <= 1 or max_workers == 1:
+            # Process files sequentially
+            for file in files:
+                _apply_worker_result(
+                    _subset_file_worker(
+                        file=file,
+                        mission_keyword=self._mission_keyword,
+                        source_ids=self._source_ids,
+                        wl_range=self._wl_range,
+                        lite=self._lite,
+                        verbose=self._verbose,
+                    )
+                )
         else:
-            files_to_include = spectral_files if isinstance(spectral_files, list) else [spectral_files]
-            files_to_include = [str(file) for file in files_to_include]
+            # Process files in parallel using ProcessPoolExecutor
+            log.debug(f"Processing files in parallel with up to {max_workers} workers...")
+            with ProcessPoolExecutor(max_workers=max_workers) as executor:
+                futures = [
+                    executor.submit(
+                        _subset_file_worker,
+                        file,
+                        self._mission_keyword,
+                        self._source_ids,
+                        self._wl_range,
+                        self._lite,
+                        self._verbose,
+                    )
+                    for file in files
+                ]
 
-            for file in files_to_include:
-                if file not in self._out_trees:
-                    raise InvalidQueryError(f"Spectral file {file} not found in subset results.")
+                for future in as_completed(futures):
+                    _apply_worker_result(future.result())
 
-        all_source_ids = set()
-        for file in files_to_include:
-            all_source_ids.update(str(sid) for sid in self._out_trees[file].keys())
-        all_source_ids = sorted(all_source_ids)
-
-        if source_ids is None:
-            sources_to_include = all_source_ids
-        else:
-            sources_to_include = source_ids if isinstance(source_ids, list) else [source_ids]
-            sources_to_include = [str(sid) for sid in sources_to_include]
-
-            for sid in sources_to_include:
-                if sid not in all_source_ids:
-                    raise InvalidQueryError(f"Source ID {sid} not found in subset results.")
-
-        return files_to_include, sources_to_include
+        if not self._out_trees:
+            raise InvalidQueryError(
+                "No subsets were created. Please verify that the source IDs are present in "
+                "the spectral files and that the wavelength range overlaps with the data."
+            )
 
     def get_source_file_keys(
         self,
@@ -164,35 +435,17 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
             spectral_files=spectral_files, source_ids=source_ids
         )
 
-        keys = {}
+        source_file_pairs = []
         for file in files_to_include:
             for sid in sources_to_include:
                 if sid not in self._out_trees[file]:
                     continue
-                keys[self.make_source_file_key(file, sid)] = (file, sid)
+                source_file_pairs.append((file, sid))
+
+        keys = self._build_source_file_keys(source_file_pairs)
 
         self.source_file_keys = keys
         return keys
-
-    def subset(self):
-        """
-        Generate the spectral subset(s) from the input ASDF files based on the specified
-        source IDs and wavelength range.
-
-        Raises
-        ------
-        InvalidQueryError
-            If no subsets were created, which may occur if the specified source IDs are not present in
-            the input spectral files or if the specified wavelength range does not overlap with the data.
-        """
-        for file in self._spectral_files:
-            self._subset_file(file)
-
-        if not self._out_trees:
-            raise InvalidQueryError(
-                "No subsets were created. Please verify that the source IDs are present in "
-                "the spectral files and that the wavelength range overlaps with the data."
-            )
 
     def get_asdf_subsets(
         self,
@@ -232,7 +485,7 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
         asdf_subsets = {}
         if group_by == "source_file":
             # Group by source and file
-            self.source_file_keys = {}
+            source_file_pairs = []
             for file in files_to_include:
                 for sid in sources_to_include:
                     if sid not in self._out_trees[file]:
@@ -241,21 +494,21 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
                             DataWarning,
                         )
                         continue
-                    tree = deepcopy(self._out_trees[file][sid])
-                    af = asdf.AsdfFile(tree)
-                    af.add_history_entry(
-                        f"Spectral subset created for source ID {sid} from file {file} "
-                        f"with wavelength range {self._wl_range}.",
-                        software={
-                            "name": "astrocut",
-                            "author": "Space Telescope Science Institute",
-                            "version": __version__,
-                            "homepage": "https://astrocut.readthedocs.io/en/latest/",
-                        },
-                    )
-                    string_key = self.make_source_file_key(file, sid)
-                    self.source_file_keys[string_key] = (file, sid)
-                    asdf_subsets[string_key] = af
+                    source_file_pairs.append((file, sid))
+
+            # Build deterministic keys for the source/file combinations and disambiguate if needed
+            self.source_file_keys = self._build_source_file_keys(source_file_pairs)
+
+            # Create separate ASDF objects for each source/file combination
+            for string_key, (file, sid) in self.source_file_keys.items():
+                tree = deepcopy(self._out_trees[file][sid])
+                af = asdf.AsdfFile(tree)
+                af.tree["history"] = _append_history_entry(
+                    tree.get("history", {}),
+                    f"Spectral subset created for source ID {sid} from file {file} with "
+                    f"wavelength range {self._wl_range}.",
+                )
+                asdf_subsets[string_key] = af
         elif group_by == "file":
             # Group by file, combining all sources in each file
             for file in files_to_include:
@@ -286,15 +539,10 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
                         },
                     }
                 af = asdf.AsdfFile(combined_tree)
-                af.add_history_entry(
-                    f"Spectral subset created for source IDs {source_ids} from file {file} "
-                    f"with wavelength range {self._wl_range}.",
-                    software={
-                        "name": "astrocut",
-                        "author": "Space Telescope Science Institute",
-                        "version": __version__,
-                        "homepage": "https://astrocut.readthedocs.io/en/latest/",
-                    },
+                af.tree["history"] = _append_history_entry(
+                    combined_tree.get("history", {}),
+                    f"Spectral subset created for source IDs {source_ids} from file {file} with "
+                    f"wavelength range {self._wl_range}.",
                 )
                 asdf_subsets[file] = af
         elif group_by == "combined":
@@ -356,15 +604,10 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
                 }
 
             af = asdf.AsdfFile(combined_tree)
-            af.add_history_entry(
+            af.tree["history"] = _append_history_entry(
+                combined_tree.get("history", {}),
                 f"Spectral subset created for source IDs {sources_to_include} from files {', '.join(files_to_include)} "
                 f"with wavelength range {self._wl_range}.",
-                software={
-                    "name": "astrocut",
-                    "author": "Space Telescope Science Institute",
-                    "version": __version__,
-                    "homepage": "https://astrocut.readthedocs.io/en/latest/",
-                },
             )
             asdf_subsets = af
         else:
@@ -440,95 +683,117 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
 
         return subset_paths
 
-    def _subset_file(self, file: str):
+    def _build_source_file_keys(self, source_file_pairs: List[Tuple[str, str]]) -> Dict[str, Tuple[str, str]]:
         """
-        Generate subsets for a single input spectral file and store the results in the
-        internal subset_data and _out_trees attributes.
+        Build deterministic source/file keys and disambiguate collisions when needed.
 
         Parameters
         ----------
-        file : str
-            The path to the input spectral file for which to generate subsets.
+        source_file_pairs : list of tuples
+            List of (file, source_id) pairs for which to build keys.
+
+        Returns
+        -------
+        dict
+            Mapping from string keys to (file, source_id) tuples.
         """
-        with asdf.open(file) as af:
-            in_tree = af.tree
-            mission_data = in_tree[self._mission_keyword]["data"]
+        key_candidates = []
+        base_counts = {}
+        for file, sid in source_file_pairs:
+            base_key = self._make_source_file_key(file, sid)
+            key_candidates.append((base_key, file, sid))
+            base_counts[base_key] = base_counts.get(base_key, 0) + 1
 
-            self._base_trees[file] = {k: v for k, v in in_tree.items() if k != self._mission_keyword}
-            self._base_missions[file] = {k: v for k, v in in_tree[self._mission_keyword].items() if k != "data"}
+        keys = {}
+        for base_key, file, sid in key_candidates:
+            if base_counts[base_key] == 1 and base_key not in keys:
+                keys[base_key] = (file, sid)
+                continue
 
-            for sid in self._source_ids:
-                sid = str(sid)
-                mission_key = sid
-                if mission_key not in mission_data:
-                    try:
-                        sid_int = int(sid)
-                    except (TypeError, ValueError):
-                        sid_int = None
+            file_hash = blake2s(str(file).encode("utf-8"), digest_size=4).hexdigest()
+            disambiguated_key = self._make_source_file_key(
+                file,
+                sid,
+                disambiguator=file_hash,
+            )
+            keys[disambiguated_key] = (file, sid)
 
-                    if sid_int in mission_data:
-                        mission_key = sid_int
-                    else:
-                        if self._verbose:
-                            warnings.warn(
-                                f"Source ID {sid} not found in file {file}. " "Skipping this source for this file.",
-                                DataWarning,
-                            )
-                        continue
+        return keys
 
-                source = mission_data[mission_key]
-                wl = source["wl"]
+    def _resolve_selection(
+        self,
+        spectral_files: Union[str, Path, S3Path, List[Union[str, Path, S3Path]]] = None,
+        source_ids: Union[str, int, List[Union[str, int]]] = None,
+    ) -> Tuple[List[str], List[str]]:
+        """
+        Resolve and validate file/source selections against available subset results.
 
-                # Apply wavelength range filter if specified
-                if self._wl_range is not None:
-                    # Validate that wl_range overlaps with available wavelength data
-                    wl_min = wl.min()
-                    wl_max = wl.max()
+        Parameters
+        ----------
+        spectral_files : str or Path or S3Path or list, optional
+            Specific spectral files to include. If None, all available files are included.
+        source_ids : str or int or list, optional
+            Specific source IDs to include. If None, all available source IDs are included.
 
-                    if self._wl_range[0] > wl_max or self._wl_range[1] < wl_min:
-                        warnings.warn(
-                            f"Wavelength range {self._wl_range} is out of bounds for source ID {sid} and file {file}. "
-                            f"Available wavelength range: [{wl_min}, {wl_max}]. Skipping this source for this file.",
-                            DataWarning,
-                        )
-                        continue
+        Returns
+        -------
+        tuple
+            A tuple containing two lists: (files_to_include, sources_to_include), where each list contains the
+            validated string keys for the selected files and source IDs, respectively.
+        """
+        if spectral_files is None:
+            files_to_include = list(self._out_trees.keys())
+        else:
+            files_to_include = spectral_files if isinstance(spectral_files, list) else [spectral_files]
+            files_to_include = [str(file) for file in files_to_include]
 
-                    mask = (wl >= self._wl_range[0]) & (wl <= self._wl_range[1])
-                else:
-                    mask = slice(None)
+            for file in files_to_include:
+                if file not in self._out_trees:
+                    raise InvalidQueryError(f"Spectral file {file} not found in subset results.")
 
-                # Identify spectral keys (arrays with length equal to n_wl)
-                keys = ["wl", "flux", "flux_error"] if self._lite else source.keys()
-                spectral_keys = {k for k, v in source.items() if hasattr(v, "__len__") and len(v) == len(wl)}
+        all_source_ids = set()
+        for file in files_to_include:
+            all_source_ids.update(str(sid) for sid in self._out_trees[file].keys())
+        all_source_ids = sorted(all_source_ids)
 
-                new_source = {}
-                for key in keys:
-                    value = source[key]
-                    if key in spectral_keys:
-                        arr = np.asarray(value)
-                        new_source[key] = arr[mask].copy()
-                    else:
-                        try:
-                            new_source[key] = deepcopy(value)
-                        except Exception:
-                            new_source[key] = value
+        if source_ids is None:
+            sources_to_include = all_source_ids
+        else:
+            sources_to_include = source_ids if isinstance(source_ids, list) else [source_ids]
+            sources_to_include = [str(sid) for sid in sources_to_include]
 
-                # Add to subset data dictionary
-                self.subset_data.setdefault(file, {})
-                self.subset_data[file][sid] = new_source
+            for sid in sources_to_include:
+                if sid not in all_source_ids:
+                    raise InvalidQueryError(f"Source ID {sid} not found in subset results.")
 
-                # Build one output tree per source
-                meta = {**self._base_missions[file].get("meta", {}), "source_id": sid}
-                if self._lite:
-                    out_tree = {self._mission_keyword: {"data": new_source, "meta": meta}}
-                else:
-                    out_tree = {
-                        **self._base_trees[file],  # shallow copy top-level
-                        self._mission_keyword: {
-                            **self._base_missions[file],  # shallow copy mission-level
-                            "data": new_source,
-                            "meta": meta,
-                        },
-                    }
-                self._out_trees.setdefault(file, {})
-                self._out_trees[file][sid] = out_tree
+        return files_to_include, sources_to_include
+
+    @staticmethod
+    def _make_source_file_key(
+        file: Union[str, Path, S3Path],
+        source_id: Union[str, int],
+        disambiguator: Optional[str] = None,
+    ) -> str:
+        """
+        Create a stable string key for a source ID and input spectral file combination.
+
+        Parameters
+        ----------
+        file : str or Path or S3Path
+            The input spectral file path.
+        source_id : str or int
+            The source ID.
+        disambiguator : str, optional
+            Additional suffix used only when needed to disambiguate duplicate keys.
+
+        Returns
+        -------
+        str
+            A string key combining the source ID and the input file name, suitable for use as a dictionary key
+        """
+        components = [str(source_id), Path(str(file)).stem]
+
+        if disambiguator:
+            components.append(disambiguator)
+
+        return "_".join(components)

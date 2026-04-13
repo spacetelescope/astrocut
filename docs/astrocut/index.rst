@@ -331,6 +331,9 @@ subsets in different ways. They accept the following parameters:
 - ``group_by``: Controls how subsets are grouped in an `~asdf.AsdfFile` object in memory or in an output file.
 
   - ``group_by='source_file'``: Groups subsets by source ID and input file, resulting in one subset object per source ID per input file.
+    In memory, these subsets are returned in a dictionary keyed by deterministic string keys, and each key maps
+    to one unique ``(input_file, source_id)`` pair. Use `~astrocut.RomanSpectralSubset.get_source_file_keys` to retrieve the valid keys and
+    their ``(input_file, source_id)`` mappings.
   - ``group_by='file'``: Groups all subsets from each input file together, resulting in one subset object per input file.
   - ``group_by='combined'``: Combines all subsets from all input files into a single subset object.See the `Spectral Subset File Formats <file_formats.html#spectral-subsets>`__ for more details on the structure of subset objects.
 
@@ -354,21 +357,16 @@ subsets in different ways. They accept the following parameters:
 Multiprocessing
 ----------------
 
-The `~astrocut.roman_spectral_subset` convenience function provides the same behavior as the `~astrocut.RomanSpectralSubset` class, but it is designed 
-for multiprocessing and writing subsets to disk. Because it can generate and write subsets in parallel, this method is preferred when generating a 
-very large number of subset files, or when generating subsets from many different input files. It is not recommended to use 
-`~astrocut.roman_spectral_subset` when generating a small number of subsets from a small number of input files, as the overhead of 
-multiprocessing will likely outweigh any performance benefits.
+`~astrocut.RomanSpectralSubset` also accepts a ``max_workers`` parameter that controls file-level multiprocessing during
+subset generation:
 
-.. code-block:: python
+- ``max_workers=1`` (default): process files sequentially.
+- ``max_workers=None``: automatically choose a worker count based on available CPUs and number of input files.
+- ``max_workers>1``: process multiple input files in parallel with that worker count.
 
-  >>> from astrocut import roman_spectral_subset
-
-  >>> output_paths = roman_spectral_subset(spectral_files=["/path/to/roman_spectral.asdf"],
-  ...                                      source_ids=[id for id in range(400000, 500000)],
-  ...                                      wl_range=(1.0, 2.0),
-  ...                                      lite=False,
-  ...                                      output_dir="/path/to/output") #doctest: +SKIP
+It is recommended to use multiprocessing when generating subsets from multiple large input files. For a single input file, or for
+multiple small input files, multiprocessing may not provide a significant speedup and may even slow down execution due to the 
+overhead of parallelization.
 
 
 Cube Cutouts

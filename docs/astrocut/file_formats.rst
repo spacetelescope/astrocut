@@ -133,7 +133,7 @@ data arrays from the original ASDF file, even when ``lite=False``. This is a key
 Spectral Subsets
 ^^^^^^^^^^^^^^^^
 
-ASDF spectral subsets are produced by the `~astrocut.RomanSpectralsubset` class.
+ASDF spectral subsets are produced by the `~astrocut.RomanSpectralSubset` class.
 The amount of information in each subset file is controlled by the ``lite`` parameter, which determines whether only essential data 
 or all data and metadata from the original file are included in the subset. The ``lite`` parameter has the following effects on the subset content:
 
@@ -154,6 +154,9 @@ Group by Source ID and Input File
 Setting ``group_by='source_file'`` writes one ASDF file per unique combination of input file and source ID. 
 This means that if multiple source IDs are selected from the same input file, each will be written to a separate ASDF file. 
 The output filename pattern for this grouping is: ``<input_stem>_subset_<source_id>[_lite].asdf``
+
+When returned in memory through `~astrocut.RomanSpectralSubset.get_asdf_subsets`, these subsets are keyed by deterministic
+string keys (for example, ``<source_id>_<input_stem>``). If key collisions occur, a short hash suffix is added automatically.
 
 **Lite Structure:**
 
@@ -344,6 +347,9 @@ The output filename pattern for this grouping is: ``combined_spectral_subset[_li
             }
         }
     }
+
+For ``group_by='combined'`` with ``lite=False``, top-level non-mission metadata from each input file is grouped into
+``<key>_combined`` mappings keyed by input filename, while the merged subset ``history`` is stored under ``history``.
 
 
 Cube Files
