@@ -277,10 +277,11 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
         reduce memory usage. Default is True.
     max_workers : int, optional
         Maximum number of worker processes to use when generating subsets in parallel. Default is 1 (no parallelism).
-        If None, the number of workers will be set based on the number of CPUs and input files. It is recommended to use
-        parallel processing when generating subsets from multiple large input files. For a single input file, or for
-        multiple small input files, multiprocessing may not provide a significant speedup and may even slow
-        down execution due to the overhead of parallelization.
+        If None, the number of workers will be set based on the number of CPUs and input files. If an
+        integer is provided, the number of workers used will be the minimum of that value and the number of
+        input files. It is recommended to use parallel processing when generating subsets from multiple
+        large input files. For a single input file, or for multiple small input files, multiprocessing may
+        not provide a significant speedup and may even slow down execution due to the overhead of parallelization.
     verbose : bool, optional
         If True, log messages will be printed during subset generation. Default is False.
 
@@ -349,7 +350,12 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
         # oversubscription on large file counts
         max_workers = self._max_workers
         if max_workers is None:
-            max_workers = min(len(files), (os.cpu_count() or 4), 8)
+            cpu_count = os.cpu_count()
+            if cpu_count is not None:
+                max_workers = min(len(files), cpu_count)
+            else:
+                max_workers = len(files)
+        max_workers = min(len(files), max_workers)  # Don't use more workers than files
 
         def _apply_worker_result(result):
             # Helper function to apply the results from the worker function to the internal attributes of the class

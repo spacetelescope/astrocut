@@ -25,10 +25,11 @@ class RomanSpectralSubset(ASDFSpectralSubset):
         reduce memory usage. Default is True.
     max_workers : int, optional
         Maximum number of worker processes to use when generating subsets in parallel. Default is 1 (no parallelism).
-        If None, the number of workers will be set based on the number of CPUs and input files. It is recommended to use
-        parallel processing when generating subsets from multiple large input files. For a single input file, or for
-        multiple small input files, multiprocessing may not provide a significant speedup and may even slow
-        down execution due to the overhead of parallelization.
+        If None, the number of workers will be set based on the number of CPUs and input files. If an
+        integer is provided, the number of workers used will be the minimum of that value and the number of
+        input files. It is recommended to use parallel processing when generating subsets from multiple
+        large input files. For a single input file, or for multiple small input files, multiprocessing may
+        not provide a significant speedup and may even slow down execution due to the overhead of parallelization.
     verbose : bool, optional
         If True, log messages will be printed during subset generation. Default is False.
     """

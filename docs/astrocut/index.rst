@@ -357,16 +357,25 @@ subsets in different ways. They accept the following parameters:
 Multiprocessing
 ----------------
 
-`~astrocut.RomanSpectralSubset` also accepts a ``max_workers`` parameter that controls file-level multiprocessing during
+`~astrocut.RomanSpectralSubset` accepts a ``max_workers`` parameter that controls file-level multiprocessing during
 subset generation:
 
-- ``max_workers=1`` (default): process files sequentially.
-- ``max_workers=None``: automatically choose a worker count based on available CPUs and number of input files.
-- ``max_workers>1``: process multiple input files in parallel with that worker count.
+- ``max_workers=1`` (default): Process files sequentially.
+- ``max_workers=None``: Automatically choose a worker count based on available CPUs and number of input files.
+- ``max_workers>1``: Process multiple input files in parallel with that worker count.
 
-It is recommended to use multiprocessing when generating subsets from multiple large input files. For a single input file, or for
-multiple small input files, multiprocessing may not provide a significant speedup and may even slow down execution due to the 
-overhead of parallelization.
+**When should I use multiprocessing?**
+
+Parallel processing can significantly speed up subset generation, but its effectiveness depends primarily on the number
+of input spectral files and their size. The number of sources requested in the subset has minimal impact on runtime. 
+Even when requesting a small subset, the full input file must still be accessed internally.
+
+Here are some general guidelines for when multiprocessing is recommended:
+
+- **1 Input File**: Multiprocessing is not recommended and may increase runtime due to overhead.
+- **2 Input Files**: Helpful for large files (≥3000 sources), but little or no benefit for smaller files (≤1000 sources).
+- **3-8 Input Files**: Multiprocessing is generally beneficial, especially for medium to large files.
+- **8+ Input Files**: Multiprocessing is recommended, except for very small files (≤300 sources).
 
 
 Cube Cutouts
