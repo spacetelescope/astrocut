@@ -3,6 +3,7 @@ import warnings
 from abc import ABC
 from collections.abc import Mapping
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from contextlib import contextmanager, nullcontext
 from copy import deepcopy
 from datetime import datetime, timezone
 from hashlib import blake2s
@@ -10,6 +11,7 @@ from pathlib import Path
 from typing import Dict, List, Literal, Optional, Tuple, Union
 
 import asdf
+import asdf.schema as asdf_schema
 import numpy as np
 from s3path import S3Path
 
@@ -257,6 +259,17 @@ def _append_history_entry(history_tree: Optional[Mapping], description: str) -> 
     return merged_history
 
 
+@contextmanager
+def _disabled_asdf_validation():
+    """Temporarily disable ASDF schema validation for trusted bulk writes."""
+    original_validate = asdf_schema.validate
+    asdf_schema.validate = lambda *args, **kwargs: None
+    try:
+        yield
+    finally:
+        asdf_schema.validate = original_validate
+
+
 class ASDFSpectralSubset(SpectralSubset, ABC):
     """
     Abstract class for creating subsets from ASDF spectral data. This class is designed to
@@ -324,7 +337,6 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
         self._max_workers = max_workers
 
         self.subset_data = dict()  # Store subset data for each source ID and input file combination
-        self.source_file_keys = {}  # Map string source/file keys to (file, source_id) tuples
 
     def subset(self):
         """
@@ -342,7 +354,6 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
         self._base_trees = {}
         self._base_missions = {}
         self.subset_data = {}
-        self.source_file_keys = {}
 
         files = [str(f) for f in self._spectral_files]
 
@@ -445,12 +456,15 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
         for file in files_to_include:
             for sid in sources_to_include:
                 if sid not in self._out_trees[file]:
+                    warnings.warn(
+                        f"Source ID {sid} not found in file {file}. " "Skipping this source for this file.",
+                        DataWarning,
+                    )
                     continue
                 source_file_pairs.append((file, sid))
 
         keys = self._build_source_file_keys(source_file_pairs)
 
-        self.source_file_keys = keys
         return keys
 
     def get_asdf_subsets(
@@ -484,29 +498,13 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
             by source ID and input file combination ('source_file'), a dictionary of ASDF subset objects
             keyed by input file ('file'), or a single ASDF subset object containing all subsets ('combined').
         """
-        files_to_include, sources_to_include = self._resolve_selection(
-            spectral_files=spectral_files, source_ids=source_ids
-        )
-
         asdf_subsets = {}
         if group_by == "source_file":
-            # Group by source and file
-            source_file_pairs = []
-            for file in files_to_include:
-                for sid in sources_to_include:
-                    if sid not in self._out_trees[file]:
-                        warnings.warn(
-                            f"Source ID {sid} not found in file {file}. " "Skipping this source for this file.",
-                            DataWarning,
-                        )
-                        continue
-                    source_file_pairs.append((file, sid))
-
             # Build deterministic keys for the source/file combinations and disambiguate if needed
-            self.source_file_keys = self._build_source_file_keys(source_file_pairs)
+            source_file_keys = self.get_source_file_keys(spectral_files=spectral_files, source_ids=source_ids)
 
             # Create separate ASDF objects for each source/file combination
-            for string_key, (file, sid) in self.source_file_keys.items():
+            for string_key, (file, sid) in source_file_keys.items():
                 tree = deepcopy(self._out_trees[file][sid])
                 af = asdf.AsdfFile(tree)
                 af.tree["history"] = _append_history_entry(
@@ -515,7 +513,13 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
                     f"wavelength range {self._wl_range}.",
                 )
                 asdf_subsets[string_key] = af
-        elif group_by == "file":
+
+            return asdf_subsets
+
+        files_to_include, sources_to_include = self._resolve_selection(
+            spectral_files=spectral_files, source_ids=source_ids
+        )
+        if group_by == "file":
             # Group by file, combining all sources in each file
             for file in files_to_include:
                 source_ids = [sid for sid in sources_to_include if sid in self._out_trees[file]]
@@ -628,6 +632,7 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
         group_by: Literal["source_file", "file", "combined"] = "combined",
         spectral_files: List[Union[str, Path]] = None,
         source_ids: Union[str, int, List[Union[str, int]]] = None,
+        validate_output: bool = False,
     ) -> List[str]:
         """
         Write the ASDF subset(s) to files in the specified output directory, grouped by source
@@ -648,6 +653,10 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
         source_ids : str or int or list, optional
             Specific source IDs to include in the output. If None, all source IDs from the
             subset results will be included. Can be a single ID or a list of IDs.
+        validate_output : bool, optional
+            If True, run ASDF schema validation during each file write. Default is False because
+            bulk writes already originate from trusted internal subset trees and repeated
+            validation is a major performance cost.
 
         Returns
         -------
@@ -657,7 +666,7 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        subset_paths = []  # List to store paths to subset files
+        write_jobs = []
 
         if group_by == "source_file":
             af_by_source_file = self.get_asdf_subsets(
@@ -665,27 +674,37 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
                 source_ids=source_ids,
                 spectral_files=spectral_files,
             )
+            source_file_keys = self.get_source_file_keys(
+                spectral_files=spectral_files,
+                source_ids=source_ids,
+            )
             for source_file_key, af in af_by_source_file.items():
-                file, sid = self.source_file_keys[source_file_key]
+                file, sid = source_file_keys[source_file_key]
                 filename = f'{Path(file).stem}_subset_{sid}{"_lite" if self._lite else ""}.asdf'
                 subset_path = output_dir / filename
-                af.write_to(subset_path)
-                subset_paths.append(str(subset_path))
+                write_jobs.append((af, str(subset_path)))
         elif group_by == "file":
             af_by_file = self.get_asdf_subsets(group_by="file", source_ids=source_ids, spectral_files=spectral_files)
             for file, af in af_by_file.items():
                 filename = f'{Path(file).stem}_subset{"_lite" if self._lite else ""}.asdf'
                 subset_path = output_dir / filename
-                af.write_to(subset_path)
-                subset_paths.append(str(subset_path))
+                write_jobs.append((af, str(subset_path)))
         elif group_by == "combined":
             af = self.get_asdf_subsets(group_by="combined", source_ids=source_ids, spectral_files=spectral_files)
             filename = f'combined_spectral_subset{"_lite" if self._lite else ""}.asdf'
             subset_path = output_dir / filename
-            af.write_to(subset_path)
-            subset_paths.append(str(subset_path))
+            write_jobs.append((af, str(subset_path)))
         else:
             raise InvalidInputError(self._invalid_group_by_msg.format(group_by))
+
+        if not write_jobs:
+            return []
+
+        subset_paths = []
+        with nullcontext() if validate_output else _disabled_asdf_validation():
+            for af, subset_path in write_jobs:
+                af.write_to(subset_path)
+                subset_paths.append(subset_path)
 
         return subset_paths
 

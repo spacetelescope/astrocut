@@ -2,6 +2,7 @@ import re
 from copy import deepcopy
 
 import asdf
+import asdf.schema as asdf_schema
 import numpy as np
 import pytest
 
@@ -333,17 +334,19 @@ def test_roman_spectral_subset_asdf_subsets_source_file(spectral_files, lite):
 
     # Only select certain source files
     asdf_subsets = subset.get_asdf_subsets(group_by="source_file", spectral_files=[spectral_files[0]])
+    source_file_keys = subset.get_source_file_keys(spectral_files=[spectral_files[0]])
     assert len(asdf_subsets) == 2  # Should only have subsets for the specified file
     for key in asdf_subsets.keys():
-        subset_file, subset_source_id = subset.source_file_keys[key]
+        subset_file, subset_source_id = source_file_keys[key]
         assert subset_file == spectral_files[0]
         assert subset_source_id in ["420007", "420008"]
 
     # Only select certain source IDs
     asdf_subsets = subset.get_asdf_subsets(group_by="source_file", source_ids=["420007"])
+    source_file_keys = subset.get_source_file_keys(source_ids=["420007"])
     assert len(asdf_subsets) == 2  # Should only have subsets for the specified source ID
     for key in asdf_subsets.keys():
-        subset_file, subset_source_id = subset.source_file_keys[key]
+        subset_file, subset_source_id = source_file_keys[key]
         assert subset_source_id == "420007"
         assert subset_file in spectral_files
 
@@ -351,9 +354,10 @@ def test_roman_spectral_subset_asdf_subsets_source_file(spectral_files, lite):
     asdf_subsets = subset.get_asdf_subsets(
         group_by="source_file", spectral_files=[spectral_files[0]], source_ids=["420007"]
     )
+    source_file_keys = subset.get_source_file_keys(spectral_files=[spectral_files[0]], source_ids=["420007"])
     assert len(asdf_subsets) == 1  # Should only have one subset for the specified file and source ID
     for key in asdf_subsets.keys():
-        subset_file, subset_source_id = subset.source_file_keys[key]
+        subset_file, subset_source_id = source_file_keys[key]
         assert subset_file == spectral_files[0]
         assert subset_source_id == "420007"
 
@@ -553,3 +557,44 @@ def test_roman_spectral_subset_write_as_asdf_invalid_group_by(spectral_files, tm
 
     with pytest.raises(InvalidInputError, match=r"Invalid group_by value: 'invalid_group'."):
         subset.write_as_asdf(tmp_path, group_by="invalid_group")
+
+
+def test_roman_spectral_subset_write_as_asdf_skips_validation_by_default(spectral_files, tmp_path, monkeypatch):
+    subset = RomanSpectralSubset(
+        spectral_files=spectral_files,
+        source_ids=[420007, 420008],
+        wl_range=(550, 850),
+        lite=True,
+    )
+
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("schema.validate should not be called during default bulk writes")
+
+    monkeypatch.setattr(asdf_schema, "validate", fail_if_called)
+
+    subset_files = subset.write_as_asdf(tmp_path, group_by="source_file")
+
+    assert len(subset_files) == 4
+    for subset_file in subset_files:
+        assert (tmp_path / subset_file).exists()
+
+
+def test_roman_spectral_subset_write_as_asdf_can_enable_validation(spectral_files, tmp_path, monkeypatch):
+    subset = RomanSpectralSubset(
+        spectral_files=spectral_files,
+        source_ids=[420007, 420008],
+        wl_range=(550, 850),
+        lite=True,
+    )
+
+    call_count = {"count": 0}
+
+    def count_calls(*args, **kwargs):
+        call_count["count"] += 1
+
+    monkeypatch.setattr(asdf_schema, "validate", count_calls)
+
+    subset_files = subset.write_as_asdf(tmp_path, group_by="source_file", validate_output=True)
+
+    assert len(subset_files) == 4
+    assert call_count["count"] > 0
