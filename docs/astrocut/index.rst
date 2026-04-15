@@ -358,24 +358,41 @@ Multiprocessing
 ----------------
 
 `~astrocut.RomanSpectralSubset` accepts a ``max_workers`` parameter that controls file-level multiprocessing during
-subset generation:
+subset generation and writing:
 
-- ``max_workers=1`` (default): Process files sequentially.
-- ``max_workers=None``: Automatically choose a worker count based on available CPUs and number of input files.
-- ``max_workers>1``: Process multiple input files in parallel with that worker count.
+- ``max_workers=1`` (default): Process or write files sequentially.
+- ``max_workers=None``: Automatically choose a worker count based on available CPUs and number of jobs.
+- ``max_workers>1``: Process or write files in parallel with that worker count.
 
-**When should I use multiprocessing?**
+**Subset Generation Guidelines**
 
 Parallel processing can significantly speed up subset generation, but its effectiveness depends primarily on the number
 of input spectral files and their size. The number of sources requested in the subset has minimal impact on runtime. 
 Even when requesting a small subset, the full input file must still be accessed internally.
 
-Here are some general guidelines for when multiprocessing is recommended:
+Here are some general guidelines for when multiprocessing is recommended during subset generation:
 
 - **1 Input File**: Multiprocessing is not recommended and may increase runtime due to overhead.
 - **2 Input Files**: Helpful for large files (≥3000 sources), but little or no benefit for smaller files (≤1000 sources).
 - **3-8 Input Files**: Multiprocessing is generally beneficial, especially for medium to large files.
 - **8+ Input Files**: Multiprocessing is recommended, except for very small files (≤300 sources).
+
+**Write Performance Guidelines**
+
+When writing spectral subsets to disk using `~astrocut.RomanSpectralSubset.write_as_asdf`, parallelization effectiveness 
+depends on the number of files being written.
+
+Here are some general guidelines for when multiprocessing is recommended during writing:
+
+- **< 5,000 Files**: Serial execution (``max_workers=1``) is recommended; parallel execution adds overhead that exceeds performance gains.
+- **5,000 - 20,000 Files**: Parallel execution begins to provide modest speedup (1.0-1.2x).
+- **> 20,000 Files**: Parallel execution is recommended for best performance.
+
+**Validation Overhead**
+
+When ``validate_output=True`` is set during write operations, validation adds approximately 3x time overhead, regardless of 
+whether execution is serial or parallel. Consider disabling validation for large batch writes if validation can be performed 
+separately or selectively.
 
 
 Cube Cutouts

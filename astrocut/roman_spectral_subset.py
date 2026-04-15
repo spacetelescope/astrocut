@@ -23,11 +23,12 @@ class RomanSpectralSubset(ASDFSpectralSubset):
     lite : bool, optional
         If True, only a subset of the data and metadata will be included in the subsets to
         reduce memory usage. Default is True.
-    max_workers : int, optional
-        Maximum number of worker processes to use when generating subsets in parallel. Default is 1 (no parallelism).
+    Maximum number of worker processes to use when generating subsets in parallel. Default is None.
         If None, the number of workers will be set based on the number of CPUs and input files. If an
         integer is provided, the number of workers used will be the minimum of that value and the number of
-        input files. It is recommended to use parallel processing when generating subsets from multiple
+        input files.
+
+        It is recommended to use parallel processing when generating subsets from multiple
         large input files. For a single input file, or for multiple small input files, multiprocessing may
         not provide a significant speedup and may even slow down execution due to the overhead of parallelization.
     verbose : bool, optional
@@ -40,7 +41,7 @@ class RomanSpectralSubset(ASDFSpectralSubset):
         source_ids: Union[str, int, List[Union[str, int]]],
         wl_range: Union[tuple, list] = None,
         lite: Optional[bool] = True,
-        max_workers: Optional[int] = 1,
+        max_workers: Optional[int] = None,
         verbose: bool = False,
     ):
         super().__init__(spectral_files, source_ids, wl_range, lite, max_workers, verbose)

@@ -49,6 +49,17 @@ def spectral_files(tmp_path):
         yield [str(temp_file), str(temp_file2)]
 
 
+@pytest.fixture
+def subset(spectral_files):
+    # Create a RomanSpectralSubset instance for testing
+    return RomanSpectralSubset(
+        spectral_files=spectral_files,
+        source_ids=[420007, 420008],
+        lite=True,
+        max_workers=1,
+    )
+
+
 def test_make_pickle_safe():
     # Test that _make_pickle_safe correctly converts non-pickle-safe data types to pickle-safe ones
     data = {
@@ -80,6 +91,7 @@ def test_roman_spectral_subset_data(spectral_files, lite):
         spectral_files=spectral_files,  # Test with multiple files (same file for simplicity)
         source_ids=[420007, 420008],
         lite=lite,
+        max_workers=1,
     )
 
     subset_data = subset.subset_data
@@ -96,6 +108,7 @@ def test_roman_spectral_subset_data(spectral_files, lite):
         assert "flag" not in subset_data_file["420007"]
         assert "number_coadds" not in subset_data_file["420007"]
     else:
+        print(subset_data_file["420007"])
         assert "flag" in subset_data_file["420007"]
         assert "number_coadds" in subset_data_file["420007"]
 
@@ -115,7 +128,7 @@ def test_roman_spectral_subset_data(spectral_files, lite):
         assert subset_number_coadds == 2
 
 
-def test_roman_spectral_subset_error(spectral_files, tmp_path):
+def test_roman_spectral_subset_error(spectral_files):
     # Warn if wavelength region does not overlap with any data in the file
     with pytest.warns(DataWarning, match=r"Wavelength range \(810, 910\) is out of bounds for source ID 430000"):
         RomanSpectralSubset(
@@ -123,6 +136,7 @@ def test_roman_spectral_subset_error(spectral_files, tmp_path):
             source_ids=[420007, 420008, 430000],
             wl_range=(810, 910),
             lite=True,
+            max_workers=1,
             verbose=True,
         )
 
@@ -136,6 +150,7 @@ def test_roman_spectral_subset_error(spectral_files, tmp_path):
             source_ids=[420007, 420008, 430000],
             wl_range=(550, 850),
             lite=True,
+            max_workers=1,
             verbose=True,
         )
 
@@ -146,6 +161,7 @@ def test_roman_spectral_subset_error(spectral_files, tmp_path):
             source_ids=[123456],  # Source ID that doesn't exist in either file
             wl_range=(810, 910),
             lite=True,
+            max_workers=1,
             verbose=False,
         )
 
@@ -158,6 +174,7 @@ def test_roman_spectral_subset_data_wavelength_filter(spectral_files, lite):
         source_ids=[420007, 420008],
         wl_range=(550, 850),
         lite=lite,
+        max_workers=1,
     )
 
     subset_data_file = subset.subset_data[spectral_files[0]]
@@ -181,35 +198,28 @@ def test_roman_spectral_subset_data_wavelength_filter(spectral_files, lite):
         assert subset_number_coadds == 2
 
 
-def test_roman_spectral_subset_parallel(spectral_files):
+def test_roman_spectral_subset_parallel(subset, spectral_files):
     # Test that parallel processing runs without error and produces the same results as non-parallel processing
     subset_parallel = RomanSpectralSubset(
         spectral_files=spectral_files,
         source_ids=[420007],
-        wl_range=(550, 850),
         lite=True,
         max_workers=None,  # Use parallel processing with default number of workers
-        verbose=False,
-    )
-
-    subset_non_parallel = RomanSpectralSubset(
-        spectral_files=spectral_files,
-        source_ids=[420007],
-        wl_range=(550, 850),
-        lite=True,
-        max_workers=1,
-        verbose=False,
     )
 
     parallel_flux = subset_parallel.subset_data[spectral_files[0]]["420007"]["flux"]
-    non_parallel_flux = subset_non_parallel.subset_data[spectral_files[0]]["420007"]["flux"]
+    non_parallel_flux = subset.subset_data[spectral_files[0]]["420007"]["flux"]
     assert np.array_equal(parallel_flux, non_parallel_flux)
 
 
 def test_roman_spectral_subset_source_file_keys(spectral_files):
     # Test the get_source_file_keys method of RomanSpectralsubset
     subset = RomanSpectralSubset(
-        spectral_files=spectral_files, source_ids=[420007, 420008, 430000], wl_range=(550, 850), lite=True
+        spectral_files=spectral_files,
+        source_ids=[420007, 420008, 430000],
+        wl_range=(550, 850),
+        lite=True,
+        max_workers=1,
     )
 
     source_file_keys = subset.get_source_file_keys()
@@ -276,7 +286,11 @@ def test_roman_spectral_subset_source_file_keys_duplicate_stems(tmp_path):
     _write_spectral_file(prism_file_2)
 
     subset = RomanSpectralSubset(
-        spectral_files=[prism_file_1, prism_file_2], source_ids=[402849], wl_range=None, lite=True
+        spectral_files=[prism_file_1, prism_file_2],
+        source_ids=[402849],
+        wl_range=None,
+        lite=True,
+        max_workers=1,
     )
 
     source_file_keys = subset.get_source_file_keys()
@@ -298,9 +312,7 @@ def test_roman_spectral_subset_source_file_keys_duplicate_stems(tmp_path):
 @pytest.mark.parametrize("lite", [True, False])
 def test_roman_spectral_subset_asdf_subsets_source_file(spectral_files, lite):
     # Test the get_asdf_subsets method of RomanSpectralsubset with group_by='source_file'
-    subset = RomanSpectralSubset(
-        spectral_files=spectral_files, source_ids=[420007, 420008], wl_range=(550, 850), lite=lite
-    )
+    subset = RomanSpectralSubset(spectral_files=spectral_files, source_ids=[420007, 420008], lite=lite, max_workers=1)
 
     asdf_subsets = subset.get_asdf_subsets(group_by="source_file")
     source_file_keys = subset.get_source_file_keys()
@@ -326,10 +338,7 @@ def test_roman_spectral_subset_asdf_subsets_source_file(spectral_files, lite):
         # Check that history entry is added to the subset ASDF file
         assert "history" in subset_af.tree
         history_entry = subset_af.tree["history"]["entries"][-1]  # Get the last history entry
-        expected_entry = (
-            f"Spectral subset created for source ID {subset_source_id} "
-            f"from file {subset_file} with wavelength range (550, 850)."
-        )
+        expected_entry = f"Spectral subset created for source ID {subset_source_id} " f"from file {subset_file}."
         assert history_entry["description"] == expected_entry
 
     # Only select certain source files
@@ -365,9 +374,7 @@ def test_roman_spectral_subset_asdf_subsets_source_file(spectral_files, lite):
 @pytest.mark.parametrize("lite", [True, False])
 def test_roman_spectral_subset_asdf_subsets_file(spectral_files, lite):
     # Test the get_asdf_subsets method of RomanSpectralsubset with group_by='file'
-    subset = RomanSpectralSubset(
-        spectral_files=spectral_files, source_ids=[420007, 420008], wl_range=(550, 850), lite=lite
-    )
+    subset = RomanSpectralSubset(spectral_files=spectral_files, source_ids=[420007, 420008], lite=lite, max_workers=1)
 
     asdf_subsets = subset.get_asdf_subsets(group_by="file")
     assert len(asdf_subsets) == 2  # Should have one subset per file
@@ -390,20 +397,14 @@ def test_roman_spectral_subset_asdf_subsets_file(spectral_files, lite):
         # Check that history entry is added to the subset ASDF file
         assert "history" in subset_af.tree
         history_entry = subset_af.tree["history"]["entries"][-1]  # Get the last history entry
-        expected_entry = (
-            f"Spectral subset created for source IDs ['420007', '420008'] "
-            f"from file {subset_file} with wavelength range (550, 850)."
-        )
+        expected_entry = f"Spectral subset created for source IDs ['420007', '420008'] " f"from file {subset_file}."
         assert history_entry["description"] == expected_entry
 
 
 @pytest.mark.parametrize("lite", [True, False])
 def test_roman_spectral_subset_asdf_subsets_combined(spectral_files, lite):
     # Test the get_asdf_subsets method of RomanSpectralsubset with group_by='combined'
-    subset = RomanSpectralSubset(
-        spectral_files=spectral_files, source_ids=[420007, 420008], wl_range=(550, 850), lite=lite
-    )
-
+    subset = RomanSpectralSubset(spectral_files=spectral_files, source_ids=[420007, 420008], lite=lite, max_workers=1)
     subset_af = subset.get_asdf_subsets(group_by="combined")
     assert isinstance(subset_af, asdf.AsdfFile)
     # Check that the subset ASDF file contains the expected data structure
@@ -434,7 +435,7 @@ def test_roman_spectral_subset_asdf_subsets_error(spectral_files, tmp_path):
         source_ids=[420007, 420008, 430000],
         wl_range=(550, 850),
         lite=True,
-        verbose=False,
+        max_workers=1,
     )
 
     # Raise error if file specified in get_asdf_subsets is not in the original input files
@@ -451,19 +452,9 @@ def test_roman_spectral_subset_asdf_subsets_error(spectral_files, tmp_path):
     with pytest.raises(InvalidInputError, match="Invalid group_by value: 'invalid_group'."):
         subset.get_asdf_subsets(group_by="invalid_group")
 
-    # Warn if source ID specified in get_asdf_subsets is not in one of the files but is in another file
-    with pytest.warns(
-        DataWarning,
-        match=r"Source ID 430000 not found in file " r".*temp_spectral\.asdf\. Skipping this source for this file\.",
-    ):
-        subset.get_asdf_subsets(group_by="source_file", source_ids=["430000"])
 
-
-def test_roman_spectral_subset_write_as_asdf_source_file(spectral_files, tmp_path):
+def test_roman_spectral_subset_write_as_asdf_source_file(subset, tmp_path):
     # Test the write_as_asdf method of RomanSpectralsubset
-    subset = RomanSpectralSubset(
-        spectral_files=spectral_files, source_ids=[420007, 420008], wl_range=(550, 850), lite=True
-    )
     subset_files = subset.write_as_asdf(tmp_path, group_by="source_file")
 
     # Should write one subset file per source ID and input file combination, so 2 sources x 2 files = 4 subset files
@@ -486,11 +477,8 @@ def test_roman_spectral_subset_write_as_asdf_source_file(spectral_files, tmp_pat
         assert "flux" in af.tree["roman"]["data"]
 
 
-def test_roman_spectral_subset_write_as_asdf_file(spectral_files, tmp_path):
+def test_roman_spectral_subset_write_as_asdf_file(subset, tmp_path):
     # Test the write_as_asdf method of RomanSpectralsubset with group_by='file'
-    subset = RomanSpectralSubset(
-        spectral_files=spectral_files, source_ids=[420007, 420008], wl_range=(550, 850), lite=True
-    )
     subset_files = subset.write_as_asdf(tmp_path, group_by="file")
 
     assert len(subset_files) == 2  # Should write one subset file per input file, so 2 files = 2 subset files
@@ -511,11 +499,8 @@ def test_roman_spectral_subset_write_as_asdf_file(spectral_files, tmp_path):
         assert "flux" in af.tree["roman"]["data"]["420007"]
 
 
-def test_roman_spectral_subset_write_as_asdf_combined(spectral_files, tmp_path):
+def test_roman_spectral_subset_write_as_asdf_combined(subset, spectral_files, tmp_path):
     # Test the write_as_asdf method of RomanSpectralsubset with group_by='combined'
-    subset = RomanSpectralSubset(
-        spectral_files=spectral_files, source_ids=[420007, 420008], wl_range=(550, 850), lite=True
-    )
     subset_files = subset.write_as_asdf(tmp_path, group_by="combined")
 
     assert len(subset_files) == 1  # Should write all subsets to a single file
@@ -537,36 +522,12 @@ def test_roman_spectral_subset_write_as_asdf_combined(spectral_files, tmp_path):
         assert "flux" in af.tree["roman"]["data"][file_str]["420007"]
 
 
-def test_roman_spectral_subset_write_as_asdf_error(spectral_files, tmp_path):
-    subset = RomanSpectralSubset(
-        spectral_files=spectral_files, source_ids=[420007, 420008], wl_range=(550, 850), lite=True
-    )
-
-    # Raise error if group_by value is invalid
-    with pytest.raises(InvalidInputError, match="Invalid group_by value: 'invalid_group'."):
-        subset.write_as_asdf(tmp_path, group_by="invalid_group")
-
-
-def test_roman_spectral_subset_write_as_asdf_invalid_group_by(spectral_files, tmp_path):
-    subset = RomanSpectralSubset(
-        spectral_files=spectral_files,
-        source_ids=[420007, 420008],
-        wl_range=(550, 850),
-        lite=True,
-    )
-
+def test_roman_spectral_subset_write_as_asdf_invalid_group_by(subset):
     with pytest.raises(InvalidInputError, match=r"Invalid group_by value: 'invalid_group'."):
-        subset.write_as_asdf(tmp_path, group_by="invalid_group")
+        subset.write_as_asdf(group_by="invalid_group")
 
 
-def test_roman_spectral_subset_write_as_asdf_skips_validation_by_default(spectral_files, tmp_path, monkeypatch):
-    subset = RomanSpectralSubset(
-        spectral_files=spectral_files,
-        source_ids=[420007, 420008],
-        wl_range=(550, 850),
-        lite=True,
-    )
-
+def test_roman_spectral_subset_write_as_asdf_skips_validation_by_default(subset, tmp_path, monkeypatch):
     def fail_if_called(*args, **kwargs):
         raise AssertionError("schema.validate should not be called during default bulk writes")
 
@@ -579,14 +540,7 @@ def test_roman_spectral_subset_write_as_asdf_skips_validation_by_default(spectra
         assert (tmp_path / subset_file).exists()
 
 
-def test_roman_spectral_subset_write_as_asdf_can_enable_validation(spectral_files, tmp_path, monkeypatch):
-    subset = RomanSpectralSubset(
-        spectral_files=spectral_files,
-        source_ids=[420007, 420008],
-        wl_range=(550, 850),
-        lite=True,
-    )
-
+def test_roman_spectral_subset_write_as_asdf_can_enable_validation(subset, tmp_path, monkeypatch):
     call_count = {"count": 0}
 
     def count_calls(*args, **kwargs):

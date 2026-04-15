@@ -270,6 +270,35 @@ def _disabled_asdf_validation():
         asdf_schema.validate = original_validate
 
 
+def _write_tree_batch_worker(tree_jobs: List[Tuple[Dict, str]], validate_output: bool = False) -> List[str]:
+    """
+    Worker function to write a batch of ASDF trees to files.
+
+    Parameters
+    ----------
+    tree_jobs : list of tuples
+        A list of tuples, where each tuple contains an ASDF tree (as a dictionary) and
+        the corresponding output file path.
+    validate_output : bool, optional
+        Whether to validate the output ASDF files after writing. Default is False, which can improve performance
+        when writing large batches of files that are expected to be valid.
+
+    Returns
+    -------
+    list of str
+        A list of the output file paths that were written by this worker.
+    """
+    subset_paths = []
+    # Write the ASDF trees to files, optionally disabling validation for performance
+
+    with nullcontext() if validate_output else _disabled_asdf_validation():
+        for tree, subset_path in tree_jobs:
+            af = asdf.AsdfFile(tree)
+            af.write_to(subset_path)
+            subset_paths.append(subset_path)
+    return subset_paths
+
+
 class ASDFSpectralSubset(SpectralSubset, ABC):
     """
     Abstract class for creating subsets from ASDF spectral data. This class is designed to
@@ -289,10 +318,12 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
         If True, only metadata and a subset of the data will be included in the subsets to
         reduce memory usage. Default is True.
     max_workers : int, optional
-        Maximum number of worker processes to use when generating subsets in parallel. Default is 1 (no parallelism).
+        Maximum number of worker processes to use when generating subsets in parallel. Default is None.
         If None, the number of workers will be set based on the number of CPUs and input files. If an
         integer is provided, the number of workers used will be the minimum of that value and the number of
-        input files. It is recommended to use parallel processing when generating subsets from multiple
+        input files.
+
+        It is recommended to use parallel processing when generating subsets from multiple
         large input files. For a single input file, or for multiple small input files, multiprocessing may
         not provide a significant speedup and may even slow down execution due to the overhead of parallelization.
     verbose : bool, optional
@@ -324,7 +355,7 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
         source_ids: Union[str, int, List[Union[str, int]]],
         wl_range: Union[tuple, list] = None,
         lite: Optional[bool] = True,
-        max_workers: Optional[int] = 1,
+        max_workers: Optional[int] = None,
         verbose: bool = False,
     ):
         super().__init__(spectral_files, source_ids, wl_range, lite, verbose)
@@ -357,16 +388,9 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
 
         files = [str(f) for f in self._spectral_files]
 
-        # If max_workers is not specified, default to min(file count, CPU count, 8) to avoid
-        # oversubscription on large file counts
-        max_workers = self._max_workers
-        if max_workers is None:
-            cpu_count = os.cpu_count()
-            if cpu_count is not None:
-                max_workers = min(len(files), cpu_count)
-            else:
-                max_workers = len(files)
-        max_workers = min(len(files), max_workers)  # Don't use more workers than files
+        # If max_workers is not specified, default to min(file count, CPU count)
+        cpu_count = os.cpu_count() or 1
+        max_workers = min(len(files), cpu_count) if self._max_workers is None else min(len(files), self._max_workers)
 
         def _apply_worker_result(result):
             # Helper function to apply the results from the worker function to the internal attributes of the class
@@ -456,10 +480,7 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
         for file in files_to_include:
             for sid in sources_to_include:
                 if sid not in self._out_trees[file]:
-                    warnings.warn(
-                        f"Source ID {sid} not found in file {file}. " "Skipping this source for this file.",
-                        DataWarning,
-                    )
+                    log.debug(f"Source ID {sid} not found in file {file}. Skipping this source for this file.")
                     continue
                 source_file_pairs.append((file, sid))
 
@@ -509,8 +530,8 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
                 af = asdf.AsdfFile(tree)
                 af.tree["history"] = _append_history_entry(
                     tree.get("history", {}),
-                    f"Spectral subset created for source ID {sid} from file {file} with "
-                    f"wavelength range {self._wl_range}.",
+                    f"Spectral subset created for source ID {sid} from file {file}"
+                    f"{f' with wavelength range {self._wl_range is not None}' if self._wl_range else ''}.",
                 )
                 asdf_subsets[string_key] = af
 
@@ -551,8 +572,8 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
                 af = asdf.AsdfFile(combined_tree)
                 af.tree["history"] = _append_history_entry(
                     combined_tree.get("history", {}),
-                    f"Spectral subset created for source IDs {source_ids} from file {file} with "
-                    f"wavelength range {self._wl_range}.",
+                    f"Spectral subset created for source IDs {source_ids} from file {file}"
+                    f"{f' with wavelength range {self._wl_range}' if self._wl_range is not None else ''}.",
                 )
                 asdf_subsets[file] = af
         elif group_by == "combined":
@@ -616,14 +637,88 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
             af = asdf.AsdfFile(combined_tree)
             af.tree["history"] = _append_history_entry(
                 combined_tree.get("history", {}),
-                f"Spectral subset created for source IDs {sources_to_include} from files {', '.join(files_to_include)} "
-                f"with wavelength range {self._wl_range}.",
+                f"Spectral subset created for source IDs {sources_to_include} from files {', '.join(files_to_include)}"
+                f"{f' with wavelength range {self._wl_range}' if self._wl_range is not None else ''}.",
             )
             asdf_subsets = af
         else:
             raise InvalidInputError(self._invalid_group_by_msg.format(group_by))
 
         return asdf_subsets
+
+    def _build_write_jobs(
+        self,
+        output_dir: Union[str, Path],
+        group_by: Literal["source_file", "file", "combined"],
+        spectral_files: List[Union[str, Path]],
+        source_ids: Union[str, int, List[Union[str, int]]],
+    ) -> List[Tuple[asdf.AsdfFile, str]]:
+        """
+        Build a list of ASDF subset objects and corresponding output file paths to write, based
+        on the specified grouping.
+
+        Parameters
+        ----------
+        output_dir : str or Path
+            The directory where the output ASDF files will be written.
+        group_by : {'source_file', 'file', 'combined'}
+            Determines how the subsets are grouped in the output ASDF objects. Must be
+            one of 'source_file', 'file', or 'combined'.
+        spectral_files : list of str or Path
+            The list of input spectral files to include in the output subsets.
+        source_ids : str or int or list
+            Specific source IDs to include in the output. Can be a single ID or a list of IDs.
+
+        Returns
+        -------
+        list of tuples
+            A list of tuples, where each tuple contains an ASDF subset object and the corresponding
+            output file path to which it should be written.
+        """
+        write_jobs = []  # List of tuples: (asdf.AsdfFile, output_file_path)
+        if group_by == "source_file":
+            # Write separate ASDF files for each source/file combination, using the deterministic keys
+            # for the source/file combinations
+            af_by_source_file = self.get_asdf_subsets(
+                group_by="source_file",
+                source_ids=source_ids,
+                spectral_files=spectral_files,
+            )
+            source_file_keys = self.get_source_file_keys(
+                spectral_files=spectral_files,
+                source_ids=source_ids,
+            )
+
+            for key, af in af_by_source_file.items():
+                file, sid = source_file_keys[key]
+                filename = f'{Path(file).stem}_subset_{sid}{"_lite" if self._lite else ""}.asdf'
+                write_jobs.append((af, str(output_dir / filename)))
+
+        elif group_by == "file":
+            # Write one ASDF file per input file, containing all specified source IDs from that file
+            af_by_file = self.get_asdf_subsets(
+                group_by="file",
+                source_ids=source_ids,
+                spectral_files=spectral_files,
+            )
+            for file, af in af_by_file.items():
+                filename = f'{Path(file).stem}_subset{"_lite" if self._lite else ""}.asdf'
+                write_jobs.append((af, str(output_dir / filename)))
+
+        elif group_by == "combined":
+            # Write a single ASDF file containing all specified source IDs from all input files
+            af = self.get_asdf_subsets(
+                group_by="combined",
+                source_ids=source_ids,
+                spectral_files=spectral_files,
+            )
+            filename = f'combined_spectral_subset{"_lite" if self._lite else ""}.asdf'
+            write_jobs.append((af, str(output_dir / filename)))
+
+        else:
+            raise InvalidInputError(self._invalid_group_by_msg.format(group_by))
+
+        return write_jobs
 
     def write_as_asdf(
         self,
@@ -632,6 +727,7 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
         group_by: Literal["source_file", "file", "combined"] = "combined",
         spectral_files: List[Union[str, Path]] = None,
         source_ids: Union[str, int, List[Union[str, int]]] = None,
+        max_workers: Optional[int] = 1,
         validate_output: bool = False,
     ) -> List[str]:
         """
@@ -653,6 +749,10 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
         source_ids : str or int or list, optional
             Specific source IDs to include in the output. If None, all source IDs from the
             subset results will be included. Can be a single ID or a list of IDs.
+        max_workers : int or None, optional
+            Maximum number of worker processes to use when writing files in parallel. Default is 1 (no parallelism).
+            If None, the number of workers will be set based on the number of write jobs and CPU count.
+            It is recommended to use parallel processing when writing large batches of files (>5000).
         validate_output : bool, optional
             If True, run ASDF schema validation during each file write. Default is False because
             bulk writes already originate from trusted internal subset trees and repeated
@@ -666,47 +766,54 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        write_jobs = []
-
-        if group_by == "source_file":
-            af_by_source_file = self.get_asdf_subsets(
-                group_by="source_file",
-                source_ids=source_ids,
-                spectral_files=spectral_files,
-            )
-            source_file_keys = self.get_source_file_keys(
-                spectral_files=spectral_files,
-                source_ids=source_ids,
-            )
-            for source_file_key, af in af_by_source_file.items():
-                file, sid = source_file_keys[source_file_key]
-                filename = f'{Path(file).stem}_subset_{sid}{"_lite" if self._lite else ""}.asdf'
-                subset_path = output_dir / filename
-                write_jobs.append((af, str(subset_path)))
-        elif group_by == "file":
-            af_by_file = self.get_asdf_subsets(group_by="file", source_ids=source_ids, spectral_files=spectral_files)
-            for file, af in af_by_file.items():
-                filename = f'{Path(file).stem}_subset{"_lite" if self._lite else ""}.asdf'
-                subset_path = output_dir / filename
-                write_jobs.append((af, str(subset_path)))
-        elif group_by == "combined":
-            af = self.get_asdf_subsets(group_by="combined", source_ids=source_ids, spectral_files=spectral_files)
-            filename = f'combined_spectral_subset{"_lite" if self._lite else ""}.asdf'
-            subset_path = output_dir / filename
-            write_jobs.append((af, str(subset_path)))
-        else:
-            raise InvalidInputError(self._invalid_group_by_msg.format(group_by))
+        write_jobs = self._build_write_jobs(
+            output_dir=output_dir,
+            group_by=group_by,
+            spectral_files=spectral_files,
+            source_ids=source_ids,
+        )
 
         if not write_jobs:
             return []
 
-        subset_paths = []
-        with nullcontext() if validate_output else _disabled_asdf_validation():
-            for af, subset_path in write_jobs:
-                af.write_to(subset_path)
-                subset_paths.append(subset_path)
+        # If max_workers is not specified, default to CPU count, but never more than the number of write jobs
+        cpu_count = os.cpu_count() or 1
+        worker_count = min(len(write_jobs), cpu_count) if max_workers is None else min(len(write_jobs), max_workers)
+        log.debug(f"Writing {len(write_jobs)} ASDF subset(s) to disk with up to {worker_count} worker(s)...")
 
-        return subset_paths
+        # Single-worker path: keep it simple and avoid process overhead
+        if worker_count == 1:
+            subset_paths = []
+            with nullcontext() if validate_output else _disabled_asdf_validation():
+                for af, subset_path in write_jobs:
+                    af.write_to(subset_path)
+                    subset_paths.append(subset_path)
+            return subset_paths
+
+        # Multi-worker path: split jobs as evenly as possible and write batches in processes
+        batch_count = max(1, min(worker_count, len(write_jobs)))
+        batches = [[] for _ in range(batch_count)]
+        for idx, item in enumerate(write_jobs):
+            batches[idx % batch_count].append(item)
+        write_job_batches = [batch for batch in batches if batch]
+        tree_job_batches = [
+            [(_make_pickle_safe(af.tree), subset_path) for af, subset_path in batch] for batch in write_job_batches
+        ]
+
+        batch_results = [None] * len(tree_job_batches)
+        with ProcessPoolExecutor(max_workers=worker_count) as executor:
+            future_to_idx = {
+                executor.submit(_write_tree_batch_worker, batch, validate_output): idx
+                for idx, batch in enumerate(tree_job_batches)
+            }
+            for future in as_completed(future_to_idx):
+                idx = future_to_idx[future]
+                batch_results[idx] = future.result()
+
+        paths = []
+        for batch_paths in batch_results:
+            paths.extend(batch_paths)
+        return paths
 
     def _build_source_file_keys(self, source_file_pairs: List[Tuple[str, str]]) -> Dict[str, Tuple[str, str]]:
         """
