@@ -357,8 +357,9 @@ subsets in different ways. They accept the following parameters:
 Multiprocessing
 ----------------
 
-`~astrocut.RomanSpectralSubset` accepts a ``max_workers`` parameter that controls file-level multiprocessing during
-subset generation and writing:
+`~astrocut.RomanSpectralSubset` and `~astrocut.RomanSpectralSubset.write_as_asdf` accept a ``max_workers`` parameter 
+that controls file-level multiprocessing during subset generation and writing, respectively. 
+The behavior of this parameter is as follows:
 
 - ``max_workers=1`` (default): Process or write files sequentially.
 - ``max_workers=None``: Automatically choose a worker count based on available CPUs and number of jobs.
@@ -372,7 +373,7 @@ Even when requesting a small subset, the full input file must still be accessed 
 
 Here are some general guidelines for when multiprocessing is recommended during subset generation:
 
-- **1 Input File**: Multiprocessing is not recommended and may increase runtime due to overhead.
+- **1 Input File**: Serial execution (``max_workers=1``) is recommended; parallel execution adds overhead that exceeds performance gains.
 - **2 Input Files**: Helpful for large files (≥3000 sources), but little or no benefit for smaller files (≤1000 sources).
 - **3-8 Input Files**: Multiprocessing is generally beneficial, especially for medium to large files.
 - **8+ Input Files**: Multiprocessing is recommended, except for very small files (≤300 sources).
@@ -385,12 +386,12 @@ depends on the number of files being written.
 Here are some general guidelines for when multiprocessing is recommended during writing:
 
 - **< 5,000 Files**: Serial execution (``max_workers=1``) is recommended; parallel execution adds overhead that exceeds performance gains.
-- **5,000 - 20,000 Files**: Parallel execution begins to provide modest speedup (1.0-1.2x).
-- **> 20,000 Files**: Parallel execution is recommended for best performance.
+- **5,000 - 20,000 Files**: Multiprocessing begins to provide modest speedup (1.0-1.2x).
+- **> 20,000 Files**: Multiprocessing is recommended for best performance.
 
 **Validation Overhead**
 
-When ``validate_output=True`` is set during write operations, validation adds approximately 3x time overhead, regardless of 
+When ``validate_output=True`` is set during write operations, validation significantly increases runtime, regardless of 
 whether execution is serial or parallel. Consider disabling validation for large batch writes if validation can be performed 
 separately or selectively.
 
