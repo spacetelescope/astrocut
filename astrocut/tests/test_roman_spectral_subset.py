@@ -455,7 +455,7 @@ def test_roman_spectral_subset_asdf_subsets_error(spectral_files, tmp_path):
 
 def test_roman_spectral_subset_write_as_asdf_source_file(subset, tmp_path):
     # Test the write_as_asdf method of RomanSpectralsubset
-    subset_files = subset.write_as_asdf(tmp_path, group_by="source_file")
+    subset_files = subset.write_as_asdf(tmp_path, group_by="source_file", max_workers=1)
 
     # Should write one subset file per source ID and input file combination, so 2 sources x 2 files = 4 subset files
     assert len(subset_files) == 4
@@ -479,7 +479,7 @@ def test_roman_spectral_subset_write_as_asdf_source_file(subset, tmp_path):
 
 def test_roman_spectral_subset_write_as_asdf_file(subset, tmp_path):
     # Test the write_as_asdf method of RomanSpectralsubset with group_by='file'
-    subset_files = subset.write_as_asdf(tmp_path, group_by="file")
+    subset_files = subset.write_as_asdf(tmp_path, group_by="file", max_workers=1)
 
     assert len(subset_files) == 2  # Should write one subset file per input file, so 2 files = 2 subset files
     for subset_file in subset_files:
@@ -527,20 +527,7 @@ def test_roman_spectral_subset_write_as_asdf_invalid_group_by(subset):
         subset.write_as_asdf(group_by="invalid_group")
 
 
-def test_roman_spectral_subset_write_as_asdf_skips_validation_by_default(subset, tmp_path, monkeypatch):
-    def fail_if_called(*args, **kwargs):
-        raise AssertionError("schema.validate should not be called during default bulk writes")
-
-    monkeypatch.setattr(asdf_schema, "validate", fail_if_called)
-
-    subset_files = subset.write_as_asdf(tmp_path, group_by="source_file")
-
-    assert len(subset_files) == 4
-    for subset_file in subset_files:
-        assert (tmp_path / subset_file).exists()
-
-
-def test_roman_spectral_subset_write_as_asdf_can_enable_validation(subset, tmp_path, monkeypatch):
+def test_roman_spectral_subset_write_as_asdf_validation_by_default(subset, tmp_path, monkeypatch):
     call_count = {"count": 0}
 
     def count_calls(*args, **kwargs):
@@ -548,7 +535,21 @@ def test_roman_spectral_subset_write_as_asdf_can_enable_validation(subset, tmp_p
 
     monkeypatch.setattr(asdf_schema, "validate", count_calls)
 
-    subset_files = subset.write_as_asdf(tmp_path, group_by="source_file", validate_output=True)
+    subset_files = subset.write_as_asdf(tmp_path, group_by="source_file", max_workers=1)
 
     assert len(subset_files) == 4
-    assert call_count["count"] > 0
+    assert call_count["count"] == 4  # Should call validation once for each subset file written
+
+
+def test_roman_spectral_subset_write_as_asdf_can_disable_validation(subset, tmp_path, monkeypatch):
+    call_count = {"count": 0}
+
+    def count_calls(*args, **kwargs):
+        call_count["count"] += 1
+
+    monkeypatch.setattr(asdf_schema, "validate", count_calls)
+
+    subset_files = subset.write_as_asdf(tmp_path, group_by="source_file", validate_output=False, max_workers=1)
+
+    assert len(subset_files) == 4
+    assert call_count["count"] == 1  # Should only call validation once

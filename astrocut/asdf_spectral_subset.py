@@ -727,8 +727,8 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
         group_by: Literal["source_file", "file", "combined"] = "combined",
         spectral_files: List[Union[str, Path]] = None,
         source_ids: Union[str, int, List[Union[str, int]]] = None,
-        max_workers: Optional[int] = 1,
-        validate_output: bool = False,
+        max_workers: Optional[int] = None,
+        validate_output: bool = True,
     ) -> List[str]:
         """
         Write the ASDF subset(s) to files in the specified output directory, grouped by source
@@ -750,13 +750,14 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
             Specific source IDs to include in the output. If None, all source IDs from the
             subset results will be included. Can be a single ID or a list of IDs.
         max_workers : int or None, optional
-            Maximum number of worker processes to use when writing files in parallel. Default is 1 (no parallelism).
+            Maximum number of worker processes to use when writing files in parallel. Default is None.
             If None, the number of workers will be set based on the number of write jobs and CPU count.
             It is recommended to use parallel processing when writing large batches of files (>5000).
         validate_output : bool, optional
-            If True, run ASDF schema validation during each file write. Default is False because
-            bulk writes already originate from trusted internal subset trees and repeated
-            validation is a major performance cost.
+            If True, run ASDF schema validation during each file write.
+            If False, validate only a single output file during its write, then skip schema
+            validation for all remaining writes. Default is True. Consider setting to False
+            for improved performance when writing large batches of files that are expected to be valid.
 
         Returns
         -------
@@ -776,6 +777,18 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
         if not write_jobs:
             return []
 
+        subset_paths = []
+        if not validate_output:
+            # Validate exactly one output file during write, before writing the remaining files.
+            validation_job = write_jobs[0]
+            validation_af, validation_target_path = validation_job
+            validation_af.write_to(validation_target_path)
+            subset_paths.append(validation_target_path)
+            write_jobs = write_jobs[1:]
+
+            if not write_jobs:
+                return subset_paths
+
         # If max_workers is not specified, default to CPU count, but never more than the number of write jobs
         cpu_count = os.cpu_count() or 1
         worker_count = min(len(write_jobs), cpu_count) if max_workers is None else min(len(write_jobs), max_workers)
@@ -783,7 +796,6 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
 
         # Single-worker path: keep it simple and avoid process overhead
         if worker_count == 1:
-            subset_paths = []
             with nullcontext() if validate_output else _disabled_asdf_validation():
                 for af, subset_path in write_jobs:
                     af.write_to(subset_path)
@@ -810,7 +822,7 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
                 idx = future_to_idx[future]
                 batch_results[idx] = future.result()
 
-        paths = []
+        paths = list(subset_paths)
         for batch_paths in batch_results:
             paths.extend(batch_paths)
         return paths
