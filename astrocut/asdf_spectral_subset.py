@@ -789,9 +789,17 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
             if not write_jobs:
                 return subset_paths
 
-        # If max_workers is not specified, default to CPU count, but never more than the number of write jobs
-        cpu_count = os.cpu_count() or 1
-        worker_count = min(len(write_jobs), cpu_count) if max_workers is None else min(len(write_jobs), max_workers)
+        num_write_jobs = len(write_jobs)
+        worker_count = 1
+        if max_workers is None:
+            # If max_workers is not specified, default based on number of write jobs and CPU count
+            if (validate_output and num_write_jobs >= 1000) or (not validate_output and num_write_jobs >= 5000):
+                # For smaller batches, don't use multiprocessing to avoid overhead costs
+                # For larger batches, default to CPUs available
+                worker_count = os.cpu_count() or 1
+        else:
+            # If max_workers is specified, use the minimum of that value and the number of write jobs
+            worker_count = min(len(write_jobs), max_workers)
         log.debug(f"Writing {len(write_jobs)} ASDF subset(s) to disk with up to {worker_count} worker(s)...")
 
         # Single-worker path: keep it simple and avoid process overhead
