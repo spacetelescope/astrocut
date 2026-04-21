@@ -434,11 +434,24 @@ def test_fits_cutout_img_output(tmpdir, test_images, caplog, center_coord, cutou
         assert IMGFLE.read(3) == b"\xff\xd8\xff"  # JPG
 
     # Png (single input file, not as list)
-    img_files = FITSCutout(test_images[0], center_coord, cutout_size).write_as_img(
-        output_format="png", output_dir=tmpdir
-    )
+    png_cutout = FITSCutout(test_images[0], center_coord, cutout_size)
+    img_files = png_cutout.write_as_img(output_format="png", output_dir=tmpdir)
     with open(img_files[0], "rb") as IMGFLE:
         assert IMGFLE.read(8) == b"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a"  # PNG
+    png_img = np.array(Image.open(img_files[0]))
+    png_cutout_data = next(iter(png_cutout.cutouts_by_file.values()))[0].data
+    normalized = FITSCutout.normalize_img(png_cutout_data)
+    flipped_error = np.mean(np.abs(png_img.astype(int) - np.flipud(normalized).astype(int)))
+    unflipped_error = np.mean(np.abs(png_img.astype(int) - normalized.astype(int)))
+    assert flipped_error < unflipped_error
+
+    # Png with no orientation flip
+    png_no_flip = np.array(
+        FITSCutout(test_images[0], center_coord, cutout_size).get_image_cutouts(flip_orientation=False)[0]
+    )
+    no_flip_flipped_error = np.mean(np.abs(png_no_flip.astype(int) - np.flipud(normalized).astype(int)))
+    no_flip_unflipped_error = np.mean(np.abs(png_no_flip.astype(int) - normalized.astype(int)))
+    assert no_flip_unflipped_error < no_flip_flipped_error
     assert len(img_files) == 1
 
     # String coordinates and verbose

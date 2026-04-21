@@ -16,7 +16,7 @@ from astropy.visualization import (
     SinhStretch,
     SqrtStretch,
 )
-from PIL import Image
+from PIL.Image import Image, Transpose, fromarray, registered_extensions
 from s3path import S3Path
 
 from . import log
@@ -78,7 +78,7 @@ class ImageCutout(Cutout, ABC):
         self._image_cutouts = None
 
     @property
-    def image_cutouts(self) -> List[Image.Image]:
+    def image_cutouts(self) -> List[Image]:
         """
         Return the cutouts as a list of `PIL.Image` objects.
 
@@ -96,7 +96,8 @@ class ImageCutout(Cutout, ABC):
         minmax_value: Optional[List[int]] = None,
         invert: Optional[bool] = False,
         colorize: Optional[bool] = False,
-    ) -> List[Image.Image]:
+        flip_orientation: Optional[bool] = True,
+    ) -> List[Image]:
         """
         Get the cutouts as `~PIL.Image` objects given certain normalization parameters. This method also sets
         the `image_cutouts` attribute.
@@ -120,6 +121,9 @@ class ImageCutout(Cutout, ABC):
             Optional, default False.  If True the image is inverted (light pixels become dark and vice versa).
         colorize : bool
             Optional, default False. If True, the first three cutouts will be combined into a single RGB image.
+        flip_orientation : bool
+            Optional, default True. If True, the cutout images are flipped vertically to match the orientation
+            of the input cutouts.
 
         Returns
         -------
@@ -157,14 +161,23 @@ class ImageCutout(Cutout, ABC):
                 img_arrs.append(self.normalize_img(cutout.data, stretch, minmax_percent, minmax_value, invert))
 
             # Combine the three cutouts into a single RGB image
-            self._image_cutouts = [Image.fromarray(np.dstack([img_arrs[0], img_arrs[1], img_arrs[2]]).astype(np.uint8))]
+            color_img = fromarray(np.dstack([img_arrs[0], img_arrs[1], img_arrs[2]]).astype(np.uint8))
+            if flip_orientation:
+                # Flip the image vertically to match the orientation of the input cutouts
+                color_img = color_img.transpose(Transpose.FLIP_TOP_BOTTOM)
+            self._image_cutouts = [color_img]
         else:  # one image per cutout
             image_cutouts = []
             for file, cutout_list in self.cutouts_by_file.items():
                 for i, cutout in enumerate(cutout_list):
                     # Apply the appropriate normalization parameters
                     img_arr = self.normalize_img(cutout.data, stretch, minmax_percent, minmax_value, invert)
-                    image_cutouts.append(Image.fromarray(img_arr))
+                    img = fromarray(img_arr)
+                    # Flip the image vertically to match the orientation of the input cutouts
+                    if flip_orientation:
+                        # Flip the image vertically to match the orientation of the input cutouts
+                        img = img.transpose(Transpose.FLIP_TOP_BOTTOM)
+                    image_cutouts.append(img)
 
             self._image_cutouts = image_cutouts
 
@@ -207,7 +220,7 @@ class ImageCutout(Cutout, ABC):
         output_format = f".{out_lower}" if not output_format.startswith(".") else out_lower
 
         # Error if the output format is not supported
-        if output_format not in Image.registered_extensions().keys():
+        if output_format not in registered_extensions().keys():
             raise InvalidInputError(f"Output format {output_format} is not supported.")
 
         return output_format
