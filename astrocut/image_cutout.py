@@ -123,7 +123,7 @@ class ImageCutout(Cutout, ABC):
             Optional, default False. If True, the first three cutouts will be combined into a single RGB image.
         flip_orientation : bool
             Optional, default True. If True, the cutout images are flipped vertically to match the orientation
-            of the input cutouts.
+            of the input images.
 
         Returns
         -------
@@ -273,6 +273,7 @@ class ImageCutout(Cutout, ABC):
         output_format: str = ".jpg",
         output_dir: Union[str, Path] = ".",
         cutout_prefix: str = "cutout",
+        flip_orientation: Optional[bool] = True,
     ) -> Union[str, List[str]]:
         """
         Write the cutout to memory or to a file in an image format. If colorize is set, the first 3 cutouts
@@ -297,6 +298,9 @@ class ImageCutout(Cutout, ABC):
             Optional, default False.  If True the image is inverted (light pixels become dark and vice versa).
         colorize : bool
             Optional, default False. If True, the first three cutouts will be combined into a single RGB image.
+        flip_orientation : bool
+            Optional, default True. If True, the cutout images are flipped vertically to match the
+            orientation of the input images.
         output_format : str
             Optional, default '.jpg'. The output format for the cutout image(s).
         output_dir : str | `~pathlib.Path`
@@ -318,7 +322,9 @@ class ImageCutout(Cutout, ABC):
         output_format = self._parse_output_format(output_format)
 
         # Get the image cutouts with the given normalization parameters
-        image_cutouts = self.get_image_cutouts(stretch, minmax_percent, minmax_value, invert, colorize)
+        image_cutouts = self.get_image_cutouts(
+            stretch, minmax_percent, minmax_value, invert, colorize, flip_orientation
+        )
 
         # Create the output directory if it does not exist
         Path(output_dir).mkdir(parents=True, exist_ok=True)

@@ -434,24 +434,11 @@ def test_fits_cutout_img_output(tmpdir, test_images, caplog, center_coord, cutou
         assert IMGFLE.read(3) == b"\xff\xd8\xff"  # JPG
 
     # Png (single input file, not as list)
-    png_cutout = FITSCutout(test_images[0], center_coord, cutout_size)
-    img_files = png_cutout.write_as_img(output_format="png", output_dir=tmpdir)
+    img_files = FITSCutout(test_images[0], center_coord, cutout_size).write_as_img(
+        output_format="png", output_dir=tmpdir
+    )
     with open(img_files[0], "rb") as IMGFLE:
         assert IMGFLE.read(8) == b"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a"  # PNG
-    png_img = np.array(Image.open(img_files[0]))
-    png_cutout_data = next(iter(png_cutout.cutouts_by_file.values()))[0].data
-    normalized = FITSCutout.normalize_img(png_cutout_data)
-    flipped_error = np.mean(np.abs(png_img.astype(int) - np.flipud(normalized).astype(int)))
-    unflipped_error = np.mean(np.abs(png_img.astype(int) - normalized.astype(int)))
-    assert flipped_error < unflipped_error
-
-    # Png with no orientation flip
-    png_no_flip = np.array(
-        FITSCutout(test_images[0], center_coord, cutout_size).get_image_cutouts(flip_orientation=False)[0]
-    )
-    no_flip_flipped_error = np.mean(np.abs(png_no_flip.astype(int) - np.flipud(normalized).astype(int)))
-    no_flip_unflipped_error = np.mean(np.abs(png_no_flip.astype(int) - normalized.astype(int)))
-    assert no_flip_unflipped_error < no_flip_flipped_error
     assert len(img_files) == 1
 
     # String coordinates and verbose
@@ -486,6 +473,34 @@ def test_fits_cutout_img_memory_only(test_images, center_coord, cutout_size):
     assert len(color_imgs) == 1
     assert isinstance(color_imgs[0], Image.Image)
     assert color_imgs[0].mode == "RGB"
+
+
+@pytest.mark.parametrize("colorize", [True, False])
+def test_fits_cutout_img_flip(test_images, center_coord, cutout_size, colorize):
+    # Test that outputs match input orientation expectations
+    input_files = test_images[:3] if colorize else test_images[0]
+    cutout = FITSCutout(input_files, center_coord, cutout_size)
+
+    flipped = np.array(cutout.get_image_cutouts(colorize=colorize)[0])
+    unflipped = np.array(cutout.get_image_cutouts(colorize=colorize, flip_orientation=False)[0])
+
+    cutout_list = [x for cutout_group in cutout.cutouts_by_file.values() for x in cutout_group]
+    if colorize:
+        expected_unflipped = np.dstack([FITSCutout.normalize_img(c.data) for c in cutout_list[:3]])
+    else:
+        expected_unflipped = FITSCutout.normalize_img(cutout_list[0].data)
+    expected_flipped = np.flipud(expected_unflipped)
+
+    flipped_to_flipped = np.mean(np.abs(flipped.astype(int) - expected_flipped.astype(int)))
+    flipped_to_unflipped = np.mean(np.abs(flipped.astype(int) - expected_unflipped.astype(int)))
+    unflipped_to_unflipped = np.mean(np.abs(unflipped.astype(int) - expected_unflipped.astype(int)))
+    unflipped_to_flipped = np.mean(np.abs(unflipped.astype(int) - expected_flipped.astype(int)))
+
+    # Default output should match the flipped orientation; opt-out should match unflipped orientation.
+    assert flipped_to_flipped < flipped_to_unflipped
+    assert flipped_to_flipped < 1
+    assert unflipped_to_unflipped < unflipped_to_flipped
+    assert unflipped_to_unflipped < 1
 
 
 def test_fits_cutout_img_errors(tmpdir, test_images, center_coord, cutout_size):
