@@ -17,6 +17,7 @@ from astropy.visualization import (
     SinhStretch,
     SqrtStretch,
 )
+from astropy.wcs.utils import proj_plane_pixel_scales
 from PIL.Image import Image, Transpose, fromarray, registered_extensions
 from PIL.PngImagePlugin import PngInfo
 from s3path import S3Path
@@ -261,6 +262,14 @@ class ImageCutout(Cutout, ABC):
             meta["input_file"] = Path(input_files[0]).name
         else:
             meta["input_files"] = ", ".join([Path(file).name for file in input_files])
+
+        # For color cutouts, we can get the pixel scale and cutout size from the first cutout
+        # since we assume they have the same WCS
+        cutout = self.cutouts_by_file.get(input_files[0], [None])[0]
+        if cutout is not None:
+            meta["cutout_size_x_pix"] = cutout.shape[1]
+            meta["cutout_size_y_pix"] = cutout.shape[0]
+            meta["pixel_scale_arcsec_per_pix"] = proj_plane_pixel_scales(cutout.wcs)[0] * 3600
 
         meta.update(
             {

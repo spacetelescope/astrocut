@@ -439,12 +439,15 @@ def test_fits_cutout_img_output(tmpdir, test_images, caplog, center_coord, cutou
     with Image.open(jpg_files[0]) as img:
         metadata = json.loads(img.getexif()[270])
     print(metadata)
-    assert len(metadata) == 5
+    assert len(metadata) == 8
     assert metadata["input_file"] == Path(test_images[0]).name
     assert metadata["center_ra_deg"] == center_coord.ra.deg.item()
     assert metadata["center_dec_deg"] == center_coord.dec.deg.item()
     assert metadata["origin"] == "STScI/MAST"
     assert metadata["version"] == __version__
+    assert metadata["cutout_size_x_pix"] == cutout_size
+    assert metadata["cutout_size_y_pix"] == cutout_size
+    assert "pixel_scale_arcsec_per_pix" in metadata
 
     # Png (single input file, not as list)
     img_files = FITSCutout(test_images[0], center_coord, cutout_size).write_as_img(
@@ -457,7 +460,7 @@ def test_fits_cutout_img_output(tmpdir, test_images, caplog, center_coord, cutou
     # Check metadata in PNG file
     with Image.open(img_files[0]) as img:
         metadata = img.info
-    assert len(metadata) == 5
+    assert len(metadata) == 8
     assert metadata["input_file"] == Path(test_images[0]).name
     assert float(metadata["center_ra_deg"]) == center_coord.ra.deg.item()
     assert float(metadata["center_dec_deg"]) == center_coord.dec.deg.item()
@@ -480,7 +483,7 @@ def test_fits_cutout_img_color(tmpdir, test_images, center_coord, cutout_size):
     img = Image.open(color_jpg)
     metadata = json.loads(img.getexif()[270])
     assert img.mode == "RGB"
-    assert len(metadata) == 5
+    assert len(metadata) == 8
     assert metadata["input_files"] == ", ".join([Path(file).name for file in test_images[:3]])
 
 
@@ -491,7 +494,7 @@ def test_fits_cutout_img_memory_only(test_images, center_coord, cutout_size):
     assert isinstance(imgs, list)
     assert len(imgs) == 1
     assert isinstance(imgs[0], Image.Image)
-    assert len(imgs[0].info) == 5
+    assert len(imgs[0].info) == 8
     assert imgs[0].info["input_file"] == Path(test_images[0]).name
 
     # Save color image to memory
@@ -500,7 +503,7 @@ def test_fits_cutout_img_memory_only(test_images, center_coord, cutout_size):
     assert isinstance(color_imgs, list)
     assert len(color_imgs) == 1
     assert isinstance(color_imgs[0], Image.Image)
-    assert len(color_imgs[0].info) == 5
+    assert len(color_imgs[0].info) == 8
     assert color_imgs[0].info["input_files"] == ", ".join([Path(file).name for file in test_images[:3]])
 
 
