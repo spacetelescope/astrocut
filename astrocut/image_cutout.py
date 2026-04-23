@@ -1,3 +1,4 @@
+import json
 import warnings
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -17,9 +18,10 @@ from astropy.visualization import (
     SqrtStretch,
 )
 from PIL.Image import Image, Transpose, fromarray, registered_extensions
+from PIL.PngImagePlugin import PngInfo
 from s3path import S3Path
 
-from . import log
+from . import __version__, log
 from .cutout import Cutout
 from .exceptions import DataWarning, InputWarning, InvalidInputError
 
@@ -141,7 +143,20 @@ class ImageCutout(Cutout, ABC):
             minmax_percent = [0.5, 99.5]
 
         if colorize:  # color cutout
-            all_cutouts = [x for fle in self._input_files for x in self.cutouts_by_file.get(fle, [])]
+            all_cutouts = []
+            all_cutout_files = []
+            for file in self._input_files:
+                file_cutouts = self.cutouts_by_file.get(file, [])
+                all_cutouts.extend(file_cutouts)
+                all_cutout_files.extend([file] * len(file_cutouts))
+
+                if len(all_cutouts) > 3:
+                    warnings.warn(
+                        "Too many inputs for a color cutout, only the first three will be used.", InputWarning
+                    )
+                    all_cutouts = all_cutouts[:3]
+                    all_cutout_files = all_cutout_files[:3]
+                    break
 
             # Check for the correct number of cutouts
             if len(all_cutouts) < 3:
@@ -151,9 +166,6 @@ class ImageCutout(Cutout, ABC):
                         "If you supplied 3 images one of the cutouts may have been empty."
                     )
                 )
-            if len(all_cutouts) > 3:
-                warnings.warn("Too many inputs for a color cutout, only the first three will be used.", InputWarning)
-                all_cutouts = all_cutouts[:3]
 
             img_arrs = []
             for cutout in all_cutouts:
@@ -165,6 +177,7 @@ class ImageCutout(Cutout, ABC):
             if flip_orientation:
                 # Flip the image vertically to match the orientation of the input cutouts
                 color_img = color_img.transpose(Transpose.FLIP_TOP_BOTTOM)
+            color_img.info.update(self._build_cutout_metadata(all_cutout_files))
             self._image_cutouts = [color_img]
         else:  # one image per cutout
             image_cutouts = []
@@ -177,6 +190,7 @@ class ImageCutout(Cutout, ABC):
                     if flip_orientation:
                         # Flip the image vertically to match the orientation of the input cutouts
                         img = img.transpose(Transpose.FLIP_TOP_BOTTOM)
+                    img.info.update(self._build_cutout_metadata([file]))
                     image_cutouts.append(img)
 
             self._image_cutouts = image_cutouts
@@ -225,6 +239,78 @@ class ImageCutout(Cutout, ABC):
 
         return output_format
 
+    def _build_cutout_metadata(self, input_files: List[Union[str, Path, S3Path]]) -> dict:
+        """
+        Build metadata describing a cutout image.
+
+        Parameters
+        ----------
+        input_files : list
+            The input file or files used to create the cutout.
+
+        Returns
+        -------
+        metadata : dict
+            Structured metadata for the cutout image.
+        """
+        meta = {}
+
+        # Add input file information to the metadata, using a single key
+        # if there is only one input file and a list if there are multiple
+        if len(input_files) == 1:
+            meta["input_file"] = Path(input_files[0]).name
+        else:
+            meta["input_files"] = ", ".join([Path(file).name for file in input_files])
+
+        meta.update(
+            {
+                "center_ra_deg": self._coordinates.ra.deg.item(),
+                "center_dec_deg": self._coordinates.dec.deg.item(),
+                "origin": "STScI/MAST",
+                "version": __version__,
+            }
+        )
+
+        return meta
+
+    def _get_img_save_kwargs(self, im: Image, file_path: str) -> dict:
+        """
+        Return format-specific keyword arguments for saving an image.
+
+        Parameters
+        ----------
+        im : `~PIL.Image`
+            The image to save.
+        file_path : str
+            The output file path.
+
+        Returns
+        -------
+        save_kwargs : dict
+            Keyword arguments to pass to `PIL.Image.Image.save`.
+        """
+        # Get the cutout metadata from top-level Image.info
+        metadata = im.info
+        if not metadata:
+            return {}
+        metadata_json = json.dumps(metadata)
+        output_suffix = Path(file_path).suffix.lower()
+
+        # Format for saving to file depends on output format
+        if output_suffix == ".png":
+            pnginfo = PngInfo()
+            for key, value in metadata.items():
+                pnginfo.add_text(key, str(value))
+            return {"pnginfo": pnginfo}
+
+        if output_suffix in {".jpg", ".jpeg", ".tif", ".tiff"}:
+            exif = im.getexif()
+            # Use tag for image description to store cutout metadata as json string
+            exif[270] = metadata_json
+            return {"exif": exif.tobytes()}
+
+        return {}
+
     def _save_img_to_file(self, im: Image, file_path: str) -> bool:
         """
         Save a `~PIL.Image` object to a file.
@@ -242,7 +328,8 @@ class ImageCutout(Cutout, ABC):
             True if the image was saved successfully, False otherwise.
         """
         try:
-            im.save(file_path)
+            save_kwargs = self._get_img_save_kwargs(im, file_path)
+            im.save(file_path, **save_kwargs)
             return True
         except ValueError as e:
             output_format = Path(file_path).suffix
