@@ -11,6 +11,7 @@ from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.wcs import WCS, FITSFixedWarning
 
+from ..cube_cutout import CubeCutout
 from ..cube_factory import CubeFactory
 from ..exceptions import DataWarning, InvalidQueryError
 from ..tess_cube_cutout import TessCubeCutout
@@ -298,7 +299,6 @@ def test_tess_cube_cutout_write_to_tpf(cube_file, tmpdir, cutout_size, coordinat
     assert "astrocut" in cutout_path
 
 
-@pytest.mark.parametrize("ffi_type", ["SPOC"])
 def test_tess_cube_cutout_write_to_zip(cube_file, cutout_size, coordinates, tmpdir):
     # Single cube input; expect one TPF member in zip
     cutout = TessCubeCutout(cube_file, coordinates, cutout_size)

@@ -13,7 +13,7 @@ from spherical_geometry.polygon import SphericalPolygon
 
 from .. import footprint_cutout
 from ..cube_cutout import CubeCutout
-from ..exceptions import InvalidQueryError
+from ..exceptions import InvalidInputError, InvalidQueryError
 from ..footprint_cutout import get_ffis, ra_dec_crossmatch
 from ..tess_cube_cutout import TessCubeCutout
 from ..tess_footprint_cutout import (
