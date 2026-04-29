@@ -38,7 +38,7 @@ def coordinates():
 
 
 @pytest.fixture
-def all_ffis(scope="module"):
+def all_ffis():
     """Fixture to return the table of all FFIs"""
     return get_ffis("s3://stpubdata/tess/public/footprints/tess_ffi_footprint_cache.json")
 
@@ -58,7 +58,7 @@ def crossmatch_spies(monkeypatch):
     yield spy_point, spy_poly
 
 
-def check_output_tpf(tpf, sequences=[], cutout_size=5):
+def check_output_tpf(tpf, sequences=None, cutout_size=5):
     """Helper function to check the validity of output cutout files"""
     tpf_table = tpf[1].data
 

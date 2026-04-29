@@ -16,7 +16,7 @@ from s3path import S3Path
 
 from . import log
 from .cutout import Cutout
-from .exceptions import InvalidQueryError
+from .exceptions import InvalidInputError, InvalidQueryError
 from .utils.wcs_fitting import fit_wcs_from_points
 
 
@@ -299,7 +299,7 @@ class CubeCutout(Cutout, ABC):
         data : `numpy.array`
             The image data cutout.
         uncertainty : `numpy.array`
-            The uncertainty data cutout if the cube has uncertainties. Otherwise, returns `None`.
+            The uncertainty data cutout.
         aperture : `numpy.array`
             The aperture array.
         wcs : `~astropy.wcs.WCS`
@@ -353,12 +353,20 @@ class CubeCutout(Cutout, ABC):
             -------
             img_cutout : `numpy.array`
                 The untransposed image cutout array.
-            uncert_cutout : `numpy.array` or `None`
+            uncert_cutout : `numpy.array`
                 The untransposed uncertainty cutout array.
             aperture : `numpy.array`
                 The aperture array. This is a 2D array that is the same size as a single cutout that is 1 where
                 there is image data and 0 where there isn't.
             """
+            # Validate that the cube has the expected structure (at least image and uncertainty planes)
+            if transposed_cube.shape[-1] < 2:
+                raise InvalidInputError(
+                    "Cube must have at least 2 planes (image and uncertainty data). "
+                    "Only SPOC-style cubes with uncertainty data are supported. "
+                    "Legacy cubes (e.g., TICA) with a single plane are not supported."
+                )
+
             # Compute cutout limits based on WCS
             xmin, xmax = self.cutout_lims[1]
             ymin, ymax = self.cutout_lims[0]

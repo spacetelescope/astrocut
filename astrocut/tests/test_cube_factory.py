@@ -9,6 +9,7 @@ from astropy.table import Table
 from astrocut.exceptions import DataWarning, InvalidInputError
 
 from ..cube_factory import CubeFactory
+from .utils_for_test import create_test_ffis
 
 
 @pytest.fixture
