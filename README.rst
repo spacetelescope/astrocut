@@ -51,7 +51,27 @@ For active development install in develop mode
 .. code-block:: bash
 
     $ pip install -e .
-    
+
+Linting
+=======
+Astrocut uses `ruff <https://github.com/charliermarsh/ruff>`_ for linting.
+
+To run ruff, install it with ``pip install ruff`` and then run the following commands from the root of the repository:
+
+.. code-block:: bash
+
+    $ ruff check .
+    $ ruff format --check .
+
+To automatically fix linting issues, run:
+
+.. code-block:: bash
+
+    $ ruff check . --fix
+    $ ruff format .
+
+Be careful with the above commands, as they will make changes to your code. You should review the changes before committing them.
+
 Testing
 =======
 Testing is now run with `tox <https://tox.readthedocs.io>`_ (``pip install tox``).
