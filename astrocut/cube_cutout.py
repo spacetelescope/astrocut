@@ -1,8 +1,8 @@
-from abc import ABC, abstractmethod
-from pathlib import Path
 import warnings
+from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 from itertools import product
+from pathlib import Path
 from time import monotonic
 from typing import List, Literal, Tuple, Union
 
@@ -45,7 +45,7 @@ class CubeCutout(Cutout, ABC):
     Attributes
     ----------
     cutouts_by_file : dict
-        Dictionary where each key is an input cube filename and its corresponding value is the resulting cutout as a 
+        Dictionary where each key is an input cube filename and its corresponding value is the resulting cutout as a
         ``CubeCutoutInstance`` object.
     cutouts : list
         List of cutout objects.
@@ -55,10 +55,17 @@ class CubeCutout(Cutout, ABC):
     cutout()
         Generate the cutouts.
     """
-    def __init__(self, input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyCoord, str], 
-                 cutout_size: Union[int, np.ndarray, u.Quantity, List[int], Tuple[int]] = 25,
-                 fill_value: Union[int, float] = np.nan, limit_rounding_method: str = 'round', 
-                 threads: Union[int, Literal['auto']] = 1, verbose: bool = False):
+
+    def __init__(
+        self,
+        input_files: List[Union[str, Path, S3Path]],
+        coordinates: Union[SkyCoord, str],
+        cutout_size: Union[int, np.ndarray, u.Quantity, List[int], Tuple[int]] = 25,
+        fill_value: Union[int, float] = np.nan,
+        limit_rounding_method: str = "round",
+        threads: Union[int, Literal["auto"]] = 1,
+        verbose: bool = False,
+    ):
         super().__init__(input_files, coordinates, cutout_size, fill_value, limit_rounding_method, verbose)
 
         # Assign the number of threads to use when making cutout
@@ -93,22 +100,16 @@ class CubeCutout(Cutout, ABC):
             The cube data.
         """
         # Suppress FITSFixedWarning from astropy
-        warnings.filterwarnings('ignore', category=wcs.FITSFixedWarning)
+        warnings.filterwarnings("ignore", category=wcs.FITSFixedWarning)
 
         # Options when opening the cube file
-        fits_options = {
-            'mode': 'denywrite',
-            'lazy_load_hdus': True
-        }
+        fits_options = {"mode": "denywrite", "lazy_load_hdus": True}
 
         # Add options based on the file's location
-        if isinstance(file, str) and file.startswith('s3://'):  # cloud-hosted file
-            fits_options.update({
-                'use_fsspec': True,
-                'fsspec_kwargs': {'default_block_size': 10_000, 'anon': True}
-            })
+        if isinstance(file, str) and file.startswith("s3://"):  # cloud-hosted file
+            fits_options.update({"use_fsspec": True, "fsspec_kwargs": {"default_block_size": 10_000, "anon": True}})
         else:
-            fits_options['memmap'] = True
+            fits_options["memmap"] = True
             self._threads = 1  # disable threading for local storage access
 
         return fits.open(file, **fits_options)
@@ -145,7 +146,7 @@ class CubeCutout(Cutout, ABC):
                 data_ind = 0
             elif data_ind == (len(table_data) // 2) - 1:
                 # Error if all indices have been checked
-                raise wcs.NoWcsKeywordsFoundError('No FFI rows contain valid WCS keywords.')
+                raise wcs.NoWcsKeywordsFoundError("No FFI rows contain valid WCS keywords.")
 
             # Making sure we have a row with wcs info.
             row = table_data[data_ind]
@@ -155,7 +156,7 @@ class CubeCutout(Cutout, ABC):
                 # If not found, move to the next
                 data_ind += 1
 
-        log.debug('Using WCS from row %s out of %s', data_ind, len(table_data))
+        log.debug("Using WCS from row %s out of %s", data_ind, len(table_data))
 
         # Convert the row into a FITS header
         wcs_header = fits.Header()
@@ -170,11 +171,10 @@ class CubeCutout(Cutout, ABC):
         # Populate the image keywords dictionary
         for kwd in self._img_kwds:
             self._img_kwds[kwd][0] = wcs_header.get(kwd)
-        
+
         # Add the FFI file reference
-        self._img_kwds['WCS_FFI'] = [table_row['FFI_FILE'],
-                                     'FFI used for cutout WCS']
-        
+        self._img_kwds["WCS_FFI"] = [table_row["FFI_FILE"], "FFI used for cutout WCS"]
+
         return WCS(wcs_header, relax=True)
 
     def _add_column_wcs(self, table_header: fits.Header, wcs_dict: dict):
@@ -184,20 +184,20 @@ class CubeCutout(Cutout, ABC):
         Parameters
         ----------
         table_header : `~astropy.io.fits.Header`
-            The table header for the cutout table that will be modified in place to include 
+            The table header for the cutout table that will be modified in place to include
             WCS information.
         wcs_dict : dict
-            Dictionary of wcs keyword/value pairs to be added to each array column in the 
+            Dictionary of wcs keyword/value pairs to be added to each array column in the
             cutout table header.
         """
         # Mapping of FITS table keywords to descriptions
         keyword_comments = {
-            'TTYPE': 'column name',
-            'TFORM': 'column format',
-            'TUNIT': 'unit',
-            'TDISP': 'display format',
-            'TDIM': 'multi-dimensional array spec',
-            'TNULL': 'null value'
+            "TTYPE": "column name",
+            "TFORM": "column format",
+            "TUNIT": "unit",
+            "TDISP": "display format",
+            "TDIM": "multi-dimensional array spec",
+            "TNULL": "null value",
         }
 
         for kwd in table_header:
@@ -206,9 +206,9 @@ class CubeCutout(Cutout, ABC):
                 if key in kwd:
                     table_header.comments[kwd] = comment
                     break
-            
+
             # If the column is a 2D array (indicated by 'TDIM'), add WCS info
-            if 'TDIM' in kwd and kwd[:-1] == 'TTYPE':
+            if "TDIM" in kwd and kwd[:-1] == "TTYPE":
                 for wcs_key, (val, com) in wcs_dict.items():
                     table_header.insert(kwd, (wcs_key.format(int(kwd[-1]) - 1), val, com))
 
@@ -228,25 +228,25 @@ class CubeCutout(Cutout, ABC):
 
     def _apply_header_inherit(self, hdu_list: fits.HDUList):
         """
-        The INHERIT keyword indicated that keywords from the primary header should be duplicated in 
-        the headers of all subsequent extensions.  This function performs this addition in place to 
+        The INHERIT keyword indicated that keywords from the primary header should be duplicated in
+        the headers of all subsequent extensions.  This function performs this addition in place to
         the given HDUList.
-        
+
         Parameters
         ----------
         hdu_list : `~astropy.io.fits.HDUList`
             The hdu list to apply the INHERIT keyword to.
         """
         primary_header = hdu_list[0].header
-        reserved_kwds = {'COMMENT', 'SIMPLE', 'BITPIX', 'EXTEND', 'NEXTEND'}
+        reserved_kwds = {"COMMENT", "SIMPLE", "BITPIX", "EXTEND", "NEXTEND"}
 
         for hdu in hdu_list[1:]:
             header = hdu.header
-            if header.get('INHERIT', False):
+            if header.get("INHERIT", False):
                 for kwd, val in primary_header.items():
                     if (kwd not in header) and (kwd not in reserved_kwds):
                         header[kwd] = (val, primary_header.comments[kwd])
-    
+
     @abstractmethod
     def _cutout_file(self, file: Union[str, Path, S3Path]):
         """
@@ -254,8 +254,8 @@ class CubeCutout(Cutout, ABC):
 
         This method is abstract and should be defined in subclasses.
         """
-        raise NotImplementedError('Subclasses must implement this method.')
-    
+        raise NotImplementedError("Subclasses must implement this method.")
+
     def cutout(self):
         """
         Generate cutouts from a list of input cube files.
@@ -273,13 +273,13 @@ class CubeCutout(Cutout, ABC):
             self._cutout_file(file)
 
         if not self.cutouts_by_file:
-            raise InvalidQueryError('Cube cutout contains no data! (Check image footprint.)')
+            raise InvalidQueryError("Cube cutout contains no data! (Check image footprint.)")
 
         # Log total time elapsed
-        log.debug('Total time: %.2f sec', (monotonic() - start_time))
+        log.debug("Total time: %.2f sec", (monotonic() - start_time))
 
         return self.cutouts
-    
+
     class CubeCutoutInstance(ABC):
         """
         Represents an individual cutout with its own data, uncertainty, and aperture arrays.
@@ -317,32 +317,40 @@ class CubeCutout(Cutout, ABC):
             The input cube filename.
         """
 
-        def __init__(self, cube: fits.HDUList, file: Union[str, Path, S3Path], cube_wcs: WCS, 
-                     has_uncert: bool, parent: 'CubeCutout'):
+        def __init__(
+            self,
+            cube: fits.HDUList,
+            file: Union[str, Path, S3Path],
+            cube_wcs: WCS,
+            has_uncert: bool,
+            parent: "CubeCutout",
+        ):
             self._parent = parent
             self.cube_filename = file
             self.cube_wcs = cube_wcs
             self.wcs_fit = {
-                'WCS_MSEP': [None, '[deg] Max offset between cutout WCS and FFI WCS'],
-                'WCS_SIG': [None, '[deg] Error measurement of cutout WCS fit'],
+                "WCS_MSEP": [None, "[deg] Max offset between cutout WCS and FFI WCS"],
+                "WCS_SIG": [None, "[deg] Error measurement of cutout WCS fit"],
             }
 
             # Get cutout limits
             self.cutout_lims = self._parent._get_cutout_limits(cube_wcs)
 
             # Get cutout data
-            self.data, self.uncertainty, self.aperture = self._get_cutout_data(cube[1].section, 
-                                                                               self._parent._threads, has_uncert)
+            self.data, self.uncertainty, self.aperture = self._get_cutout_data(
+                cube[1].section, self._parent._threads, has_uncert
+            )
             self.shape = self.data.shape
-            
+
             # Get cutout WCS
             self.wcs = self._get_full_cutout_wcs(cube_wcs, cube[2].header)
 
             # Fit the cutout WCS
             self._fit_cutout_wcs(self.data.shape[1:])
 
-        def _get_cutout_data(self, transposed_cube: fits.ImageHDU.section, threads: int, 
-                             has_uncert: bool = True) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        def _get_cutout_data(
+            self, transposed_cube: fits.ImageHDU.section, threads: int, has_uncert: bool = True
+        ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
             """
             Extract a cutout from an image/uncertainty cube that has been transposed to have time on the longest axis.
 
@@ -362,7 +370,7 @@ class CubeCutout(Cutout, ABC):
             uncert_cutout : `numpy.array` or `None`
                 The untransposed uncertainty cutout array if `self._product` is 'SPOC'. Otherwise, returns `None`.
             aperture : `numpy.array`
-                The aperture array. This is a 2D array that is the same size as a single cutout that is 1 where 
+                The aperture array. This is a 2D array that is the same size as a single cutout that is 1 where
                 there is image data and 0 where there isn't.
             """
             # Compute cutout limits based on WCS
@@ -377,11 +385,11 @@ class CubeCutout(Cutout, ABC):
             xmin, padding[1, 0] = max(0, xmin), max(0, -xmin)
             ymin, padding[2, 0] = max(0, ymin), max(0, -ymin)
             xmax, padding[1, 1] = min(xmax, xmax_cube), max(0, xmax - xmax_cube)
-            ymax, padding[2, 1] = min(ymax, ymax_cube), max(0, ymax - ymax_cube)    
-            
+            ymax, padding[2, 1] = min(ymax, ymax_cube), max(0, ymax - ymax_cube)
+
             # Perform the cutout
-            if threads == 'auto' or threads > 1:
-                max_workers = None if threads == 'auto' else threads
+            if threads == "auto" or threads > 1:
+                max_workers = None if threads == "auto" else threads
                 with ThreadPoolExecutor(max_workers=max_workers) as pool:
                     # Increase download performance by making remote cutouts inside of a threadpool
                     # astropy.io.fits Section class executes a list comprehension, generating a sequence of http range
@@ -398,21 +406,21 @@ class CubeCutout(Cutout, ABC):
             # Extract image and uncertainty cutouts
             img_cutout = np.moveaxis(cutout[:, :, :, 0], 2, 0)
             uncert_cutout = np.moveaxis(cutout[:, :, :, 1], 2, 0) if has_uncert else None
-            
+
             # Create aperture mask
             aperture = np.ones((xmax - xmin, ymax - ymin), dtype=np.int32)
 
             # Apply padding if needed
             if padding.any():
-                img_cutout = np.pad(img_cutout, padding, 'constant', constant_values=self._parent._fill_value)
+                img_cutout = np.pad(img_cutout, padding, "constant", constant_values=self._parent._fill_value)
                 if has_uncert:
-                    uncert_cutout = np.pad(uncert_cutout, padding, 'constant', constant_values=self._parent._fill_value)
-                aperture = np.pad(aperture, padding[1:], 'constant', constant_values=0)
+                    uncert_cutout = np.pad(uncert_cutout, padding, "constant", constant_values=self._parent._fill_value)
+                aperture = np.pad(aperture, padding[1:], "constant", constant_values=0)
 
-            log.debug('Image cutout cube shape: %s', img_cutout.shape)
+            log.debug("Image cutout cube shape: %s", img_cutout.shape)
             if has_uncert:
-                log.debug('Uncertainty cutout cube shape: %s', uncert_cutout.shape)
-        
+                log.debug("Uncertainty cutout cube shape: %s", uncert_cutout.shape)
+
             return img_cutout, uncert_cutout, aperture
 
         @abstractmethod
@@ -422,20 +430,20 @@ class CubeCutout(Cutout, ABC):
 
             This method is abstract and should be defined in subclasses.
             """
-            raise NotImplementedError('Subclasses must implement this method.')
+            raise NotImplementedError("Subclasses must implement this method.")
 
         def _fit_cutout_wcs(self, cutout_shape: Tuple[int, int]) -> Tuple[float, float]:
             """
-            Given a full (including SIP coefficients) WCS for the cutout, 
+            Given a full (including SIP coefficients) WCS for the cutout,
             calculate the best fit linear WCS and a measure of the goodness-of-fit.
-            
+
             The new WCS is stored in ``self.wcs``.
             Goodness-of-fit measures are returned and stored in ``self.wcs_fit``.
 
             Parameters
             ----------
             cutout_wcs :  `~astropy.wcs.WCS`
-                The full (including SIP coefficients) cutout WCS object 
+                The full (including SIP coefficients) cutout WCS object
             cutout_shape : tuple
                 The shape of the cutout in the form (width, height).
 
@@ -466,7 +474,7 @@ class CubeCutout(Cutout, ABC):
             step_size = 1
             while (width / step_size) * (height / step_size) > 100:
                 step_size += 1
-                
+
             # Create evenly spaced pixel indices along the x and y axes
             xvals = np.arange(0, width, step_size).tolist()
             if xvals[-1] != width - 1:
@@ -475,27 +483,27 @@ class CubeCutout(Cutout, ABC):
             yvals = np.arange(0, height, step_size).tolist()
             if yvals[-1] != height - 1:
                 yvals.append(height - 1)
-            
+
             # Generate pixel coordinate pairs
             pix_inds = np.array(list(product(xvals, yvals)))
 
             # Convert pixel coordinates to world coordinates
-            world_pix = SkyCoord(self.wcs.all_pix2world(pix_inds, 0), unit='deg')
+            world_pix = SkyCoord(self.wcs.all_pix2world(pix_inds, 0), unit="deg")
 
             # Fit a linear WCS
-            linear_wcs = fit_wcs_from_points([pix_inds[:, 0], pix_inds[:, 1]], world_pix, proj_point='center')
+            linear_wcs = fit_wcs_from_points([pix_inds[:, 0], pix_inds[:, 1]], world_pix, proj_point="center")
             self.wcs = linear_wcs
 
             # Evaluate fit using all the pixels in the cutout
             full_pix_inds = np.array(list(product(range(width), range(height))))
-            world_pix_original = SkyCoord(self.wcs.all_pix2world(full_pix_inds, 0), unit='deg')
-            world_pix_fitted = SkyCoord(linear_wcs.all_pix2world(full_pix_inds, 0), unit='deg')
+            world_pix_original = SkyCoord(self.wcs.all_pix2world(full_pix_inds, 0), unit="deg")
+            world_pix_fitted = SkyCoord(linear_wcs.all_pix2world(full_pix_inds, 0), unit="deg")
 
             # Compute fit residuals
-            dists = world_pix_original.separation(world_pix_fitted).to('deg')
+            dists = world_pix_original.separation(world_pix_fitted).to("deg")
             max_dist = dists.max().value
             sigma = np.sqrt(np.sum(dists.value**2))
 
             # Store fit quality metrics
-            self.wcs_fit['WCS_MSEP'][0] = max_dist
-            self.wcs_fit['WCS_SIG'][0] = sigma
+            self.wcs_fit["WCS_MSEP"][0] = max_dist
+            self.wcs_fit["WCS_SIG"][0] = sigma

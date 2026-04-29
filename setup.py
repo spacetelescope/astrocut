@@ -9,7 +9,6 @@ import sys
 
 from setuptools import setup
 
-
 # First provide helpful messages if contributors try and run legacy commands
 # for tests or docs.
 
@@ -34,7 +33,7 @@ For more information, see:
   http://docs.astropy.org/en/latest/development/testguide.html#running-tests
 """
 
-if 'test' in sys.argv:
+if "test" in sys.argv:
     print(TEST_HELP)
     sys.exit(1)
 
@@ -59,7 +58,7 @@ For more information, see:
   http://docs.astropy.org/en/latest/install.html#builddocs
 """
 
-if 'build_docs' in sys.argv or 'build_sphinx' in sys.argv:
+if "build_docs" in sys.argv or "build_sphinx" in sys.argv:
     print(DOCS_HELP)
     sys.exit(1)
 
@@ -76,11 +75,14 @@ except Exception:
 
 current_path = os.path.abspath(os.path.dirname(__file__))
 
+
 def read_file(*parts):
-    with open(os.path.join(current_path, *parts), encoding='utf-8') as reader:
+    with open(os.path.join(current_path, *parts), encoding="utf-8") as reader:
         return reader.read()
 
-setup(use_scm_version={'write_to': os.path.join('astrocut', 'version.py'),
-                       'write_to_template': VERSION_TEMPLATE},
-     long_description=read_file('README.rst'),
-     long_description_content_type='text/x-rst')
+
+setup(
+    use_scm_version={"write_to": os.path.join("astrocut", "version.py"), "write_to_template": VERSION_TEMPLATE},
+    long_description=read_file("README.rst"),
+    long_description_content_type="text/x-rst",
+)

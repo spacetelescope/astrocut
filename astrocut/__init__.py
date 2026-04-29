@@ -4,7 +4,11 @@
 # should keep this content at the top.
 # ----------------------------------------------------------------------------
 from ._astropy_init import *  # noqa
-# ----------------------------------------------------------------------------
+
+import sys
+
+from .exceptions import UnsupportedPythonError
+from .utils.logger import setup_logger
 
 """
 This module initializes the astrocut package and performs essential setup tasks, including:
@@ -12,11 +16,6 @@ This module initializes the astrocut package and performs essential setup tasks,
 - Setting up package-wide logging.
 - Importing key modules.
 """
-
-import sys
-
-from .exceptions import UnsupportedPythonError
-from .utils.logger import setup_logger
 
 # Enforce Python version check during package import.
 __minimum_python_version__ = "3.9"  # minimum supported Python version

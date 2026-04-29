@@ -2,19 +2,18 @@
 
 """This module includes a variety of functions that may be used by multiple modules."""
 
-import warnings
-import numpy as np
 import logging
-
+import warnings
 from datetime import date
 
+import numpy as np
+from astropy import units as u
 from astropy import wcs
 from astropy.io import fits
-from astropy import units as u
 from astropy.utils import deprecated
 
 from .. import __version__, log
-from ..exceptions import InvalidQueryError, InputWarning
+from ..exceptions import InputWarning, InvalidQueryError
 
 
 def parse_size_input(cutout_size):
@@ -24,10 +23,10 @@ def parse_size_input(cutout_size):
     Parameters
     ----------
     cutout_size : int, array-like, `~astropy.units.Quantity`
-        The size of the cutout array. If ``cutout_size`` is a scalar number or a scalar 
-        `~astropy.units.Quantity`, then a square cutout of ``cutout_size`` will be created.  
-        If ``cutout_size`` has two elements, they should be in ``(ny, nx)`` order.  Scalar numbers 
-        in ``cutout_size`` are assumed to be in units of pixels. `~astropy.units.Quantity` objects 
+        The size of the cutout array. If ``cutout_size`` is a scalar number or a scalar
+        `~astropy.units.Quantity`, then a square cutout of ``cutout_size`` will be created.
+        If ``cutout_size`` has two elements, they should be in ``(ny, nx)`` order.  Scalar numbers
+        in ``cutout_size`` are assumed to be in units of pixels. `~astropy.units.Quantity` objects
         must be in pixel or angular units.
 
     Returns
@@ -48,14 +47,14 @@ def parse_size_input(cutout_size):
         cutout_size = np.array(cutout_size)
 
     if len(cutout_size) > 2:
-        warnings.warn("Too many dimensions in cutout size, only the first two will be used.",
-                      InputWarning)
+        warnings.warn("Too many dimensions in cutout size, only the first two will be used.", InputWarning)
         cutout_size = cutout_size[:2]
 
     ny, nx = cutout_size
     if ny <= 0 or nx <= 0:
-        raise InvalidQueryError('Cutout size dimensions must be greater than zero. '
-                                f'Provided size: ({cutout_size[0]}, {cutout_size[1]})')
+        raise InvalidQueryError(
+            f"Cutout size dimensions must be greater than zero. Provided size: ({cutout_size[0]}, {cutout_size[1]})"
+        )
 
     return cutout_size
 
@@ -66,7 +65,7 @@ def get_cutout_limits(img_wcs, center_coord, cutout_size):
     which the cutout is being taken and returns the x and y pixel limits
     for the cutout.
 
-    Note: This function does no bounds checking, so the returned limits are not 
+    Note: This function does no bounds checking, so the returned limits are not
           guaranteed to overlap the original image.
 
     Parameters
@@ -83,7 +82,7 @@ def get_cutout_limits(img_wcs, center_coord, cutout_size):
     response : `numpy.array`
         The cutout pixel limits in an array of the form [[xmin,xmax],[ymin,ymax]]
     """
-        
+
     # Note: This is returning the center pixel in 1-up
     try:
         center_pixel = center_coord.to_pixel(img_wcs, 1)
@@ -93,18 +92,16 @@ def get_cutout_limits(img_wcs, center_coord, cutout_size):
     # For some reason you can sometimes get nans without a no convergance error
     if np.isnan(center_pixel).all():
         raise InvalidQueryError("Cutout location is not in image footprint!")
-    
+
     lims = np.zeros((2, 2), dtype=int)
 
     for axis, size in enumerate(cutout_size):
-        
         if not isinstance(size, u.Quantity):  # assume pixels
             dim = size / 2
         elif size.unit == u.pixel:  # also pixels
             dim = size.value / 2
-        elif size.unit.physical_type == 'angle':
-            pixel_scale = u.Quantity(wcs.utils.proj_plane_pixel_scales(img_wcs)[axis],
-                                     img_wcs.wcs.cunit[axis])
+        elif size.unit.physical_type == "angle":
+            pixel_scale = u.Quantity(wcs.utils.proj_plane_pixel_scales(img_wcs)[axis], img_wcs.wcs.cunit[axis])
             dim = (size / pixel_scale).decompose() / 2
 
         lims[axis, 0] = int(np.round(center_pixel[axis] - 1 - dim))
@@ -137,7 +134,7 @@ def get_cutout_wcs(img_wcs, cutout_lims):
     """
 
     # relax = True is important when the WCS has sip distortions, otherwise it has no effect
-    wcs_header = img_wcs.to_header(relax=True) 
+    wcs_header = img_wcs.to_header(relax=True)
 
     # Adjusting the CRPIX values
     wcs_header["CRPIX1"] -= cutout_lims[0, 0]
@@ -146,13 +143,13 @@ def get_cutout_wcs(img_wcs, cutout_lims):
     # Adding the physical wcs keywords
     wcs_header.set("WCSNAMEP", "PHYSICAL", "name of world coordinate system alternate P")
     wcs_header.set("WCSAXESP", 2, "number of WCS physical axes")
-    
+
     wcs_header.set("CTYPE1P", "RAWX", "physical WCS axis 1 type CCD col")
     wcs_header.set("CUNIT1P", "PIXEL", "physical WCS axis 1 unit")
     wcs_header.set("CRPIX1P", 1, "reference CCD column")
     wcs_header.set("CRVAL1P", cutout_lims[0, 0] + 1, "value at reference CCD column")
     wcs_header.set("CDELT1P", 1.0, "physical WCS axis 1 step")
-                
+
     wcs_header.set("CTYPE2P", "RAWY", "physical WCS axis 2 type CCD col")
     wcs_header.set("CUNIT2P", "PIXEL", "physical WCS axis 2 unit")
     wcs_header.set("CRPIX2P", 1, "reference CCD row")
@@ -168,9 +165,13 @@ def _build_astrocut_primaryhdu(**keywords):
     """
 
     primary_hdu = fits.PrimaryHDU()
-    primary_hdu.header.extend([("ORIGIN", 'STScI/MAST', "institution responsible for creating this file"),
-                               ("DATE", str(date.today()), "file creation date"),
-                               ('PROCVER', __version__, 'software version')])
+    primary_hdu.header.extend(
+        [
+            ("ORIGIN", "STScI/MAST", "institution responsible for creating this file"),
+            ("DATE", str(date.today()), "file creation date"),
+            ("PROCVER", __version__, "software version"),
+        ]
+    )
     for kwd in keywords:
         primary_hdu.header[kwd] = keywords[kwd]
 
@@ -198,12 +199,14 @@ def get_fits(cutout_hdus, center_coord=None, output_path=None):
 
     if isinstance(cutout_hdus, fits.hdu.image.ImageHDU):
         cutout_hdus = [cutout_hdus]
-    
+
     # Setting up the Primary HDU
     keywords = dict()
     if center_coord:
-        keywords = {"RA_OBJ": (center_coord.ra.deg, '[deg] right ascension'),
-                    "DEC_OBJ": (center_coord.dec.deg, '[deg] declination')}
+        keywords = {
+            "RA_OBJ": (center_coord.ra.deg, "[deg] right ascension"),
+            "DEC_OBJ": (center_coord.dec.deg, "[deg] declination"),
+        }
     primary_hdu = _build_astrocut_primaryhdu(**keywords)
 
     cutout_hdulist = fits.HDUList([primary_hdu] + cutout_hdus)
@@ -211,7 +214,7 @@ def get_fits(cutout_hdus, center_coord=None, output_path=None):
     if output_path:
         # Writing out the hdu often causes a warning as the ORIG_FLE card description is truncated
         with warnings.catch_warnings():
-            warnings.simplefilter("ignore") 
+            warnings.simplefilter("ignore")
             cutout_hdulist.writeto(output_path, overwrite=True, checksum=True)
 
     return cutout_hdulist
