@@ -53,7 +53,7 @@ def parse_size_input(cutout_size):
     ny, nx = cutout_size
     if ny <= 0 or nx <= 0:
         raise InvalidQueryError(
-            "Cutout size dimensions must be greater than zero. " f"Provided size: ({cutout_size[0]}, {cutout_size[1]})"
+            f"Cutout size dimensions must be greater than zero. Provided size: ({cutout_size[0]}, {cutout_size[1]})"
         )
 
     return cutout_size

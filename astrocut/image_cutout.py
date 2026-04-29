@@ -234,7 +234,7 @@ class ImageCutout(Cutout, ABC):
         except ValueError as e:
             output_format = Path(file_path).suffix
             warnings.warn(
-                f"Cutout could not be saved in {output_format} format: {e}. " "Please try a different output format.",
+                f"Cutout could not be saved in {output_format} format: {e}. Please try a different output format.",
                 DataWarning,
             )
             return False
@@ -414,7 +414,7 @@ class ImageCutout(Cutout, ABC):
             transform = LinearStretch()
         else:
             raise InvalidInputError(
-                f"Stretch {stretch} is not supported!" "Valid options are: asinh, sinh, sqrt, log, linear."
+                f"Stretch {stretch} is not supported!Valid options are: asinh, sinh, sqrt, log, linear."
             )
 
         # Adding the scaling to the transform

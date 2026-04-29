@@ -691,7 +691,7 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
 
             for key, af in af_by_source_file.items():
                 file, sid = source_file_keys[key]
-                filename = f'{Path(file).stem}_subset_{sid}{"_lite" if self._lite else ""}.asdf'
+                filename = f"{Path(file).stem}_subset_{sid}{'_lite' if self._lite else ''}.asdf"
                 write_jobs.append((af, str(output_dir / filename)))
 
         elif group_by == "file":
@@ -702,7 +702,7 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
                 spectral_files=spectral_files,
             )
             for file, af in af_by_file.items():
-                filename = f'{Path(file).stem}_subset{"_lite" if self._lite else ""}.asdf'
+                filename = f"{Path(file).stem}_subset{'_lite' if self._lite else ''}.asdf"
                 write_jobs.append((af, str(output_dir / filename)))
 
         elif group_by == "combined":
@@ -712,7 +712,7 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
                 source_ids=source_ids,
                 spectral_files=spectral_files,
             )
-            filename = f'combined_spectral_subset{"_lite" if self._lite else ""}.asdf'
+            filename = f"combined_spectral_subset{'_lite' if self._lite else ''}.asdf"
             write_jobs.append((af, str(output_dir / filename)))
 
         else:

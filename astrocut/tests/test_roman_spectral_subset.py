@@ -338,7 +338,7 @@ def test_roman_spectral_subset_asdf_subsets_source_file(spectral_files, lite):
         # Check that history entry is added to the subset ASDF file
         assert "history" in subset_af.tree
         history_entry = subset_af.tree["history"]["entries"][-1]  # Get the last history entry
-        expected_entry = f"Spectral subset created for source ID {subset_source_id} " f"from file {subset_file}."
+        expected_entry = f"Spectral subset created for source ID {subset_source_id} from file {subset_file}."
         assert history_entry["description"] == expected_entry
 
     # Only select certain source files
@@ -397,7 +397,7 @@ def test_roman_spectral_subset_asdf_subsets_file(spectral_files, lite):
         # Check that history entry is added to the subset ASDF file
         assert "history" in subset_af.tree
         history_entry = subset_af.tree["history"]["entries"][-1]  # Get the last history entry
-        expected_entry = f"Spectral subset created for source IDs ['420007', '420008'] " f"from file {subset_file}."
+        expected_entry = f"Spectral subset created for source IDs ['420007', '420008'] from file {subset_file}."
         assert history_entry["description"] == expected_entry
 
 

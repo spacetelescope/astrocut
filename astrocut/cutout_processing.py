@@ -59,9 +59,9 @@ def _combine_headers(headers, constant_only=False):
 
             n_vk += 1
             for i, hdr in enumerate(headers):
-                varying_keywords.append((f"F{i+1:02}_K{n_vk:02}", kwd, "Keyword"))
-                varying_keywords.append((f"F{i+1:02}_V{n_vk:02}", hdr[kwd], "Value"))
-                varying_keywords.append((f"F{i+1:02}_C{n_vk:02}", hdr.comments[kwd], "Comment"))
+                varying_keywords.append((f"F{i + 1:02}_K{n_vk:02}", kwd, "Keyword"))
+                varying_keywords.append((f"F{i + 1:02}_V{n_vk:02}", hdr[kwd], "Value"))
+                varying_keywords.append((f"F{i + 1:02}_C{n_vk:02}", hdr.comments[kwd], "Comment"))
 
     # TODO: Add wcs checking? How?
     return fits.Header(uniform_cards + varying_keywords)
@@ -429,7 +429,7 @@ def center_on_path(
     if not target_pixel_file:
         target = "path" if not target else target
         target_pixel_file = (
-            f"{target}_{primary_header['TSTART']}-{primary_header['TSTop']}_" f"{size[0]}-x-{size[1]}_astrocut.fits"
+            f"{target}_{primary_header['TSTART']}-{primary_header['TSTop']}_{size[0]}-x-{size[1]}_astrocut.fits"
         )
 
     # Replace any slashes/spaces for filename conventions

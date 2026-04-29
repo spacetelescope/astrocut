@@ -145,7 +145,7 @@ class ASDFCutout(ImageCutout):
                     self._can_embed_asdf_in_fits = False
             else:
                 warnings.warn(
-                    "ASDF-in-FITS embedding requires Python 3.11 or higher. " "Skipping embedding for these cutouts.",
+                    "ASDF-in-FITS embedding requires Python 3.11 or higher. Skipping embedding for these cutouts.",
                     ModuleWarning,
                 )
                 self._can_embed_asdf_in_fits = False
@@ -794,5 +794,5 @@ def asdf_cut(
     else:
         # Error if output format not recognized
         raise InvalidInputError(
-            f"Output format {output_format} is not recognized. " 'Valid options are ".asdf" and ".fits".'
+            f'Output format {output_format} is not recognized. Valid options are ".asdf" and ".fits".'
         )

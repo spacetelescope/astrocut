@@ -46,7 +46,7 @@ class CubeFactory:
     """
 
     ERROR_MSG = (
-        "One or more incorrect file types were input. Please input only SPOC FFI files when " "using ``CubeFactory``."
+        "One or more incorrect file types were input. Please input only SPOC FFI files when using ``CubeFactory``."
     )
 
     def __init__(self, max_memory: int = 50):
@@ -596,7 +596,7 @@ class CubeFactory:
         cube_path = Path(cube_file)
         if not cube_path.exists():
             raise InvalidInputError(
-                "Cube file was not found at the location provided. Please ensure the " "correct path was provided."
+                "Cube file was not found at the location provided. Please ensure the correct path was provided."
             )
         self._cube_file = cube_file
         log.debug("Updating cube file: %s", cube_file)

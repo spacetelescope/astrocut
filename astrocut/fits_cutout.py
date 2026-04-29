@@ -365,26 +365,26 @@ class FITSCutout(ImageCutout):
 
             except OSError as err:
                 warnings.warn(
-                    f"Error {err} encountered when performing cutout on {file}, " f"extension {ind}, skipping...",
+                    f"Error {err} encountered when performing cutout on {file}, extension {ind}, skipping...",
                     DataWarning,
                 )
                 num_empty += 1
             except NoOverlapError:
                 warnings.warn(
-                    f"Cutout footprint does not overlap with data in {file}, " f"extension {ind}, skipping...",
+                    f"Cutout footprint does not overlap with data in {file}, extension {ind}, skipping...",
                     DataWarning,
                 )
                 num_empty += 1
             except InvalidQueryError:
                 warnings.warn(
-                    f"Cutout footprint does not overlap with data in {file}, " f"extension {ind}, skipping...",
+                    f"Cutout footprint does not overlap with data in {file}, extension {ind}, skipping...",
                     DataWarning,
                 )
                 num_empty += 1
             except ValueError as err:
                 if "Input position contains invalid values" in str(err):
                     warnings.warn(
-                        f"Cutout footprint does not overlap with data in {file}, " f"extension {ind}, skipping...",
+                        f"Cutout footprint does not overlap with data in {file}, extension {ind}, skipping...",
                         DataWarning,
                     )
                     num_empty += 1
