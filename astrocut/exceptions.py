@@ -11,14 +11,16 @@ class InvalidQueryError(Exception):
     """
     Errors related to invalid queries.
     """
+
     pass
 
 
 class InvalidInputError(Exception):
     """
-    Exception to be issued when user input is incorrect in a 
+    Exception to be issued when user input is incorrect in a
     way that prevents the function from running.
     """
+
     pass
 
 
@@ -27,6 +29,7 @@ class UnsupportedPythonError(Exception):
     Exception to be issued when attempting to use astrocut with
     an unsupported version of Python.
     """
+
     pass
 
 
@@ -35,6 +38,7 @@ class InputWarning(AstropyWarning):
     Warning to be issued when user input is incorrect in
     some way but doesn't prevent the function from running.
     """
+
     pass
 
 
@@ -42,6 +46,7 @@ class TypeWarning(AstropyWarning):
     """
     Warnings to do with data types.
     """
+
     pass
 
 
@@ -49,6 +54,7 @@ class DataWarning(AstropyWarning):
     """
     Warnings to do with data content.
     """
+
     pass
 
 
@@ -56,4 +62,5 @@ class ModuleWarning(AstropyWarning):
     """
     Warnings to do with optional modules.
     """
+
     pass

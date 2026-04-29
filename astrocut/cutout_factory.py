@@ -3,7 +3,7 @@
 """This module implements the cutout functionality."""
 
 from pathlib import Path
-from typing import Literal, Optional, Union, List, Tuple
+from typing import List, Literal, Optional, Tuple, Union
 
 import astropy.units as u
 import numpy as np
@@ -14,26 +14,38 @@ from s3path import S3Path
 from .tess_cube_cutout import TessCubeCutout
 
 
-class CutoutFactory():
+class CutoutFactory:
     """
     Class for creating image cutouts from TESS image cube files.
 
-    This class encompasses all of the cutout functionality.  
-    In the current version, this means creating cutout target pixel files from 
+    This class encompasses all of the cutout functionality.
+    In the current version, this means creating cutout target pixel files from
     TESS full frame images cubes.
 
     This class is maintained for backwards compatibility. For maximum flexibility, we recommend using the
     `~astrocut.TessCubeCutout` class.
     """
 
-    @deprecated_renamed_argument('product', None, since='1.1.0', message='The `product` argument is deprecated and '
-                                 'will be removed in a future version. Astrocut will only support cutouts from '
-                                 'SPOC products.')
-    def cube_cut(self, cube_file: Union[str, Path, S3Path], coordinates: Union[SkyCoord, str],
-                 cutout_size: Union[int, np.ndarray, u.Quantity, List[int], Tuple[int]], 
-                 product: str = 'SPOC', target_pixel_file: Optional[str] = None, 
-                 output_path: Union[str, Path] = '.', memory_only: bool = False, 
-                 threads: Union[int, Literal["auto"]] = 1, verbose: bool = False):
+    @deprecated_renamed_argument(
+        "product",
+        None,
+        since="1.1.0",
+        message="The `product` argument is deprecated and "
+        "will be removed in a future version. Astrocut will only support cutouts from "
+        "SPOC products.",
+    )
+    def cube_cut(
+        self,
+        cube_file: Union[str, Path, S3Path],
+        coordinates: Union[SkyCoord, str],
+        cutout_size: Union[int, np.ndarray, u.Quantity, List[int], Tuple[int]],
+        product: str = "SPOC",
+        target_pixel_file: Optional[str] = None,
+        output_path: Union[str, Path] = ".",
+        memory_only: bool = False,
+        threads: Union[int, Literal["auto"]] = 1,
+        verbose: bool = False,
+    ):
         """
         Takes a cube file (as created by `~astrocut.CubeFactory`), and makes a cutout target pixel
         file of the given size around the given coordinates. The target pixel file is formatted like
@@ -87,34 +99,46 @@ class CutoutFactory():
             or the path to the target pixel file if saved to disk.
             If unsuccessful returns None.
         """
-        cube_cutout = TessCubeCutout(input_files=cube_file,
-                                     coordinates=coordinates,
-                                     cutout_size=cutout_size,
-                                     product=product,
-                                     threads=threads,
-                                     verbose=verbose)
-        
+        cube_cutout = TessCubeCutout(
+            input_files=cube_file,
+            coordinates=coordinates,
+            cutout_size=cutout_size,
+            product=product,
+            threads=threads,
+            verbose=verbose,
+        )
+
         # Assign these attributes to be backwards compatible
         cutout_obj = cube_cutout.cutouts_by_file[cube_file]
         self.cube_wcs = cutout_obj.cube_wcs
         self.center_coord = cube_cutout._coordinates
         self.cutout_lims = cutout_obj.cutout_lims
         self.cutout_wcs = cutout_obj.wcs
-        
+
         if memory_only:
             return cube_cutout.tpf_cutouts[0]
-        
-        return cube_cutout.write_as_tpf(output_dir=output_path, 
-                                        output_file=target_pixel_file)[0]
-    
 
-@deprecated_renamed_argument('product', None, since='1.1.0', message='The `product` argument is deprecated and will be '
-                             'removed in a future version. Astrocut will only support cutouts from SPOC products.')
-def cube_cut(cube_file: Union[str, Path, S3Path], coordinates: Union[SkyCoord, str],
-             cutout_size: Union[int, np.ndarray, u.Quantity, List[int], Tuple[int]], 
-             product: str = 'SPOC', target_pixel_file: Optional[str] = None, 
-             output_path: Union[str, Path] = '.', memory_only: bool = False, 
-             threads: Union[int, Literal["auto"]] = 1, verbose: bool = False):
+        return cube_cutout.write_as_tpf(output_dir=output_path, output_file=target_pixel_file)[0]
+
+
+@deprecated_renamed_argument(
+    "product",
+    None,
+    since="1.1.0",
+    message="The `product` argument is deprecated and will be "
+    "removed in a future version. Astrocut will only support cutouts from SPOC products.",
+)
+def cube_cut(
+    cube_file: Union[str, Path, S3Path],
+    coordinates: Union[SkyCoord, str],
+    cutout_size: Union[int, np.ndarray, u.Quantity, List[int], Tuple[int]],
+    product: str = "SPOC",
+    target_pixel_file: Optional[str] = None,
+    output_path: Union[str, Path] = ".",
+    memory_only: bool = False,
+    threads: Union[int, Literal["auto"]] = 1,
+    verbose: bool = False,
+):
     """
     Takes a cube file (as created by `~astrocut.CubeFactory`), and makes a cutout target pixel
     file of the given size around the given coordinates. The target pixel file is formatted like
@@ -168,15 +192,16 @@ def cube_cut(cube_file: Union[str, Path, S3Path], coordinates: Union[SkyCoord, s
         or the path to the target pixel file if saved to disk.
         If unsuccessful, returns None.
     """
-    cube_cutout = TessCubeCutout(input_files=cube_file,
-                                 coordinates=coordinates,
-                                 cutout_size=cutout_size,
-                                 product=product,
-                                 threads=threads,
-                                 verbose=verbose)
-            
+    cube_cutout = TessCubeCutout(
+        input_files=cube_file,
+        coordinates=coordinates,
+        cutout_size=cutout_size,
+        product=product,
+        threads=threads,
+        verbose=verbose,
+    )
+
     if memory_only:
         return cube_cutout.tpf_cutouts[0]
-    
-    return cube_cutout.write_as_tpf(output_dir=output_path, 
-                                    output_file=target_pixel_file)[0]
+
+    return cube_cutout.write_as_tpf(output_dir=output_path, output_file=target_pixel_file)[0]

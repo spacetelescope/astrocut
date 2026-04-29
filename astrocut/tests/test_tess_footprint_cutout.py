@@ -1,11 +1,11 @@
-from pathlib import Path
-import pytest
 import re
 import zipfile
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import astropy.units as u
 import numpy as np
+import pytest
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.table import Table
@@ -15,9 +15,14 @@ from .. import footprint_cutout
 from ..cube_cutout import CubeCutout
 from ..exceptions import InvalidInputError, InvalidQueryError
 from ..footprint_cutout import get_ffis, ra_dec_crossmatch
-from ..tess_footprint_cutout import (TessFootprintCutout, cube_cut_from_footprint, get_tess_sectors, 
-                                     _extract_sequence_information, _create_sequence_list)
 from ..tess_cube_cutout import TessCubeCutout
+from ..tess_footprint_cutout import (
+    TessFootprintCutout,
+    _create_sequence_list,
+    _extract_sequence_information,
+    cube_cut_from_footprint,
+    get_tess_sectors,
+)
 
 
 @pytest.fixture
@@ -29,13 +34,13 @@ def cutout_size():
 @pytest.fixture
 def coordinates():
     """Fixture to return the coordinates at the center of the images"""
-    return SkyCoord('350 -80', unit='deg')
+    return SkyCoord("350 -80", unit="deg")
 
 
 @pytest.fixture
-def all_ffis(scope='module'):
+def all_ffis(scope="module"):
     """Fixture to return the table of all FFIs"""
-    return get_ffis('s3://stpubdata/tess/public/footprints/tess_ffi_footprint_cache.json')
+    return get_ffis("s3://stpubdata/tess/public/footprints/tess_ffi_footprint_cache.json")
 
 
 @pytest.fixture
@@ -59,11 +64,11 @@ def check_output_tpf(tpf, sequences=[], cutout_size=5):
 
     # SPOC cutouts have 1 extra columns in EXT 1
     assert len(tpf_table.columns) == 12
-    assert tpf_table[0]['FLUX'].shape == (cutout_size, cutout_size)
+    assert tpf_table[0]["FLUX"].shape == (cutout_size, cutout_size)
 
     # Check that sector matches a provided sequence
     if sequences:
-        assert tpf[0].header['SECTOR'] in sequences
+        assert tpf[0].header["SECTOR"] in sequences
 
     # Close TPF
     tpf.close()
@@ -71,31 +76,32 @@ def check_output_tpf(tpf, sequences=[], cutout_size=5):
 
 def test_s_region_to_polygon_unsupported_region():
     """Test that ValueError is raised if s_region is not a polygon"""
-    s_region = 'CIRCLE'
-    err = f'Unsupported s_region type: {s_region}'
+    s_region = "CIRCLE"
+    err = f"Unsupported s_region type: {s_region}"
     with pytest.raises(ValueError, match=err):
         TessFootprintCutout._s_region_to_polygon(s_region)
 
 
-@pytest.mark.parametrize("lon, lat, center, expected", [
-    ((345, 355, 355, 345), (-15, -15, -5, -5), (350, -10), True),  # intersecting
-    ((335, 345, 345, 335), (-15, -15, -5, -5), (340, -10), False),  # non-intersecting
-    ((340, 350, 350, 340), (-15, -15, -5, -5), (345, -10), True),  # edge object that intersects
-    ((340, 349, 349, 340), (-15, -15, -5, -5), (345, -10), False),  # edge object that does not intersect
-])
+@pytest.mark.parametrize(
+    "lon, lat, center, expected",
+    [
+        ((345, 355, 355, 345), (-15, -15, -5, -5), (350, -10), True),  # intersecting
+        ((335, 345, 345, 335), (-15, -15, -5, -5), (340, -10), False),  # non-intersecting
+        ((340, 350, 350, 340), (-15, -15, -5, -5), (345, -10), True),  # edge object that intersects
+        ((340, 349, 349, 340), (-15, -15, -5, -5), (345, -10), False),  # edge object that does not intersect
+    ],
+)
 def test_ffi_intersect(lon, lat, center, expected):
     """Test that FFI intersection with cutout outputs proper results."""
     # SphericalPolygon object for cutout
-    cutout_sp = SphericalPolygon.from_radec(lon=(350, 10, 10, 350),
-                                            lat=(-10, -10, 10, 10),
-                                            center=(0, 0))
+    cutout_sp = SphericalPolygon.from_radec(lon=(350, 10, 10, 350), lat=(-10, -10, 10, 10), center=(0, 0))
 
     # Create a SphericalPolygon with the parametrized lon, lat, and center
     polygon = SphericalPolygon.from_radec(lon=lon, lat=lat, center=center)
 
     # Create a table with this polygon
-    polygon_table = Table(names=['polygon'], dtype=[SphericalPolygon])
-    polygon_table['polygon'] = [polygon]
+    polygon_table = Table(names=["polygon"], dtype=[SphericalPolygon])
+    polygon_table["polygon"] = [polygon]
 
     # Perform the intersection check
     intersection = TessFootprintCutout._ffi_intersect(polygon_table, cutout_sp)
@@ -104,11 +110,13 @@ def test_ffi_intersect(lon, lat, center, expected):
     assert intersection.value[0] == expected
 
 
-@pytest.mark.parametrize("cutout_size", [0, 0 * u.arcmin, [0, 0], (0, 0), (0*u.pix, 0*u.pix), 
-                                         [0*u.arcsec, 0*u.arcsec], np.array([0, 0])])
+@pytest.mark.parametrize(
+    "cutout_size",
+    [0, 0 * u.arcmin, [0, 0], (0, 0), (0 * u.pix, 0 * u.pix), [0 * u.arcsec, 0 * u.arcsec], np.array([0, 0])],
+)
 def test_ra_dec_crossmatch_point(coordinates, all_ffis, cutout_size, crossmatch_spies):
     spy_point, spy_poly = crossmatch_spies
-    
+
     # Cutout size of 0 should do a point match
     results = ra_dec_crossmatch(all_ffis, coordinates, cutout_size)
     assert isinstance(results, Table)
@@ -116,12 +124,12 @@ def test_ra_dec_crossmatch_point(coordinates, all_ffis, cutout_size, crossmatch_
     spy_poly.assert_not_called()
 
 
-@pytest.mark.parametrize("cutout_size", [5, 5 * u.arcmin, [5, 5], [5*u.arcsec, 5*u.arcsec], (5, 0), (5, 0)])
+@pytest.mark.parametrize("cutout_size", [5, 5 * u.arcmin, [5, 5], [5 * u.arcsec, 5 * u.arcsec], (5, 0), (5, 0)])
 def test_ra_dec_crossmatch_poly(all_ffis, cutout_size, crossmatch_spies):
     spy_point, spy_poly = crossmatch_spies
-    
+
     # Cutout size of 0 should do a point match
-    results = ra_dec_crossmatch(all_ffis, '350 -80', cutout_size)
+    results = ra_dec_crossmatch(all_ffis, "350 -80", cutout_size)
     assert isinstance(results, Table)
     spy_poly.assert_called_once()
     spy_point.assert_not_called()
@@ -129,7 +137,7 @@ def test_ra_dec_crossmatch_poly(all_ffis, cutout_size, crossmatch_spies):
 
 def test_tess_footprint_cutout(cutout_size, caplog):
     """Test that a single data cube is created for a given sequence"""
-    cutout = TessFootprintCutout('130 30', cutout_size, sequence=44, verbose=True)
+    cutout = TessFootprintCutout("130 30", cutout_size, sequence=44, verbose=True)
 
     # Check cutouts attribute
     cutouts = cutout.cutouts
@@ -162,20 +170,20 @@ def test_tess_footprint_cutout(cutout_size, caplog):
     # Check tess_cube attribute
     tess_cube = cutout.tess_cube_cutout
     assert isinstance(tess_cube, TessCubeCutout)
-    
+
     # Assert that messages were printed
     captured = caplog.text
-    assert 'Coordinates:' in captured
-    assert 'Cutout size: [5 5]' in captured
-    assert re.search(r'Found \d+ footprint files.', captured)
-    assert re.search(r'Filtered to \d+ footprints for sequences: 44', captured)
-    assert re.search(r'Found \d+ matching files.', captured)
-    assert 'Generating cutouts...' in captured
+    assert "Coordinates:" in captured
+    assert "Cutout size: [5 5]" in captured
+    assert re.search(r"Found \d+ footprint files.", captured)
+    assert re.search(r"Filtered to \d+ footprints for sequences: 44", captured)
+    assert re.search(r"Found \d+ matching files.", captured)
+    assert "Generating cutouts..." in captured
 
     # Check that _extract_sequence_information works correctly
     # Should return empty dict if sector name does not match format
-    sector_name = 'invalid_s'
-    sector_name += '0044-4-1'
+    sector_name = "invalid_s"
+    sector_name += "0044-4-1"
     info = _extract_sequence_information(sector_name)
     assert info == {}
 
@@ -200,9 +208,9 @@ def test_tess_footprint_cutout_all_sequences(coordinates, cutout_size):
 
     # Crossmatch to get sectors that contain cutout
     all_ffis = get_ffis(cutout.S3_FOOTPRINT_CACHE)
-    cone_results = ra_dec_crossmatch(all_ffis, '350 -80', cutout_size, 21)
+    cone_results = ra_dec_crossmatch(all_ffis, "350 -80", cutout_size, 21)
     seq_list = _create_sequence_list(cone_results)
-    sequences = [int(seq['sector']) for seq in seq_list]
+    sequences = [int(seq["sector"]) for seq in seq_list]
 
     # Assert non-empty results
     assert len(seq_list) == len(cutout_tpfs)
@@ -218,7 +226,7 @@ def test_tess_footprint_cutout_write_as_tpf(coordinates, cutout_size, tmpdir):
     for cutout_path in paths:
         path = Path(cutout_path)
         assert path.exists()
-        assert path.suffix == '.fits'
+        assert path.suffix == ".fits"
 
         # Check that file can be opened
         with fits.open(path) as hdu:
@@ -228,31 +236,31 @@ def test_tess_footprint_cutout_write_as_tpf(coordinates, cutout_size, tmpdir):
 def test_tess_footprint_cutout_write_to_zip(coordinates, cutout_size, tmpdir):
     """Test that TPF cutouts are written to a ZIP archive"""
     cutout = TessFootprintCutout(coordinates, cutout_size, sequence=[1, 13])
-    zip_path = cutout.write_as_zip(output_dir=tmpdir, filename='tess_cutouts')
+    zip_path = cutout.write_as_zip(output_dir=tmpdir, filename="tess_cutouts")
 
     path = Path(zip_path)
     assert path.exists()
-    assert path.name == 'tess_cutouts.zip'
-    assert path.suffix == '.zip'
+    assert path.name == "tess_cutouts.zip"
+    assert path.suffix == ".zip"
 
     # Check contents of ZIP file
-    with zipfile.ZipFile(path, 'r') as zf:
+    with zipfile.ZipFile(path, "r") as zf:
         namelist = zf.namelist()
         assert len(namelist) == 2  # Two sequences
         for name in namelist:
-            assert name.endswith('.fits')
+            assert name.endswith(".fits")
 
 
 def test_tess_footprint_cutout_invalid_sequence(coordinates, cutout_size):
     """Test that InvalidQueryError is raised if sequence does not have cube files"""
-    err = 'No files were found for sequences: -1'
+    err = "No files were found for sequences: -1"
     with pytest.raises(InvalidQueryError, match=err):
         TessFootprintCutout(coordinates, cutout_size, sequence=-1)
 
 
 def test_tess_footprint_cutout_outside_coords(coordinates, cutout_size):
     """Test that InvalidQueryError is raised if coordinates are not found in sequence"""
-    err = 'The given coordinates were not found within the specified sequence(s).'
+    err = "The given coordinates were not found within the specified sequence(s)."
     with pytest.raises(InvalidQueryError, match=re.escape(err)):
         TessFootprintCutout(coordinates, cutout_size, sequence=2)
 
@@ -261,56 +269,50 @@ def test_tess_footprint_cutout_invalid_product(coordinates, cutout_size):
     """Test that InvalidQueryError is raised if an invalid product is given"""
     err = 'Product for TESS cube cutouts must be "SPOC".'
     with pytest.raises(InvalidInputError, match=err):
-        TessFootprintCutout(coordinates, cutout_size, product='invalid')
+        TessFootprintCutout(coordinates, cutout_size, product="invalid")
 
     with pytest.raises(InvalidInputError, match=err):
-        TessFootprintCutout(coordinates, cutout_size, product='TICA')
-        
+        TessFootprintCutout(coordinates, cutout_size, product="TICA")
+
 
 def test_cube_cut_from_footprint(coordinates, cutout_size, tmpdir):
     """Test that data cube is cut from FFI file using parallel processing"""
     # Writing to memory, should return cutouts as memory objects
-    cutouts = cube_cut_from_footprint(coordinates, 
-                                      cutout_size,
-                                      sequence=13,
-                                      memory_only=True)
+    cutouts = cube_cut_from_footprint(coordinates, cutout_size, sequence=13, memory_only=True)
     assert len(cutouts) == 1
     assert isinstance(cutouts, list)
     assert isinstance(cutouts[0], fits.HDUList)
 
     # Writing to disk, should return cutout filepaths
-    cutouts = cube_cut_from_footprint(coordinates, 
-                                      cutout_size,
-                                      sequence=13,
-                                      output_dir=tmpdir)
+    cutouts = cube_cut_from_footprint(coordinates, cutout_size, sequence=13, output_dir=tmpdir)
     assert len(cutouts) == 1
     assert isinstance(cutouts, list)
     assert isinstance(cutouts[0], str)
     assert str(tmpdir) in cutouts[0]
 
 
-@pytest.mark.parametrize("cutout_size", [0, 5, 1 * u.arcmin, [5, 5], (3*u.arcsec, 3*u.arcsec)])
+@pytest.mark.parametrize("cutout_size", [0, 5, 1 * u.arcmin, [5, 5], (3 * u.arcsec, 3 * u.arcsec)])
 def test_get_tess_sectors(coordinates, cutout_size):
     """Test that get_tess_sectors returns sector list"""
     sector_table = get_tess_sectors(coordinates, cutout_size)
     assert isinstance(sector_table, Table)
-    assert 'sectorName' in sector_table.colnames
-    assert 'sector' in sector_table.colnames
-    assert 'camera' in sector_table.colnames
-    assert 'ccd' in sector_table.colnames
+    assert "sectorName" in sector_table.colnames
+    assert "sector" in sector_table.colnames
+    assert "camera" in sector_table.colnames
+    assert "ccd" in sector_table.colnames
     assert len(sector_table) >= 7
 
 
 def test_get_tess_sectors_invalid_coordinates():
     """Test that InvalidInputError is raised for invalid coordinates input"""
-    with pytest.raises(InvalidInputError, match='Invalid coordinates input'):
-        get_tess_sectors('400 -120', 0)
+    with pytest.raises(InvalidInputError, match="Invalid coordinates input"):
+        get_tess_sectors("400 -120", 0)
 
 
 def test_get_tess_sectors_no_matches(monkeypatch, coordinates):
     """When no FFIs overlap the cutout, the sectors table should be empty."""
-    empty_table = Table(names=['sectorName', 'sector', 'camera', 'ccd'], dtype=['S10', 'i4', 'i4', 'i4'])
-    monkeypatch.setattr('astrocut.tess_footprint_cutout.ra_dec_crossmatch', lambda *_a, **_k: empty_table)
+    empty_table = Table(names=["sectorName", "sector", "camera", "ccd"], dtype=["S10", "i4", "i4", "i4"])
+    monkeypatch.setattr("astrocut.tess_footprint_cutout.ra_dec_crossmatch", lambda *_a, **_k: empty_table)
 
     sector_table = get_tess_sectors(coordinates, 0)
     assert isinstance(sector_table, Table)

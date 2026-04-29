@@ -1,20 +1,27 @@
-from abc import abstractmethod, ABC
-from pathlib import Path
-from typing import List, Optional, Union, Tuple
 import warnings
-
-from astropy.coordinates import SkyCoord
-from astropy.units import Quantity
-from astropy.visualization import (SqrtStretch, LogStretch, AsinhStretch, SinhStretch, LinearStretch,
-                                   MinMaxInterval, ManualInterval, AsymmetricPercentileInterval)
+from abc import ABC, abstractmethod
+from pathlib import Path
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
+from astropy.coordinates import SkyCoord
+from astropy.units import Quantity
+from astropy.visualization import (
+    AsinhStretch,
+    AsymmetricPercentileInterval,
+    LinearStretch,
+    LogStretch,
+    ManualInterval,
+    MinMaxInterval,
+    SinhStretch,
+    SqrtStretch,
+)
 from PIL import Image
 from s3path import S3Path
 
 from . import log
-from .exceptions import DataWarning, InputWarning, InvalidInputError
 from .cutout import Cutout
+from .exceptions import DataWarning, InputWarning, InvalidInputError
 
 
 class ImageCutout(Cutout, ABC):
@@ -56,10 +63,15 @@ class ImageCutout(Cutout, ABC):
         Apply given stretch and scaling to an image array.
     """
 
-    def __init__(self, input_files: List[Union[str, Path, S3Path]], coordinates: Union[SkyCoord, str], 
-                 cutout_size: Union[int, np.ndarray, Quantity, List[int], Tuple[int]] = 25,
-                 fill_value: Union[int, float] = np.nan, limit_rounding_method: str = 'round',
-                 verbose: bool = False):
+    def __init__(
+        self,
+        input_files: List[Union[str, Path, S3Path]],
+        coordinates: Union[SkyCoord, str],
+        cutout_size: Union[int, np.ndarray, Quantity, List[int], Tuple[int]] = 25,
+        fill_value: Union[int, float] = np.nan,
+        limit_rounding_method: str = "round",
+        verbose: bool = False,
+    ):
         super().__init__(input_files, coordinates, cutout_size, fill_value, limit_rounding_method, verbose)
 
         # Stores the image cutouts as PIL.Image objects
@@ -76,10 +88,15 @@ class ImageCutout(Cutout, ABC):
         if not self._image_cutouts:
             self._image_cutouts = self.get_image_cutouts()
         return self._image_cutouts
-    
-    def get_image_cutouts(self, stretch: Optional[str] = 'asinh', minmax_percent: Optional[List[int]] = None, 
-                          minmax_value: Optional[List[int]] = None, invert: Optional[bool] = False, 
-                          colorize: Optional[bool] = False) -> List[Image.Image]:
+
+    def get_image_cutouts(
+        self,
+        stretch: Optional[str] = "asinh",
+        minmax_percent: Optional[List[int]] = None,
+        minmax_value: Optional[List[int]] = None,
+        invert: Optional[bool] = False,
+        colorize: Optional[bool] = False,
+    ) -> List[Image.Image]:
         """
         Get the cutouts as `~PIL.Image` objects given certain normalization parameters. This method also sets
         the `image_cutouts` attribute.
@@ -90,7 +107,7 @@ class ImageCutout(Cutout, ABC):
             Optional, default 'asinh'. The stretch to apply to the image array.
             Valid values are: asinh, sinh, sqrt, log, linear
         minmax_percent : array
-            Optional. Interval based on a keeping a specified fraction of pixels (can be asymmetric) 
+            Optional. Interval based on a keeping a specified fraction of pixels (can be asymmetric)
             when scaling the image. The format is [lower percentile, upper percentile], where pixel
             values below the lower percentile and above the upper percentile are clipped.
             Only one of minmax_percent and minmax_value should be specified.
@@ -110,9 +127,9 @@ class ImageCutout(Cutout, ABC):
             List of `~PIL.Image` objects representing the cutouts.
         """
         # Validate the stretch parameter
-        valid_stretches = ['asinh', 'sinh', 'sqrt', 'log', 'linear']
+        valid_stretches = ["asinh", "sinh", "sqrt", "log", "linear"]
         if not isinstance(stretch, str) or stretch.lower() not in valid_stretches:
-            raise InvalidInputError(f'Stretch {stretch} is not recognized. Valid options are {valid_stretches}.')
+            raise InvalidInputError(f"Stretch {stretch} is not recognized. Valid options are {valid_stretches}.")
         stretch = stretch.lower()
 
         # Apply default scaling for image outputs
@@ -124,10 +141,14 @@ class ImageCutout(Cutout, ABC):
 
             # Check for the correct number of cutouts
             if len(all_cutouts) < 3:
-                raise InvalidInputError(('Color cutouts require 3 input images (RGB).'
-                                         'If you supplied 3 images one of the cutouts may have been empty.'))
+                raise InvalidInputError(
+                    (
+                        "Color cutouts require 3 input images (RGB)."
+                        "If you supplied 3 images one of the cutouts may have been empty."
+                    )
+                )
             if len(all_cutouts) > 3:
-                warnings.warn('Too many inputs for a color cutout, only the first three will be used.', InputWarning)
+                warnings.warn("Too many inputs for a color cutout, only the first three will be used.", InputWarning)
                 all_cutouts = all_cutouts[:3]
 
             img_arrs = []
@@ -148,7 +169,7 @@ class ImageCutout(Cutout, ABC):
             self._image_cutouts = image_cutouts
 
         return self._image_cutouts
-    
+
     @abstractmethod
     def _cutout_file(self, file: Union[str, Path, S3Path]):
         """
@@ -156,7 +177,7 @@ class ImageCutout(Cutout, ABC):
 
         This method is abstract and should be defined in subclasses.
         """
-        raise NotImplementedError('Subclasses must implement this method.')
+        raise NotImplementedError("Subclasses must implement this method.")
 
     @abstractmethod
     def cutout(self):
@@ -165,8 +186,8 @@ class ImageCutout(Cutout, ABC):
 
         This method is abstract and should be defined in subclasses.
         """
-        raise NotImplementedError('Subclasses must implement this method.')
-    
+        raise NotImplementedError("Subclasses must implement this method.")
+
     def _parse_output_format(self, output_format: str) -> str:
         """
         Parse the output format string and return it in a standardized format.
@@ -183,12 +204,12 @@ class ImageCutout(Cutout, ABC):
         """
         # Put format in standard format
         out_lower = output_format.lower()
-        output_format = f'.{out_lower}' if not output_format.startswith('.') else out_lower
-    
+        output_format = f".{out_lower}" if not output_format.startswith(".") else out_lower
+
         # Error if the output format is not supported
         if output_format not in Image.registered_extensions().keys():
-            raise InvalidInputError(f'Output format {output_format} is not supported.')
-        
+            raise InvalidInputError(f"Output format {output_format} is not supported.")
+
         return output_format
 
     def _save_img_to_file(self, im: Image, file_path: str) -> bool:
@@ -212,24 +233,36 @@ class ImageCutout(Cutout, ABC):
             return True
         except ValueError as e:
             output_format = Path(file_path).suffix
-            warnings.warn(f'Cutout could not be saved in {output_format} format: {e}. '
-                          'Please try a different output format.', DataWarning)
+            warnings.warn(
+                f"Cutout could not be saved in {output_format} format: {e}. " "Please try a different output format.",
+                DataWarning,
+            )
             return False
         except KeyError as e:
             output_format = Path(file_path).suffix
-            warnings.warn(f'Cutout could not be saved in {output_format} format due to a KeyError: {e}. '
-                          'Please try a different output format.', DataWarning)
+            warnings.warn(
+                f"Cutout could not be saved in {output_format} format due to a KeyError: {e}. "
+                "Please try a different output format.",
+                DataWarning,
+            )
             return False
         except OSError as e:
-            warnings.warn(f'Cutout could not be saved: {e}', DataWarning)
+            warnings.warn(f"Cutout could not be saved: {e}", DataWarning)
             return False
 
-    def write_as_img(self, stretch: Optional[str] = 'asinh', minmax_percent: Optional[List[int]] = None, 
-                     minmax_value: Optional[List[int]] = None, invert: Optional[bool] = False, 
-                     colorize: Optional[bool] = False, output_format: str = '.jpg', 
-                     output_dir: Union[str, Path] = '.', cutout_prefix: str = 'cutout') -> Union[str, List[str]]:
+    def write_as_img(
+        self,
+        stretch: Optional[str] = "asinh",
+        minmax_percent: Optional[List[int]] = None,
+        minmax_value: Optional[List[int]] = None,
+        invert: Optional[bool] = False,
+        colorize: Optional[bool] = False,
+        output_format: str = ".jpg",
+        output_dir: Union[str, Path] = ".",
+        cutout_prefix: str = "cutout",
+    ) -> Union[str, List[str]]:
         """
-        Write the cutout to memory or to a file in an image format. If colorize is set, the first 3 cutouts 
+        Write the cutout to memory or to a file in an image format. If colorize is set, the first 3 cutouts
         will be combined into a single RGB image. Otherwise, each cutout will be written to a separate file.
 
         Parameters
@@ -238,7 +271,7 @@ class ImageCutout(Cutout, ABC):
             Optional, default 'asinh'. The stretch to apply to the image array.
             Valid values are: asinh, sinh, sqrt, log, linear
         minmax_percent : array
-            Optional. Interval based on a keeping a specified fraction of pixels (can be asymmetric) 
+            Optional. Interval based on a keeping a specified fraction of pixels (can be asymmetric)
             when scaling the image. The format is [lower percentile, upper percentile], where pixel
             values below the lower percentile and above the upper percentile are clipped.
             Only one of minmax_percent and minmax_value shoul be specified.
@@ -280,13 +313,13 @@ class ImageCutout(Cutout, ABC):
         # Set up output files and write them
         if colorize:  # Combine first three cutouts into a single RGB image
             # Write the colorized cutout to disk
-            filename = '{}_{:.7f}_{:.7f}_{}-x-{}_astrocut{}'.format(
+            filename = "{}_{:.7f}_{:.7f}_{}-x-{}_astrocut{}".format(
                 cutout_prefix,
                 self._coordinates.ra.value,
                 self._coordinates.dec.value,
-                str(self._cutout_size[0]).replace(' ', ''), 
-                str(self._cutout_size[1]).replace(' ', ''),
-                output_format
+                str(self._cutout_size[0]).replace(" ", ""),
+                str(self._cutout_size[1]).replace(" ", ""),
+                output_format,
             )
 
             # Attempt to write image to file
@@ -299,15 +332,16 @@ class ImageCutout(Cutout, ABC):
             cutout_paths = []  # Store the paths of the written cutout files
             for i, file in enumerate(self.cutouts_by_file):
                 # Write individual cutouts to disk
-                filename = '{}_{:.7f}_{:.7f}_{}-x-{}_astrocut_{}{}'.format(
+                filename = "{}_{:.7f}_{:.7f}_{}-x-{}_astrocut_{}{}".format(
                     Path(file).stem,
                     self._coordinates.ra.value,
                     self._coordinates.dec.value,
-                    str(self._cutout_size[0]).replace(' ', ''), 
-                    str(self._cutout_size[1]).replace(' ', ''),
+                    str(self._cutout_size[0]).replace(" ", ""),
+                    str(self._cutout_size[1]).replace(" ", ""),
                     i,
-                    output_format)
-                
+                    output_format,
+                )
+
                 # Attempt to write image to file
                 cutout_path = Path(output_dir, filename).as_posix()
                 success = self._save_img_to_file(image_cutouts[i], cutout_path)
@@ -318,12 +352,17 @@ class ImageCutout(Cutout, ABC):
                     cutout_path = None
                 cutout_paths.append(cutout_path)
 
-        log.debug('Cutout filepaths: {}'.format(cutout_paths))
+        log.debug("Cutout filepaths: {}".format(cutout_paths))
         return cutout_paths
-    
+
     @staticmethod
-    def normalize_img(img_arr: np.ndarray, stretch: str = 'asinh', minmax_percent: Optional[List[int]] = None, 
-                      minmax_value: Optional[List[int]] = None, invert: bool = False) -> np.ndarray:
+    def normalize_img(
+        img_arr: np.ndarray,
+        stretch: str = "asinh",
+        minmax_percent: Optional[List[int]] = None,
+        minmax_value: Optional[List[int]] = None,
+        invert: bool = False,
+    ) -> np.ndarray:
         """
         Apply given stretch and scaling to an image array.
 
@@ -335,7 +374,7 @@ class ImageCutout(Cutout, ABC):
             Optional, default 'asinh'. The stretch to apply to the image array.
             Valid values are: asinh, sinh, sqrt, log, linear
         minmax_percent : array
-            Optional. Interval based on a keeping a specified fraction of pixels (can be asymmetric) 
+            Optional. Interval based on a keeping a specified fraction of pixels (can be asymmetric)
             when scaling the image. The format is [lower percentile, upper percentile], where pixel
             values below the lower percentile and above the upper percentile are clipped.
             Only one of minmax_percent and minmax_value shoul be specified.
@@ -360,30 +399,32 @@ class ImageCutout(Cutout, ABC):
 
         # Check if the input image array is empty
         if img_arr.size == 0:
-            raise InvalidInputError('Input image array is empty.')
+            raise InvalidInputError("Input image array is empty.")
 
         # Setting up the transform with the stretch
-        if stretch == 'asinh':
+        if stretch == "asinh":
             transform = AsinhStretch()
-        elif stretch == 'sinh':
+        elif stretch == "sinh":
             transform = SinhStretch()
-        elif stretch == 'sqrt':
+        elif stretch == "sqrt":
             transform = SqrtStretch()
-        elif stretch == 'log':
+        elif stretch == "log":
             transform = LogStretch()
-        elif stretch == 'linear':
+        elif stretch == "linear":
             transform = LinearStretch()
         else:
-            raise InvalidInputError(f'Stretch {stretch} is not supported!'
-                                    'Valid options are: asinh, sinh, sqrt, log, linear.')
+            raise InvalidInputError(
+                f"Stretch {stretch} is not supported!" "Valid options are: asinh, sinh, sqrt, log, linear."
+            )
 
         # Adding the scaling to the transform
         if minmax_percent is not None:
             transform += AsymmetricPercentileInterval(*minmax_percent)
-            
+
             if minmax_value is not None:
-                warnings.warn('Both minmax_percent and minmax_value are set, minmax_value will be ignored.', 
-                              InputWarning)
+                warnings.warn(
+                    "Both minmax_percent and minmax_value are set, minmax_value will be ignored.", InputWarning
+                )
         elif minmax_value is not None:
             transform += ManualInterval(*minmax_value)
         else:  # Default, scale the entire image range to [0,1]
@@ -398,10 +439,15 @@ class ImageCutout(Cutout, ABC):
         np.subtract(255, norm_img, out=norm_img, where=invert)
 
         return norm_img
-    
 
-def normalize_img(img_arr: np.ndarray, stretch: str = 'asinh', minmax_percent: Optional[List[int]] = None, 
-                  minmax_value: Optional[List[int]] = None, invert: bool = False) -> np.ndarray:
+
+def normalize_img(
+    img_arr: np.ndarray,
+    stretch: str = "asinh",
+    minmax_percent: Optional[List[int]] = None,
+    minmax_value: Optional[List[int]] = None,
+    invert: bool = False,
+) -> np.ndarray:
     """
     Apply given stretch and scaling to an image array.
 
@@ -413,7 +459,7 @@ def normalize_img(img_arr: np.ndarray, stretch: str = 'asinh', minmax_percent: O
         Optional, default 'asinh'. The stretch to apply to the image array.
         Valid values are: asinh, sinh, sqrt, log, linear
     minmax_percent : array
-        Optional. Interval based on a keeping a specified fraction of pixels (can be asymmetric) 
+        Optional. Interval based on a keeping a specified fraction of pixels (can be asymmetric)
         when scaling the image. The format is [lower percentile, upper percentile], where pixel
         values below the lower percentile and above the upper percentile are clipped.
         Only one of minmax_percent and minmax_value shoul be specified.
@@ -430,8 +476,6 @@ def normalize_img(img_arr: np.ndarray, stretch: str = 'asinh', minmax_percent: O
     response : array
         The normalized image array, in the form in an integer arrays with values in the range 0-255.
     """
-    return ImageCutout.normalize_img(img_arr=img_arr,
-                                     stretch=stretch,
-                                     minmax_percent=minmax_percent,
-                                     minmax_value=minmax_value,
-                                     invert=invert)
+    return ImageCutout.normalize_img(
+        img_arr=img_arr, stretch=stretch, minmax_percent=minmax_percent, minmax_value=minmax_value, invert=invert
+    )

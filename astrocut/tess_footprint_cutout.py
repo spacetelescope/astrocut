@@ -1,23 +1,23 @@
 import re
 from pathlib import Path
-from typing import Union, List, Tuple
+from typing import List, Tuple, Union
 
 import astropy.units as u
 import numpy as np
 from astropy.coordinates import SkyCoord
 from astropy.io.fits import HDUList
-from astropy.utils.decorators import deprecated_renamed_argument
 from astropy.table import Table
+from astropy.utils.decorators import deprecated_renamed_argument
 
 from . import log
-from .exceptions import InvalidQueryError, InvalidInputError
+from .exceptions import InvalidInputError, InvalidQueryError
 from .footprint_cutout import FootprintCutout, get_ffis, ra_dec_crossmatch
 from .tess_cube_cutout import TessCubeCutout
 
 
 class TessFootprintCutout(FootprintCutout):
     """
-    Class for generating cutouts from TESS Full Frame Images (FFIs) hosted on the cloud 
+    Class for generating cutouts from TESS Full Frame Images (FFIs) hosted on the cloud
     based on the footprint of the cutout.
 
     Parameters
@@ -32,7 +32,7 @@ class TessFootprintCutout(FootprintCutout):
         Method to use for rounding the cutout limits. Options are 'round', 'ceil', and 'floor'.
     sequence : int | list | None
         Default None. Sequence(s) from which to generate cutouts. Can provide a single
-        sequence number as an int or a list of sequence numbers. If not specified, 
+        sequence number as an int or a list of sequence numbers. If not specified,
         cutouts will be generated from all sequences that contain the cutout.
         For the TESS mission, this parameter corresponds to sectors.
     product : str, optional
@@ -47,7 +47,7 @@ class TessFootprintCutout(FootprintCutout):
     tess_cube_cutout : `~astrocut.TessCubeCutout`
         Object containing the cutouts from the TESS cubes.
     cutouts_by_file : dict
-        Dictionary where each key is an input cube S3 URI and its corresponding value is the resulting cutout as a 
+        Dictionary where each key is an input cube S3 URI and its corresponding value is the resulting cutout as a
         ``CubeCutoutInstance`` object.
     cutouts : list
         List of cutout objects.
@@ -67,23 +67,33 @@ class TessFootprintCutout(FootprintCutout):
 
     # Mission-specific defaults
     ARCSEC_PER_PX = 21  # Number of arcseconds per pixel in a TESS image
-    S3_FOOTPRINT_CACHE = 's3://stpubdata/tess/public/footprints/tess_ffi_footprint_cache.json'
-    S3_BASE_FILE_PATH = 's3://stpubdata/tess/public/mast/'
+    S3_FOOTPRINT_CACHE = "s3://stpubdata/tess/public/footprints/tess_ffi_footprint_cache.json"
+    S3_BASE_FILE_PATH = "s3://stpubdata/tess/public/mast/"
 
-
-    @deprecated_renamed_argument('product', None, since='1.1.0', message='Astrocut no longer supports cutouts from '
-                                 'TESS Image Calibrator (TICA) products. '
-                                 'The `product` argument is deprecated and will be removed in a future version.')
-    def __init__(self, coordinates: Union[SkyCoord, str], 
-                 cutout_size: Union[int, np.ndarray, u.Quantity, List[int], Tuple[int]] = 25,
-                 fill_value: Union[int, float] = np.nan, limit_rounding_method: str = 'round', 
-                 sequence: Union[int, List[int], None] = None, product: str = 'SPOC', verbose: bool = False):
+    @deprecated_renamed_argument(
+        "product",
+        None,
+        since="1.1.0",
+        message="Astrocut no longer supports cutouts from "
+        "TESS Image Calibrator (TICA) products. "
+        "The `product` argument is deprecated and will be removed in a future version.",
+    )
+    def __init__(
+        self,
+        coordinates: Union[SkyCoord, str],
+        cutout_size: Union[int, np.ndarray, u.Quantity, List[int], Tuple[int]] = 25,
+        fill_value: Union[int, float] = np.nan,
+        limit_rounding_method: str = "round",
+        sequence: Union[int, List[int], None] = None,
+        product: str = "SPOC",
+        verbose: bool = False,
+    ):
         super().__init__(coordinates, cutout_size, fill_value, limit_rounding_method, sequence, verbose)
-        
+
         # Validate and set the product
-        if product.upper() != 'SPOC':
+        if product.upper() != "SPOC":
             raise InvalidInputError('Product for TESS cube cutouts must be "SPOC".')
-        self._product = 'SPOC'
+        self._product = "SPOC"
 
         # Make the cutouts upon initialization
         self.cutout()
@@ -100,41 +110,49 @@ class TessFootprintCutout(FootprintCutout):
         """
         # Get footprints from the cloud
         all_ffis = get_ffis(self.S3_FOOTPRINT_CACHE)
-        log.debug('Found %d footprint files.', len(all_ffis))
+        log.debug("Found %d footprint files.", len(all_ffis))
 
         # Filter footprints by sequence
         if self._sequence:
-            all_ffis = all_ffis[np.isin(all_ffis['sequence_number'], self._sequence)]
+            all_ffis = all_ffis[np.isin(all_ffis["sequence_number"], self._sequence)]
 
             if len(all_ffis) == 0:
-                raise InvalidQueryError('No files were found for sequences: ' +
-                                        ', '.join(str(s) for s in self._sequence))
-            
-            log.debug('Filtered to %d footprints for sequences: %s', len(all_ffis), 
-                      ', '.join(str(s) for s in self._sequence))
+                raise InvalidQueryError(
+                    "No files were found for sequences: " + ", ".join(str(s) for s in self._sequence)
+                )
+
+            log.debug(
+                "Filtered to %d footprints for sequences: %s", len(all_ffis), ", ".join(str(s) for s in self._sequence)
+            )
 
         # Get sequence names and files that contain the cutout
         cone_results = ra_dec_crossmatch(all_ffis, self._coordinates, self._cutout_size, self.ARCSEC_PER_PX)
         if not cone_results:
-            raise InvalidQueryError('The given coordinates were not found within the specified sequence(s).')
+            raise InvalidQueryError("The given coordinates were not found within the specified sequence(s).")
         files_mapping = _get_files_from_cone_results(cone_results)
-        log.debug('Found %d matching files.', len(files_mapping))
+        log.debug("Found %d matching files.", len(files_mapping))
 
         # Generate the cube cutouts
-        log.debug('Generating cutouts...')
+        log.debug("Generating cutouts...")
         input_files = [f"{self.S3_BASE_FILE_PATH}{file['cube']}" for file in files_mapping]
-        tess_cube_cutout = TessCubeCutout(input_files, self._coordinates, self._cutout_size, 
-                                          self._fill_value, self._limit_rounding_method, threads=8, 
-                                          verbose=self._verbose)
-        
+        tess_cube_cutout = TessCubeCutout(
+            input_files,
+            self._coordinates,
+            self._cutout_size,
+            self._fill_value,
+            self._limit_rounding_method,
+            threads=8,
+            verbose=self._verbose,
+        )
+
         # Assign attributes from the TessCubeCutout object
         self.tess_cube_cutout = tess_cube_cutout
         self.cutouts_by_file = tess_cube_cutout.cutouts_by_file
         self.cutouts = tess_cube_cutout.cutouts
         self.tpf_cutouts_by_file = tess_cube_cutout.tpf_cutouts_by_file
         self.tpf_cutouts = tess_cube_cutout.tpf_cutouts
-        
-    def write_as_tpf(self, output_dir: Union[str, Path] = '.') -> List[str]:
+
+    def write_as_tpf(self, output_dir: Union[str, Path] = ".") -> List[str]:
         """
         Write the cutouts to disk as target pixel files.
 
@@ -149,8 +167,8 @@ class TessFootprintCutout(FootprintCutout):
             List of file paths to cutout target pixel files.
         """
         return self.tess_cube_cutout.write_as_tpf(output_dir)
-    
-    def write_as_zip(self, output_dir: Union[str, Path] = '.', filename: Union[str, Path, None] = None) -> str:
+
+    def write_as_zip(self, output_dir: Union[str, Path] = ".", filename: Union[str, Path, None] = None) -> str:
         """
         Package the cutout TPF files into a zip archive.
 
@@ -234,7 +252,7 @@ def _create_sequence_list(observations: Table) -> List[dict]:
 
 def _get_files_from_cone_results(cone_results: Table) -> List[dict]:
     """
-    Converts a `~astropy.table.Table` of cone search results to a list of dictionaries containing 
+    Converts a `~astropy.table.Table` of cone search results to a list of dictionaries containing
     information for each cloud cube file that intersects with the cutout.
 
     This is a helper function and should be left private.
@@ -267,13 +285,23 @@ def _get_files_from_cone_results(cone_results: Table) -> List[dict]:
     return cube_files
 
 
-@deprecated_renamed_argument('product', None, since='1.1.0', message='Astrocut no longer supports cutouts from '
-                             'TESS Image Calibrator (TICA) products. '
-                             'The `product` argument is deprecated and will be removed in a future version.')
-def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size, 
-                            sequence: Union[int, List[int], None] = None, product: str = 'SPOC',
-                            memory_only=False, output_dir: str = '.', 
-                            verbose: bool = False) -> Union[List[str], List[HDUList]]:
+@deprecated_renamed_argument(
+    "product",
+    None,
+    since="1.1.0",
+    message="Astrocut no longer supports cutouts from "
+    "TESS Image Calibrator (TICA) products. "
+    "The `product` argument is deprecated and will be removed in a future version.",
+)
+def cube_cut_from_footprint(
+    coordinates: Union[str, SkyCoord],
+    cutout_size,
+    sequence: Union[int, List[int], None] = None,
+    product: str = "SPOC",
+    memory_only=False,
+    output_dir: str = ".",
+    verbose: bool = False,
+) -> Union[List[str], List[HDUList]]:
     """
     Generates cutouts around `coordinates` of size `cutout_size` from image cube files hosted on the S3 cloud.
 
@@ -293,7 +321,7 @@ def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size,
         angular units.
     sequence : int, List[int], optional
         Default None. Sequence(s) from which to generate cutouts. Can provide a single
-        sequence number as an int or a list of sequence numbers. If not specified, 
+        sequence number as an int or a list of sequence numbers. If not specified,
         cutouts will be generated from all sequences that contain the cutout.
         For the TESS mission, this parameter corresponds to sectors.
     product : str, optional
@@ -331,13 +359,14 @@ def cube_cut_from_footprint(coordinates: Union[str, SkyCoord], cutout_size,
     # Return cutouts as memory objects
     if memory_only:
         return cutouts.tpf_cutouts
-    
+
     # Write cutouts
     return cutouts.write_as_tpf(output_dir)
 
 
-def get_tess_sectors(coordinates: Union[str, SkyCoord],
-                     cutout_size: Union[int, u.Quantity, List[int], Tuple[int]]) -> Table:
+def get_tess_sectors(
+    coordinates: Union[str, SkyCoord], cutout_size: Union[int, u.Quantity, List[int], Tuple[int]]
+) -> Table:
     """
     Return the TESS sectors (sequence, camera, CCD) whose FFI footprints overlap
     the given cutout defined by position and size.
@@ -356,8 +385,8 @@ def get_tess_sectors(coordinates: Union[str, SkyCoord],
         units of pixels. `~astropy.units.Quantity` objects must be in pixel or
         angular units.
 
-        If a cutout size of zero is provided, the function will return sectors that contain 
-        the exact RA and Dec position. If a non-zero cutout size is provided, the function 
+        If a cutout size of zero is provided, the function will return sectors that contain
+        the exact RA and Dec position. If a non-zero cutout size is provided, the function
         will return sectors whose footprints overlap with the cutout area.
 
     Returns
@@ -366,8 +395,8 @@ def get_tess_sectors(coordinates: Union[str, SkyCoord],
         A table containing the sector name, sector number, camera number, and CCD number
         for each sector that contains the specified coordinates within the cutout size.
     """
-    column_names = ['sectorName', 'sector', 'camera', 'ccd']
-    column_dtypes = ['S20', 'i4', 'i4', 'i4']
+    column_names = ["sectorName", "sector", "camera", "ccd"]
+    column_dtypes = ["S20", "i4", "i4", "i4"]
 
     # Get footprints from the cloud
     ffis = get_ffis(TessFootprintCutout.S3_FOOTPRINT_CACHE)
@@ -380,7 +409,11 @@ def get_tess_sectors(coordinates: Union[str, SkyCoord],
     # Create a list of unique sector entries
     sector_list = _create_sequence_list(matched_ffis)
 
-    return Table(rows=[
-        (entry['sectorName'], int(entry['sector']), int(entry['camera']), int(entry['ccd']))
-        for entry in sector_list
-    ], names=column_names, dtype=column_dtypes)
+    return Table(
+        rows=[
+            (entry["sectorName"], int(entry["sector"]), int(entry["camera"]), int(entry["ccd"]))
+            for entry in sector_list
+        ],
+        names=column_names,
+        dtype=column_dtypes,
+    )

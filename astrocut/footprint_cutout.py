@@ -7,7 +7,7 @@ import astropy.units as u
 import fsspec
 import numpy as np
 from astropy.coordinates import SkyCoord
-from astropy.table import Table, Column
+from astropy.table import Column, Table
 from cachetools import TTLCache, cached
 from spherical_geometry.polygon import SphericalPolygon
 from spherical_geometry.vector import radec_to_vector
@@ -34,7 +34,7 @@ class FootprintCutout(Cutout, ABC):
         Method to use for rounding the cutout limits. Options are 'round', 'ceil', and 'floor'.
     sequence : int | list | None
         Default None. Sequence(s) from which to generate cutouts. Can provide a single
-        sequence number as an int or a list of sequence numbers. If not specified, 
+        sequence number as an int or a list of sequence numbers. If not specified,
         cutouts will be generated from all sequences that contain the cutout.
     verbose : bool
         If True, log messages are printed to the console.
@@ -45,10 +45,15 @@ class FootprintCutout(Cutout, ABC):
         Fetch the cloud files that contain the cutout and generate the cutouts.
     """
 
-    def __init__(self, coordinates: Union[SkyCoord, str], 
-                 cutout_size: Union[int, np.ndarray, u.Quantity, List[int], Tuple[int]] = 25,
-                 fill_value: Union[int, float] = np.nan, limit_rounding_method: str = 'round', 
-                 sequence: Union[int, List[int], None] = None, verbose: bool = False):
+    def __init__(
+        self,
+        coordinates: Union[SkyCoord, str],
+        cutout_size: Union[int, np.ndarray, u.Quantity, List[int], Tuple[int]] = 25,
+        fill_value: Union[int, float] = np.nan,
+        limit_rounding_method: str = "round",
+        sequence: Union[int, List[int], None] = None,
+        verbose: bool = False,
+    ):
         super().__init__([], coordinates, cutout_size, fill_value, limit_rounding_method, verbose)
 
         # Assigning other attributes
@@ -63,7 +68,7 @@ class FootprintCutout(Cutout, ABC):
 
         This method is abstract and should be implemented in subclasses.
         """
-        raise NotImplementedError('Subclasses must implement this method.')
+        raise NotImplementedError("Subclasses must implement this method.")
 
     @staticmethod
     def _s_region_to_polygon(s_region: Column) -> Column:
@@ -74,7 +79,7 @@ class FootprintCutout(Cutout, ABC):
         Parameters
         ----------
         s_region : `~astropy.table.Column`
-            Column containing the s_region string. Example input: 'POLYGON 229.80771900 -75.17048500 
+            Column containing the s_region string. Example input: 'POLYGON 229.80771900 -75.17048500
             241.67788000 -63.95992300 269.94872000 -64.39276400 277.87862300 -75.57754400'
 
         Returns
@@ -82,6 +87,7 @@ class FootprintCutout(Cutout, ABC):
         polygon : `~astropy.table.Column`
             Column containing `~spherical_geometry.polygon.SphericalPolygon` objects representing each s_region.
         """
+
         def ind_sregion_to_polygon(s_reg):
             """
             Helper function to convert s_region string to a `~spherical_geometry.polygon.SphericalPolygon` object.
@@ -95,12 +101,12 @@ class FootprintCutout(Cutout, ABC):
             -------
             `~spherical_geometry.polygon.SphericalPolygon`
                 A SphericalPolygon object created from the provided coordinates.
-            
+
             Raises
             ------
             ValueError
                 If the S_REGION type is not 'POLYGON'.
-            
+
             """
             # Split input string into individual components
             sr_list = s_reg.strip().split()
@@ -108,7 +114,7 @@ class FootprintCutout(Cutout, ABC):
             # Extract the region type (first element of list)
             reg_type = sr_list[0].upper()
 
-            if reg_type == 'POLYGON':
+            if reg_type == "POLYGON":
                 # Extract RA and Dec values
                 # RAs are at odd indices
                 ras = np.array(sr_list[1::2], dtype=float)
@@ -122,10 +128,10 @@ class FootprintCutout(Cutout, ABC):
                 # Create SphericalPolygon object
                 return SphericalPolygon.from_radec(ras, decs)
             else:
-                raise ValueError(f'Unsupported s_region type: {reg_type}.')
+                raise ValueError(f"Unsupported s_region type: {reg_type}.")
 
         return np.vectorize(ind_sregion_to_polygon)(s_region)
-    
+
     @staticmethod
     def _ffi_intersect(ffi_list: Table, polygon: SphericalPolygon) -> np.ndarray:
         """
@@ -143,11 +149,12 @@ class FootprintCutout(Cutout, ABC):
         intersect : `~numpy.ndarray`
             Boolean array indicating whether each FFI intersects with the cutout.
         """
+
         def single_intersect(ffi, polygon):
             return ffi.intersects_poly(polygon)
 
-        return np.vectorize(single_intersect)(ffi_list['polygon'], polygon)
-    
+        return np.vectorize(single_intersect)(ffi_list["polygon"], polygon)
+
 
 @cached(cache=FFI_TTLCACHE, lock=Lock())
 def get_ffis(s3_footprint_cache: str) -> Table:
@@ -169,11 +176,11 @@ def get_ffis(s3_footprint_cache: str) -> Table:
         Table containing information about FFIs and their footprints.
     """
     # Open footprint file with fsspec
-    with fsspec.open(s3_footprint_cache, s3={'anon': True}) as f:
+    with fsspec.open(s3_footprint_cache, s3={"anon": True}) as f:
         ffis = json.load(f)
 
     # Compute spherical polygons
-    ffis['polygon'] = FootprintCutout._s_region_to_polygon(ffis['s_region'])
+    ffis["polygon"] = FootprintCutout._s_region_to_polygon(ffis["s_region"])
 
     # Convert to Astropy table
     ffis = Table(ffis)
@@ -185,7 +192,7 @@ def _crossmatch_point(ra: SkyCoord, dec: SkyCoord, all_ffis: Table) -> np.ndarra
     """
     Returns the indices of the Full Frame Images (FFIs) that contain the given RA and
     Dec coordinates by checking which FFI polygons contain the point.
-    
+
     Parameters
     ----------
     ra : SkyCoord
@@ -194,7 +201,7 @@ def _crossmatch_point(ra: SkyCoord, dec: SkyCoord, all_ffis: Table) -> np.ndarra
         Declination in degrees.
     all_ffis : `~astropy.table.Table`
         Table of FFIs to crossmatch with the point.
-        
+
     Returns
     -------
     ffi_inds : `~numpy.ndarray`
@@ -202,9 +209,9 @@ def _crossmatch_point(ra: SkyCoord, dec: SkyCoord, all_ffis: Table) -> np.ndarra
     """
     ffi_inds = []
     vector_coord = radec_to_vector(ra, dec)
-    for sector in np.unique(all_ffis['sequence_number']):
+    for sector in np.unique(all_ffis["sequence_number"]):
         # Returns a 2-long array where the first element is indexes and the 2nd element is empty
-        sector_ffi_inds = np.where(all_ffis['sequence_number'] == sector)[0]
+        sector_ffi_inds = np.where(all_ffis["sequence_number"] == sector)[0]
 
         for ind in sector_ffi_inds:
             if all_ffis[ind]["polygon"].contains_point(vector_coord):
@@ -213,8 +220,9 @@ def _crossmatch_point(ra: SkyCoord, dec: SkyCoord, all_ffis: Table) -> np.ndarra
     return np.array(ffi_inds, dtype=int)
 
 
-def _crossmatch_polygon(ra: SkyCoord, dec: SkyCoord, all_ffis: Table, px_size: np.ndarray,
-                        arcsec_per_px: int = 21) -> np.ndarray:
+def _crossmatch_polygon(
+    ra: SkyCoord, dec: SkyCoord, all_ffis: Table, px_size: np.ndarray, arcsec_per_px: int = 21
+) -> np.ndarray:
     """
     Returns the indices of the Full Frame Images (FFIs) that intersect with the given cutout footprint
     by checking which FFI polygons intersect with the cutout polygon.
@@ -258,14 +266,15 @@ def _crossmatch_polygon(ra: SkyCoord, dec: SkyCoord, all_ffis: Table, px_size: n
     cutout_fp = SphericalPolygon.from_radec(ras, decs, center=(ra, dec))
 
     # Find indices of FFIs that intersect with the cutout
-    ffi_inds = np.vectorize(lambda ffi: ffi.intersects_poly(cutout_fp))(all_ffis['polygon'])
+    ffi_inds = np.vectorize(lambda ffi: ffi.intersects_poly(cutout_fp))(all_ffis["polygon"])
     ffi_inds = FootprintCutout._ffi_intersect(all_ffis, cutout_fp)
 
     return ffi_inds
 
 
-def ra_dec_crossmatch(all_ffis: Table, coordinates: Union[SkyCoord, str], cutout_size, 
-                      arcsec_per_px: int = 21) -> Table:
+def ra_dec_crossmatch(
+    all_ffis: Table, coordinates: Union[SkyCoord, str], cutout_size, arcsec_per_px: int = 21
+) -> Table:
     """
     Returns the Full Frame Images (FFIs) whose footprints overlap with a cutout of a given position and size.
 
@@ -286,8 +295,8 @@ def ra_dec_crossmatch(all_ffis: Table, coordinates: Union[SkyCoord, str], cutout
         units of pixels. `~astropy.units.Quantity` objects must be in pixel or
         angular units.
 
-        If a cutout size of zero is provided, the function will return FFIs that contain 
-        the exact RA and Dec position. If a non-zero cutout size is provided, the function 
+        If a cutout size of zero is provided, the function will return FFIs that contain
+        the exact RA and Dec position. If a non-zero cutout size is provided, the function
         will return FFIs whose footprints overlap with the cutout area.
     arcsec_per_px : int, optional
         Default 21. The number of arcseconds per pixel in an image. Used to determine
@@ -302,9 +311,9 @@ def ra_dec_crossmatch(all_ffis: Table, coordinates: Union[SkyCoord, str], cutout
     # Convert coordinates to SkyCoord
     if not isinstance(coordinates, SkyCoord):
         try:
-            coordinates = SkyCoord(coordinates, unit='deg')
+            coordinates = SkyCoord(coordinates, unit="deg")
         except ValueError as e:
-            raise InvalidInputError(f'Invalid coordinates input: {e}')
+            raise InvalidInputError(f"Invalid coordinates input: {e}")
     ra, dec = coordinates.ra, coordinates.dec
 
     px_size = np.zeros(2, dtype=object)

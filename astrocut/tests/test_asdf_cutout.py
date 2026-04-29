@@ -1,28 +1,28 @@
-from pathlib import Path
-import numpy as np
-import pytest
-import zipfile
-import io
 import importlib.util
+import io
+import zipfile
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import asdf
+import numpy as np
+import pytest
 from astropy import coordinates as coord
-from astropy.time import Time
 from astropy import units as u
 from astropy.coordinates import SkyCoord
+from astropy.io import fits
 from astropy.modeling import models
 from astropy.nddata import Cutout2D
-from astropy.io import fits
-from gwcs import wcs, coordinate_frames
+from astropy.time import Time
+from gwcs import coordinate_frames, wcs
 from PIL import Image
 
 from astrocut.asdf_cutout import ASDFCutout, asdf_cut, get_center_pixel
 from astrocut.exceptions import DataWarning, InvalidInputError, InvalidQueryError, ModuleWarning
 
 
-def make_wcs(xsize, ysize, ra=30., dec=45.):
-    """ Create a fake gwcs object """
+def make_wcs(xsize, ysize, ra=30.0, dec=45.0):
+    """Create a fake gwcs object"""
     # todo - refine this to better reflect roman wcs
 
     # create transformations
@@ -31,26 +31,26 @@ def make_wcs(xsize, ysize, ra=30., dec=45.):
     # - project coords onto sky with TAN projection
     # - transform center pixel to the input celestial coordinate
     pixelshift = models.Shift(-xsize) & models.Shift(-ysize)
-    pixelscale = models.Scale(0.1 / 3600.) & models.Scale(0.1 / 3600.)  # 0.1 arcsec/pixel
+    pixelscale = models.Scale(0.1 / 3600.0) & models.Scale(0.1 / 3600.0)  # 0.1 arcsec/pixel
     tangent_projection = models.Pix2Sky_TAN()
-    celestial_rotation = models.RotateNative2Celestial(ra, dec, 180.)
+    celestial_rotation = models.RotateNative2Celestial(ra, dec, 180.0)
 
     # net transforms pixels to sky
     det2sky = pixelshift | pixelscale | tangent_projection | celestial_rotation
 
     # define the wcs object
-    detector_frame = coordinate_frames.Frame2D(name='detector', axes_names=('x', 'y'), unit=(u.pix, u.pix))
-    sky_frame = coordinate_frames.CelestialFrame(reference_frame=coord.ICRS(), name='world', unit=(u.deg, u.deg))
+    detector_frame = coordinate_frames.Frame2D(name="detector", axes_names=("x", "y"), unit=(u.pix, u.pix))
+    sky_frame = coordinate_frames.CelestialFrame(reference_frame=coord.ICRS(), name="world", unit=(u.deg, u.deg))
     return wcs.WCS([(detector_frame, det2sky), (sky_frame, None)])
 
 
 @pytest.fixture()
 def makefake():
-    """ Fixture factory to make a fake gwcs and dataset """
+    """Fixture factory to make a fake gwcs and dataset"""
 
     def _make_fake(nx, ny, ra, dec, zero=False, asint=False):
         # create the wcs
-        wcsobj = make_wcs(nx/2, ny/2, ra=ra, dec=dec)
+        wcsobj = make_wcs(nx / 2, ny / 2, ra=ra, dec=dec)
         wcsobj.bounding_box = ((0, nx), (0, ny))
 
         # create the data
@@ -61,7 +61,7 @@ def makefake():
             data = np.arange(size).reshape(nx, ny)
 
         # make a quantity
-        data *= (u.electron / u.second)
+        data *= u.electron / u.second
 
         # make integer array
         if asint:
@@ -74,43 +74,49 @@ def makefake():
 
 @pytest.fixture()
 def fakedata(makefake):
-    """ Fixture to create fake data and wcs """
+    """Fixture to create fake data and wcs"""
     # set up initial parameters
     nx = 1000
     ny = 1000
-    ra = 30.
-    dec = 45.
+    ra = 30.0
+    dec = 45.0
 
     yield makefake(nx, ny, ra, dec)
 
 
 @pytest.fixture()
 def test_images(tmp_path, fakedata):
-    """ Fixture to create a fake dataset of 3 images """
+    """Fixture to create a fake dataset of 3 images"""
     # get the fake data
     data, wcsobj = fakedata
 
     # create meta
-    meta = {'wcs': wcsobj,
-            'product_type': 'l2',
-            'origin': 'STSCI/SOC',
-            'file_date': Time('2023-10-01T00:00:00', format='isot')}
+    meta = {
+        "wcs": wcsobj,
+        "product_type": "l2",
+        "origin": "STSCI/SOC",
+        "file_date": Time("2023-10-01T00:00:00", format="isot"),
+    }
 
     # create and write the asdf file
-    tree = {'roman': {'meta': meta, 
-                      'data': data, 
-                      'dq': data, 
-                      'err': data,
-                      'context': np.expand_dims(data, axis=0),
-                      'invalid_dims': np.ndarray(shape=(10))}}
+    tree = {
+        "roman": {
+            "meta": meta,
+            "data": data,
+            "dq": data,
+            "err": data,
+            "context": np.expand_dims(data, axis=0),
+            "invalid_dims": np.ndarray(shape=(10)),
+        }
+    }
     af = asdf.AsdfFile(tree)
 
-    path = tmp_path / 'roman'
+    path = tmp_path / "roman"
     path.mkdir(exist_ok=True)
 
     files = []
     for i in range(3):
-        filename = path / f'test_roman_{i}.asdf'
+        filename = path / f"test_roman_{i}.asdf"
         af.write_to(filename)
         files.append(filename)
 
@@ -119,13 +125,13 @@ def test_images(tmp_path, fakedata):
 
 @pytest.fixture
 def center_coord():
-    """ Fixture to return a center coordinate """
-    return SkyCoord('29.99901792 44.99930555', unit='deg')
+    """Fixture to return a center coordinate"""
+    return SkyCoord("29.99901792 44.99930555", unit="deg")
 
 
 @pytest.fixture
 def cutout_size():
-    """ Fixture to return a cutout size """
+    """Fixture to return a cutout size"""
     return 10
 
 
@@ -150,7 +156,7 @@ def test_asdf_cutout(test_images, center_coord, cutout_size):
 
         # Check that data is equal between cutout and original image
         with asdf.open(test_images[i]) as input_af:
-            assert np.all(cutout_data == input_af['roman']['data'].value[470:480, 471:481])
+            assert np.all(cutout_data == input_af["roman"]["data"].value[470:480, 471:481])
 
         # Check WCS and that center coordinate matches input
         s_coord = cutout_wcs.pixel_to_world(cutout_size / 2, cutout_size / 2)
@@ -162,21 +168,21 @@ def test_asdf_cutout(test_images, center_coord, cutout_size):
 def test_asdf_cutout_write_to_file(test_images, center_coord, cutout_size, tmpdir):
     def check_asdf_metadata(af, original_file, cutout_data, meta_only=False):
         """Check that ASDF file contains correct metadata"""
-        assert 'roman' in af
-        assert 'meta' in af['roman']
-        meta = af['roman']['meta']
-        assert meta['wcs'].pixel_shape == (10, 10)
-        assert meta['product_type'] == 'l2'
-        assert meta['file_date'] == Time('2023-10-01T00:00:00', format='isot')
-        assert meta['origin'] == 'STSCI/SOC'
-        assert meta['orig_file'] == original_file.as_posix()
+        assert "roman" in af
+        assert "meta" in af["roman"]
+        meta = af["roman"]["meta"]
+        assert meta["wcs"].pixel_shape == (10, 10)
+        assert meta["product_type"] == "l2"
+        assert meta["file_date"] == Time("2023-10-01T00:00:00", format="isot")
+        assert meta["origin"] == "STSCI/SOC"
+        assert meta["orig_file"] == original_file.as_posix()
 
         if not meta_only:
             # Check cutout data and metadata
-            for key in ['data', 'dq', 'err', 'context']:
-                assert key in af['roman']
-                assert np.all(af['roman'][key] == cutout_data)
-    
+            for key in ["data", "dq", "err", "context"]:
+                assert key in af["roman"]
+                assert np.all(af["roman"][key] == cutout_data)
+
     # Write cutouts to ASDF files on disk
     cutout = ASDFCutout(test_images, center_coord, cutout_size)
     asdf_files = cutout.write_as_asdf(output_dir=tmpdir)
@@ -193,45 +199,46 @@ def test_asdf_cutout_write_to_file(test_images, center_coord, cutout_size, tmpdi
     assert len(fits_files) == 3
     for i, fits_file in enumerate(fits_files):
         with fits.open(fits_file) as hdul:
-            assert hdul[0].name == 'PRIMARY'
-            assert hdul[1].name == 'CUTOUT'
+            assert hdul[0].name == "PRIMARY"
+            assert hdul[1].name == "CUTOUT"
             assert np.all(hdul[1].data == cutout.cutouts[i].data)
-            assert hdul[1].header['NAXIS1'] == 10
-            assert hdul[1].header['NAXIS2'] == 10
-            assert hdul[1].header['ORIG_FLE'] == test_images[i].as_posix()
+            assert hdul[1].header["NAXIS1"] == 10
+            assert hdul[1].header["NAXIS2"] == 10
+            assert hdul[1].header["ORIG_FLE"] == test_images[i].as_posix()
             assert Path(fits_file).stat().st_size < Path(test_images[i]).stat().st_size
 
         # Check ASDF extension contents (stdatamodels optional)
-        if importlib.util.find_spec('stdatamodels') is not None:
+        if importlib.util.find_spec("stdatamodels") is not None:
             from stdatamodels import asdf_in_fits
+
             with asdf_in_fits.open(fits_file) as af:
                 check_asdf_metadata(af, test_images[i], cutout.cutouts[i].data, meta_only=True)
 
 
-@pytest.mark.parametrize('output_format', ['.asdf', '.fits'])
+@pytest.mark.parametrize("output_format", [".asdf", ".fits"])
 def test_asdf_cutout_write_to_zip(tmpdir, test_images, center_coord, cutout_size, output_format):
     # Zip ASDF representations
     cutout = ASDFCutout(test_images, center_coord, cutout_size)
     zip_path = cutout.write_as_zip(output_dir=tmpdir, output_format=output_format)
     assert Path(zip_path).exists()
 
-    with zipfile.ZipFile(zip_path, 'r') as zf:
+    with zipfile.ZipFile(zip_path, "r") as zf:
         names = zf.namelist()
         assert len(names) == len(test_images)
         for name in names:
-            assert name.endswith(f'_astrocut{output_format}')
+            assert name.endswith(f"_astrocut{output_format}")
 
         # Open one file and check contents
         data = zf.read(names[0])
-        if output_format == '.asdf':
+        if output_format == ".asdf":
             with asdf.open(io.BytesIO(data)) as af:
-                assert 'roman' in af
-                assert 'data' in af['roman']
-                assert af['roman']['data'].shape == (cutout_size, cutout_size)
+                assert "roman" in af
+                assert "data" in af["roman"]
+                assert af["roman"]["data"].shape == (cutout_size, cutout_size)
         else:
             with fits.open(io.BytesIO(data)) as hdul:
                 assert isinstance(hdul, fits.HDUList)
-                assert len(hdul) == 3 if importlib.util.find_spec('stdatamodels') is not None else 2
+                assert len(hdul) == 3 if importlib.util.find_spec("stdatamodels") is not None else 2
                 assert hdul[1].data.shape == (cutout_size, cutout_size)
 
 
@@ -239,20 +246,20 @@ def test_asdf_cutout_write_to_zip_invalid_format(tmpdir, test_images, center_coo
     # Invalid output format for zip
     cutout = ASDFCutout(test_images, center_coord, cutout_size)
     with pytest.raises(InvalidInputError, match="File format must be either '.asdf' or '.fits'"):
-        cutout.write_as_zip(output_dir=tmpdir, output_format='.invalid')
+        cutout.write_as_zip(output_dir=tmpdir, output_format=".invalid")
 
 
 def test_asdf_cutout_lite(test_images, center_coord, cutout_size):
     def check_lite_metadata(af, meta_only=False):
         """Check that ASDF file contains only lite metadata"""
-        assert 'roman' in af
-        assert 'meta' in af['roman']
-        assert 'wcs' in af['roman']['meta']
-        assert 'orig_file' in af['roman']['meta']
-        assert len(af['roman']) == (1 if meta_only else 2)
-        assert len(af['roman']['meta']) == 2  # only wcs and original filename
+        assert "roman" in af
+        assert "meta" in af["roman"]
+        assert "wcs" in af["roman"]["meta"]
+        assert "orig_file" in af["roman"]["meta"]
+        assert len(af["roman"]) == (1 if meta_only else 2)
+        assert len(af["roman"]["meta"]) == 2  # only wcs and original filename
         if not meta_only:
-            assert 'data' in af['roman']
+            assert "data" in af["roman"]
 
     # Write cutouts to ASDF objects in lite mode
     cutout = ASDFCutout(test_images, center_coord, cutout_size, lite=True)
@@ -262,48 +269,49 @@ def test_asdf_cutout_lite(test_images, center_coord, cutout_size):
     # Write cutouts to HDUList objects in lite mode
     cutout = ASDFCutout(test_images, center_coord, cutout_size, lite=True)
     for hdul in cutout.fits_cutouts:
-        has_stdatamodels = importlib.util.find_spec('stdatamodels') is not None
+        has_stdatamodels = importlib.util.find_spec("stdatamodels") is not None
         assert len(hdul) == 3 if has_stdatamodels else 2  # primary HDU + cutout HDU + embedded ASDF extension
-        assert hdul[0].name == 'PRIMARY'
-        assert hdul[1].name == 'CUTOUT'
+        assert hdul[0].name == "PRIMARY"
+        assert hdul[1].name == "CUTOUT"
 
         # Check ASDF extension contents (stdatamodels optional)
         if has_stdatamodels:
-            assert hdul[2].name == 'ASDF'
+            assert hdul[2].name == "ASDF"
             from stdatamodels import asdf_in_fits
+
             with asdf_in_fits.open(hdul) as af:
                 check_lite_metadata(af, meta_only=True)
 
 
 def test_asdf_cutout_partial(test_images, center_coord, cutout_size):
     # Off the top
-    center_coord = SkyCoord('29.99901792 44.9861', unit='deg')
+    center_coord = SkyCoord("29.99901792 44.9861", unit="deg")
     cutout = ASDFCutout(test_images[0], center_coord, cutout_size).cutouts[0]
     assert cutout.data.shape == (10, 10)
-    assert np.isnan(cutout.data[:cutout_size//2, :]).all()
+    assert np.isnan(cutout.data[: cutout_size // 2, :]).all()
 
     # Off the bottom
-    center_coord = SkyCoord('29.99901792 45.01387', unit='deg')
+    center_coord = SkyCoord("29.99901792 45.01387", unit="deg")
     cutout = ASDFCutout(test_images[0], center_coord, cutout_size).cutouts[0]
-    assert np.isnan(cutout.data[cutout_size//2:, :]).all()
+    assert np.isnan(cutout.data[cutout_size // 2 :, :]).all()
 
     # Off the left, with integer fill value
-    center_coord = SkyCoord('29.98035835 44.99930555', unit='deg')
+    center_coord = SkyCoord("29.98035835 44.99930555", unit="deg")
     cutout = ASDFCutout(test_images[0], center_coord, cutout_size, fill_value=1).cutouts[0]
-    assert np.all(cutout.data[:, :cutout_size//2] == 1)
+    assert np.all(cutout.data[:, : cutout_size // 2] == 1)
 
     # Off the right, with float fill value
-    center_coord = SkyCoord('30.01961 44.99930555', unit='deg')
+    center_coord = SkyCoord("30.01961 44.99930555", unit="deg")
     cutout = ASDFCutout(test_images[0], center_coord, cutout_size, fill_value=1.5).cutouts[0]
-    assert np.all(cutout.data[:, cutout_size//2:] == 1.5)
+    assert np.all(cutout.data[:, cutout_size // 2 :] == 1.5)
 
     # Error if unexpected fill value
-    with pytest.raises(InvalidInputError, match='Fill value must be an integer or a float.'):
-        ASDFCutout(test_images[0], center_coord, cutout_size, fill_value='invalid')
+    with pytest.raises(InvalidInputError, match="Fill value must be an integer or a float."):
+        ASDFCutout(test_images[0], center_coord, cutout_size, fill_value="invalid")
 
 
 def test_asdf_cutout_poles(cutout_size, makefake, tmp_path):
-    """ Test we can make cutouts around poles """
+    """Test we can make cutouts around poles"""
     # Make fake zero data around the pole
     ra, dec = 315.0, 89.995
     data, gwcs = makefake(1000, 1000, ra, dec, zero=True)
@@ -316,15 +324,15 @@ def test_asdf_cutout_poles(cutout_size, makefake, tmp_path):
     assert ss == (ra, dec)
 
     # Set input cutout coord
-    center_coord = SkyCoord(284.702, 89.986, unit='deg')
+    center_coord = SkyCoord(284.702, 89.986, unit="deg")
 
     # create and write the asdf file
-    meta = {'wcs': gwcs}
-    tree = {'roman': {'data': data, 'meta': meta}}
+    meta = {"wcs": gwcs}
+    tree = {"roman": {"data": data, "meta": meta}}
     af = asdf.AsdfFile(tree)
-    path = tmp_path / 'roman'
+    path = tmp_path / "roman"
     path.mkdir(exist_ok=True)
-    filename = path / 'test_roman_poles.asdf'
+    filename = path / "test_roman_poles.asdf"
     af.write_to(filename)
 
     # Get cutout
@@ -336,29 +344,29 @@ def test_asdf_cutout_poles(cutout_size, makefake, tmp_path):
 
 def test_asdf_cutout_not_in_footprint(test_images, center_coord, cutout_size):
     # Throw error if cutout location is not in image footprint
-    with pytest.warns(DataWarning, match='Cutout footprint does not overlap'):
-        with pytest.raises(InvalidQueryError, match='Cutout contains no data!'):
-            ASDFCutout(test_images[0], SkyCoord('0 0', unit='deg'), cutout_size)
+    with pytest.warns(DataWarning, match="Cutout footprint does not overlap"):
+        with pytest.raises(InvalidQueryError, match="Cutout contains no data!"):
+            ASDFCutout(test_images[0], SkyCoord("0 0", unit="deg"), cutout_size)
 
     # Alter one of the test images to only contain zeros in cutout footprint
-    with asdf.open(test_images[0], mode='rw') as af:
-        af['roman']['data'][470:480, 471:481] = 0
+    with asdf.open(test_images[0], mode="rw") as af:
+        af["roman"]["data"][470:480, 471:481] = 0
         af.update()
 
     # Should warn about first image containing no data, but not fail
-    with pytest.warns(DataWarning, match='contains no data, skipping...'):
+    with pytest.warns(DataWarning, match="contains no data, skipping..."):
         cutouts = ASDFCutout(test_images, center_coord, cutout_size).cutouts
     assert len(cutouts) == 2
 
 
 def test_asdf_cutout_no_gwcs(test_images, center_coord, cutout_size):
     # Remove WCS from test image
-    with asdf.open(test_images[0], mode='rw') as af:
-        del af['roman']['meta']['wcs']
+    with asdf.open(test_images[0], mode="rw") as af:
+        del af["roman"]["meta"]["wcs"]
         af.update()
 
     # Should warn about missing WCS for first image, but not fail
-    with pytest.warns(DataWarning, match='does not contain a GWCS object'):
+    with pytest.warns(DataWarning, match="does not contain a GWCS object"):
         cutouts = ASDFCutout(test_images, center_coord, cutout_size).cutouts
     assert len(cutouts) == 2
 
@@ -366,23 +374,23 @@ def test_asdf_cutout_no_gwcs(test_images, center_coord, cutout_size):
 def test_asdf_cutout_invalid_params(test_images, center_coord, cutout_size, tmpdir):
     # Invalid units for cutout size
     cutout_size = 1 * u.m  # meters are not valid
-    with pytest.raises(InvalidInputError, match='Cutout size unit meter is not supported.'):
+    with pytest.raises(InvalidInputError, match="Cutout size unit meter is not supported."):
         ASDFCutout(test_images, center_coord, cutout_size)
 
 
 def test_asdf_cutout_img_output(test_images, center_coord, cutout_size, tmpdir):
     # Basic JPG image
-    jpg_files = ASDFCutout(test_images, center_coord, cutout_size).write_as_img(output_dir=tmpdir, 
-                                                                                output_format='jpg')
+    jpg_files = ASDFCutout(test_images, center_coord, cutout_size).write_as_img(output_dir=tmpdir, output_format="jpg")
     assert len(jpg_files) == len(test_images)
-    with open(jpg_files[0], 'rb') as IMGFLE:
-        assert IMGFLE.read(3) == b'\xFF\xD8\xFF'  # JPG
+    with open(jpg_files[0], "rb") as IMGFLE:
+        assert IMGFLE.read(3) == b"\xff\xd8\xff"  # JPG
 
     # PNG (single input file, not as list)
-    png_files = ASDFCutout(test_images[0], center_coord, cutout_size).write_as_img(output_dir=tmpdir, 
-                                                                                   output_format='png')
-    with open(png_files[0], 'rb') as IMGFLE:
-        assert IMGFLE.read(8) == b'\x89\x50\x4E\x47\x0D\x0A\x1A\x0A'  # PNG
+    png_files = ASDFCutout(test_images[0], center_coord, cutout_size).write_as_img(
+        output_dir=tmpdir, output_format="png"
+    )
+    with open(png_files[0], "rb") as IMGFLE:
+        assert IMGFLE.read(8) == b"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a"  # PNG
     assert len(png_files) == 1
 
     # Save to memory only
@@ -394,14 +402,14 @@ def test_asdf_cutout_img_output(test_images, center_coord, cutout_size, tmpdir):
     # Color image
     color_jpg = ASDFCutout(test_images, center_coord, cutout_size).write_as_img(output_dir=tmpdir, colorize=True)
     img = Image.open(color_jpg)
-    assert img.mode == 'RGB'
+    assert img.mode == "RGB"
 
 
 def test_asdf_cutout_gwcs(test_images, center_coord):
-    """ Test creating a rectangular cutout to make sure cutout gwcs is correct """
+    """Test creating a rectangular cutout to make sure cutout gwcs is correct"""
     cutout = ASDFCutout(test_images[0], center_coord, cutout_size=[20, 40])
     asdf_cutouts = cutout.asdf_cutouts
-    gwcs = asdf_cutouts[0]['roman']['meta']['wcs']
+    gwcs = asdf_cutouts[0]["roman"]["meta"]["wcs"]
     assert isinstance(gwcs, wcs.WCS)
     assert gwcs.pixel_shape == (20, 40)
     assert gwcs.array_shape == (40, 20)
@@ -411,19 +419,21 @@ def test_asdf_cutout_gwcs(test_images, center_coord):
     assert gwcs.bounding_box.intervals[1].upper == 39
 
 
-@pytest.mark.parametrize(('is_installed', 'warn_msg'), 
-                         [(True, 'not available in the correct version'), (False, 'package cannot be imported')])
+@pytest.mark.parametrize(
+    ("is_installed", "warn_msg"),
+    [(True, "not available in the correct version"), (False, "package cannot be imported")],
+)
 def test_asdf_cutout_stdatamodels(test_images, center_coord, cutout_size, is_installed, warn_msg):
-    """ Test that warning is emitted about ASDF-in-FITS embedding for stdatamodels issues """
+    """Test that warning is emitted about ASDF-in-FITS embedding for stdatamodels issues"""
     mock_stdatamodels = None
     if is_installed:
         mock_stdatamodels = MagicMock()
-        mock_stdatamodels.__version__ = '1.0.0'
+        mock_stdatamodels.__version__ = "1.0.0"
         mock_stdatamodels.asdf_in_fits = MagicMock()
-    patch_dict = {'stdatamodels': mock_stdatamodels}
+    patch_dict = {"stdatamodels": mock_stdatamodels}
 
-    with patch.dict('sys.modules', patch_dict):
-        with patch('sys.version_info', (3, 11, 0)):
+    with patch.dict("sys.modules", patch_dict):
+        with patch("sys.version_info", (3, 11, 0)):
             with pytest.warns(ModuleWarning, match=warn_msg):
                 cutout = ASDFCutout(test_images, center_coord, cutout_size)
                 fits_cutouts = cutout.fits_cutouts
@@ -432,9 +442,9 @@ def test_asdf_cutout_stdatamodels(test_images, center_coord, cutout_size, is_ins
 
 
 def test_asdf_cutout_python_version(test_images, center_coord, cutout_size):
-    """ Test that warning is emitted about ASDF-in-FITS embedding for Python <3.11 """
-    with patch('sys.version_info', (3, 10, 0)):
-        with pytest.warns(ModuleWarning, match='requires Python 3.11 or higher'):
+    """Test that warning is emitted about ASDF-in-FITS embedding for Python <3.11"""
+    with patch("sys.version_info", (3, 10, 0)):
+        with pytest.warns(ModuleWarning, match="requires Python 3.11 or higher"):
             cutout = ASDFCutout(test_images, center_coord, cutout_size)
             fits_cutouts = cutout.fits_cutouts
         assert cutout._py311_or_higher is False
@@ -443,7 +453,7 @@ def test_asdf_cutout_python_version(test_images, center_coord, cutout_size):
 
 
 def test_get_center_pixel(fakedata):
-    """ Test get_center_pixel function """
+    """Test get_center_pixel function"""
     # Get the fake data
     __, gwcs = fakedata
 
@@ -460,7 +470,8 @@ def test_get_center_pixel(fakedata):
 
 
 def test_asdf_cut(test_images, center_coord, cutout_size, tmpdir):
-    """ Test convenience function to create ASDF cutouts """
+    """Test convenience function to create ASDF cutouts"""
+
     def check_paths(cutout_paths, ext):
         assert isinstance(cutout_paths, list)
         assert isinstance(cutout_paths[0], str)
@@ -471,18 +482,19 @@ def test_asdf_cut(test_images, center_coord, cutout_size, tmpdir):
             assert Path(path).exists()
             assert str(tmpdir) in path
             assert Path(test_images[i]).stem in path
-            assert center_coord.ra.to_string(unit='deg', decimal=True) in path
-            assert center_coord.dec.to_string(unit='deg', decimal=True) in path
-            assert '10-x-10' in path
-    
+            assert center_coord.ra.to_string(unit="deg", decimal=True) in path
+            assert center_coord.dec.to_string(unit="deg", decimal=True) in path
+            assert "10-x-10" in path
+
     # Write files to disk as ASDF files
     asdf_paths = asdf_cut(test_images, center_coord.ra.deg, center_coord.dec.deg, cutout_size, output_dir=tmpdir)
-    check_paths(asdf_paths, '.asdf')
+    check_paths(asdf_paths, ".asdf")
 
     # Write files to disk as FITS files
-    fits_paths = asdf_cut(test_images, center_coord.ra.deg, center_coord.dec.deg, cutout_size, output_dir=tmpdir, 
-                          output_format='fits')
-    check_paths = (fits_paths, '.fits')
+    fits_paths = asdf_cut(
+        test_images, center_coord.ra.deg, center_coord.dec.deg, cutout_size, output_dir=tmpdir, output_format="fits"
+    )
+    check_paths = (fits_paths, ".fits")
 
     # Write cutouts to memory as Cutout2D objects
     cutouts = asdf_cut(test_images, center_coord.ra.deg, center_coord.dec.deg, cutout_size, write_file=False)
@@ -491,5 +503,5 @@ def test_asdf_cut(test_images, center_coord, cutout_size, tmpdir):
     assert len(cutouts) == 3
 
     # Error if output format is not supported
-    with pytest.raises(InvalidInputError, match='Output format .invalid is not recognized.'):
-        asdf_cut(test_images, center_coord.ra.deg, center_coord.dec.deg, cutout_size, output_format='invalid')
+    with pytest.raises(InvalidInputError, match="Output format .invalid is not recognized."):
+        asdf_cut(test_images, center_coord.ra.deg, center_coord.dec.deg, cutout_size, output_format="invalid")

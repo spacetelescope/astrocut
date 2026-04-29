@@ -12,7 +12,7 @@ def setup_logger():
 
     # Create a console handler with format
     sh = logging.StreamHandler()
-    formatter = logging.Formatter('%(levelname)s: %(message)s [%(module)s]')
+    formatter = logging.Formatter("%(levelname)s: %(message)s [%(module)s]")
     sh.setFormatter(formatter)
     log.addHandler(sh)
 
