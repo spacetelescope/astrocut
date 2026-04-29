@@ -54,7 +54,7 @@ For active development install in develop mode
 
 Linting
 =======
-Astrocut uses `ruff <https://github.com/charliermarsh/ruff>`_ for linting.
+Astrocut uses `ruff <https://github.com/astral-sh/ruff>`_ for linting.
 
 To run ruff, install it with ``pip install ruff`` and then run the following commands from the root of the repository:
 

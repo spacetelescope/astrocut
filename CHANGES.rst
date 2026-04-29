@@ -3,6 +3,12 @@ Unreleased
 
 - Added ``fsspec_kwargs`` parameter to ``FITSCutout`` to pass through to ``s3fs`` for cloud-hosted files. [#177]
 - New ``RomanSpectralSubset`` class for creating spectral subsets from Roman Space Telescope ASDF data. [#179]
+- Added support for Python 3.14. [#181]
+
+Breaking Changes
+^^^^^^^^^^^^^^^^
+
+- Removed support for Python 3.8. [#181]
 
 
 1.2.0 (2026-02-04)
