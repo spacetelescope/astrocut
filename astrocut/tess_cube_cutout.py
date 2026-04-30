@@ -12,7 +12,7 @@ from s3path import S3Path
 
 from . import __version__, log
 from .cube_cutout import CubeCutout
-from .exceptions import DataWarning, InvalidInputError, InvalidQueryError
+from .exceptions import DataWarning, InvalidQueryError
 
 
 class TessCubeCutout(CubeCutout):
@@ -328,15 +328,6 @@ class TessCubeCutout(CubeCutout):
         # Copy the primary HDU and update its header
         primary_hdu = cube_fits[0].copy()
         self._update_primary_header(primary_hdu.header)
-
-        required_columns = {"TSTART", "TSTOP", "BARYCORR", "DQUALITY", "FFI_FILE"}
-        available_columns = set(cube_fits[2].columns.names)
-        missing_columns = sorted(required_columns - available_columns)
-        if missing_columns:
-            raise InvalidInputError(
-                "Unsupported cube format: missing required table column(s) "
-                f"{', '.join(missing_columns)}. Only SPOC-style cubes with time correction data are supported."
-            )
 
         cols = []  # list to store FITS table columns
         img_cube = cutout.data

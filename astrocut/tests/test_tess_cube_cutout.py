@@ -13,7 +13,7 @@ from astropy.wcs import WCS, FITSFixedWarning
 
 from ..cube_cutout import CubeCutout
 from ..cube_factory import CubeFactory
-from ..exceptions import DataWarning, InvalidQueryError
+from ..exceptions import DataWarning, InvalidInputError, InvalidQueryError
 from ..tess_cube_cutout import TessCubeCutout
 from .utils_for_test import create_test_ffis
 
@@ -363,3 +363,16 @@ def test_tess_cube_cutout_not_in_footprint(cube_file):
     with pytest.warns(DataWarning, match="Cutout footprint does not overlap"):
         with pytest.raises(InvalidQueryError, match="Cube cutout contains no data!"):
             TessCubeCutout(cube_file, coord, 3)
+
+
+def test_tess_cube_cutout_not_spoc(cube_file, tmpdir, cutout_size, coordinates):
+    # Make a copy of the cube file and modify it to not be SPOC compliant
+    with fits.open(cube_file) as hdul:
+        # Remove the uncertainty column to make it non-SPOC compliant
+        hdul[1].data = hdul[1].data[..., :1]
+        modified_cube_file = Path(tmpdir, "modified_cube.fits")
+        hdul.writeto(modified_cube_file, overwrite=True)
+
+    # Attempt to make a cutout with the non-SPOC compliant cube file
+    with pytest.raises(InvalidInputError, match="Cube must have at least 2 planes"):
+        TessCubeCutout(modified_cube_file, coordinates, cutout_size)
