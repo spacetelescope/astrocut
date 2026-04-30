@@ -1,4 +1,5 @@
 import io
+import json
 import zipfile
 from os import path
 from pathlib import Path
@@ -16,6 +17,7 @@ from PIL import Image
 
 from astrocut.fits_cutout import FITSCutout
 
+from .. import __version__
 from ..exceptions import DataWarning, InputWarning, InvalidInputError, InvalidQueryError
 from .utils_for_test import create_test_imgs
 
@@ -433,6 +435,20 @@ def test_fits_cutout_img_output(tmpdir, test_images, caplog, center_coord, cutou
     with open(jpg_files[0], "rb") as IMGFLE:
         assert IMGFLE.read(3) == b"\xff\xd8\xff"  # JPG
 
+    # Check metadata in JPG file
+    with Image.open(jpg_files[0]) as img:
+        metadata = json.loads(img.getexif()[270])
+    print(metadata)
+    assert len(metadata) == 8
+    assert metadata["input_file"] == Path(test_images[0]).name
+    assert metadata["center_ra_deg"] == center_coord.ra.deg.item()
+    assert metadata["center_dec_deg"] == center_coord.dec.deg.item()
+    assert metadata["origin"] == "STScI/MAST"
+    assert metadata["version"] == __version__
+    assert metadata["cutout_size_x_pix"] == cutout_size
+    assert metadata["cutout_size_y_pix"] == cutout_size
+    assert "pixel_scale_arcsec_per_pix" in metadata
+
     # Png (single input file, not as list)
     img_files = FITSCutout(test_images[0], center_coord, cutout_size).write_as_img(
         output_format="png", output_dir=tmpdir
@@ -440,6 +456,14 @@ def test_fits_cutout_img_output(tmpdir, test_images, caplog, center_coord, cutou
     with open(img_files[0], "rb") as IMGFLE:
         assert IMGFLE.read(8) == b"\x89\x50\x4e\x47\x0d\x0a\x1a\x0a"  # PNG
     assert len(img_files) == 1
+
+    # Check metadata in PNG file
+    with Image.open(img_files[0]) as img:
+        metadata = img.info
+    assert len(metadata) == 8
+    assert metadata["input_file"] == Path(test_images[0]).name
+    assert float(metadata["center_ra_deg"]) == center_coord.ra.deg.item()
+    assert float(metadata["center_dec_deg"]) == center_coord.dec.deg.item()
 
     # String coordinates and verbose
     center_coord = "150.1163213 2.200973097"
@@ -457,22 +481,58 @@ def test_fits_cutout_img_color(tmpdir, test_images, center_coord, cutout_size):
         output_format="jpg", colorize=True, output_dir=tmpdir
     )
     img = Image.open(color_jpg)
+    metadata = json.loads(img.getexif()[270])
     assert img.mode == "RGB"
+    assert len(metadata) == 8
+    assert metadata["input_files"] == ", ".join([Path(file).name for file in test_images[:3]])
 
 
 def test_fits_cutout_img_memory_only(test_images, center_coord, cutout_size):
     # Save black and white image to memory
-    imgs = FITSCutout(test_images[0], center_coord, cutout_size).image_cutouts
+    cutout = FITSCutout(test_images[0], center_coord, cutout_size)
+    imgs = cutout.image_cutouts
     assert isinstance(imgs, list)
     assert len(imgs) == 1
     assert isinstance(imgs[0], Image.Image)
+    assert len(imgs[0].info) == 8
+    assert imgs[0].info["input_file"] == Path(test_images[0]).name
 
     # Save color image to memory
-    color_imgs = FITSCutout(test_images[:3], center_coord, cutout_size).get_image_cutouts(colorize=True)
+    color_cutout = FITSCutout(test_images[:3], center_coord, cutout_size)
+    color_imgs = color_cutout.get_image_cutouts(colorize=True)
     assert isinstance(color_imgs, list)
     assert len(color_imgs) == 1
     assert isinstance(color_imgs[0], Image.Image)
-    assert color_imgs[0].mode == "RGB"
+    assert len(color_imgs[0].info) == 8
+    assert color_imgs[0].info["input_files"] == ", ".join([Path(file).name for file in test_images[:3]])
+
+
+@pytest.mark.parametrize("colorize", [True, False])
+def test_fits_cutout_img_flip(test_images, center_coord, cutout_size, colorize):
+    # Test that outputs match input orientation expectations
+    input_files = test_images[:3] if colorize else test_images[0]
+    cutout = FITSCutout(input_files, center_coord, cutout_size)
+
+    flipped = np.array(cutout.get_image_cutouts(colorize=colorize)[0])
+    unflipped = np.array(cutout.get_image_cutouts(colorize=colorize, flip_orientation=False)[0])
+
+    cutout_list = [x for cutout_group in cutout.cutouts_by_file.values() for x in cutout_group]
+    if colorize:
+        expected_unflipped = np.dstack([FITSCutout.normalize_img(c.data) for c in cutout_list[:3]])
+    else:
+        expected_unflipped = FITSCutout.normalize_img(cutout_list[0].data)
+    expected_flipped = np.flipud(expected_unflipped)
+
+    flipped_to_flipped = np.mean(np.abs(flipped.astype(int) - expected_flipped.astype(int)))
+    flipped_to_unflipped = np.mean(np.abs(flipped.astype(int) - expected_unflipped.astype(int)))
+    unflipped_to_unflipped = np.mean(np.abs(unflipped.astype(int) - expected_unflipped.astype(int)))
+    unflipped_to_flipped = np.mean(np.abs(unflipped.astype(int) - expected_flipped.astype(int)))
+
+    # Default output should match the flipped orientation; opt-out should match unflipped orientation.
+    assert flipped_to_flipped < flipped_to_unflipped
+    assert flipped_to_flipped < 1
+    assert unflipped_to_unflipped < unflipped_to_flipped
+    assert unflipped_to_unflipped < 1
 
 
 def test_fits_cutout_img_errors(tmpdir, test_images, center_coord, cutout_size):

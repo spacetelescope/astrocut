@@ -1,3 +1,4 @@
+import json
 import warnings
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -16,10 +17,12 @@ from astropy.visualization import (
     SinhStretch,
     SqrtStretch,
 )
-from PIL import Image
+from astropy.wcs.utils import proj_plane_pixel_scales
+from PIL.Image import Image, Transpose, fromarray, registered_extensions
+from PIL.PngImagePlugin import PngInfo
 from s3path import S3Path
 
-from . import log
+from . import __version__, log
 from .cutout import Cutout
 from .exceptions import DataWarning, InputWarning, InvalidInputError
 
@@ -78,7 +81,7 @@ class ImageCutout(Cutout, ABC):
         self._image_cutouts = None
 
     @property
-    def image_cutouts(self) -> List[Image.Image]:
+    def image_cutouts(self) -> List[Image]:
         """
         Return the cutouts as a list of `PIL.Image` objects.
 
@@ -96,7 +99,8 @@ class ImageCutout(Cutout, ABC):
         minmax_value: Optional[List[int]] = None,
         invert: Optional[bool] = False,
         colorize: Optional[bool] = False,
-    ) -> List[Image.Image]:
+        flip_orientation: Optional[bool] = True,
+    ) -> List[Image]:
         """
         Get the cutouts as `~PIL.Image` objects given certain normalization parameters. This method also sets
         the `image_cutouts` attribute.
@@ -120,6 +124,9 @@ class ImageCutout(Cutout, ABC):
             Optional, default False.  If True the image is inverted (light pixels become dark and vice versa).
         colorize : bool
             Optional, default False. If True, the first three cutouts will be combined into a single RGB image.
+        flip_orientation : bool
+            Optional, default True. If True, the cutout images are flipped vertically to match the orientation
+            of the input images.
 
         Returns
         -------
@@ -137,7 +144,20 @@ class ImageCutout(Cutout, ABC):
             minmax_percent = [0.5, 99.5]
 
         if colorize:  # color cutout
-            all_cutouts = [x for fle in self._input_files for x in self.cutouts_by_file.get(fle, [])]
+            all_cutouts = []
+            all_cutout_files = []
+            for file in self._input_files:
+                file_cutouts = self.cutouts_by_file.get(file, [])
+                all_cutouts.extend(file_cutouts)
+                all_cutout_files.extend([file] * len(file_cutouts))
+
+                if len(all_cutouts) > 3:
+                    warnings.warn(
+                        "Too many inputs for a color cutout, only the first three will be used.", InputWarning
+                    )
+                    all_cutouts = all_cutouts[:3]
+                    all_cutout_files = all_cutout_files[:3]
+                    break
 
             # Check for the correct number of cutouts
             if len(all_cutouts) < 3:
@@ -147,9 +167,6 @@ class ImageCutout(Cutout, ABC):
                         "If you supplied 3 images one of the cutouts may have been empty."
                     )
                 )
-            if len(all_cutouts) > 3:
-                warnings.warn("Too many inputs for a color cutout, only the first three will be used.", InputWarning)
-                all_cutouts = all_cutouts[:3]
 
             img_arrs = []
             for cutout in all_cutouts:
@@ -157,14 +174,25 @@ class ImageCutout(Cutout, ABC):
                 img_arrs.append(self.normalize_img(cutout.data, stretch, minmax_percent, minmax_value, invert))
 
             # Combine the three cutouts into a single RGB image
-            self._image_cutouts = [Image.fromarray(np.dstack([img_arrs[0], img_arrs[1], img_arrs[2]]).astype(np.uint8))]
+            color_img = fromarray(np.dstack([img_arrs[0], img_arrs[1], img_arrs[2]]).astype(np.uint8))
+            if flip_orientation:
+                # Flip the image vertically to match the orientation of the input cutouts
+                color_img = color_img.transpose(Transpose.FLIP_TOP_BOTTOM)
+            color_img.info.update(self._build_cutout_metadata(all_cutout_files))
+            self._image_cutouts = [color_img]
         else:  # one image per cutout
             image_cutouts = []
             for file, cutout_list in self.cutouts_by_file.items():
                 for i, cutout in enumerate(cutout_list):
                     # Apply the appropriate normalization parameters
                     img_arr = self.normalize_img(cutout.data, stretch, minmax_percent, minmax_value, invert)
-                    image_cutouts.append(Image.fromarray(img_arr))
+                    img = fromarray(img_arr)
+                    # Flip the image vertically to match the orientation of the input cutouts
+                    if flip_orientation:
+                        # Flip the image vertically to match the orientation of the input cutouts
+                        img = img.transpose(Transpose.FLIP_TOP_BOTTOM)
+                    img.info.update(self._build_cutout_metadata([file]))
+                    image_cutouts.append(img)
 
             self._image_cutouts = image_cutouts
 
@@ -207,10 +235,90 @@ class ImageCutout(Cutout, ABC):
         output_format = f".{out_lower}" if not output_format.startswith(".") else out_lower
 
         # Error if the output format is not supported
-        if output_format not in Image.registered_extensions().keys():
+        if output_format not in registered_extensions().keys():
             raise InvalidInputError(f"Output format {output_format} is not supported.")
 
         return output_format
+
+    def _build_cutout_metadata(self, input_files: List[Union[str, Path, S3Path]]) -> dict:
+        """
+        Build metadata describing a cutout image.
+
+        Parameters
+        ----------
+        input_files : list
+            The input file or files used to create the cutout.
+
+        Returns
+        -------
+        metadata : dict
+            Structured metadata for the cutout image.
+        """
+        meta = {}
+
+        # Add input file information to the metadata, using a single key
+        # if there is only one input file and a list if there are multiple
+        if len(input_files) == 1:
+            meta["input_file"] = Path(input_files[0]).name
+        else:
+            meta["input_files"] = ", ".join([Path(file).name for file in input_files])
+
+        # For color cutouts, we can get the pixel scale and cutout size from the first cutout
+        # since we assume they have the same WCS
+        cutout = self.cutouts_by_file.get(input_files[0], [None])[0]
+        if cutout is not None:
+            meta["cutout_size_x_pix"] = cutout.shape[1]
+            meta["cutout_size_y_pix"] = cutout.shape[0]
+            meta["pixel_scale_arcsec_per_pix"] = proj_plane_pixel_scales(cutout.wcs)[0] * 3600
+
+        meta.update(
+            {
+                "center_ra_deg": self._coordinates.ra.deg.item(),
+                "center_dec_deg": self._coordinates.dec.deg.item(),
+                "origin": "STScI/MAST",
+                "version": __version__,
+            }
+        )
+
+        return meta
+
+    def _get_img_save_kwargs(self, im: Image, file_path: str) -> dict:
+        """
+        Return format-specific keyword arguments for saving an image.
+
+        Parameters
+        ----------
+        im : `~PIL.Image`
+            The image to save.
+        file_path : str
+            The output file path.
+
+        Returns
+        -------
+        save_kwargs : dict
+            Keyword arguments to pass to `PIL.Image.Image.save`.
+        """
+        # Get the cutout metadata from top-level Image.info
+        metadata = im.info
+        if not metadata:
+            return {}
+        metadata_json = json.dumps(metadata)
+        output_suffix = Path(file_path).suffix.lower()
+
+        # Format for saving to file depends on output format
+        if output_suffix == ".png":
+            pnginfo = PngInfo()
+            for key, value in metadata.items():
+                pnginfo.add_text(key, str(value))
+            return {"pnginfo": pnginfo}
+
+        if output_suffix in {".jpg", ".jpeg", ".tif", ".tiff"}:
+            exif = im.getexif()
+            # Use tag for image description to store cutout metadata as json string
+            exif[270] = metadata_json
+            return {"exif": exif.tobytes()}
+
+        return {}
 
     def _save_img_to_file(self, im: Image, file_path: str) -> bool:
         """
@@ -229,7 +337,8 @@ class ImageCutout(Cutout, ABC):
             True if the image was saved successfully, False otherwise.
         """
         try:
-            im.save(file_path)
+            save_kwargs = self._get_img_save_kwargs(im, file_path)
+            im.save(file_path, **save_kwargs)
             return True
         except ValueError as e:
             output_format = Path(file_path).suffix
@@ -260,6 +369,7 @@ class ImageCutout(Cutout, ABC):
         output_format: str = ".jpg",
         output_dir: Union[str, Path] = ".",
         cutout_prefix: str = "cutout",
+        flip_orientation: Optional[bool] = True,
     ) -> Union[str, List[str]]:
         """
         Write the cutout to memory or to a file in an image format. If colorize is set, the first 3 cutouts
@@ -284,6 +394,9 @@ class ImageCutout(Cutout, ABC):
             Optional, default False.  If True the image is inverted (light pixels become dark and vice versa).
         colorize : bool
             Optional, default False. If True, the first three cutouts will be combined into a single RGB image.
+        flip_orientation : bool
+            Optional, default True. If True, the cutout images are flipped vertically to match the
+            orientation of the input images.
         output_format : str
             Optional, default '.jpg'. The output format for the cutout image(s).
         output_dir : str | `~pathlib.Path`
@@ -305,7 +418,9 @@ class ImageCutout(Cutout, ABC):
         output_format = self._parse_output_format(output_format)
 
         # Get the image cutouts with the given normalization parameters
-        image_cutouts = self.get_image_cutouts(stretch, minmax_percent, minmax_value, invert, colorize)
+        image_cutouts = self.get_image_cutouts(
+            stretch, minmax_percent, minmax_value, invert, colorize, flip_orientation
+        )
 
         # Create the output directory if it does not exist
         Path(output_dir).mkdir(parents=True, exist_ok=True)
