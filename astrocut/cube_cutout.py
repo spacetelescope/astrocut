@@ -16,7 +16,7 @@ from s3path import S3Path
 
 from . import log
 from .cutout import Cutout
-from .exceptions import InvalidQueryError
+from .exceptions import InvalidInputError, InvalidQueryError
 from .utils.wcs_fitting import fit_wcs_from_points
 
 
@@ -72,7 +72,6 @@ class CubeCutout(Cutout, ABC):
         self._threads = threads
 
         # Populate these in child classes
-        self._has_uncertainty = False  # If the cube has uncertainty data
         self._img_kwds = {}  # Extra keywords to add to the TPF headers
         self._wcs_axes_keyword = None  # Keyword corresponding to WCS axis
         self._wcs_axes_value = None  # Expected value for the WCS axis keyword
@@ -292,8 +291,6 @@ class CubeCutout(Cutout, ABC):
             The input cube filename.
         cube_wcs : `~astropy.wcs.WCS`
             The WCS object for the input cube.
-        has_uncert : bool
-            If the cube has uncertainty data.
         parent : `CubeCutout`
             The parent `CubeCutout` object.
 
@@ -302,7 +299,7 @@ class CubeCutout(Cutout, ABC):
         data : `numpy.array`
             The image data cutout.
         uncertainty : `numpy.array`
-            The uncertainty data cutout if the cube has uncertainties. Otherwise, returns `None`.
+            The uncertainty data cutout.
         aperture : `numpy.array`
             The aperture array.
         wcs : `~astropy.wcs.WCS`
@@ -317,14 +314,7 @@ class CubeCutout(Cutout, ABC):
             The input cube filename.
         """
 
-        def __init__(
-            self,
-            cube: fits.HDUList,
-            file: Union[str, Path, S3Path],
-            cube_wcs: WCS,
-            has_uncert: bool,
-            parent: "CubeCutout",
-        ):
+        def __init__(self, cube: fits.HDUList, file: Union[str, Path, S3Path], cube_wcs: WCS, parent: "CubeCutout"):
             self._parent = parent
             self.cube_filename = file
             self.cube_wcs = cube_wcs
@@ -337,9 +327,7 @@ class CubeCutout(Cutout, ABC):
             self.cutout_lims = self._parent._get_cutout_limits(cube_wcs)
 
             # Get cutout data
-            self.data, self.uncertainty, self.aperture = self._get_cutout_data(
-                cube[1].section, self._parent._threads, has_uncert
-            )
+            self.data, self.uncertainty, self.aperture = self._get_cutout_data(cube[1].section, self._parent._threads)
             self.shape = self.data.shape
 
             # Get cutout WCS
@@ -349,7 +337,7 @@ class CubeCutout(Cutout, ABC):
             self._fit_cutout_wcs(self.data.shape[1:])
 
         def _get_cutout_data(
-            self, transposed_cube: fits.ImageHDU.section, threads: int, has_uncert: bool = True
+            self, transposed_cube: fits.ImageHDU.section, threads: int
         ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
             """
             Extract a cutout from an image/uncertainty cube that has been transposed to have time on the longest axis.
@@ -360,19 +348,25 @@ class CubeCutout(Cutout, ABC):
                 Transposed image/uncertainty array.
             threads : int
                 The number of threads to use for the cutout.
-            has_uncert : bool
-                If the cube has uncertainty data.
 
             Returns
             -------
             img_cutout : `numpy.array`
                 The untransposed image cutout array.
-            uncert_cutout : `numpy.array` or `None`
-                The untransposed uncertainty cutout array if `self._product` is 'SPOC'. Otherwise, returns `None`.
+            uncert_cutout : `numpy.array`
+                The untransposed uncertainty cutout array.
             aperture : `numpy.array`
                 The aperture array. This is a 2D array that is the same size as a single cutout that is 1 where
                 there is image data and 0 where there isn't.
             """
+            # Validate that the cube has the expected structure (at least image and uncertainty planes)
+            if transposed_cube.shape[-1] < 2:
+                raise InvalidInputError(
+                    "Cube must have at least 2 planes (image and uncertainty data). "
+                    "Only SPOC-style cubes with uncertainty data are supported. "
+                    "Legacy cubes (e.g., TICA) with a single plane are not supported."
+                )
+
             # Compute cutout limits based on WCS
             xmin, xmax = self.cutout_lims[1]
             ymin, ymax = self.cutout_lims[0]
@@ -405,7 +399,7 @@ class CubeCutout(Cutout, ABC):
 
             # Extract image and uncertainty cutouts
             img_cutout = np.moveaxis(cutout[:, :, :, 0], 2, 0)
-            uncert_cutout = np.moveaxis(cutout[:, :, :, 1], 2, 0) if has_uncert else None
+            uncert_cutout = np.moveaxis(cutout[:, :, :, 1], 2, 0)
 
             # Create aperture mask
             aperture = np.ones((xmax - xmin, ymax - ymin), dtype=np.int32)
@@ -413,13 +407,11 @@ class CubeCutout(Cutout, ABC):
             # Apply padding if needed
             if padding.any():
                 img_cutout = np.pad(img_cutout, padding, "constant", constant_values=self._parent._fill_value)
-                if has_uncert:
-                    uncert_cutout = np.pad(uncert_cutout, padding, "constant", constant_values=self._parent._fill_value)
+                uncert_cutout = np.pad(uncert_cutout, padding, "constant", constant_values=self._parent._fill_value)
                 aperture = np.pad(aperture, padding[1:], "constant", constant_values=0)
 
             log.debug("Image cutout cube shape: %s", img_cutout.shape)
-            if has_uncert:
-                log.debug("Uncertainty cutout cube shape: %s", uncert_cutout.shape)
+            log.debug("Uncertainty cutout cube shape: %s", uncert_cutout.shape)
 
             return img_cutout, uncert_cutout, aperture
 

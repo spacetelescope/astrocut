@@ -7,10 +7,9 @@ import numpy as np
 from astropy.coordinates import SkyCoord
 from astropy.io.fits import HDUList
 from astropy.table import Table
-from astropy.utils.decorators import deprecated_renamed_argument
 
 from . import log
-from .exceptions import InvalidInputError, InvalidQueryError
+from .exceptions import InvalidQueryError
 from .footprint_cutout import FootprintCutout, get_ffis, ra_dec_crossmatch
 from .tess_cube_cutout import TessCubeCutout
 
@@ -35,10 +34,6 @@ class TessFootprintCutout(FootprintCutout):
         sequence number as an int or a list of sequence numbers. If not specified,
         cutouts will be generated from all sequences that contain the cutout.
         For the TESS mission, this parameter corresponds to sectors.
-    product : str, optional
-        .. deprecated:: 1.1.0
-           This parameter is deprecated and will be removed in a future release.
-           Only "SPOC" products are now supported.
     verbose : bool
         If True, log messages are printed to the console.
 
@@ -70,14 +65,6 @@ class TessFootprintCutout(FootprintCutout):
     S3_FOOTPRINT_CACHE = "s3://stpubdata/tess/public/footprints/tess_ffi_footprint_cache.json"
     S3_BASE_FILE_PATH = "s3://stpubdata/tess/public/mast/"
 
-    @deprecated_renamed_argument(
-        "product",
-        None,
-        since="1.1.0",
-        message="Astrocut no longer supports cutouts from "
-        "TESS Image Calibrator (TICA) products. "
-        "The `product` argument is deprecated and will be removed in a future version.",
-    )
     def __init__(
         self,
         coordinates: Union[SkyCoord, str],
@@ -85,16 +72,9 @@ class TessFootprintCutout(FootprintCutout):
         fill_value: Union[int, float] = np.nan,
         limit_rounding_method: str = "round",
         sequence: Union[int, List[int], None] = None,
-        product: str = "SPOC",
         verbose: bool = False,
     ):
         super().__init__(coordinates, cutout_size, fill_value, limit_rounding_method, sequence, verbose)
-
-        # Validate and set the product
-        if product.upper() != "SPOC":
-            raise InvalidInputError('Product for TESS cube cutouts must be "SPOC".')
-        self._product = "SPOC"
-
         # Make the cutouts upon initialization
         self.cutout()
 
@@ -285,19 +265,10 @@ def _get_files_from_cone_results(cone_results: Table) -> List[dict]:
     return cube_files
 
 
-@deprecated_renamed_argument(
-    "product",
-    None,
-    since="1.1.0",
-    message="Astrocut no longer supports cutouts from "
-    "TESS Image Calibrator (TICA) products. "
-    "The `product` argument is deprecated and will be removed in a future version.",
-)
 def cube_cut_from_footprint(
     coordinates: Union[str, SkyCoord],
     cutout_size,
     sequence: Union[int, List[int], None] = None,
-    product: str = "SPOC",
     memory_only=False,
     output_dir: str = ".",
     verbose: bool = False,
@@ -324,10 +295,6 @@ def cube_cut_from_footprint(
         sequence number as an int or a list of sequence numbers. If not specified,
         cutouts will be generated from all sequences that contain the cutout.
         For the TESS mission, this parameter corresponds to sectors.
-    product : str, optional
-        .. deprecated:: 1.1.0
-           This parameter is deprecated and will be removed in a future release.
-           Only "SPOC" products are now supported.
     memory_only : bool, optional
         Default False. If True, the cutouts are stored in memory and not written to disk.
     output_dir : str, optional
@@ -354,7 +321,7 @@ def cube_cut_from_footprint(
      './cutouts/tess-s0002-4-1/tess-s0002-4-1_83.406310_-62.489771_64x64_astrocut.fits']
     """
     # Create the TessFootprintCutout object
-    cutouts = TessFootprintCutout(coordinates, cutout_size, sequence=sequence, product=product, verbose=verbose)
+    cutouts = TessFootprintCutout(coordinates, cutout_size, sequence=sequence, verbose=verbose)
 
     # Return cutouts as memory objects
     if memory_only:

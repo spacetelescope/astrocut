@@ -9,6 +9,9 @@ Breaking Changes
 ^^^^^^^^^^^^^^^^
 
 - Removed support for Python 3.8. [#181]
+- Remove the ``TicaCubeFactory`` class after deprecation in 1.1.0. [#182]
+- Remove the ``product`` parameter from the ``TessCubeCutout`` class, the ``TessFootprintCutout`` class, the ``cube_cut`` function,
+  the ``CutoutFactory.cube_cut`` function, and the ``cube_cut_from_footprint`` function after deprecation in 1.1.0. [#182]
 
 
 1.2.0 (2026-02-04)
@@ -63,7 +66,7 @@ Breaking Changes
 - Remove TICA (TESS Image Calibration) as an option for the ``product`` parameter in ``TessFootprintCutout``. [#161]
 - Deprecate the ``TicaCubeFactory`` class. [#161]
 - Deprecate the ``product`` parameter in the ``TessCubeCutout`` class, the ``TessFootprintCutout`` class, the ``cube_cut`` function,
-  the ``CutoutFactory.cube_cut`` function, and the ``cube_cutout_from_footprint`` function. [#161]
+  the ``CutoutFactory.cube_cut`` function, and the ``cube_cut_from_footprint`` function. [#161]
 
 
 1.0.1 (2025-05-12)

@@ -38,7 +38,7 @@ def coordinates():
 
 
 @pytest.fixture
-def all_ffis(scope="module"):
+def all_ffis():
     """Fixture to return the table of all FFIs"""
     return get_ffis("s3://stpubdata/tess/public/footprints/tess_ffi_footprint_cache.json")
 
@@ -58,7 +58,7 @@ def crossmatch_spies(monkeypatch):
     yield spy_point, spy_poly
 
 
-def check_output_tpf(tpf, sequences=[], cutout_size=5):
+def check_output_tpf(tpf, sequences=None, cutout_size=5):
     """Helper function to check the validity of output cutout files"""
     tpf_table = tpf[1].data
 
@@ -263,16 +263,6 @@ def test_tess_footprint_cutout_outside_coords(coordinates, cutout_size):
     err = "The given coordinates were not found within the specified sequence(s)."
     with pytest.raises(InvalidQueryError, match=re.escape(err)):
         TessFootprintCutout(coordinates, cutout_size, sequence=2)
-
-
-def test_tess_footprint_cutout_invalid_product(coordinates, cutout_size):
-    """Test that InvalidQueryError is raised if an invalid product is given"""
-    err = 'Product for TESS cube cutouts must be "SPOC".'
-    with pytest.raises(InvalidInputError, match=err):
-        TessFootprintCutout(coordinates, cutout_size, product="invalid")
-
-    with pytest.raises(InvalidInputError, match=err):
-        TessFootprintCutout(coordinates, cutout_size, product="TICA")
 
 
 def test_cube_cut_from_footprint(coordinates, cutout_size, tmpdir):
