@@ -126,7 +126,6 @@ def test_cube_cutout(cube_file, ffi_files, use_factory, tmp_path):
     img_header = fits.getheader(ffi_files[0], n)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", FITSFixedWarning)
-        warnings.simplefilter("ignore", FITSFixedWarning)
         cube_wcs = wcs.WCS(img_header)
 
     # get pixel positions at edges and center of image
@@ -355,7 +354,6 @@ def test_target_pixel_file(cube_file, tmp_path):
     assert "FFI_FILE" in tpf_table.columns.names
 
     # Check img cutout shape and data type
-    cutout_img = tpf_table[0]["FLUX"]
     cutout_img = tpf_table[0]["FLUX"]
     assert cutout_img.shape == (3, 5)
     assert cutout_img.dtype.name == "float32"
