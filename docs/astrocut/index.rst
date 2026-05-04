@@ -248,7 +248,7 @@ normalization parameters:
   (200, 300)
   >>> fits_img.show() #doctest: +SKIP
 
-.. image:: imgs/img_cutout.jpg
+.. image:: imgs/img_cutout.png
 
 To produce a colorized RGB image, set the ``colorize`` parameter to True. Color images require three cutouts, 
 which will be treated as the R, G, and B channels, respectively.
@@ -281,6 +281,7 @@ To specify the output format of the cutout images, use the ``output_format`` par
 
   >>> path = fits_cutout.write_as_img(stretch='sqrt', invert=True, output_format='png')
   >>> im = Image.open(path[0]) #doctest: +SKIP
+  >>> im.show() #doctest: +SKIP
   
 .. image:: imgs/img_cutout_invert.png
 

@@ -3,6 +3,8 @@ Unreleased
 
 - Added ``fsspec_kwargs`` parameter to ``FITSCutout`` to pass through to ``s3fs`` for cloud-hosted files. [#177]
 - New ``RomanSpectralSubset`` class for creating spectral subsets from Roman Space Telescope ASDF data. [#179]
+- Added ``flip_orientation`` parameter to ``get_image_cutouts`` and ``write_as_img`` methods in ``FITSCutout`` and ``ASDFCutout``
+  classes to allow users to flip outputs vertically to match the orientation of the input images. Default is True. [#180]
 - Added support for Python 3.14. [#181]
 
 Breaking Changes
