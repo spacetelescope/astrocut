@@ -369,7 +369,7 @@ class ASDFCutout(ImageCutout):
 
             if obj.ndim == 2:
                 # Simple 2D cutout
-                cutout = self._make_cutout(obj, pixel_coords, wcs if is_data else None)
+                cutout = self._make_cutout(obj, pixel_coords, wcs)
                 tree[self._mission_kwd][key] = cutout.data
                 if is_data:
                     data_cutout = cutout
@@ -377,11 +377,13 @@ class ASDFCutout(ImageCutout):
 
             else:
                 # Cube or higher dimension array
-                new_shape = obj.shape[:-2] + (self._cutout_size[1], self._cutout_size[0])
-                cutout_cube = np.full(new_shape, self._fill_value, dtype=obj.dtype)
+                cutout_cube = None
 
                 for idx in np.ndindex(obj.shape[:-2]):
-                    cutout = self._make_cutout(obj[idx], pixel_coords, None)
+                    cutout = self._make_cutout(obj[idx], pixel_coords, wcs)
+                    if cutout_cube is None:
+                        new_shape = obj.shape[:-2] + cutout.data.shape
+                        cutout_cube = np.full(new_shape, self._fill_value, dtype=cutout.data.dtype)
                     cutout_cube[idx] = cutout.data
 
                 tree[self._mission_kwd][key] = cutout_cube
@@ -684,7 +686,10 @@ def get_center_pixel(gwcsobj: gwcs.wcs.WCS, ra: float, dec: float) -> Tuple[Tupl
 
     # Map the coordinates to a pixel's location on the 2d image
     row, col = gwcsobj.invert(np.atleast_1d(ra), np.atleast_1d(dec), with_bounding_box=False)
-    pixel_coords = (float(row[0]), float(col[0]))
+    row_pix = float(row.value[0]) if isinstance(row, Quantity) else float(row[0])
+    col_pix = float(col.value[0]) if isinstance(col, Quantity) else float(col[0])
+    pixel_coords = (row_pix, col_pix)
+
     return pixel_coords, wcs_updated
 
 

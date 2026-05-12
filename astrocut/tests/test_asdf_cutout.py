@@ -405,6 +405,14 @@ def test_asdf_cutout_img_output(test_images, center_coord, cutout_size, tmpdir):
     assert img.mode == "RGB"
 
 
+def test_asdf_cutout_cube_angular_size(test_images, center_coord):
+    """Test that cube-like arrays use the computed cutout shape for angular sizes."""
+    cutout = ASDFCutout(test_images[0], center_coord, 2 * u.arcsec)
+
+    assert cutout.cutouts[0].data.shape == (20, 20)
+    assert cutout.asdf_cutouts[0]["roman"]["context"].shape == (1, 20, 20)
+
+
 def test_asdf_cutout_gwcs(test_images, center_coord):
     """Test creating a rectangular cutout to make sure cutout gwcs is correct"""
     cutout = ASDFCutout(test_images[0], center_coord, cutout_size=[20, 40])
