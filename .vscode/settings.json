@@ -1,0 +1,15 @@
+{
+    "python.defaultInterpreterPath": "/opt/miniconda3/envs/astrocut/bin/python",
+    "python.defaultEnvManager": "ms-python.python:conda",
+    "python.defaultPackageManager": "ms-python.python:conda",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+        "source.fixAll": "explicit",
+        "source.organizeImports": "explicit"
+    },
+    "ruff.enable": true,
+    "ruff.fixAll": true,
+    "python.linting.flake8Enabled": false,
+    "python.formatting.provider": "none",
+    "git.addAICoAuthor": "off"
+}
