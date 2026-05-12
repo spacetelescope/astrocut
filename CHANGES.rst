@@ -6,6 +6,7 @@ Unreleased
 - Added ``flip_orientation`` parameter to ``get_image_cutouts`` and ``write_as_img`` methods in ``FITSCutout`` and ``ASDFCutout``
   classes to allow users to flip outputs vertically to match the orientation of the input images. Default is True. [#180]
 - Added support for Python 3.14. [#181]
+- Bugfix for incorrect handling of cutout shapes for cube-like arrays in ``ASDFCutout`` when cutout sizes are specified in angular units. [#184]
 
 Breaking Changes
 ^^^^^^^^^^^^^^^^
