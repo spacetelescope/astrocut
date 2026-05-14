@@ -13,7 +13,7 @@ on:
 
 jobs:
   tests:
-    name: PR and Push Tests
+    name: PR Tests
     if: github.event_name == 'pull_request' || github.event_name == 'push'
     runs-on: ${{ matrix.os }}
     strategy:
