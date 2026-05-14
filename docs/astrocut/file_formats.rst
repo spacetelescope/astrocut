@@ -4,6 +4,8 @@
 Astrocut File Formats
 *********************
 
+.. _fits-cutout-files:
+
 FITS Cutout Files
 =================
 
@@ -38,6 +40,7 @@ updated to match the cutout image. Additionally the keyword ``ORIG_FLE`` has bee
 it contains the name of the file the cutout comes from.
 
 
+.. _asdf-cutout-files:
 
 ASDF Cutout Files
 ==================
@@ -129,6 +132,8 @@ data arrays from the original ASDF file, even when ``lite=False``. This is a key
 
     BinTableHDU (Extension 2, Python 3.11+ and stdatamodels>=4.1.0) - ASDF
     └── Data: <ASDF metadata tree (lite or full) embedded as binary table>
+
+.. _spectral-subsets:
 
 Spectral Subsets
 ^^^^^^^^^^^^^^^^
@@ -351,6 +356,7 @@ The output filename pattern for this grouping is: ``combined_spectral_subset[_li
 For ``group_by='combined'`` with ``lite=False``, top-level non-mission metadata from each input file is grouped into
 ``<key>_combined`` mappings keyed by input filename, while the merged subset ``history`` is stored under ``history``.
 
+.. _cube-files:
 
 Cube Files
 ==========
@@ -409,6 +415,8 @@ contains FFI filename for each row. Each column name keyword also has an entry i
 Image extension header, with the value being the keyword value from the FFI header.
 This last column allows the FFI Image extension headers to be recreated completely if desired.
 
+
+.. _target-pixel-files:
 
 Target Pixel Files
 ==================
@@ -517,6 +525,7 @@ Cosmic Ray Binary Table Extension
 
 This extension is not present in Astrocut TPFs, although it is a part of the Mission pipeline TPFs.
 
+.. _path-focused-target-pixel-files:
 
 Path Focused Target Pixel Files
 ===============================

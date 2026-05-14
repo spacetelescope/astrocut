@@ -29,7 +29,7 @@ FITS Cutouts
 
 The Flexible Image Transport System (FITS) is a standard format for astronomical data. Astrocut can generate cutouts from FITS files
 and return the results in memory or as a written file, depending on the user's preference. The cutout '~astropy.fits.io.HDUList' object 
-format is described in the `Astrocut File Fomats <file_formats.html#fits-cutout-files>`__ page.
+format is described in the :ref:`Astrocut File Formats <fits-cutout-files>` page.
 
 To make a cutout from a FITS file or files, use the `~astrocut.FITSCutout` class. 
 
@@ -96,7 +96,7 @@ ASDF Cutouts
 
 The Advanced Scientific Data Format (ASDF) is a flexible format for storing scientific data. Astrocut can generate cutouts from ASDF files
 and return the results in memory or as a written file, depending on the user's preference. The cutout ASDF file format is 
-described in the `Astrocut File Formats <file_formats.html#asdf-cutout-files>`__ page.
+described in the :ref:`Astrocut File Formats <asdf-cutout-files>` page.
 
 To make a cutout from an ASDF file or files, use the `~astrocut.ASDFCutout` class.
 
@@ -336,7 +336,7 @@ subsets in different ways. They accept the following parameters:
     to one unique ``(input_file, source_id)`` pair. Use `~astrocut.RomanSpectralSubset.get_source_file_keys` to retrieve the valid keys and
     their ``(input_file, source_id)`` mappings.
   - ``group_by='file'``: Groups all subsets from each input file together, resulting in one subset object per input file.
-  - ``group_by='combined'``: Combines all subsets from all input files into a single subset object.See the `Spectral Subset File Formats <file_formats.html#spectral-subsets>`__ for more details on the structure of subset objects.
+  - ``group_by='combined'``: Combines all subsets from all input files into a single subset object. See the :ref:`Spectral Subset File Formats <spectral-subsets>` for more details on the structure of subset objects.
 
 .. code-block:: python
 
@@ -455,7 +455,7 @@ all output.
 
 Note, you can only make cubes from a set of FFIs that were observed in the same sector, camera, and CCD.
 
-The output image cube file format is described in the `Astrocut File Formats <file_formats.html#cube-files>`__ page.
+The output image cube file format is described in the :ref:`Astrocut File Formats <cube-files>` page.
 
 .. code-block:: python
 
@@ -495,7 +495,7 @@ Making Cutout Target Pixel Files
 
 Astrocut can generate cutout target pixel files from TESS cubes using the `astrocut.TessCubeCutout` class and return the results
 in memory or as a file, depending on the user's preference. The cutout target pixel file format is described in the 
-`Astrocut File Formats <file_formats.html#target-pixel-files>`__ page.
+:ref:`Astrocut File Formats <target-pixel-files>` page.
 
 The `astrocut.TessCubeCutout` class takes the following parameters:
 
@@ -623,7 +623,7 @@ To restrict the cutouts to specific sectors, use the ``sequence`` parameter with
 If ``sequence`` is set to None, cutouts will be returned for all matching cube files.
 
 The resulting cutouts can be returned in memory or as a file, depending on the user's preference. The cutout target pixel file format is
-described in the `Astrocut File Formats <file_formats.html#target-pixel-files>`__ page.
+described in the :ref:`Astrocut File Formats <target-pixel-files>` page.
 
 .. code-block:: python
 
@@ -686,7 +686,7 @@ The `~astrocut.center_on_path` function allows the user to take one or more Astr
 TPF(s) and create a single cutout, centered on a moving target that crosses through
 the file(s). The user can optionally pass in a target object name and FFI WCS object.
 
-The output target pixel file format is described `here <file_formats.html#path-focused-target-pixel-files>`__.
+The output target pixel file format is described on the :ref:`Astrocut File Formats <path-focused-target-pixel-files>` page.
 
 This example starts with a path, and uses several `TESScut services <https://mast.stsci.edu/tesscut/docs/>`__
 to retrieve all of the inputs for the `~astrocut.center_on_path` function. We also use the helper function

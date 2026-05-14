@@ -11,6 +11,7 @@ Breaking Changes
 ^^^^^^^^^^^^^^^^
 
 - Removed support for Python 3.8. [#181]
+- Removed support for Python 3.9. [#185]
 - Remove the ``TicaCubeFactory`` class after deprecation in 1.1.0. [#182]
 - Remove the ``product`` parameter from the ``TessCubeCutout`` class, the ``TessFootprintCutout`` class, the ``cube_cut`` function,
   the ``CutoutFactory.cube_cut`` function, and the ``cube_cut_from_footprint`` function after deprecation in 1.1.0. [#182]

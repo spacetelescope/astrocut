@@ -13,111 +13,162 @@ on:
 
 jobs:
   tests:
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: true
       matrix:
         include:
-          - name: Python 3.9 with minimal dependencies
-            os: ubuntu-latest
-            python: 3.9
-            toxenv: py39-test
-
-          - name: Python 3.9 with all optional dependencies
-            os: ubuntu-latest
-            python: 3.9
-            toxenv: py39-test-alldeps
-            toxargs: -v --develop
-
-          - name: Python 3.10 with numpy 1.23 and full coverage
+          - name: PR Python 3.10 baseline
             os: ubuntu-latest
             python: "3.10"
-            toxenv: py310-test-alldeps-numpy123-cov
+            toxenv: py310-test
 
-          - name: Python 3.10 with all optional dependencies (MacOS X)
-            os: macos-latest
-            python: "3.10"
-            toxenv: py310-test-alldeps
-
-          - name: Python 3.10 with numpy 2
+          - name: PR Python 3.11 baseline
             os: ubuntu-latest
-            python: "3.10"
-            toxenv: py310-test-alldeps-numpy2
-
-          - name: Python 3.11 with minimal dependencies
-            os: ubuntu-latest
-            python: 3.11
+            python: "3.11"
             toxenv: py311-test
 
-          - name: Python 3.12 with minimal dependencies
+          - name: PR Python 3.12 baseline
             os: ubuntu-latest
-            python: 3.12
+            python: "3.12"
             toxenv: py312-test
 
-          - name: Python 3.13 with minimal dependencies
+          - name: PR Python 3.13 baseline
             os: ubuntu-latest
-            python: 3.13
+            python: "3.13"
             toxenv: py313-test
+
+          - name: PR Python 3.14 baseline
+            os: ubuntu-latest
+            python: "3.14"
+            toxenv: py314-test
+
+          - name: PR Python 3.14 on macOS
+            os: macos-latest
+            python: "3.14"
+            toxenv: py314-test
+
+          - name: PR Python 3.12 alldeps with coverage
+            os: ubuntu-latest
+            python: "3.12"
+            toxenv: py312-test-alldeps-cov
+
+          - name: PR code style checks
+            os: ubuntu-latest
+            python: "3.12"
+            toxenv: codestyle
 
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           fetch-depth: 0
+
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
         with:
           python-version: ${{ matrix.python }}
+
       - name: Install language-pack-de and tzdata
         if: startsWith(matrix.os, 'ubuntu')
         run: |
           sudo apt-get update
           sudo apt-get install language-pack-de tzdata
+
       - name: Install Python dependencies
         run: python -m pip install --upgrade tox
+
       - name: Run tests
-        run: tox ${{ matrix.toxargs }} -e ${{ matrix.toxenv }} -- ${{ matrix.toxposargs }}
+        run: tox -e ${{ matrix.toxenv }}
+
       - name: Upload coverage to codecov
         if: ${{ contains(matrix.toxenv,'-cov') }}
         uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2  # v6.0.0
         with:
-          file: ./coverage.xml
+          files: ./coverage.xml
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
-  allowed_failures:
+  nightly_tests:
+    if: github.event_name == 'schedule'
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
+    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: Code style checks
+          - name: Nightly Python 3.10 baseline
             os: ubuntu-latest
-            python: 3.x
-            toxenv: codestyle
+            python: "3.10"
+            toxenv: py310-test
 
-          - name: (Allowed Failure) Python 3.12 with dev version of key dependencies
+          - name: Nightly Python 3.11 baseline
             os: ubuntu-latest
-            python: 3.12
-            toxenv: py312-test-devdeps
+            python: "3.11"
+            toxenv: py311-test
+
+          - name: Nightly Python 3.12 baseline
+            os: ubuntu-latest
+            python: "3.12"
+            toxenv: py312-test
+
+          - name: Nightly Python 3.13 baseline
+            os: ubuntu-latest
+            python: "3.13"
+            toxenv: py313-test
+
+          - name: Nightly Python 3.14 baseline
+            os: ubuntu-latest
+            python: "3.14"
+            toxenv: py314-test
+
+          - name: Nightly Python 3.14 dev dependencies
+            os: ubuntu-latest
+            python: "3.14"
+            toxenv: py314-test-devdeps
+
+          - name: Nightly Python 3.14 all dependencies
+            os: ubuntu-latest
+            python: "3.14"
+            toxenv: py314-test-alldeps
+
+          - name: Nightly docs linkcheck
+            os: ubuntu-latest
+            python: "3.12"
+            toxenv: linkcheck
+
+          - name: Nighly Python 3.10 numpy 1.23 pin
+            os: ubuntu-latest
+            python: "3.10"
+            toxenv: py310-test-numpy123
+
+          - name: Nightly Python 3.12 astropy 5.2 pin
+            os: ubuntu-latest
+            python: "3.12"
+            toxenv: py312-test-astropy52
 
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           fetch-depth: 0
+
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
         with:
           python-version: ${{ matrix.python }}
+
       - name: Install language-pack-de and tzdata
         if: startsWith(matrix.os, 'ubuntu')
         run: |
           sudo apt-get update
           sudo apt-get install language-pack-de tzdata
+
       - name: Install Python dependencies
-        run: python -m pip install --upgrade tox codecov
+        run: python -m pip install --upgrade tox
+
       - name: Run tests
-        run: tox ${{ matrix.toxargs }} -e ${{ matrix.toxenv }} -- ${{ matrix.toxposargs }}
+        run: tox -e ${{ matrix.toxenv }}
