@@ -38,7 +38,9 @@ class ASDFCutout(ImageCutout):
     cutout_size : int | array | list | tuple | `~astropy.units.Quantity`
         Size of the cutout array.
     fill_value : int | float
-        Value to fill the cutout with if the cutout is outside the image.
+        Value to fill the cutout with if the cutout is outside the image. Default is np.nan. If the input data array
+        has an integer data type, the fill value will be converted to an integer (e.g., a fill value of 1.0 will be
+        converted to 1). If the conversion fails, it will default to 0.
     key : str
         Optional, default None. Access key ID for S3 file system.
     secret : str
@@ -316,13 +318,22 @@ class ASDFCutout(ImageCutout):
         cutout : Cutout2D
             The generated cutout.
         """
+        # If the array has an integer data type, fill_value must be an integer
+        fill_value = self._fill_value
+        if np.issubdtype(array.dtype, np.integer) and not isinstance(fill_value, int):
+            log.debug("Input data array has integer data type, converting fill_value to integer.")
+            try:
+                fill_value = int(self._fill_value)
+            except ValueError:
+                fill_value = 0  # Default to 0 if conversion fails
+
         cutout = Cutout2D(
             array,
             position=position,
             wcs=wcs,
             size=(self._cutout_size[1], self._cutout_size[0]),
             mode="partial",
-            fill_value=self._fill_value,
+            fill_value=fill_value,
             copy=True,
         )
 

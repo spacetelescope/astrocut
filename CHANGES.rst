@@ -7,6 +7,7 @@ Unreleased
   classes to allow users to flip outputs vertically to match the orientation of the input images. Default is True. [#180]
 - Added support for Python 3.14. [#181]
 - Bugfix for incorrect handling of cutout shapes for cube-like arrays in ``ASDFCutout`` when cutout sizes are specified in angular units. [#184]
+- Bugfix for incorrect data type of fill values in ``ASDFCutout`` when input data is an integer array. [#184]
 
 Breaking Changes
 ^^^^^^^^^^^^^^^^
