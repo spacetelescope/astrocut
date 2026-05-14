@@ -13,8 +13,8 @@ on:
 
 jobs:
   tests:
+    name: PR and Push Tests
     if: github.event_name == 'pull_request' || github.event_name == 'push'
-    name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: true
@@ -93,7 +93,7 @@ jobs:
 
   nightly_tests:
     if: github.event_name == 'schedule'
-    name: ${{ matrix.name }}
+    name: Nightly Tests
     runs-on: ${{ matrix.os }}
     continue-on-error: true
     strategy:
