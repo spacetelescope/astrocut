@@ -18,7 +18,7 @@ This module initializes the astrocut package and performs essential setup tasks,
 """
 
 # Enforce Python version check during package import.
-__minimum_python_version__ = "3.9"  # minimum supported Python version
+__minimum_python_version__ = "3.10"  # minimum supported Python version
 if sys.version_info < tuple(map(int, __minimum_python_version__.split("."))):
     raise UnsupportedPythonError(f"astrocut does not support Python < {__minimum_python_version__}")
 
