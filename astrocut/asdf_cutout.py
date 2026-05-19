@@ -393,6 +393,8 @@ class ASDFCutout(ImageCutout):
                 for idx in np.ndindex(obj.shape[:-2]):
                     cutout = self._make_cutout(obj[idx], pixel_coords, wcs)
                     if cutout_cube is None:
+                        # Determine shape of cutout cube on first iteration and initialize wthe cube with fill_value
+                        # Need to determine pixel shape after first cutout is made to account for angular cutout sizes
                         new_shape = obj.shape[:-2] + cutout.data.shape
                         cutout_cube = np.full(new_shape, self._fill_value, dtype=cutout.data.dtype)
                     cutout_cube[idx] = cutout.data
