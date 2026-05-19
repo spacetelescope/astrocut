@@ -8,6 +8,10 @@ Unreleased
 - Added support for Python 3.14. [#181]
 - Bugfix for incorrect handling of cutout shapes for cube-like arrays in ``ASDFCutout`` when cutout sizes are specified in angular units. [#184]
 - Bugfix for incorrect data type of fill values in ``ASDFCutout`` when input data is an integer array. [#184]
+- The default value of the ``lite`` parameter in the ``ASDFCutout`` class is now True, resulting in cutouts that
+  include only the science data and updated world coordinate system by default. [#186]
+- Added ``validate_output`` parameter to ``ASDFCutout.write_as_asdf`` method to optionally validate the output ASDF
+  file against the ASDF schema. Default is True. [#186]
 
 Breaking Changes
 ^^^^^^^^^^^^^^^^

@@ -665,7 +665,9 @@ class ASDFCutout(ImageCutout):
         output_dir : str | Path
             The output directory to write the cutouts to. Defaults to the current directory.
         validate_output : bool
-            Whether to validate the output ASDF file. Defaults to True.
+            Whether to validate the output ASDF file. Defaults to True. Setting to False can
+            speed up writing for large numbers of cutouts, but should only be used if you
+            trust the output is valid.
 
         Returns
         -------
