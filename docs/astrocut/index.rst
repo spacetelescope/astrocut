@@ -5,8 +5,8 @@ Astrocut Documentation
 
 Astrocut is a powerful Python package for generating cutouts from sets of astronomical images with overlapping footprints.
 
-It supports both two-dimensional images and three-dimensional image cubes, making it versatile for a wide range of astronomical data. 
-Astrocut is compatible with multiple file formats, including FITS, ASDF, and TESS full-frame images. Beyond cutout extraction, the package 
+It supports both two-dimensional images and three-dimensional image cubes, making it versatile for a wide range of astronomical data.
+Astrocut is compatible with multiple file formats, including FITS, ASDF, and TESS full-frame images. Beyond cutout extraction, the package
 includes features for post-processing, such as aligning cutouts along a path and combining multiple cutouts for enhanced analysis.
 
 Astrocut is actively maintained and continuously evolving to support the needs of the astronomical community.
@@ -14,7 +14,7 @@ Astrocut is actively maintained and continuously evolving to support the needs o
 Image Cutouts
 =============
 
-Astrocut can generate cutouts of image data from FITS and ASDF files using the `~astrocut.FITSCutout` and `~astrocut.ASDFCutout` classes, respectively. 
+Astrocut can generate cutouts of image data from FITS and ASDF files using the `~astrocut.FITSCutout` and `~astrocut.ASDFCutout` classes, respectively.
 The package supports both single and multiple cutouts, allowing users to extract data from a single image or multiple images with overlapping footprints.
 
 Both image cutout classes take the following parameters:
@@ -28,10 +28,10 @@ FITS Cutouts
 ------------
 
 The Flexible Image Transport System (FITS) is a standard format for astronomical data. Astrocut can generate cutouts from FITS files
-and return the results in memory or as a written file, depending on the user's preference. The cutout '~astropy.fits.io.HDUList' object 
+and return the results in memory or as a written file, depending on the user's preference. The cutout '~astropy.fits.io.HDUList' object
 format is described in the :ref:`Astrocut File Formats <fits-cutout-files>` page.
 
-To make a cutout from a FITS file or files, use the `~astrocut.FITSCutout` class. 
+To make a cutout from a FITS file or files, use the `~astrocut.FITSCutout` class.
 
 .. code-block:: python
 
@@ -43,9 +43,9 @@ To make a cutout from a FITS file or files, use the `~astrocut.FITSCutout` class
 
   >>> center_coord = SkyCoord("150.0945 2.38681", unit="deg")
   >>> cutout_size = [200, 300]
-  >>> fits_cutout = FITSCutout(input_files=input_files, 
-  ...                          coordinates=center_coord, 
-  ...                          cutout_size=cutout_size, 
+  >>> fits_cutout = FITSCutout(input_files=input_files,
+  ...                          coordinates=center_coord,
+  ...                          cutout_size=cutout_size,
   ...                          single_outfile=True)
 
 The resulting `~astrocut.FITSCutout` object can be used to access the cutout data and metadata. The ``cutouts_by_file`` attribute is a dictionary that
@@ -57,7 +57,7 @@ These objects can be used to access cutout data and metadata in the HDU header.
 
 The ``fits_cutouts`` attribute is a list of cutouts as `~astropy.io.fits.HDUList` objects. The ``single_outfile`` parameter decides whether all the cutouts
 will be written to a single `~astropy.io.fits.HDUList` object or to separate objects. When ``single_outfile`` is set to True,
-a single `~astropy.io.fits.HDUList` object will contain all the cutouts. 
+a single `~astropy.io.fits.HDUList` object will contain all the cutouts.
 
 .. code-block:: python
 
@@ -65,12 +65,12 @@ a single `~astropy.io.fits.HDUList` object will contain all the cutouts.
   >>> cutout.info()
   Filename: (No file associated with this HDUList)
   No.    Name      Ver    Type      Cards   Dimensions   Format
-    0  PRIMARY       1 PrimaryHDU       9   ()      
-    1  CUTOUT        1 ImageHDU      2767   (200, 300)   float32   
-    2  CUTOUT        1 ImageHDU      3343   (200, 300)   float32   
+    0  PRIMARY       1 PrimaryHDU       9   ()
+    1  CUTOUT        1 ImageHDU      2767   (200, 300)   float32
+    2  CUTOUT        1 ImageHDU      3343   (200, 300)   float32
 
 To write the cutouts and their metadata to FITS files, use the `~astrocut.FITSCutout.write_as_fits` method. This method returns a list of paths to the
-cutout FITS files. 
+cutout FITS files.
 
 .. code-block:: python
 
@@ -84,8 +84,8 @@ cutout FITS files.
   ...     hdul.info()
   Filename: cutout_150.0945000_2.3868100_200-x-300_astrocut.fits
   No.    Name      Ver    Type      Cards   Dimensions   Format
-    0  PRIMARY       1 PrimaryHDU      11   ()      
-    1  CUTOUT        1 ImageHDU      2769   (200, 300)   float32   
+    0  PRIMARY       1 PrimaryHDU      11   ()
+    1  CUTOUT        1 ImageHDU      2769   (200, 300)   float32
     2  CUTOUT        1 ImageHDU      3345   (200, 300)   float32
 
 By default, the cutouts are written to the current working directory. You can specify a different output directory using the ``output_dir`` parameter.
@@ -95,7 +95,7 @@ ASDF Cutouts
 ------------
 
 The Advanced Scientific Data Format (ASDF) is a flexible format for storing scientific data. Astrocut can generate cutouts from ASDF files
-and return the results in memory or as a written file, depending on the user's preference. The cutout ASDF file format is 
+and return the results in memory or as a written file, depending on the user's preference. The cutout ASDF file format is
 described in the :ref:`Astrocut File Formats <asdf-cutout-files>` page.
 
 To make a cutout from an ASDF file or files, use the `~astrocut.ASDFCutout` class.
@@ -109,8 +109,8 @@ To make a cutout from an ASDF file or files, use the `~astrocut.ASDFCutout` clas
 
   >>> center_coord = SkyCoord("80.15189743 29.74561219", unit="deg")
   >>> cutout_size = 25
-  >>> asdf_cutout = ASDFCutout(input_files=input_files, 
-  ...                          coordinates=center_coord, 
+  >>> asdf_cutout = ASDFCutout(input_files=input_files,
+  ...                          coordinates=center_coord,
   ...                          cutout_size=cutout_size) #doctest: +SKIP
 
 .. warning::
@@ -127,13 +127,76 @@ The ``asdf_cutouts`` attribute is a list of cutouts as `~asdf.AsdfFile` objects,
 `~astropy.io.fits.HDUList` objects. The cutout objects in these lists can be used to access cutout data and metadata, as shown below.
 
 .. note::
-  Although Astrocut supports writing ASDF cutouts as FITS objects, we recommend using the ASDF output format whenever possible. FITS files may not 
+  Although Astrocut supports writing ASDF cutouts as FITS objects, we recommend using the ASDF output format whenever possible. FITS files may not
   accurately represent the ASDF world coordinate system, so saving cutouts in their original format will generally give the most reliable results.
 
 .. code-block:: python
 
   >>> cutout_asdf = asdf_cutout.asdf_cutouts[0] #doctest: +SKIP
   >>> cutout_asdf.info() #doctest: +SKIP
+  root (AsdfObject)
+  └─roman (dict)
+    ├─meta (dict)
+    │ └─wcs (WCS)
+    └─data (ndarray): shape=(25, 25), dtype=float32
+
+  >>> cutout_fits = asdf_cutout.fits_cutouts[0] #doctest: +SKIP
+  >>> cutout_fits.info() #doctest: +SKIP
+  Filename: (No file associated with this HDUList)
+  No.    Name      Ver    Type      Cards   Dimensions   Format
+    0  PRIMARY       1 PrimaryHDU      11   ()
+    1  CUTOUT        1 ImageHDU        67   (25, 25)   float32
+    2  ASDF          1 BinTableHDU     13   1R x 1C   ['36470B']
+
+To write the cutouts and their metadata to ASDF files, use the `~astrocut.ASDFCutout.write_as_asdf` method. This method returns a list of paths to the
+cutout ASDF files.
+
+.. code-block:: python
+
+  >>> import asdf
+
+  >>> path = asdf_cutout.write_as_asdf() #doctest: +SKIP
+
+  >>> with asdf.open(path[0]) as af:
+  ...     print(af['roman']['data'].shape) #doctest: +SKIP
+  (25, 25)
+
+To write the cutouts and their metadata to FITS files, use the `~astrocut.ASDFCutout.write_as_fits` method. This method returns a list of paths to the
+cutout FITS files.
+
+.. code-block:: python
+
+  >>> from astropy.io import fits
+
+  >>> path = asdf_cutout.write_as_fits() #doctest: +SKIP
+
+  >>> with fits.open(path[0]) as hdul:
+  ...     hdul.info() #doctest: +SKIP
+  Filename: r0099101001001001001_F158_visit_r274dp63x31y81_i2d_269.6970000_66.0450000_25-x-25_astrocut.fits
+  No.    Name      Ver    Type      Cards   Dimensions   Format
+    0  PRIMARY       1 PrimaryHDU      11   ()
+    1  CUTOUT        1 ImageHDU        67   (25, 25)   float32
+    2  ASDF          1 BinTableHDU     13   1R x 1C   [36470B]
+
+By default, the cutouts are written to the current working directory. You can specify a different output directory using the ``output_dir`` parameter
+in either of the write functions.
+
+Lite Mode
+^^^^^^^^^
+By default, `~astrocut.ASDFCutout` creates lite cutouts that include only the science data array and the updated world coordinate system. These cutouts
+can be accessed through the `asdf_cutouts` attribute.
+
+If you need the full ASDF tree, including other arrays in the input file (e.g., data, error, uncertainty, variance, etc.) and the original metadata,
+set the ``lite`` parameter to False. This produces larger cutouts, but preserves the full set of arrays and metadata for downstream analysis.
+
+.. code-block:: python
+
+  >>> asdf_cutout_full = ASDFCutout(input_files=input_files,
+  ...                               coordinates=center_coord,
+  ...                               cutout_size=cutout_size,
+  ...                               lite=False) #doctest: +SKIP
+  >>> cutout_asdf_full = asdf_cutout_full.asdf_cutouts[0] #doctest: +SKIP
+  >>> cutout_asdf_full.info() #doctest: +SKIP
   root (AsdfObject)
   ├─asdf_library (Software)
   │ ├─author (str): The ASDF Developers
@@ -159,79 +222,13 @@ The ``asdf_cutouts`` attribute is a list of cutouts as `~asdf.AsdfFile` objects,
     └─individual_image_cal_logs (list) ...
   Some nodes not shown.
 
-  >>> cutout_fits = asdf_cutout.fits_cutouts[0] #doctest: +SKIP
-  >>> cutout_fits.info() #doctest: +SKIP
-  Filename: (No file associated with this HDUList)
-  No.    Name      Ver    Type      Cards   Dimensions   Format
-    0  PRIMARY       1 PrimaryHDU      11   ()      
-    1  CUTOUT        1 ImageHDU        67   (25, 25)   float32   
-    2  ASDF          1 BinTableHDU     13   1R x 1C   ['36470B']   
-
-To write the cutouts and their metadata to ASDF files, use the `~astrocut.ASDFCutout.write_as_asdf` method. This method returns a list of paths to the
-cutout ASDF files. 
-
-.. code-block:: python
-
-  >>> import asdf
-
-  >>> path = asdf_cutout.write_as_asdf() #doctest: +SKIP
-
-  >>> with asdf.open(path[0]) as af:
-  ...     print(af['roman']['data'].shape) #doctest: +SKIP
-  (25, 25)
-
-To write the cutouts and their metadata to FITS files, use the `~astrocut.ASDFCutout.write_as_fits` method. This method returns a list of paths to the
-cutout FITS files.
-
-.. code-block:: python
-
-  >>> from astropy.io import fits
-
-  >>> path = asdf_cutout.write_as_fits() #doctest: +SKIP
-
-  >>> with fits.open(path[0]) as hdul:
-  ...     hdul.info() #doctest: +SKIP
-  Filename: r0099101001001001001_F158_visit_r274dp63x31y81_i2d_269.6970000_66.0450000_25-x-25_astrocut.fits
-  No.    Name      Ver    Type      Cards   Dimensions   Format
-    0  PRIMARY       1 PrimaryHDU      11   ()      
-    1  CUTOUT        1 ImageHDU        67   (25, 25)   float32   
-    2  ASDF          1 BinTableHDU     13   1R x 1C   [36470B]   
-
-By default, the cutouts are written to the current working directory. You can specify a different output directory using the ``output_dir`` parameter
-in either of the write functions.
-
-Lite Mode
-^^^^^^^^^
-By default, `~astrocut.ASDFCutout` creates cutouts of all arrays in the input file (e.g., data, error, uncertainty, variance, etc.) where the last
-two dimensions match the shape of the science data array. It also preserves all of the metadata from the input file. These cutout arrays and metadata
-can be accessed through the `asdf_cutouts` attribute.
-
-For large input files, this can result in large output cutouts. If you only require the science data and the updated world coordinate system, you can
-set the ``lite`` parameter to True. With this option enabled, only the science data array is cut out and returned, and metadata is reduced to the sliced
-GWCS object needed to interpret the cutout. This makes the output cutouts smaller and faster to create, while still retaining essential information for 
-science analysis.
-
-.. code-block:: python
-
-  >>> asdf_cutout_lite = ASDFCutout(input_files=input_files, 
-  ...                               coordinates=center_coord, 
-  ...                               cutout_size=cutout_size,
-  ...                               lite=True) #doctest: +SKIP
-  >>> cutout_asdf_lite = asdf_cutout_lite.asdf_cutouts[0] #doctest: +SKIP
-  >>> cutout_asdf_lite.info() #doctest: +SKIP
-  root (AsdfObject)
-  └─roman (dict)
-    ├─meta (dict)
-    │ └─wcs (WCS)
-    └─data (ndarray): shape=(25, 25), dtype=float32
-
 Image Outputs
 -------------
 
-Both the `~astrocut.FITSCutout` and `~astrocut.ASDFCutout` classes provide methods to normalize the cutout data and write it as an image, 
+Both the `~astrocut.FITSCutout` and `~astrocut.ASDFCutout` classes provide methods to normalize the cutout data and write it as an image,
 either as a a `~PIL.Image.Image` object or a file.
 
-To create cutouts as `~PIL.Image.Image` objects, use the `~astrocut.FITSCutout.get_image_cutouts` method. You can provide the following 
+To create cutouts as `~PIL.Image.Image` objects, use the `~astrocut.FITSCutout.get_image_cutouts` method. You can provide the following
 normalization parameters:
 
 - ``stretch``: The stretch function to apply to the image array. Options include "asinh", "sinh", "sqrt", "log", and "linear".
@@ -250,27 +247,27 @@ normalization parameters:
 
 .. image:: imgs/img_cutout.png
 
-To produce a colorized RGB image, set the ``colorize`` parameter to True. Color images require three cutouts, 
+To produce a colorized RGB image, set the ``colorize`` parameter to True. Color images require three cutouts,
 which will be treated as the R, G, and B channels, respectively.
 
 .. code-block:: python
 
   >>> from astrocut import FITSCutout
   >>> from astropy.coordinates import SkyCoord
-  
+
   >>> input_files = ["https://archive.stsci.edu/pub/hlsp/goods/v2/h_nz_sect14_v2.0_drz_img.fits",
   ...                "https://archive.stsci.edu/pub/hlsp/goods/v2/h_ni_sect14_v2.0_drz_img.fits",
   ...                "https://archive.stsci.edu/pub/hlsp/goods/v2/h_nv_sect14_v2.0_drz_img.fits"]
-  
+
   >>> center_coord = SkyCoord("189.51522 62.2865221", unit='deg')
   >>> cutout_size = [200, 300]
 
   >>> color_image = FITSCutout(input_files, center_coord, cutout_size).get_image_cutouts(colorize=True)[0]
   >>> color_image.show() #doctest: +SKIP
-                
+
 .. image:: imgs/img_cutout_color.png
 
-To write the cutouts to image files, use the `astrocut.FITSCutout.write_as_img` method. This method returns a list of paths to 
+To write the cutouts to image files, use the `astrocut.FITSCutout.write_as_img` method. This method returns a list of paths to
 the cutout image files. `astrocut.FITSCutout.write_as_img` takes the same normalization parameters as `astrocut.FITSCutout.get_image_cutouts`.
 
 To specify the output format of the cutout images, use the ``output_format`` parameter.
@@ -282,7 +279,7 @@ To specify the output format of the cutout images, use the ``output_format`` par
   >>> path = fits_cutout.write_as_img(stretch='sqrt', invert=True, output_format='png')
   >>> im = Image.open(path[0]) #doctest: +SKIP
   >>> im.show() #doctest: +SKIP
-  
+
 .. image:: imgs/img_cutout_invert.png
 
 By default, the cutouts are written to the current working directory. You can specify a different output directory using the ``output_dir`` parameter.
@@ -315,16 +312,16 @@ The ``lite`` parameter controls the size of the subset and how much of the origi
 - ``lite=True`` (default): The subset data only includes the "wl", "flux", and "flux_error" arrays. All original
   metadata is preserved, but all other data arrays and top-level keys from the original file are omitted from the subset.
 
-- ``lite=False``: The subset includes all data and metadata from the original ASDF file(s), with all arrays that match the 
+- ``lite=False``: The subset includes all data and metadata from the original ASDF file(s), with all arrays that match the
   dimensions of the ``wl`` array being sliced to the subset shape if a ``wl_range`` was specified.
   The full tree structure and metadata from the original file(s) are preserved.
 
 The resulting `~astrocut.RomanSpectralSubset` object can be used to access the subset data and metadata.
 The ``subset_data`` attribute is a dictionary that stores the subset data keyed by input filename and source ID.
 
-The `~astrocut.RomanSpectralSubset.get_asdf_subsets` method returns the subsets as `~asdf.AsdfFile` objects in memory, 
-and the `~astrocut.RomanSpectralSubset.write_as_asdf` method writes the subsets to ASDF files on disk and returns a list 
-of paths to the output files. Both methods support filtering the subsets by source ID and input file, as well as grouping the 
+The `~astrocut.RomanSpectralSubset.get_asdf_subsets` method returns the subsets as `~asdf.AsdfFile` objects in memory,
+and the `~astrocut.RomanSpectralSubset.write_as_asdf` method writes the subsets to ASDF files on disk and returns a list
+of paths to the output files. Both methods support filtering the subsets by source ID and input file, as well as grouping the
 subsets in different ways. They accept the following parameters:
 
 - ``source_ids``: A list of source IDs to include in the output. If None, all source IDs will be included.
@@ -358,8 +355,8 @@ subsets in different ways. They accept the following parameters:
 Multiprocessing
 ----------------
 
-`~astrocut.RomanSpectralSubset` and `~astrocut.RomanSpectralSubset.write_as_asdf` accept a ``max_workers`` parameter 
-that controls file-level multiprocessing during subset generation and writing, respectively. 
+`~astrocut.RomanSpectralSubset` and `~astrocut.RomanSpectralSubset.write_as_asdf` accept a ``max_workers`` parameter
+that controls file-level multiprocessing during subset generation and writing, respectively.
 The behavior of this parameter is as follows:
 
 - ``max_workers=None`` (default): Automatically choose a worker count based on available CPUs and number of jobs.
@@ -369,7 +366,7 @@ The behavior of this parameter is as follows:
 **Subset Generation Guidelines**
 
 Parallel processing can significantly speed up subset generation, but its effectiveness depends primarily on the number
-of input spectral files and their size. The number of sources requested in the subset has minimal impact on runtime. 
+of input spectral files and their size. The number of sources requested in the subset has minimal impact on runtime.
 Even when requesting a small subset, the full input file must still be accessed internally.
 
 Here are some general guidelines for when multiprocessing is recommended during subset generation:
@@ -381,11 +378,11 @@ Here are some general guidelines for when multiprocessing is recommended during 
 
 **Write Performance Guidelines**
 
-When writing spectral subsets to disk using `~astrocut.RomanSpectralSubset.write_as_asdf`, parallelization effectiveness 
+When writing spectral subsets to disk using `~astrocut.RomanSpectralSubset.write_as_asdf`, parallelization effectiveness
 depends on the number of files being written and whether output validation is enabled.
 
-When ``validate_output=True`` is set during write operations, validation significantly increases runtime, regardless of 
-whether execution is serial or parallel. Consider disabling validation for large batch writes if validation can be performed 
+When ``validate_output=True`` is set during write operations, validation significantly increases runtime, regardless of
+whether execution is serial or parallel. Consider disabling validation for large batch writes if validation can be performed
 separately or selectively.
 
 Here are some general guidelines for when multiprocessing is recommended during writing:
@@ -405,17 +402,17 @@ Cube Cutouts
 Astrocut enables the creation of cutouts from image cube files, including TESS full-frame images (FFIs). Supported products
 are from the Science Processing Operations Center (`SPOC <https://archive.stsci.edu/missions-and-data/tess>`_).
 
-To begin, the `~astrocut.CubeFactory` class constructs a large image cube from a list of FFI files, optimizing the 
+To begin, the `~astrocut.CubeFactory` class constructs a large image cube from a list of FFI files, optimizing the
 writing process for efficiency. The `~astrocut.TessCubeCutout` class then extracts the desired cutout and generates a target pixel file (TPF)
 similar to those produced by the TESS Mission.
 
-For a small number of cutouts, the `TESSCut web service <https://mast.stsci.edu/tesscut/>`_ may suit 
+For a small number of cutouts, the `TESSCut web service <https://mast.stsci.edu/tesscut/>`_ may suit
 your needs.
 
-.. note:: 
-  Starting in version 2.0.0, the ability to create image cubes and cube cutouts using TESS Image Calibration 
+.. note::
+  Starting in version 2.0.0, the ability to create image cubes and cube cutouts using TESS Image Calibration
   (`TICA <https://ui.adsabs.harvard.edu/abs/2020RNAAS...4..251F/abstract>`__) full frame images has been removed.
-  Individual TICA full-frame images will remain available from the 
+  Individual TICA full-frame images will remain available from the
   `MAST TICA homepage <https://archive.stsci.edu/hlsp/tica>`__.
 
 Making Image Cubes
@@ -428,28 +425,28 @@ Making Image Cubes
    time-memory trade-off.
 
    The ``max_memory`` argument determines the maximum memory in GB that will be used
-   for the image data cube while it is being built. This is the amount of memory required 
+   for the image data cube while it is being built. This is the amount of memory required
    *only* for the data cube, so is somewhat smaller than the total amount of memory needed
    for the program to run. You should never set it to your system's total memory.
 
    Because of this, cube files do not need to allocate their total size in
    memory all at once. Instead, a smaller memory allocation can be used while
    the cube file is constructed; however, this will significantly increase the
-   execution time as bytes are swapped into and out of the memory allocation 
+   execution time as bytes are swapped into and out of the memory allocation
    being used. The default value of 50 GB was chosen because it fits all of the
    TESS FFIs from a single Prime Mission Sector (Sectors 1-26); however, in the
    current TESS Extended Mission 2, where 6 times more FFIs are observed per Sector
    (compared to the number of FFIs observed per Sector in the Prime Mission), 50 GB
-   is not enough space to hold all of the FFIs in memory, and the cubes will be 
+   is not enough space to hold all of the FFIs in memory, and the cubes will be
    written in multiple blocks. With the default settings, on a system with 64 GB of
    memory, it takes about 3 hours to build a single cube file. On a system with less
-   memory or where ``max_memory`` is set to a value less than 50 GB, more passes 
+   memory or where ``max_memory`` is set to a value less than 50 GB, more passes
    through the list of files are required, and the time to create a cube can increase
    significantly.
-   
+
 
 Assuming that you have set of calibrated TESS FFI files stored locally, you can
-create a cube using the `~astrocut.CubeFactory.make_cube` method. By default, `~astrocut.CubeFactory.make_cube` 
+create a cube using the `~astrocut.CubeFactory.make_cube` method. By default, `~astrocut.CubeFactory.make_cube`
 runs in verbose mode and prints out progress; setting the ``verbose`` parameter to ``False`` will silence
 all output.
 
@@ -462,10 +459,10 @@ The output image cube file format is described in the :ref:`Astrocut File Format
   >>> from astrocut import CubeFactory
   >>> from glob import glob
   >>> from astropy.io import fits
-  
+
   >>> my_cuber = CubeFactory()
-  >>> input_files = glob("data/*ffic.fits") 
-  
+  >>> input_files = glob("data/*ffic.fits")
+
   >>> cube_file = my_cuber.make_cube(input_files) #doctest: +SKIP
   Completed file 0
   Completed file 1
@@ -485,16 +482,16 @@ The output image cube file format is described in the :ref:`Astrocut File Format
   >>> cube_hdu.info()  #doctest: +SKIP
   Filename: img-cube.fits
   No.    Name      Ver    Type      Cards   Dimensions   Format
-  0  PRIMARY       1 PrimaryHDU      28   ()      
-  1                1 ImageHDU         9   (2, 144, 2136, 2078)   float32   
-  2                1 BinTableHDU    302   144R x 147C   [24A, J, J, J, J, J, J, D, 24A, J, 24A, 24A, J, J, D, 24A, 24A, 24A, J, D, 24A, D, D, D, D, 24A, 24A, D, D, D, D, D, 24A, D, D, D, D, J, D, D, D, D, D, D, D, D, D, D, D, D, J, J, D, J, J, J, J, J, J, J, J, J, J, D, J, J, J, J, J, J, D, J, J, J, J, J, J, D, J, J, J, J, J, J, D, J, J, J, J, J, J, J, J, 24A, D, J, 24A, 24A, D, D, D, D, D, D, D, D, J, J, D, D, D, D, D, D, J, J, D, D, D, D, D, D, D, D, D, D, D, D, 24A, J, 24A, 24A, J, J, D, 24A, 24A, J, J, D, D, D, D, J, 24A, 24A, 24A]  
+  0  PRIMARY       1 PrimaryHDU      28   ()
+  1                1 ImageHDU         9   (2, 144, 2136, 2078)   float32
+  2                1 BinTableHDU    302   144R x 147C   [24A, J, J, J, J, J, J, D, 24A, J, 24A, 24A, J, J, D, 24A, 24A, 24A, J, D, 24A, D, D, D, D, 24A, 24A, D, D, D, D, D, 24A, D, D, D, D, J, D, D, D, D, D, D, D, D, D, D, D, D, J, J, D, J, J, J, J, J, J, J, J, J, J, D, J, J, J, J, J, J, D, J, J, J, J, J, J, D, J, J, J, J, J, J, D, J, J, J, J, J, J, J, J, 24A, D, J, 24A, 24A, D, D, D, D, D, D, D, D, J, J, D, D, D, D, D, D, J, J, D, D, D, D, D, D, D, D, D, D, D, D, 24A, J, 24A, 24A, J, J, D, 24A, 24A, J, J, D, D, D, D, J, 24A, 24A, 24A]
 
 
 Making Cutout Target Pixel Files
 --------------------------------
 
 Astrocut can generate cutout target pixel files from TESS cubes using the `astrocut.TessCubeCutout` class and return the results
-in memory or as a file, depending on the user's preference. The cutout target pixel file format is described in the 
+in memory or as a file, depending on the user's preference. The cutout target pixel file format is described in the
 :ref:`Astrocut File Formats <target-pixel-files>` page.
 
 The `astrocut.TessCubeCutout` class takes the following parameters:
@@ -528,12 +525,12 @@ The ``tpf_cutouts`` attribute is a list of cutouts as `~astropy.io.fits.HDUList`
   >>> tpf_cutout.info() #doctest: +SKIP
   Filename: (No file associated with this HDUList)
   No.    Name      Ver    Type      Cards   Dimensions   Format
-  0  PRIMARY       1 PrimaryHDU      42   ()      
-  1  PIXELS        1 BinTableHDU    222   144R x 12C   [D, E, J, 25J, 25E, 25E, 25E, 25E, J, E, E, 38A]   
-  2  APERTURE      1 ImageHDU        45   (5, 5)   float64  
+  0  PRIMARY       1 PrimaryHDU      42   ()
+  1  PIXELS        1 BinTableHDU    222   144R x 12C   [D, E, J, 25J, 25E, 25E, 25E, 25E, J, E, E, 38A]
+  2  APERTURE      1 ImageHDU        45   (5, 5)   float64
 
-To write the cutout target pixel files to FITS files, use the `~astrocut.TessCubeCutout.write_as_tpf` method. 
-This method returns a list of paths to the cutout TPF files. The file names will be in the pattern of 
+To write the cutout target pixel files to FITS files, use the `~astrocut.TessCubeCutout.write_as_tpf` method.
+This method returns a list of paths to the cutout TPF files. The file names will be in the pattern of
 "<cube_file_base>_<ra>_<dec>_<cutout_size>_astrocut.fits".
 
 .. code-block:: python
@@ -548,11 +545,11 @@ This method returns a list of paths to the cutout TPF files. The file names will
   ...     hdul.info() #doctest: +SKIP
   Filename: img_251.51_32.36_5x5_astrocut.fits
   No.    Name      Ver    Type      Cards   Dimensions   Format
-  0  PRIMARY       1 PrimaryHDU      42   ()      
-  1  PIXELS        1 BinTableHDU    222   144R x 12C   [D, E, J, 25J, 25E, 25E, 25E, 25E, J, E, E, 38A]   
-  2  APERTURE      1 ImageHDU        45   (5, 5)   float64  
+  0  PRIMARY       1 PrimaryHDU      42   ()
+  1  PIXELS        1 BinTableHDU    222   144R x 12C   [D, E, J, 25J, 25E, 25E, 25E, 25E, J, E, E, 38A]
+  2  APERTURE      1 ImageHDU        45   (5, 5)   float64
 
-By default, the cutouts are written to the current working directory. You can specify a different output directory using the 
+By default, the cutouts are written to the current working directory. You can specify a different output directory using the
 ``output_dir`` parameter.
 
 Multithreading
@@ -561,7 +558,7 @@ Multithreading
 Using cube files stored on the cloud allows you the option to implement multithreading to improve cutout generation
 speed. See below for a multithreaded example, using a TESS cube file stored on AWS.
 
-To use multithreading for cloud-based cutouts, set the ``threads`` argument in ``cube_cut`` to the number of threads you want to use. 
+To use multithreading for cloud-based cutouts, set the ``threads`` argument in ``cube_cut`` to the number of threads you want to use.
 Alternatively, you can set ``threads`` to ``"auto"``, which will set the number of threads based on the CPU count of your machine.
 Note that ``Total Time`` results may vary from machine to machine.
 
@@ -574,10 +571,10 @@ Note that ``Total Time`` results may vary from machine to machine.
   >>> cutout_size = 30
   >>> cube_file = "s3://stpubdata/tess/public/mast/tess-s0038-2-2-cube.fits"
 
-  >>> cube_cutout = TessCubeCutout(cube_file, 
-  ...                              coordinates=coord, 
-  ...                              cutout_size=cutout_size, 
-  ...                              verbose=True, 
+  >>> cube_cutout = TessCubeCutout(cube_file,
+  ...                              coordinates=coord,
+  ...                              cutout_size=cutout_size,
+  ...                              verbose=True,
   ...                              threads="auto") # doctest: +IGNORE_OUTPUT
   DEBUG: Coordinates: <SkyCoord (ICRS): (ra, dec) in deg
     (217.42893801, -62.67949189)> [Cutout]
@@ -595,9 +592,9 @@ Note that multithreading is disabled by default.
 
 .. code-block:: python
 
-  >>> cube_cutout = TessCubeCutout(cube_file, 
-  ...                              coordinates=coord, 
-  ...                              cutout_size=cutout_size, 
+  >>> cube_cutout = TessCubeCutout(cube_file,
+  ...                              coordinates=coord,
+  ...                              cutout_size=cutout_size,
   ...                              verbose=True) # doctest: +IGNORE_OUTPUT
   DEBUG: Coordinates: <SkyCoord (ICRS): (ra, dec) in deg
     (217.42893801, -62.67949189)> [Cutout]
@@ -617,9 +614,9 @@ Footprint Cutouts
 Astrocut can create cutouts without input files by matching the cutout's footprint to the footprints of available data products on the cloud.
 
 The `~astrocut.TessFootprintCutout` class generates cutouts from TESS image cube files stored in MAST's AWS Open Data Bucket.
-Simply provide the target coordinates and cutout size, and the class will match the cutout's footprint to the footprints 
+Simply provide the target coordinates and cutout size, and the class will match the cutout's footprint to the footprints
 of available cube files on the cloud. A cutout target pixel file will be generated for each matching cube file.
-To restrict the cutouts to specific sectors, use the ``sequence`` parameter with a sector number or a list of sector numbers. 
+To restrict the cutouts to specific sectors, use the ``sequence`` parameter with a sector number or a list of sector numbers.
 If ``sequence`` is set to None, cutouts will be returned for all matching cube files.
 
 The resulting cutouts can be returned in memory or as a file, depending on the user's preference. The cutout target pixel file format is
@@ -644,17 +641,17 @@ These objects are in the format of target pixel files and can be used to access 
 The ``tpf_cutouts`` attribute is a list of cutouts as `~astropy.io.fits.HDUList` objects in the format of target pixel files.
 
 .. code-block:: python
-  
+
   >>> tpf_cutout = fp_cutout.tpf_cutouts[0]
   >>> tpf_cutout.info() #doctest: +SKIP
   Filename: (No file associated with this HDUList)
   No.    Name      Ver    Type      Cards   Dimensions   Format
-    0  PRIMARY       1 PrimaryHDU      55   ()      
-    1  PIXELS        1 BinTableHDU    144   1282R x 12C   ['D', 'E', 'J', '100J', '100E', '100E', '100E', '100E', 'J', 'E', 'E', '38A']   
-    2  APERTURE      1 ImageHDU        80   (10, 10)   int32   
+    0  PRIMARY       1 PrimaryHDU      55   ()
+    1  PIXELS        1 BinTableHDU    144   1282R x 12C   ['D', 'E', 'J', '100J', '100E', '100E', '100E', '100E', 'J', 'E', 'E', '38A']
+    2  APERTURE      1 ImageHDU        80   (10, 10)   int32
 
 To write the cutout target pixel files to FITS files, use the `~astrocut.TessFootprintCutout.write_as_tpf` method. This method
-returns a list of paths to the cutout TPF files. 
+returns a list of paths to the cutout TPF files.
 
 .. code-block:: python
 
@@ -668,12 +665,12 @@ returns a list of paths to the cutout TPF files.
   ...     hdul.info()
   Filename: tess-s0001-4-4_83.4063097_-62.4897713_10-x-10_astrocut.fits
   No.    Name      Ver    Type      Cards   Dimensions   Format
-    0  PRIMARY       1 PrimaryHDU      57   ()      
-    1  PIXELS        1 BinTableHDU    146   1282R x 12C   [D, E, J, 100J, 100E, 100E, 100E, 100E, J, E, E, 38A]   
-    2  APERTURE      1 ImageHDU        82   (10, 10)   int32  
+    0  PRIMARY       1 PrimaryHDU      57   ()
+    1  PIXELS        1 BinTableHDU    146   1282R x 12C   [D, E, J, 100J, 100E, 100E, 100E, 100E, J, E, E, 38A]
+    2  APERTURE      1 ImageHDU        82   (10, 10)   int32
 
-By default, the cutouts are written to the current working directory. You can specify a different output directory using the 
-``output_dir`` parameter. 
+By default, the cutouts are written to the current working directory. You can specify a different output directory using the
+``output_dir`` parameter.
 
 
 Additional Cutout Processing
@@ -694,7 +691,7 @@ to retrieve all of the inputs for the `~astrocut.center_on_path` function. We al
 cutout location/size(s) necesary to cover the entire path.
 
 .. code-block:: python
-  
+
   >>> import astrocut
 
   >>> import requests  #doctest: +SKIP
@@ -710,7 +707,7 @@ cutout location/size(s) necesary to cover the entire path.
   >>> # The moving target path
   >>> path_table = Table({"time": Time([2458468.275827604, 2458468.900827604, 2458469.525827604,
   ...                                   2458470.150827604, 2458470.775827604], format="jd"),
-  ...                     "position": SkyCoord([82.22813, 82.07676, 81.92551, 81.7746, 81.62425], 
+  ...                     "position": SkyCoord([82.22813, 82.07676, 81.92551, 81.7746, 81.62425],
   ...                                          [-1.5821,- 1.54791, -1.5117, -1.47359, -1.43369], unit="deg")
   ...                    })
 
@@ -721,12 +718,12 @@ cutout location/size(s) necesary to cover the entire path.
   WCS Keywords
 
   Number of WCS axes: 2
-  CTYPE : 'RA---TAN-SIP'  'DEC--TAN-SIP'  
-  CRVAL : 86.239936828613  -0.87476283311844  
-  CRPIX : 1045.0  1001.0  
-  PC1_1 PC1_2  : 0.0057049915194511  7.5332427513786e-06  
-  PC2_1 PC2_2  : -0.00015248404815793  0.005706631578505  
-  CDELT : 1.0  1.0  
+  CTYPE : 'RA---TAN-SIP'  'DEC--TAN-SIP'
+  CRVAL : 86.239936828613  -0.87476283311844
+  CRPIX : 1045.0  1001.0
+  PC1_1 PC1_2  : 0.0057049915194511  7.5332427513786e-06
+  PC2_1 PC2_2  : -0.00015248404815793  0.005706631578505
+  CDELT : 1.0  1.0
   NAXIS : 2136  2078
 
   >>> # Making the regular cutout (using astroquery)
@@ -739,21 +736,21 @@ cutout location/size(s) necesary to cover the entire path.
   >>> manifest = Tesscut.download_cutouts(**footprints[0], sector=6)  #doctest: +SKIP
   Downloading URL https://mast.stsci.edu/tesscut/api/v0.1/astrocut?ra=81.92560876541987&dec=-1.5088083330171362&y=37&x=125&units=px&sector=6 to ./tesscut_20210707103901.zip ... [Done]
   Inflating...
-  
+
   >>> print(manifest["Local Path"][0])  #doctest: +SKIP
   ./tess-s0006-1-1_81.925609_-1.508808_125x37_astrocut.fits
 
   # Centering on the moving target
-  >>> mt_cutout_fle = astrocut.center_on_path(path_table, size, manifest["Local Path"], target="my_asteroid", 
+  >>> mt_cutout_fle = astrocut.center_on_path(path_table, size, manifest["Local Path"], target="my_asteroid",
   ...                                         img_wcs=ffi_wcs, verbose=False)  #doctest: +SKIP
 
   >>> cutout_hdu = fits.open(mt_cutout_fle)  #doctest: +SKIP
   >>> cutout_hdu.info()  #doctest: +SKIP
   Filename: ./my_asteroid_1468.9120483398438-1470.1412353515625_15-x-15_astrocut.fits
   No.    Name      Ver    Type      Cards   Dimensions   Format
-    0  PRIMARY       1 PrimaryHDU      56   ()      
-    1  PIXELS        1 BinTableHDU    152   60R x 16C   [D, E, J, 225J, 225E, 225E, 225E, 225E, J, E, E, 38A, D, D, D, D]   
-    2  APERTURE      1 ImageHDU        97   (2136, 2078)   int32  
+    0  PRIMARY       1 PrimaryHDU      56   ()
+    1  PIXELS        1 BinTableHDU    152   60R x 16C   [D, E, J, 225J, 225E, 225E, 225E, 225E, J, E, E, 38A, D, D, D, D]
+    2  APERTURE      1 ImageHDU        97   (2136, 2078)   int32
 
 
 Combining Cutouts
@@ -777,9 +774,9 @@ function. See the `~astrocut.build_default_combine_function` for an example of h
 
 
 .. code-block:: python
-  
+
   >>> import astrocut
-  
+
   >>> from astropy.coordinates import SkyCoord
 
   >>> fle_1 = 'hst_skycell-p2381x05y09_wfc3_uvis_f275w-all-all_drc.fits'
@@ -790,33 +787,33 @@ function. See the `~astrocut.build_default_combine_function` for an example of h
 
   >>> cutout_1 = astrocut.fits_cut(fle_1, center_coord, size, extension='all',
   ...                     cutout_prefix="cutout_p2381x05y09", verbose=False)  #doctest: +SKIP
-  >>> cutout_2 = astrocut.fits_cut(fle_2, center_coord, size, extension='all', 
+  >>> cutout_2 = astrocut.fits_cut(fle_2, center_coord, size, extension='all',
   ...                     cutout_prefix="cutout_p2381x06y09", verbose=False)  #doctest: +SKIP
 
   >>> plt.imshow(fits.getdata(cutout_1, 1))  #doctest: +SKIP
-                
+
 .. image:: imgs/hapcut_left.png
 
 .. code-block:: python
-                
+
   >>> plt.imshow(fits.getdata(cutout_2, 1))  #doctest: +SKIP
-                
+
 .. image:: imgs/hapcut_right.png
 
 .. code-block:: python
 
   >>> combined_cutout = astrocut.CutoutsCombiner([cutout_1, cutout_2]).combine("combined_cut.fits")  #doctest: +SKIP
   >>> plt.imshow(fits.getdata(combined_cutout, 1))  #doctest: +SKIP
-                
-.. image:: imgs/hapcut_combined.png        
+
+.. image:: imgs/hapcut_combined.png
 
 
 All of the combining can be done in memory, without writing FITS files to disk as well.
 
 .. code-block:: python
-  
+
   >>> import astrocut
-  
+
   >>> from astropy.coordinates import SkyCoord
 
   >>> fle_1 = 'hst_skycell-p2381x05y09_wfc3_uvis_f275w-all-all_drc.fits'
@@ -827,22 +824,22 @@ All of the combining can be done in memory, without writing FITS files to disk a
 
   >>> cutout_1 = astrocut.fits_cut(fle_1, center_coord, size, extension='all',
   ...                     cutout_prefix="cutout_p2381x05y09", memory_only=True)[0]  #doctest: +SKIP
-  >>> cutout_2 = astrocut.fits_cut(fle_2, center_coord, size, extension='all', 
+  >>> cutout_2 = astrocut.fits_cut(fle_2, center_coord, size, extension='all',
   ...                     cutout_prefix="cutout_p2381x06y09", memory_only=True)[0]  #doctest: +SKIP
 
   >>> plt.imshow(cutout_1[1].data)  #doctest: +SKIP
-                
+
 .. image:: imgs/hapcut_left.png
 
 .. code-block:: python
-                
+
   >>> plt.imshow(cutout_2[1].data)  #doctest: +SKIP
-                
+
 .. image:: imgs/hapcut_right.png
 
 .. code-block:: python
 
   >>> combined_cutout = astrocut.CutoutsCombiner([cutout_1, cutout_2]).combine(memory_only=True)  #doctest: +SKIP
   >>> plt.imshow(combined_cutout[1].data)  #doctest: +SKIP
-                
-.. image:: imgs/hapcut_combined.png        
+
+.. image:: imgs/hapcut_combined.png
