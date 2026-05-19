@@ -103,7 +103,7 @@ def test_images(tmp_path, fakedata):
         "roman": {
             "meta": meta,
             "data": data,
-            "dq": data,
+            "dq": data.astype(int),  # DQ is typically an integer array
             "err": data,
             "context": np.expand_dims(data, axis=0),
             "invalid_dims": np.ndarray(shape=(10)),
@@ -286,9 +286,12 @@ def test_asdf_cutout_lite(test_images, center_coord, cutout_size):
 def test_asdf_cutout_partial(test_images, center_coord, cutout_size):
     # Off the top
     center_coord = SkyCoord("29.99901792 44.9861", unit="deg")
-    cutout = ASDFCutout(test_images[0], center_coord, cutout_size).cutouts[0]
+    asdf_cutout = ASDFCutout(test_images[0], center_coord, cutout_size)
+    cutout = asdf_cutout.cutouts[0]
     assert cutout.data.shape == (10, 10)
     assert np.isnan(cutout.data[: cutout_size // 2, :]).all()
+    # Default to 0 for integer arrays
+    assert np.all(asdf_cutout.asdf_cutouts[0]["roman"]["dq"][: cutout_size // 2, :] == 0)
 
     # Off the bottom
     center_coord = SkyCoord("29.99901792 45.01387", unit="deg")
@@ -302,8 +305,11 @@ def test_asdf_cutout_partial(test_images, center_coord, cutout_size):
 
     # Off the right, with float fill value
     center_coord = SkyCoord("30.01961 44.99930555", unit="deg")
-    cutout = ASDFCutout(test_images[0], center_coord, cutout_size, fill_value=1.5).cutouts[0]
+    asdf_cutout = ASDFCutout(test_images[0], center_coord, cutout_size, fill_value=1.5)
+    cutout = asdf_cutout.cutouts[0]
     assert np.all(cutout.data[:, cutout_size // 2 :] == 1.5)
+    # Convert to integer fill value for DQ array
+    assert np.all(asdf_cutout.asdf_cutouts[0]["roman"]["dq"][:, cutout_size // 2 :] == 1)
 
     # Error if unexpected fill value
     with pytest.raises(InvalidInputError, match="Fill value must be an integer or a float."):
@@ -403,6 +409,14 @@ def test_asdf_cutout_img_output(test_images, center_coord, cutout_size, tmpdir):
     color_jpg = ASDFCutout(test_images, center_coord, cutout_size).write_as_img(output_dir=tmpdir, colorize=True)
     img = Image.open(color_jpg)
     assert img.mode == "RGB"
+
+
+def test_asdf_cutout_cube_angular_size(test_images, center_coord):
+    """Test that cube-like arrays use the computed cutout shape for angular sizes."""
+    cutout = ASDFCutout(test_images[0], center_coord, 2 * u.arcsec)
+
+    assert cutout.cutouts[0].data.shape == (20, 20)
+    assert cutout.asdf_cutouts[0]["roman"]["context"].shape == (1, 20, 20)
 
 
 def test_asdf_cutout_gwcs(test_images, center_coord):

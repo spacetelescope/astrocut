@@ -38,7 +38,9 @@ class ASDFCutout(ImageCutout):
     cutout_size : int | array | list | tuple | `~astropy.units.Quantity`
         Size of the cutout array.
     fill_value : int | float
-        Value to fill the cutout with if the cutout is outside the image.
+        Value to fill the cutout with if the cutout is outside the image. Default is np.nan. If the input data array
+        has an integer data type, the fill value will be converted to an integer (e.g., a fill value of 1.0 will be
+        converted to 1). If the conversion fails, it will default to 0.
     key : str
         Optional, default None. Access key ID for S3 file system.
     secret : str
@@ -316,13 +318,22 @@ class ASDFCutout(ImageCutout):
         cutout : Cutout2D
             The generated cutout.
         """
+        # If the array has an integer data type, fill_value must be an integer
+        fill_value = self._fill_value
+        if np.issubdtype(array.dtype, np.integer) and not isinstance(fill_value, int):
+            log.debug("Input data array has integer data type, converting fill_value to integer.")
+            try:
+                fill_value = int(self._fill_value)
+            except ValueError:
+                fill_value = 0  # Default to 0 if conversion fails
+
         cutout = Cutout2D(
             array,
             position=position,
             wcs=wcs,
             size=(self._cutout_size[1], self._cutout_size[0]),
             mode="partial",
-            fill_value=self._fill_value,
+            fill_value=fill_value,
             copy=True,
         )
 
@@ -369,7 +380,7 @@ class ASDFCutout(ImageCutout):
 
             if obj.ndim == 2:
                 # Simple 2D cutout
-                cutout = self._make_cutout(obj, pixel_coords, wcs if is_data else None)
+                cutout = self._make_cutout(obj, pixel_coords, wcs)
                 tree[self._mission_kwd][key] = cutout.data
                 if is_data:
                     data_cutout = cutout
@@ -377,11 +388,15 @@ class ASDFCutout(ImageCutout):
 
             else:
                 # Cube or higher dimension array
-                new_shape = obj.shape[:-2] + (self._cutout_size[1], self._cutout_size[0])
-                cutout_cube = np.full(new_shape, self._fill_value, dtype=obj.dtype)
+                cutout_cube = None
 
                 for idx in np.ndindex(obj.shape[:-2]):
-                    cutout = self._make_cutout(obj[idx], pixel_coords, None)
+                    cutout = self._make_cutout(obj[idx], pixel_coords, wcs)
+                    if cutout_cube is None:
+                        # Determine shape of cutout cube on first iteration and initialize wthe cube with fill_value
+                        # Need to determine pixel shape after first cutout is made to account for angular cutout sizes
+                        new_shape = obj.shape[:-2] + cutout.data.shape
+                        cutout_cube = np.full(new_shape, self._fill_value, dtype=cutout.data.dtype)
                     cutout_cube[idx] = cutout.data
 
                 tree[self._mission_kwd][key] = cutout_cube
@@ -684,7 +699,10 @@ def get_center_pixel(gwcsobj: gwcs.wcs.WCS, ra: float, dec: float) -> Tuple[Tupl
 
     # Map the coordinates to a pixel's location on the 2d image
     row, col = gwcsobj.invert(np.atleast_1d(ra), np.atleast_1d(dec), with_bounding_box=False)
-    pixel_coords = (float(row[0]), float(col[0]))
+    row_pix = float(row.value[0]) if isinstance(row, Quantity) else float(row[0])
+    col_pix = float(col.value[0]) if isinstance(col, Quantity) else float(col[0])
+    pixel_coords = (row_pix, col_pix)
+
     return pixel_coords, wcs_updated
 
 
