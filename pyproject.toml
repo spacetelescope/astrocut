@@ -1,8 +1,109 @@
+[project]
+name = "astrocut"
+description = "Cutout tools for astronomical images"
+readme = "README.rst"
+requires-python = ">=3.10"
+license = { text = "BSD 3-Clause" }
+authors = [
+    { name = "MAST Archive Developers", email = "archive@stsci.edu" },
+]
+dynamic = ["version"]
+dependencies = [
+    "asdf>=4.1.0",  # for ASDF file format
+    "astropy>=5.2",  # astropy with s3fs support
+    "cachetools>=5.3.2",  # for caching data
+    "s3fs>=2022.8.2",  # for remote cutouts
+    "fsspec[http,s3]>=2022.8.2",  # for remote cutouts
+    "s3path>=0.5.7",  # for remote file paths
+    "requests>=2.32.3",  # for making HTTP requests
+    "spherical_geometry>=1.3.0",
+    "gwcs>=0.21.0",
+    "scipy",
+    "Pillow",
+]
+
+[project.urls]
+Homepage = "https://astrocut.readthedocs.io"
+Issues = "https://github.com/spacetelescope/astrocut/issues"
+Repository = "https://github.com/spacetelescope/astrocut"
+
+[project.scripts]
+astropy-package-template-example = "packagename.example_mod:main"
+
+[project.optional-dependencies]
+test = [
+    "pytest-astropy",
+    "astroquery>=0.4.6",
+]
+docs = [
+    "sphinx>4.1.0",
+    "docutils>=0.16",
+    "sphinx-astropy>=1.11",
+    "sphinx_rtd_theme>=0.5.2",
+    "tomli>=2.0.0; python_version < '3.11'",
+]
+all = [
+    "stdatamodels>=4.1.0",  # optional; required for ASDF-in-FITS embedding (Python>=3.11)
+]
+
 [build-system]
-requires = ["setuptools",
-            "setuptools_scm",
-            "wheel"]
+requires = ["setuptools>=70.1",
+            "setuptools_scm"]
 build-backend = 'setuptools.build_meta'
+
+[tool.setuptools_scm]
+write_to = "astrocut/version.py"
+
+[tool.setuptools]
+zip-safe = false
+license-files = ["licenses/LICENSE.rst"]
+
+[tool.setuptools.packages.find]
+include = ["astrocut", "astrocut.*"]
+
+[tool.setuptools.package-data]
+"astrocut.tests" = ["data/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["astrocut", "docs"]
+astropy_header = true
+doctest_plus = "enabled"
+text_file_format = "rst"
+addopts = "--doctest-rst"
+
+[tool.coverage.run]
+omit = [
+    "astrocut/_astropy_init*",
+    "astrocut/conftest.py",
+    "astrocut/*setup_package*",
+    "astrocut/tests/*",
+    "astrocut/*/tests/*",
+    "astrocut/extern/*",
+    "astrocut/version*",
+    "*/astrocut/_astropy_init*",
+    "*/astrocut/conftest.py",
+    "*/astrocut/*setup_package*",
+    "*/astrocut/tests/*",
+    "*/astrocut/*/tests/*",
+    "*/astrocut/extern/*",
+    "*/astrocut/version*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "except ImportError",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "def main\\(.*\\):",
+    "pragma: py{ignore_python_version}",
+    "def _ipython_key_completions_",
+]
+
+[tool.astrocut.docs]
+edit_on_github = false
+github_project = "spacetelescope/astrocut"
+author = "MAST Archive Developers"
 
 [tool.ruff]
 line-length = 120
