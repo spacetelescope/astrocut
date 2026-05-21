@@ -254,9 +254,9 @@ class ASDFCutout(ImageCutout):
         self._asdf_cutouts = asdf_cutouts
         return asdf_cutouts
 
-    def _get_cloud_http(self, input_file: Union[str, S3Path]) -> str:
+    def _get_cloud_file(self, input_file: Union[str, S3Path]):
         """
-        Get the HTTP URL of a cloud resource from an S3 URI.
+        Open a cloud-hosted file using fsspec.
 
         Parameters
         ----------
@@ -265,25 +265,24 @@ class ASDFCutout(ImageCutout):
 
         Returns
         -------
-        str
-            The HTTP URL of the cloud resource.
+        file-like object
+            An open binary file handle for the cloud resource.
         """
-        # Import requests and s3fs here to avoid unnecessary imports for users who don't need cloud access
-        import requests
-        import s3fs
+        # Import fsspec here to avoid adding it as a dependency for users who don't need cloud support
+        import fsspec
 
-        # Check if public or private by sending an HTTP request
-        s3_path = S3Path.from_uri(input_file) if isinstance(input_file, str) else input_file
-        url = f"https://{s3_path.bucket}.s3.amazonaws.com/{s3_path.key}"
-        resp = requests.head(url, timeout=10)
-        is_anon = False if resp.status_code == 403 else True
-        if not is_anon:
-            log.debug("Attempting to access private S3 bucket: %s", s3_path.bucket)
+        fsspec_kwargs = {}
+        if self._key is None and self._secret is None and self._token is None:
+            fsspec_kwargs["anon"] = True
+        else:
+            if self._key is not None:
+                fsspec_kwargs["key"] = self._key
+            if self._secret is not None:
+                fsspec_kwargs["secret"] = self._secret
+            if self._token is not None:
+                fsspec_kwargs["token"] = self._token
 
-        # Create file system and get URL of file
-        fs = s3fs.S3FileSystem(anon=is_anon, key=self._key, secret=self._secret, token=self._token)
-        with fs.open(input_file, "rb") as f:
-            return f.url()
+        return fsspec.open(input_file, mode="rb", **fsspec_kwargs)
 
     def _get_fill_value(self, dtype: np.dtype) -> Union[int, float]:
         """
@@ -480,69 +479,80 @@ class ASDFCutout(ImageCutout):
         file : str | Path | S3Path
             The input file to create a cutout from.
         """
-        # If file comes from AWS cloud bucket, get HTTP URL to open with asdf
+        input_file = file
+        cloud_file = None
+        # If file comes from AWS cloud bucket, open it with fsspec and pass the file handle to ASDF.
         if (isinstance(file, str) and file.startswith("s3://")) or isinstance(file, S3Path):
-            file = self._get_cloud_http(file)
+            cloud_file = self._get_cloud_file(file)
 
-        with asdf.open(file) as af:
-            # Load the data from the input file
-            tree = af.tree
-            mission_tree = tree[self._mission_kwd] if self._mission_kwd in tree else None
-            if mission_tree is None:
-                warnings.warn(
-                    f"File {file} does not contain the expected mission keyword '{self._mission_kwd}'. Skipping...",
-                    DataWarning,
-                )
-                return
+        if cloud_file is not None:
+            asdf_file = cloud_file
+        else:
+            asdf_file = nullcontext(file)
 
-            # Skip if the file does not contain a GWCS object
-            gwcs = mission_tree["meta"].get("wcs", None)
-            if gwcs is None:
-                warnings.warn(f"File {file} does not contain a GWCS object. Skipping...", DataWarning)
-                return
+        with asdf_file as file_handle:
+            with asdf.open(file_handle) as af:
+                # Load the data from the input file
+                tree = af.tree
+                mission_tree = tree[self._mission_kwd] if self._mission_kwd in tree else None
+                if mission_tree is None:
+                    warnings.warn(
+                        f"File {input_file} does not contain the expected mission keyword '{self._mission_kwd}'. "
+                        "Skipping...",
+                        DataWarning,
+                    )
+                    return
 
-            new_mission_tree = {"meta": mission_tree.get("meta", {})}
-            new_tree = {self._mission_kwd: new_mission_tree}
+                # Skip if the file does not contain a GWCS object
+                gwcs = mission_tree["meta"].get("wcs", None)
+                if gwcs is None:
+                    warnings.warn(f"File {input_file} does not contain a GWCS object. Skipping...", DataWarning)
+                    return
 
-            data_shape = mission_tree["data"].shape
+                new_mission_tree = {"meta": mission_tree.get("meta", {})}
+                new_tree = {self._mission_kwd: new_mission_tree}
 
-            for key, value in mission_tree.items():
-                if isinstance(value, (np.ndarray, NDArrayType)):
-                    if value.shape[-2:] == data_shape[-2:]:
-                        new_mission_tree[key] = value
+                data_shape = mission_tree["data"].shape
 
-            # Get closest pixel coordinates and approximated WCS
-            pixel_coords, wcs = get_center_pixel(gwcs, self._coordinates.ra.value, self._coordinates.dec.value)
+                for key, value in mission_tree.items():
+                    if isinstance(value, (np.ndarray, NDArrayType)):
+                        if value.shape[-2:] == data_shape[-2:]:
+                            new_mission_tree[key] = value
 
-            # Create the cutout
-            try:
-                data_cutout = self._get_cutout_data(new_mission_tree, wcs, pixel_coords)
-            except NoOverlapError:
-                warnings.warn(f"Cutout footprint does not overlap with data in {file}, skipping...", DataWarning)
-                return
+                # Get closest pixel coordinates and approximated WCS
+                pixel_coords, wcs = get_center_pixel(gwcs, self._coordinates.ra.value, self._coordinates.dec.value)
 
-            # Check that there is data in the cutout image
-            data = data_cutout.data
-            if np.isnan(data).all() or not np.any(data):
-                warnings.warn(f"Cutout of {file} contains no data, skipping...", DataWarning)
-                return
+                # Create the cutout
+                try:
+                    data_cutout = self._get_cutout_data(new_mission_tree, wcs, pixel_coords)
+                except NoOverlapError:
+                    warnings.warn(
+                        f"Cutout footprint does not overlap with data in {input_file}, skipping...", DataWarning
+                    )
+                    return
 
-            # Store the Cutout2D object
-            self.cutouts.append(data_cutout)
+                # Check that there is data in the cutout image
+                data = data_cutout.data
+                if np.isnan(data).all() or not np.any(data):
+                    warnings.warn(f"Cutout of {input_file} contains no data, skipping...", DataWarning)
+                    return
 
-            # Slice the GWCS to the cutout and store it for use in lite mode and in ASDF trees
-            sliced_gwcs = self._slice_gwcs(data_cutout, gwcs)
-            self._sliced_gwcs_objects.append(sliced_gwcs)
+                # Store the Cutout2D object
+                self.cutouts.append(data_cutout)
 
-            if not self._lite:
-                new_mission_tree["meta"]["wcs"] = sliced_gwcs
+                # Slice the GWCS to the cutout and store it for use in lite mode and in ASDF trees
+                sliced_gwcs = self._slice_gwcs(data_cutout, gwcs)
+                self._sliced_gwcs_objects.append(sliced_gwcs)
 
-                # Store the original filename in the tree metadata for the ASDF cutout
-                new_mission_tree["meta"]["orig_file"] = str(file)
-                self._asdf_trees.append(new_tree)
+                if not self._lite:
+                    new_mission_tree["meta"]["wcs"] = sliced_gwcs
 
-            # Store cutout with filename
-            self.cutouts_by_file[file] = [data_cutout]
+                    # Store the original filename in the tree metadata for the ASDF cutout
+                    new_mission_tree["meta"]["orig_file"] = str(input_file)
+                    self._asdf_trees.append(new_tree)
+
+                # Store cutout with filename
+                self.cutouts_by_file[input_file] = [data_cutout]
 
     def cutout(self) -> Union[str, List[str], List[fits.HDUList]]:
         """
