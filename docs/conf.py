@@ -30,7 +30,10 @@ import sys
 from importlib import import_module
 from pathlib import Path
 
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
 
 try:
     from sphinx_astropy.conf.v1 import *  # noqa

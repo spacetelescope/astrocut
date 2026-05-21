@@ -27,9 +27,6 @@ Homepage = "https://astrocut.readthedocs.io"
 Issues = "https://github.com/spacetelescope/astrocut/issues"
 Repository = "https://github.com/spacetelescope/astrocut"
 
-[project.scripts]
-astropy-package-template-example = "packagename.example_mod:main"
-
 [project.optional-dependencies]
 test = [
     "pytest-astropy",
@@ -39,7 +36,8 @@ docs = [
     "sphinx>4.1.0",
     "docutils>=0.16",
     "sphinx-astropy>=1.11",
-    "sphinx_rtd_theme>=0.5.2"
+    "sphinx_rtd_theme>=0.5.2",
+    "tomli>=2.0.0; python_version < '3.11'",
 ]
 all = [
     "stdatamodels>=4.1.0",  # optional; required for ASDF-in-FITS embedding (Python>=3.11)
@@ -47,7 +45,8 @@ all = [
 
 [build-system]
 requires = ["setuptools>=70.1",
-            "setuptools_scm"]
+            "setuptools_scm[toml]>=8.0",
+            "wheel"]
 build-backend = 'setuptools.build_meta'
 
 [tool.setuptools_scm]
