@@ -39,8 +39,7 @@ docs = [
     "sphinx>4.1.0",
     "docutils>=0.16",
     "sphinx-astropy>=1.11",
-    "sphinx_rtd_theme>=0.5.2",
-    "tomli>=2.0.0; python_version < '3.11'",
+    "sphinx_rtd_theme>=0.5.2"
 ]
 all = [
     "stdatamodels>=4.1.0",  # optional; required for ASDF-in-FITS embedding (Python>=3.11)
