@@ -1,10 +1,6 @@
 #!/usr/bin/env python
 # Licensed under a 3-clause BSD style license - see LICENSE.rst
 
-# NOTE: The configuration for the package, including the name, version, and
-# other information are set in the setup.cfg file.
-
-import os
 import sys
 
 from setuptools import setup
@@ -62,27 +58,5 @@ if "build_docs" in sys.argv or "build_sphinx" in sys.argv:
     print(DOCS_HELP)
     sys.exit(1)
 
-VERSION_TEMPLATE = """
-# Note that we need to fall back to the hard-coded version if either
-# setuptools_scm can't be imported or setuptools_scm can't determine the
-# version, so we catch the generic 'Exception'.
-try:
-    from setuptools_scm import get_version
-    version = get_version(root='..', relative_to=__file__)
-except Exception:
-    version = '{version}'
-""".lstrip()
-
-current_path = os.path.abspath(os.path.dirname(__file__))
-
-
-def read_file(*parts):
-    with open(os.path.join(current_path, *parts), encoding="utf-8") as reader:
-        return reader.read()
-
-
-setup(
-    use_scm_version={"write_to": os.path.join("astrocut", "version.py"), "write_to_template": VERSION_TEMPLATE},
-    long_description=read_file("README.rst"),
-    long_description_content_type="text/x-rst",
-)
+# Metadata and build configuration are defined in pyproject.toml.
+setup()
