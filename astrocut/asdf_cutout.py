@@ -1,6 +1,6 @@
 import sys
 import warnings
-from contextlib import contextmanager, nullcontext
+from contextlib import nullcontext
 from copy import copy
 from datetime import date
 from pathlib import Path
@@ -8,7 +8,6 @@ from time import monotonic
 from typing import List, Optional, Tuple, Union
 
 import asdf
-import asdf.schema as asdf_schema
 import gwcs
 import numpy as np
 from asdf.tags.core.ndarray import NDArrayType
@@ -25,17 +24,6 @@ from s3path import S3Path
 from . import __version__, log
 from .exceptions import DataWarning, InvalidInputError, InvalidQueryError, ModuleWarning
 from .image_cutout import ImageCutout
-
-
-@contextmanager
-def _disabled_asdf_validation():
-    """Temporarily disable ASDF schema validation for trusted bulk writes."""
-    original_validate = asdf_schema.validate
-    asdf_schema.validate = lambda *args, **kwargs: None
-    try:
-        yield
-    finally:
-        asdf_schema.validate = original_validate
 
 
 class ASDFCutout(ImageCutout):
@@ -684,8 +672,7 @@ class ASDFCutout(ImageCutout):
         list
             A list of paths to the cutout ASDF files.
         """
-        with nullcontext() if validate_output else _disabled_asdf_validation():
-            return self._write_as_format(output_format=".asdf", output_dir=output_dir)
+        return self._write_as_format(output_format=".asdf", output_dir=output_dir)
 
     def write_as_zip(
         self,
