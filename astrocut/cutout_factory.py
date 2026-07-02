@@ -34,8 +34,8 @@ class CutoutFactory:
         output_path: Union[str, Path] = ".",
         memory_only: bool = False,
         threads: Union[int, Literal["auto"]] = 1,
-        legacy_filenames: bool = False,
         verbose: bool = False,
+        legacy_filenames: bool = False,
     ):
         """
         Takes a cube file (as created by `~astrocut.CubeFactory`), and makes a cutout target pixel
@@ -77,12 +77,12 @@ class CutoutFactory:
             Number of threads to use when making remote (e.g. s3) cutouts, will not use threads for local access
             <=1 disables the threadpool, >1 sets threadpool to the specified number of threads,
             "auto" uses `concurrent.futures.ThreadPoolExecutor`'s default: cpu_count + 4, limit to max of 32
+        verbose : bool
+            Optional. If true intermediate information is printed.
         legacy_filenames : bool
             Optional. If True, generated cutout filenames use the pre-1.2.0 format (``<ny>x<nx>`` size
             separator and 6-decimal RA/Dec precision) instead of the current format (``<ny>-x-<nx>`` size
             separator and 7-decimal RA/Dec precision). Default is False.
-        verbose : bool
-            Optional. If true intermediate information is printed.
 
         Returns
         -------
@@ -121,8 +121,8 @@ def cube_cut(
     output_path: Union[str, Path] = ".",
     memory_only: bool = False,
     threads: Union[int, Literal["auto"]] = 1,
-    legacy_filenames: bool = False,
     verbose: bool = False,
+    legacy_filenames: bool = False,
 ):
     """
     Takes a cube file (as created by `~astrocut.CubeFactory`), and makes a cutout target pixel
@@ -164,12 +164,12 @@ def cube_cut(
         Number of threads to use when making remote (e.g. s3) cutouts, will not use threads for local access
         <=1 disables the threadpool, >1 sets threadpool to the specified number of threads,
         "auto" uses `concurrent.futures.ThreadPoolExecutor`'s default: cpu_count + 4, limit to max of 32
+    verbose : bool
+        Optional. If true intermediate information is printed.
     legacy_filenames : bool
         Optional. If True, generated cutout filenames use the pre-1.2.0 format (``<ny>x<nx>`` size
         separator and 6-decimal RA/Dec precision) instead of the current format (``<ny>-x-<nx>`` size
         separator and 7-decimal RA/Dec precision). Default is False.
-    verbose : bool
-        Optional. If true intermediate information is printed.
 
     Returns
     -------

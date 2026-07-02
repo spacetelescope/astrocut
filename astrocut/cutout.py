@@ -47,12 +47,12 @@ class Cutout(BaseCutout, ABC):
         Value to fill the cutout with if the cutout is outside the image.
     limit_rounding_method : str
         Method to use for rounding the cutout limits. Options are 'round', 'ceil', and 'floor'.
+    verbose : bool
+        If True, log messages are printed to the console.
     legacy_filenames : bool
         If True, generated cutout filenames use the pre-1.2.0 format (``<ny>x<nx>`` size separator
         and 6-decimal RA/Dec precision) instead of the current format (``<ny>-x-<nx>`` size separator
         and 7-decimal RA/Dec precision). Default is False.
-    verbose : bool
-        If True, log messages are printed to the console.
 
     Methods
     -------
@@ -67,8 +67,8 @@ class Cutout(BaseCutout, ABC):
         cutout_size: Union[int, np.ndarray, u.Quantity, List[int], Tuple[int]] = 25,
         fill_value: Union[int, float] = np.nan,
         limit_rounding_method: str = "round",
-        legacy_filenames: bool = False,
         verbose: bool = False,
+        legacy_filenames: bool = False,
     ):
         super().__init__(verbose=verbose)
 
