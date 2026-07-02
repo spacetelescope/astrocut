@@ -36,6 +36,10 @@ class FootprintCutout(Cutout, ABC):
         Default None. Sequence(s) from which to generate cutouts. Can provide a single
         sequence number as an int or a list of sequence numbers. If not specified,
         cutouts will be generated from all sequences that contain the cutout.
+    legacy_filenames : bool
+        If True, generated cutout filenames use the pre-1.2.0 format (``<ny>x<nx>`` size separator
+        and 6-decimal RA/Dec precision) instead of the current format (``<ny>-x-<nx>`` size separator
+        and 7-decimal RA/Dec precision). Default is False.
     verbose : bool
         If True, log messages are printed to the console.
 
@@ -52,9 +56,10 @@ class FootprintCutout(Cutout, ABC):
         fill_value: Union[int, float] = np.nan,
         limit_rounding_method: str = "round",
         sequence: Union[int, List[int], None] = None,
+        legacy_filenames: bool = False,
         verbose: bool = False,
     ):
-        super().__init__([], coordinates, cutout_size, fill_value, limit_rounding_method, verbose)
+        super().__init__([], coordinates, cutout_size, fill_value, limit_rounding_method, legacy_filenames, verbose)
 
         # Assigning other attributes
         if isinstance(sequence, int):

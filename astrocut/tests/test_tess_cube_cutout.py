@@ -299,6 +299,22 @@ def test_tess_cube_cutout_write_to_tpf(cube_file, tmpdir, cutout_size, coordinat
     assert "astrocut" in cutout_path
 
 
+def test_tess_cube_cutout_write_to_tpf_legacy_filenames(cube_file, tmpdir, cutout_size, coordinates):
+    # Make cutout with legacy_filenames enabled
+    cutout = TessCubeCutout(cube_file, coordinates, cutout_size, legacy_filenames=True)
+
+    # Write to TPF without output_file specified
+    cutout_path = cutout.write_as_tpf(tmpdir)[0]
+
+    # Check pathname uses the legacy format: 6-decimal RA/Dec and "x" separator (no hyphens)
+    assert Path(cutout_path).exists()
+    assert f"{coordinates.ra.value:.6f}" in cutout_path
+    assert f"{coordinates.dec.value:.6f}" in cutout_path
+    assert f"{cutout_size}x{cutout_size}" in cutout_path
+    assert "-x-" not in cutout_path
+    assert "astrocut" in cutout_path
+
+
 def test_tess_cube_cutout_write_to_zip(cube_file, cutout_size, coordinates, tmpdir):
     # Single cube input; expect one TPF member in zip
     cutout = TessCubeCutout(cube_file, coordinates, cutout_size)

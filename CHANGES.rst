@@ -10,6 +10,10 @@ Unreleased
 - Bugfix for incorrect data type of fill values in ``ASDFCutout`` when input data is an integer array. [#184]
 - The default value of the ``lite`` parameter in the ``ASDFCutout`` class is now True, resulting in cutouts that
   include only the science data and updated world coordinate system by default. [#186]
+- Added ``legacy_filenames`` parameter to the ``TessCubeCutout``, ``TessFootprintCutout``, ``cube_cut``, and 
+  ``CutoutFactory.cube_cut``to allow users to opt into the pre-1.2.0 cutout/target pixel file filename format 
+  (``<ny>x<nx>`` size separator and 6-decimal RA/Dec precision) instead of the current format 
+  (``<ny>-x-<nx>`` size separator and 7-decimal RA/Dec precision). Default is False. [#194]
 
 Breaking Changes
 ^^^^^^^^^^^^^^^^

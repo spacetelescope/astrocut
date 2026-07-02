@@ -34,6 +34,10 @@ class TessCubeCutout(CubeCutout):
     threads : int | 'auto'
         The number of threads to use for making the cutouts. If 'auto', the number of threads will be set to the number
         of available CPUs.
+    legacy_filenames : bool
+        If True, generated cutout filenames use the pre-1.2.0 format (``<ny>x<nx>`` size separator
+        and 6-decimal RA/Dec precision) instead of the current format (``<ny>-x-<nx>`` size separator
+        and 7-decimal RA/Dec precision). Default is False.
     verbose : bool
         If True, log messages are printed to the console.
 
@@ -64,9 +68,19 @@ class TessCubeCutout(CubeCutout):
         fill_value: Union[int, float] = np.nan,
         limit_rounding_method: str = "round",
         threads: Union[int, Literal["auto"]] = 1,
+        legacy_filenames: bool = False,
         verbose: bool = False,
     ):
-        super().__init__(input_files, coordinates, cutout_size, fill_value, limit_rounding_method, threads, verbose)
+        super().__init__(
+            input_files,
+            coordinates,
+            cutout_size,
+            fill_value,
+            limit_rounding_method,
+            threads,
+            legacy_filenames,
+            verbose,
+        )
 
         # Keyword corresponding to WCS axis
         self._wcs_axes_keyword = "CTYPE2"

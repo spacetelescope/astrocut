@@ -34,6 +34,7 @@ class CutoutFactory:
         output_path: Union[str, Path] = ".",
         memory_only: bool = False,
         threads: Union[int, Literal["auto"]] = 1,
+        legacy_filenames: bool = False,
         verbose: bool = False,
     ):
         """
@@ -65,6 +66,7 @@ class CutoutFactory:
             Optional. The name for the output target pixel file.
             If no name is supplied, the file will be named:
             ``<cube_file_base>_<ra>_<dec>_<cutout_size>_astrocut.fits``
+            (or ``<cube_file_base>_<ra>_<dec>_<ny>x<nx>_astrocut.fits`` if ``legacy_filenames`` is True).
         output_path : str
             Optional. The path where the output file is saved.
             The current directory is default.
@@ -75,6 +77,10 @@ class CutoutFactory:
             Number of threads to use when making remote (e.g. s3) cutouts, will not use threads for local access
             <=1 disables the threadpool, >1 sets threadpool to the specified number of threads,
             "auto" uses `concurrent.futures.ThreadPoolExecutor`'s default: cpu_count + 4, limit to max of 32
+        legacy_filenames : bool
+            Optional. If True, generated cutout filenames use the pre-1.2.0 format (``<ny>x<nx>`` size
+            separator and 6-decimal RA/Dec precision) instead of the current format (``<ny>-x-<nx>`` size
+            separator and 7-decimal RA/Dec precision). Default is False.
         verbose : bool
             Optional. If true intermediate information is printed.
 
@@ -86,7 +92,12 @@ class CutoutFactory:
             If unsuccessful returns None.
         """
         cube_cutout = TessCubeCutout(
-            input_files=cube_file, coordinates=coordinates, cutout_size=cutout_size, threads=threads, verbose=verbose
+            input_files=cube_file,
+            coordinates=coordinates,
+            cutout_size=cutout_size,
+            threads=threads,
+            legacy_filenames=legacy_filenames,
+            verbose=verbose,
         )
 
         # Assign these attributes to be backwards compatible
@@ -110,6 +121,7 @@ def cube_cut(
     output_path: Union[str, Path] = ".",
     memory_only: bool = False,
     threads: Union[int, Literal["auto"]] = 1,
+    legacy_filenames: bool = False,
     verbose: bool = False,
 ):
     """
@@ -141,6 +153,7 @@ def cube_cut(
         Optional. The name for the output target pixel file.
         If no name is supplied, the file will be named:
         ``<cube_file_base>_<ra>_<dec>_<cutout_size>_astrocut.fits``
+        (or ``<cube_file_base>_<ra>_<dec>_<ny>x<nx>_astrocut.fits`` if ``legacy_filenames`` is True).
     output_path : str
         Optional. The path where the output file is saved.
         The current directory is default.
@@ -151,6 +164,10 @@ def cube_cut(
         Number of threads to use when making remote (e.g. s3) cutouts, will not use threads for local access
         <=1 disables the threadpool, >1 sets threadpool to the specified number of threads,
         "auto" uses `concurrent.futures.ThreadPoolExecutor`'s default: cpu_count + 4, limit to max of 32
+    legacy_filenames : bool
+        Optional. If True, generated cutout filenames use the pre-1.2.0 format (``<ny>x<nx>`` size
+        separator and 6-decimal RA/Dec precision) instead of the current format (``<ny>-x-<nx>`` size
+        separator and 7-decimal RA/Dec precision). Default is False.
     verbose : bool
         Optional. If true intermediate information is printed.
 
@@ -162,7 +179,12 @@ def cube_cut(
         If unsuccessful, returns None.
     """
     cube_cutout = TessCubeCutout(
-        input_files=cube_file, coordinates=coordinates, cutout_size=cutout_size, threads=threads, verbose=verbose
+        input_files=cube_file,
+        coordinates=coordinates,
+        cutout_size=cutout_size,
+        threads=threads,
+        legacy_filenames=legacy_filenames,
+        verbose=verbose,
     )
 
     if memory_only:

@@ -47,6 +47,10 @@ class Cutout(BaseCutout, ABC):
         Value to fill the cutout with if the cutout is outside the image.
     limit_rounding_method : str
         Method to use for rounding the cutout limits. Options are 'round', 'ceil', and 'floor'.
+    legacy_filenames : bool
+        If True, generated cutout filenames use the pre-1.2.0 format (``<ny>x<nx>`` size separator
+        and 6-decimal RA/Dec precision) instead of the current format (``<ny>-x-<nx>`` size separator
+        and 7-decimal RA/Dec precision). Default is False.
     verbose : bool
         If True, log messages are printed to the console.
 
@@ -63,6 +67,7 @@ class Cutout(BaseCutout, ABC):
         cutout_size: Union[int, np.ndarray, u.Quantity, List[int], Tuple[int]] = 25,
         fill_value: Union[int, float] = np.nan,
         limit_rounding_method: str = "round",
+        legacy_filenames: bool = False,
         verbose: bool = False,
     ):
         super().__init__(verbose=verbose)
@@ -90,6 +95,8 @@ class Cutout(BaseCutout, ABC):
                 "Valid options are {valid_rounding}."
             )
         self._limit_rounding_method = limit_rounding_method
+
+        self._legacy_filenames = legacy_filenames
 
         if not isinstance(fill_value, int) and not isinstance(fill_value, float):
             raise InvalidInputError("Fill value must be an integer or a float.")
@@ -168,13 +175,17 @@ class Cutout(BaseCutout, ABC):
         filename : str
             The generated cutout filename.
         """
-        return "{}_{:.7f}_{:.7f}_{}-x-{}_astrocut.fits".format(
-            file_stem,
-            self._coordinates.ra.value,
-            self._coordinates.dec.value,
-            str(self._cutout_size[0]).replace(" ", ""),
-            str(self._cutout_size[1]).replace(" ", ""),
-        )
+        separator = "-x-"
+        precision = 7
+        if self._legacy_filenames:
+            separator = "x"
+            precision = 6
+
+        ra = self._coordinates.ra.value
+        dec = self._coordinates.dec.value
+        ny = str(self._cutout_size[0]).replace(" ", "")
+        nx = str(self._cutout_size[1]).replace(" ", "")
+        return f"{file_stem}_{ra:.{precision}f}_{dec:.{precision}f}_{ny}{separator}{nx}_astrocut.fits"
 
     def _obj_to_bytes(self, obj: Union[fits.HDUList, asdf.AsdfFile]) -> bytes:
         """
