@@ -33,6 +33,9 @@ Breaking Changes
 - Cutouts of ASDF data in FITS format now include embedded ASDF metadata in an "ASDF" extension within the FITS file for
   Python versions greater than or equal to 3.11. [#170]
 - Bugfix for getting the pixel location of given coordinates in ``ASDFCutout``. [#175]
+- Added ``parse_table_wcs`` utility function to build a `~astropy.wcs.WCS` object from a cube's image-header table
+  (HDU 2) without needing to construct a full ``CubeCutout``/``TessCubeCutout`` instance. ``CubeCutout._parse_table_info``
+  now delegates to this function internally.
 
 Breaking Changes
 ^^^^^^^^^^^^^^^^

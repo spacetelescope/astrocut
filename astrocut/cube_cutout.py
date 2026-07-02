@@ -17,6 +17,7 @@ from s3path import S3Path
 from . import log
 from .cutout import Cutout
 from .exceptions import InvalidInputError, InvalidQueryError
+from .utils import utils
 from .utils.wcs_fitting import fit_wcs_from_points
 
 
@@ -134,47 +135,18 @@ class CubeCutout(Cutout, ABC):
         ~astrocut.wcs.NoWcsKeywordsFoundError
             If no FFI rows contain valid WCS keywords.
         """
-        # Find the middle row of the table
-        data_ind = len(table_data) // 2
-        table_row = None
-
-        # Iterate to find a row containing valid WCS information
-        while table_row is None:
-            if data_ind == len(table_data):
-                # Reset the index to the first row
-                data_ind = 0
-            elif data_ind == (len(table_data) // 2) - 1:
-                # Error if all indices have been checked
-                raise wcs.NoWcsKeywordsFoundError("No FFI rows contain valid WCS keywords.")
-
-            # Making sure we have a row with wcs info.
-            row = table_data[data_ind]
-            if row[self._wcs_axes_keyword] == self._wcs_axes_value:
-                table_row = row
-            else:
-                # If not found, move to the next
-                data_ind += 1
-
-        log.debug("Using WCS from row %s out of %s", data_ind, len(table_data))
-
-        # Convert the row into a FITS header
-        wcs_header = fits.Header()
-        for col in table_data.columns:
-            wcs_val = table_row[col.name]
-
-            if (not isinstance(wcs_val, str)) and (np.isnan(wcs_val)):
-                continue  # Skip NaN values
-
-            wcs_header[col.name] = wcs_val
+        table_wcs, wcs_header = utils.parse_table_wcs(
+            table_data, self._wcs_axes_keyword, self._wcs_axes_value, return_header=True
+        )
 
         # Populate the image keywords dictionary
         for kwd in self._img_kwds:
             self._img_kwds[kwd][0] = wcs_header.get(kwd)
 
         # Add the FFI file reference
-        self._img_kwds["WCS_FFI"] = [table_row["FFI_FILE"], "FFI used for cutout WCS"]
+        self._img_kwds["WCS_FFI"] = [wcs_header.get("FFI_FILE"), "FFI used for cutout WCS"]
 
-        return WCS(wcs_header, relax=True)
+        return table_wcs
 
     def _add_column_wcs(self, table_header: fits.Header, wcs_dict: dict):
         """
