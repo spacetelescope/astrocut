@@ -9,7 +9,7 @@ import pytest
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.table import Table
-from spherical_geometry.polygon import SphericalPolygon
+from sphersgeo import SphericalPolygon
 
 from .. import footprint_cutout
 from ..cube_cutout import CubeCutout
@@ -94,10 +94,10 @@ def test_s_region_to_polygon_unsupported_region():
 def test_ffi_intersect(lon, lat, center, expected):
     """Test that FFI intersection with cutout outputs proper results."""
     # SphericalPolygon object for cutout
-    cutout_sp = SphericalPolygon.from_radec(lon=(350, 10, 10, 350), lat=(-10, -10, 10, 10), center=(0, 0))
+    cutout_sp = SphericalPolygon((np.stack(((350, 10, 10, 350), (-10, -10, 10, 10)), axis=1), (0, 0)))
 
     # Create a SphericalPolygon with the parametrized lon, lat, and center
-    polygon = SphericalPolygon.from_radec(lon=lon, lat=lat, center=center)
+    polygon = SphericalPolygon((np.stack((lon, lat), axis=1), center))
 
     # Create a table with this polygon
     polygon_table = Table(names=["polygon"], dtype=[SphericalPolygon])
