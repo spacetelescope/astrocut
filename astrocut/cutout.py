@@ -49,10 +49,6 @@ class Cutout(BaseCutout, ABC):
         Method to use for rounding the cutout limits. Options are 'round', 'ceil', and 'floor'.
     verbose : bool
         If True, log messages are printed to the console.
-    legacy_filenames : bool
-        If True, generated cutout filenames use the pre-1.2.0 format (``<ny>x<nx>`` size separator
-        and 6-decimal RA/Dec precision) instead of the current format (``<ny>-x-<nx>`` size separator
-        and 7-decimal RA/Dec precision). Default is False.
 
     Methods
     -------
@@ -68,7 +64,6 @@ class Cutout(BaseCutout, ABC):
         fill_value: Union[int, float] = np.nan,
         limit_rounding_method: str = "round",
         verbose: bool = False,
-        legacy_filenames: bool = False,
     ):
         super().__init__(verbose=verbose)
 
@@ -95,8 +90,6 @@ class Cutout(BaseCutout, ABC):
                 "Valid options are {valid_rounding}."
             )
         self._limit_rounding_method = limit_rounding_method
-
-        self._legacy_filenames = legacy_filenames
 
         if not isinstance(fill_value, int) and not isinstance(fill_value, float):
             raise InvalidInputError("Fill value must be an integer or a float.")
@@ -161,7 +154,7 @@ class Cutout(BaseCutout, ABC):
                 lims[axis, 1] = lims[axis, 0] + 1
         return lims
 
-    def _make_cutout_filename(self, file_stem: str) -> str:
+    def _make_cutout_filename(self, file_stem: str, legacy_filenames: bool = False) -> str:
         """
         Create a cutout filename based on a file stem, coordinates, and cutout size.
 
@@ -169,6 +162,10 @@ class Cutout(BaseCutout, ABC):
         ----------
         file_stem : str
             The stem of the input file to use in the cutout filename.
+        legacy_filenames : bool
+            If True, use the pre-1.2.0 format (``<ny>x<nx>`` size separator and 6-decimal
+            RA/Dec precision) instead of the current format (``<ny>-x-<nx>`` size separator
+            and 7-decimal RA/Dec precision). Default is False.
 
         Returns
         -------
@@ -177,7 +174,7 @@ class Cutout(BaseCutout, ABC):
         """
         separator = "-x-"
         precision = 7
-        if self._legacy_filenames:
+        if legacy_filenames:
             separator = "x"
             precision = 6
 

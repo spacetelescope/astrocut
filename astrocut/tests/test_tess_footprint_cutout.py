@@ -235,8 +235,8 @@ def test_tess_footprint_cutout_write_as_tpf(coordinates, cutout_size, tmpdir):
 
 def test_tess_footprint_cutout_legacy_filenames(coordinates, cutout_size, tmpdir):
     """Test that legacy_filenames restores the pre-1.2.0 TPF filename format"""
-    cutout = TessFootprintCutout(coordinates, cutout_size, sequence=[1, 13], legacy_filenames=True)
-    paths = cutout.write_as_tpf(output_dir=tmpdir)
+    cutout = TessFootprintCutout(coordinates, cutout_size, sequence=[1, 13])
+    paths = cutout.write_as_tpf(output_dir=tmpdir, legacy_filenames=True)
 
     assert len(paths) > 0
     for cutout_path in paths:

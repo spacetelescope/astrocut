@@ -36,10 +36,6 @@ class TessCubeCutout(CubeCutout):
         of available CPUs.
     verbose : bool
         If True, log messages are printed to the console.
-    legacy_filenames : bool
-        If True, generated cutout filenames use the pre-1.2.0 format (``<ny>x<nx>`` size separator
-        and 6-decimal RA/Dec precision) instead of the current format (``<ny>-x-<nx>`` size separator
-        and 7-decimal RA/Dec precision). Default is False.
 
     Attributes
     ----------
@@ -56,7 +52,7 @@ class TessCubeCutout(CubeCutout):
 
     Methods
     -------
-    write_as_tpf(output_dir, output_file)
+    write_as_tpf(output_dir, output_file, legacy_filenames)
         Write the cutouts to target pixel files.
     """
 
@@ -69,7 +65,6 @@ class TessCubeCutout(CubeCutout):
         limit_rounding_method: str = "round",
         threads: Union[int, Literal["auto"]] = 1,
         verbose: bool = False,
-        legacy_filenames: bool = False,
     ):
         super().__init__(
             input_files,
@@ -79,7 +74,6 @@ class TessCubeCutout(CubeCutout):
             limit_rounding_method,
             threads,
             verbose,
-            legacy_filenames,
         )
 
         # Keyword corresponding to WCS axis
@@ -498,7 +492,12 @@ class TessCubeCutout(CubeCutout):
         # Store cutouts with filename
         self.cutouts_by_file[file] = cutout
 
-    def write_as_tpf(self, output_dir: Union[str, Path] = ".", output_file: str = None):
+    def write_as_tpf(
+        self,
+        output_dir: Union[str, Path] = ".",
+        output_file: str = None,
+        legacy_filenames: bool = False,
+    ):
         """
         Write the cutouts to disk as target pixel files.
 
@@ -510,6 +509,11 @@ class TessCubeCutout(CubeCutout):
             The output filename. If not provided or more than one cutout is created, the filename
             will be generated based on the input filename. This parameter is included so that
             ``CubeCutout`` is backwards compatible with ``CutoutFactory.cube_cut``.
+        legacy_filenames : bool
+            If True, generated cutout filenames use the pre-1.2.0 format (``<ny>x<nx>`` size separator
+            and 6-decimal RA/Dec precision) instead of the current format (``<ny>-x-<nx>`` size separator
+            and 7-decimal RA/Dec precision). Default is False. Ignored when ``output_file`` is provided
+            for a single cutout.
 
         Returns
         -------
@@ -526,7 +530,9 @@ class TessCubeCutout(CubeCutout):
         for file, cutout in self.cutouts_by_file.items():
             # Determine file name
             if not output_file or len(self._input_files) > 1:
-                filename = self._make_cutout_filename(Path(file).stem.rstrip("-cube"))
+                filename = self._make_cutout_filename(
+                    Path(file).stem.rstrip("-cube"), legacy_filenames=legacy_filenames
+                )
             else:
                 filename = output_file
 
@@ -549,7 +555,12 @@ class TessCubeCutout(CubeCutout):
         log.debug("Write time: %.2f sec", (monotonic() - write_time))
         return cutout_paths
 
-    def write_as_zip(self, output_dir: Union[str, Path] = ".", filename: Union[str, Path, None] = None) -> str:
+    def write_as_zip(
+        self,
+        output_dir: Union[str, Path] = ".",
+        filename: Union[str, Path, None] = None,
+        legacy_filenames: bool = False,
+    ) -> str:
         """
         Package the cutout TPF files into a zip archive without writing intermediate files.
 
@@ -561,6 +572,11 @@ class TessCubeCutout(CubeCutout):
             Name (or path) of the output zip file. If not provided, defaults to
             'astrocut_{ra}_{dec}_{size}.zip'. If provided without a '.zip' suffix,
             the suffix is added automatically.
+        legacy_filenames : bool
+            If True, generated cutout filenames inside the zip use the pre-1.2.0 format
+            (``<ny>x<nx>`` size separator and 6-decimal RA/Dec precision) instead of the
+            current format (``<ny>-x-<nx>`` size separator and 7-decimal RA/Dec precision).
+            Default is False.
 
         Returns
         -------
@@ -570,7 +586,7 @@ class TessCubeCutout(CubeCutout):
 
         def build_entries():
             for file, tpf in self.tpf_cutouts_by_file.items():
-                arcname = self._make_cutout_filename(Path(file).stem.rstrip("-cube"))
+                arcname = self._make_cutout_filename(Path(file).stem.rstrip("-cube"), legacy_filenames=legacy_filenames)
                 yield arcname, tpf
 
         return self._write_cutouts_to_zip(output_dir=output_dir, filename=filename, build_entries=build_entries)

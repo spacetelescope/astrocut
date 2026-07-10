@@ -96,7 +96,6 @@ class CutoutFactory:
             coordinates=coordinates,
             cutout_size=cutout_size,
             threads=threads,
-            legacy_filenames=legacy_filenames,
             verbose=verbose,
         )
 
@@ -110,7 +109,9 @@ class CutoutFactory:
         if memory_only:
             return cube_cutout.tpf_cutouts[0]
 
-        return cube_cutout.write_as_tpf(output_dir=output_path, output_file=target_pixel_file)[0]
+        return cube_cutout.write_as_tpf(
+            output_dir=output_path, output_file=target_pixel_file, legacy_filenames=legacy_filenames
+        )[0]
 
 
 def cube_cut(
@@ -183,11 +184,12 @@ def cube_cut(
         coordinates=coordinates,
         cutout_size=cutout_size,
         threads=threads,
-        legacy_filenames=legacy_filenames,
         verbose=verbose,
     )
 
     if memory_only:
         return cube_cutout.tpf_cutouts[0]
 
-    return cube_cutout.write_as_tpf(output_dir=output_path, output_file=target_pixel_file)[0]
+    return cube_cutout.write_as_tpf(
+        output_dir=output_path, output_file=target_pixel_file, legacy_filenames=legacy_filenames
+    )[0]

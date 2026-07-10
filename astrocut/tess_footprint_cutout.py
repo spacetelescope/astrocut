@@ -36,10 +36,6 @@ class TessFootprintCutout(FootprintCutout):
         For the TESS mission, this parameter corresponds to sectors.
     verbose : bool
         If True, log messages are printed to the console.
-    legacy_filenames : bool
-        If True, generated cutout filenames use the pre-1.2.0 format (``<ny>x<nx>`` size separator
-        and 6-decimal RA/Dec precision) instead of the current format (``<ny>-x-<nx>`` size separator
-        and 7-decimal RA/Dec precision). Default is False.
 
     Attributes
     ----------
@@ -60,7 +56,7 @@ class TessFootprintCutout(FootprintCutout):
     -------
     cutout()
         Generate the cutouts from the cloud FFIs that intersect the cutout footprint.
-    write_as_tpf(output_dir)
+    write_as_tpf(output_dir, legacy_filenames)
         Write the cutouts as Target Pixel Files (TPFs) to the specified directory.
     """
 
@@ -77,11 +73,8 @@ class TessFootprintCutout(FootprintCutout):
         limit_rounding_method: str = "round",
         sequence: Union[int, List[int], None] = None,
         verbose: bool = False,
-        legacy_filenames: bool = False,
     ):
-        super().__init__(
-            coordinates, cutout_size, fill_value, limit_rounding_method, sequence, verbose, legacy_filenames
-        )
+        super().__init__(coordinates, cutout_size, fill_value, limit_rounding_method, sequence, verbose)
         # Make the cutouts upon initialization
         self.cutout()
 
@@ -129,7 +122,6 @@ class TessFootprintCutout(FootprintCutout):
             self._fill_value,
             self._limit_rounding_method,
             threads=8,
-            legacy_filenames=self._legacy_filenames,
             verbose=self._verbose,
         )
 
@@ -140,7 +132,7 @@ class TessFootprintCutout(FootprintCutout):
         self.tpf_cutouts_by_file = tess_cube_cutout.tpf_cutouts_by_file
         self.tpf_cutouts = tess_cube_cutout.tpf_cutouts
 
-    def write_as_tpf(self, output_dir: Union[str, Path] = ".") -> List[str]:
+    def write_as_tpf(self, output_dir: Union[str, Path] = ".", legacy_filenames: bool = False) -> List[str]:
         """
         Write the cutouts to disk as target pixel files.
 
@@ -148,15 +140,24 @@ class TessFootprintCutout(FootprintCutout):
         ----------
         output_dir : str | Path
             The output directory where the cutout files will be saved.
+        legacy_filenames : bool
+            If True, generated cutout filenames use the pre-1.2.0 format (``<ny>x<nx>`` size separator
+            and 6-decimal RA/Dec precision) instead of the current format (``<ny>-x-<nx>`` size separator
+            and 7-decimal RA/Dec precision). Default is False.
 
         Returns
         -------
         cutout_paths : list
             List of file paths to cutout target pixel files.
         """
-        return self.tess_cube_cutout.write_as_tpf(output_dir)
+        return self.tess_cube_cutout.write_as_tpf(output_dir, legacy_filenames=legacy_filenames)
 
-    def write_as_zip(self, output_dir: Union[str, Path] = ".", filename: Union[str, Path, None] = None) -> str:
+    def write_as_zip(
+        self,
+        output_dir: Union[str, Path] = ".",
+        filename: Union[str, Path, None] = None,
+        legacy_filenames: bool = False,
+    ) -> str:
         """
         Package the cutout TPF files into a zip archive.
 
@@ -168,13 +169,18 @@ class TessFootprintCutout(FootprintCutout):
             Name (or path) of the output zip file. If not provided, defaults to
             'astrocut_{ra}_{dec}_{size}.zip'. If provided without a '.zip' suffix,
             the suffix is added automatically.
+        legacy_filenames : bool
+            If True, generated cutout filenames inside the zip use the pre-1.2.0 format
+            (``<ny>x<nx>`` size separator and 6-decimal RA/Dec precision) instead of the
+            current format (``<ny>-x-<nx>`` size separator and 7-decimal RA/Dec precision).
+            Default is False.
 
         Returns
         -------
         zip_path : str
             Path to the created zip file.
         """
-        return self.tess_cube_cutout.write_as_zip(output_dir, filename)
+        return self.tess_cube_cutout.write_as_zip(output_dir, filename, legacy_filenames=legacy_filenames)
 
 
 def _extract_sequence_information(sector_name: str) -> dict:
@@ -280,6 +286,7 @@ def cube_cut_from_footprint(
     memory_only=False,
     output_dir: str = ".",
     verbose: bool = False,
+    legacy_filenames: bool = False,
 ) -> Union[List[str], List[HDUList]]:
     """
     Generates cutouts around `coordinates` of size `cutout_size` from image cube files hosted on the S3 cloud.
@@ -310,6 +317,10 @@ def cube_cut_from_footprint(
         The current directory is default.
     verbose : bool, optional
         Default False. If True, intermediate information is printed.
+    legacy_filenames : bool, optional
+        If True, generated cutout filenames use the pre-1.2.0 format (``<ny>x<nx>`` size
+        separator and 6-decimal RA/Dec precision) instead of the current format
+        (``<ny>-x-<nx>`` size separator and 7-decimal RA/Dec precision). Default is False.
 
     Returns
     -------
@@ -336,7 +347,7 @@ def cube_cut_from_footprint(
         return cutouts.tpf_cutouts
 
     # Write cutouts
-    return cutouts.write_as_tpf(output_dir)
+    return cutouts.write_as_tpf(output_dir, legacy_filenames=legacy_filenames)
 
 
 def get_tess_sectors(
