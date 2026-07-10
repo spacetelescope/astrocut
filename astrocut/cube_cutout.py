@@ -17,7 +17,6 @@ from s3path import S3Path
 from . import log
 from .cutout import Cutout
 from .exceptions import InvalidInputError, InvalidQueryError
-from .utils import utils
 from .utils.wcs_fitting import fit_wcs_from_points
 
 
@@ -85,6 +84,83 @@ class CubeCutout(Cutout, ABC):
         """
         return list(self.cutouts_by_file.values())
 
+    @staticmethod
+    def parse_table_wcs(
+        table_data, wcs_axes_keyword: str, wcs_axes_value: str, return_header: bool = False
+    ) -> WCS | tuple[WCS, fits.Header]:
+        """
+        Takes the cube table (EXT 2) of image header data and builds a WCS object
+        that encapsulates the WCS information for one of the underlying FFIs.
+
+        Starting at the middle row of the table, walks outward until it finds a row whose
+        ``wcs_axes_keyword`` column matches ``wcs_axes_value``, which indicates that row holds
+        a complete WCS for its FFI. A `~astropy.wcs.WCS` object is then built from that row's
+        columns.
+
+        Parameters
+        ----------
+        table_data : `~astropy.io.fits.fitsrec.FITS_rec`
+            The cube image header data table.
+        wcs_axes_keyword : str
+            The table column name used to identify a row with valid WCS keywords
+            (e.g. ``'CTYPE2'``).
+        wcs_axes_value : str
+            The expected value of ``wcs_axes_keyword`` for a row that holds a valid WCS
+            (e.g. ``'DEC--TAN-SIP'``).
+        return_header : bool
+            Optional, default False. If True, also return the `~astropy.io.fits.Header` built
+            from the selected table row, in addition to the WCS object.
+
+        Returns
+        -------
+        response : `~astropy.wcs.WCS` or tuple
+            The WCS object built from the selected table row. If ``return_header`` is True,
+            a tuple of ``(WCS, Header)`` is returned instead.
+
+        Raises
+        ------
+        ~astropy.wcs.NoWcsKeywordsFoundError
+            If no rows contain valid WCS keywords.
+        """
+        # Find the middle row of the table
+        data_ind = len(table_data) // 2
+        table_row = None
+
+        # Iterate to find a row containing valid WCS information
+        while table_row is None:
+            if data_ind == len(table_data):
+                # Reset the index to the first row
+                data_ind = 0
+            elif data_ind == (len(table_data) // 2) - 1:
+                # Error if all indices have been checked
+                raise wcs.NoWcsKeywordsFoundError("No FFI rows contain valid WCS keywords.")
+
+            # Making sure we have a row with wcs info.
+            row = table_data[data_ind]
+            if row[wcs_axes_keyword] == wcs_axes_value:
+                table_row = row
+            else:
+                # If not found, move to the next
+                data_ind += 1
+
+        log.debug("Using WCS from row %s out of %s", data_ind, len(table_data))
+
+        # Convert the row into a FITS header
+        wcs_header = fits.Header()
+        for col in table_data.columns:
+            wcs_val = table_row[col.name]
+
+            if (not isinstance(wcs_val, str)) and (np.isnan(wcs_val)):
+                continue  # Skip NaN values
+
+            wcs_header[col.name] = wcs_val
+
+        table_wcs = wcs.WCS(wcs_header, relax=True)
+
+        if return_header:
+            return table_wcs, wcs_header
+        return table_wcs
+
     def _load_file_data(self, file: Union[str, Path, S3Path]) -> fits.HDUList:
         """
         Load the data from an input cube file.
@@ -135,7 +211,7 @@ class CubeCutout(Cutout, ABC):
         ~astrocut.wcs.NoWcsKeywordsFoundError
             If no FFI rows contain valid WCS keywords.
         """
-        table_wcs, wcs_header = utils.parse_table_wcs(
+        table_wcs, wcs_header = self.parse_table_wcs(
             table_data, self._wcs_axes_keyword, self._wcs_axes_value, return_header=True
         )
 

@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
-from astropy.wcs import WCS, FITSFixedWarning
+from astropy.wcs import WCS, FITSFixedWarning, NoWcsKeywordsFoundError
 
 from ..cube_cutout import CubeCutout
 from ..cube_factory import CubeFactory
@@ -376,3 +376,65 @@ def test_tess_cube_cutout_not_spoc(cube_file, tmpdir, cutout_size, coordinates):
     # Attempt to make a cutout with the non-SPOC compliant cube file
     with pytest.raises(InvalidInputError, match="Cube must have at least 2 planes"):
         TessCubeCutout(modified_cube_file, coordinates, cutout_size)
+
+
+def _make_table_data(ctype2_values):
+    """Build a minimal cube image-header table (as found in HDU 2 of a cube file) with one
+    row per entry in ``ctype2_values``, for use in testing ``CubeCutout.parse_table_wcs``."""
+
+    n_rows = len(ctype2_values)
+
+    columns = [
+        fits.Column(name="CTYPE1", format="24A", array=np.full(n_rows, "RA---TAN-SIP")),
+        fits.Column(name="CTYPE2", format="24A", array=np.array(ctype2_values)),
+        fits.Column(name="CRVAL1", format="D", array=np.full(n_rows, 100.0)),
+        fits.Column(name="CRVAL2", format="D", array=np.full(n_rows, 20.0)),
+        fits.Column(name="CRPIX1", format="D", array=np.full(n_rows, 10.0)),
+        fits.Column(name="CRPIX2", format="D", array=np.full(n_rows, 15.0)),
+        fits.Column(name="CDELT1", format="D", array=np.full(n_rows, 1.0)),
+        fits.Column(name="CDELT2", format="D", array=np.full(n_rows, 1.0)),
+        fits.Column(name="CUNIT1", format="8A", array=np.full(n_rows, "deg")),
+        fits.Column(name="CUNIT2", format="8A", array=np.full(n_rows, "deg")),
+        fits.Column(name="FFI_FILE", format="40A", array=np.array([f"ffi_{i}.fits" for i in range(n_rows)])),
+    ]
+
+    return fits.BinTableHDU.from_columns(columns).data
+
+
+def test_parse_table_wcs():
+    """Test that parse_table_wcs finds the valid WCS row and builds a matching WCS object."""
+
+    ctype2_values = ["INVALID", "INVALID", "DEC--TAN-SIP", "INVALID", "INVALID"]
+    table_data = _make_table_data(ctype2_values)
+
+    table_wcs = CubeCutout.parse_table_wcs(table_data, "CTYPE2", "DEC--TAN-SIP")
+    assert isinstance(table_wcs, WCS)
+    assert (table_wcs.wcs.crval == [100.0, 20.0]).all()
+    assert (table_wcs.wcs.crpix == [10.0, 15.0]).all()
+
+    # return_header=True should also give back the header the WCS was built from, including
+    # non-WCS columns like FFI_FILE
+    table_wcs, wcs_header = CubeCutout.parse_table_wcs(table_data, "CTYPE2", "DEC--TAN-SIP", return_header=True)
+    assert isinstance(table_wcs, WCS)
+    assert wcs_header["FFI_FILE"] == "ffi_2.fits"
+
+
+def test_parse_table_wcs_walks_outward_from_middle():
+    """Test that parse_table_wcs starts at the middle row and wraps around to find a match."""
+
+    # Valid row is before the middle, so the search must wrap around after reaching the end
+    ctype2_values = ["DEC--TAN-SIP", "INVALID", "INVALID", "INVALID", "INVALID"]
+    table_data = _make_table_data(ctype2_values)
+
+    table_wcs, wcs_header = CubeCutout.parse_table_wcs(table_data, "CTYPE2", "DEC--TAN-SIP", return_header=True)
+    assert wcs_header["FFI_FILE"] == "ffi_0.fits"
+
+
+def test_parse_table_wcs_no_valid_row():
+    """Test that a NoWcsKeywordsFoundError is raised when no row has valid WCS keywords."""
+
+    ctype2_values = ["INVALID"] * 6
+    table_data = _make_table_data(ctype2_values)
+
+    with pytest.raises(NoWcsKeywordsFoundError, match="No FFI rows contain valid WCS keywords."):
+        CubeCutout.parse_table_wcs(table_data, "CTYPE2", "DEC--TAN-SIP")
