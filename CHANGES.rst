@@ -13,6 +13,12 @@ Unreleased
 - Added ``CubeCutout.parse_table_wcs`` static method to build a `~astropy.wcs.WCS` object from a cube's
   image-header table (HDU 2) without needing to construct a full ``CubeCutout``/ ``TessCubeCutout`` instance.
   ``CubeCutout._parse_table_info`` now delegates to this method internally. [#193]
+- Added ``legacy_filenames`` parameter to the ``TessCubeCutout.write_as_tpf`` /
+  ``write_as_zip``, ``TessFootprintCutout.write_as_tpf`` / ``write_as_zip``, ``cube_cut``,
+  ``CutoutFactory.cube_cut``, and ``cube_cut_from_footprint`` methods/functions to allow users
+  to opt into the pre-1.2.0 cutout/target pixel file filename format (``<ny>x<nx>`` size separator
+  and 6-decimal RA/Dec precision) instead of the current format (``<ny>-x-<nx>`` size separator
+  and 7-decimal RA/Dec precision). Default is False. [#194]
 
 Breaking Changes
 ^^^^^^^^^^^^^^^^

@@ -35,6 +35,7 @@ class CutoutFactory:
         memory_only: bool = False,
         threads: Union[int, Literal["auto"]] = 1,
         verbose: bool = False,
+        legacy_filenames: bool = False,
     ):
         """
         Takes a cube file (as created by `~astrocut.CubeFactory`), and makes a cutout target pixel
@@ -65,6 +66,7 @@ class CutoutFactory:
             Optional. The name for the output target pixel file.
             If no name is supplied, the file will be named:
             ``<cube_file_base>_<ra>_<dec>_<cutout_size>_astrocut.fits``
+            (or ``<cube_file_base>_<ra>_<dec>_<ny>x<nx>_astrocut.fits`` if ``legacy_filenames`` is True).
         output_path : str
             Optional. The path where the output file is saved.
             The current directory is default.
@@ -77,6 +79,10 @@ class CutoutFactory:
             "auto" uses `concurrent.futures.ThreadPoolExecutor`'s default: cpu_count + 4, limit to max of 32
         verbose : bool
             Optional. If true intermediate information is printed.
+        legacy_filenames : bool
+            Optional. If True, generated cutout filenames use the pre-1.2.0 format (``<ny>x<nx>`` size
+            separator and 6-decimal RA/Dec precision) instead of the current format (``<ny>-x-<nx>`` size
+            separator and 7-decimal RA/Dec precision). Default is False.
 
         Returns
         -------
@@ -86,7 +92,11 @@ class CutoutFactory:
             If unsuccessful returns None.
         """
         cube_cutout = TessCubeCutout(
-            input_files=cube_file, coordinates=coordinates, cutout_size=cutout_size, threads=threads, verbose=verbose
+            input_files=cube_file,
+            coordinates=coordinates,
+            cutout_size=cutout_size,
+            threads=threads,
+            verbose=verbose,
         )
 
         # Assign these attributes to be backwards compatible
@@ -99,7 +109,9 @@ class CutoutFactory:
         if memory_only:
             return cube_cutout.tpf_cutouts[0]
 
-        return cube_cutout.write_as_tpf(output_dir=output_path, output_file=target_pixel_file)[0]
+        return cube_cutout.write_as_tpf(
+            output_dir=output_path, output_file=target_pixel_file, legacy_filenames=legacy_filenames
+        )[0]
 
 
 def cube_cut(
@@ -111,6 +123,7 @@ def cube_cut(
     memory_only: bool = False,
     threads: Union[int, Literal["auto"]] = 1,
     verbose: bool = False,
+    legacy_filenames: bool = False,
 ):
     """
     Takes a cube file (as created by `~astrocut.CubeFactory`), and makes a cutout target pixel
@@ -141,6 +154,7 @@ def cube_cut(
         Optional. The name for the output target pixel file.
         If no name is supplied, the file will be named:
         ``<cube_file_base>_<ra>_<dec>_<cutout_size>_astrocut.fits``
+        (or ``<cube_file_base>_<ra>_<dec>_<ny>x<nx>_astrocut.fits`` if ``legacy_filenames`` is True).
     output_path : str
         Optional. The path where the output file is saved.
         The current directory is default.
@@ -153,6 +167,10 @@ def cube_cut(
         "auto" uses `concurrent.futures.ThreadPoolExecutor`'s default: cpu_count + 4, limit to max of 32
     verbose : bool
         Optional. If true intermediate information is printed.
+    legacy_filenames : bool
+        Optional. If True, generated cutout filenames use the pre-1.2.0 format (``<ny>x<nx>`` size
+        separator and 6-decimal RA/Dec precision) instead of the current format (``<ny>-x-<nx>`` size
+        separator and 7-decimal RA/Dec precision). Default is False.
 
     Returns
     -------
@@ -162,10 +180,16 @@ def cube_cut(
         If unsuccessful, returns None.
     """
     cube_cutout = TessCubeCutout(
-        input_files=cube_file, coordinates=coordinates, cutout_size=cutout_size, threads=threads, verbose=verbose
+        input_files=cube_file,
+        coordinates=coordinates,
+        cutout_size=cutout_size,
+        threads=threads,
+        verbose=verbose,
     )
 
     if memory_only:
         return cube_cutout.tpf_cutouts[0]
 
-    return cube_cutout.write_as_tpf(output_dir=output_path, output_file=target_pixel_file)[0]
+    return cube_cutout.write_as_tpf(
+        output_dir=output_path, output_file=target_pixel_file, legacy_filenames=legacy_filenames
+    )[0]

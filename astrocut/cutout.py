@@ -154,7 +154,7 @@ class Cutout(BaseCutout, ABC):
                 lims[axis, 1] = lims[axis, 0] + 1
         return lims
 
-    def _make_cutout_filename(self, file_stem: str) -> str:
+    def _make_cutout_filename(self, file_stem: str, legacy_filenames: bool = False) -> str:
         """
         Create a cutout filename based on a file stem, coordinates, and cutout size.
 
@@ -162,19 +162,27 @@ class Cutout(BaseCutout, ABC):
         ----------
         file_stem : str
             The stem of the input file to use in the cutout filename.
+        legacy_filenames : bool
+            If True, use the pre-1.2.0 format (``<ny>x<nx>`` size separator and 6-decimal
+            RA/Dec precision) instead of the current format (``<ny>-x-<nx>`` size separator
+            and 7-decimal RA/Dec precision). Default is False.
 
         Returns
         -------
         filename : str
             The generated cutout filename.
         """
-        return "{}_{:.7f}_{:.7f}_{}-x-{}_astrocut.fits".format(
-            file_stem,
-            self._coordinates.ra.value,
-            self._coordinates.dec.value,
-            str(self._cutout_size[0]).replace(" ", ""),
-            str(self._cutout_size[1]).replace(" ", ""),
-        )
+        separator = "-x-"
+        precision = 7
+        if legacy_filenames:
+            separator = "x"
+            precision = 6
+
+        ra = self._coordinates.ra.value
+        dec = self._coordinates.dec.value
+        ny = str(self._cutout_size[0]).replace(" ", "")
+        nx = str(self._cutout_size[1]).replace(" ", "")
+        return f"{file_stem}_{ra:.{precision}f}_{dec:.{precision}f}_{ny}{separator}{nx}_astrocut.fits"
 
     def _obj_to_bytes(self, obj: Union[fits.HDUList, asdf.AsdfFile]) -> bytes:
         """

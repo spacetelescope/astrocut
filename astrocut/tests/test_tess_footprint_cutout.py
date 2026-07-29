@@ -233,6 +233,19 @@ def test_tess_footprint_cutout_write_as_tpf(coordinates, cutout_size, tmpdir):
             hdu.info()
 
 
+def test_tess_footprint_cutout_legacy_filenames(coordinates, cutout_size, tmpdir):
+    """Test that legacy_filenames restores the pre-1.2.0 TPF filename format"""
+    cutout = TessFootprintCutout(coordinates, cutout_size, sequence=[1, 13])
+    paths = cutout.write_as_tpf(output_dir=tmpdir, legacy_filenames=True)
+
+    assert len(paths) > 0
+    for cutout_path in paths:
+        assert f"{coordinates.ra.value:.6f}" in cutout_path
+        assert f"{coordinates.dec.value:.6f}" in cutout_path
+        assert f"{cutout_size}x{cutout_size}" in cutout_path
+        assert "-x-" not in cutout_path
+
+
 def test_tess_footprint_cutout_write_to_zip(coordinates, cutout_size, tmpdir):
     """Test that TPF cutouts are written to a ZIP archive"""
     cutout = TessFootprintCutout(coordinates, cutout_size, sequence=[1, 13])
