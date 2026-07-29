@@ -69,7 +69,7 @@ class ImageCutout(Cutout, ABC):
     def __init__(
         self,
         input_files: List[Union[str, Path, S3Path]],
-        coordinates: Union[SkyCoord, str],
+        coordinates: Union[SkyCoord, str, List[Union[SkyCoord, str]]],
         cutout_size: Union[int, np.ndarray, Quantity, List[int], Tuple[int]] = 25,
         fill_value: Union[int, float] = np.nan,
         limit_rounding_method: str = "round",
@@ -178,7 +178,7 @@ class ImageCutout(Cutout, ABC):
             if flip_orientation:
                 # Flip the image vertically to match the orientation of the input cutouts
                 color_img = color_img.transpose(Transpose.FLIP_TOP_BOTTOM)
-            color_img.info.update(self._build_cutout_metadata(all_cutout_files))
+            color_img.info.update(self._build_cutout_metadata(all_cutout_files, all_cutouts[0], self._coordinates))
             self._image_cutouts = [color_img]
         else:  # one image per cutout
             image_cutouts = []
@@ -191,7 +191,7 @@ class ImageCutout(Cutout, ABC):
                     if flip_orientation:
                         # Flip the image vertically to match the orientation of the input cutouts
                         img = img.transpose(Transpose.FLIP_TOP_BOTTOM)
-                    img.info.update(self._build_cutout_metadata([file]))
+                    img.info.update(self._build_cutout_metadata([file], cutout, self._coordinates))
                     image_cutouts.append(img)
 
             self._image_cutouts = image_cutouts
@@ -240,7 +240,7 @@ class ImageCutout(Cutout, ABC):
 
         return output_format
 
-    def _build_cutout_metadata(self, input_files: List[Union[str, Path, S3Path]]) -> dict:
+    def _build_cutout_metadata(self, input_files: List[Union[str, Path, S3Path]], cutout, coord: str) -> dict:
         """
         Build metadata describing a cutout image.
 
@@ -248,6 +248,10 @@ class ImageCutout(Cutout, ABC):
         ----------
         input_files : list
             The input file or files used to create the cutout.
+        cutout : `~astropy.nddata.Cutout2D`
+            The cutout object.
+        coord : str
+            The center coordinate of the cutout.
 
         Returns
         -------
@@ -263,18 +267,18 @@ class ImageCutout(Cutout, ABC):
         else:
             meta["input_files"] = ", ".join([Path(file).name for file in input_files])
 
-        # For color cutouts, we can get the pixel scale and cutout size from the first cutout
-        # since we assume they have the same WCS
-        cutout = self.cutouts_by_file.get(input_files[0], [None])[0]
-        if cutout is not None:
-            meta["cutout_size_x_pix"] = cutout.shape[1]
-            meta["cutout_size_y_pix"] = cutout.shape[0]
-            meta["pixel_scale_arcsec_per_pix"] = proj_plane_pixel_scales(cutout.wcs)[0] * 3600
+        meta["cutout_size_x_pix"] = cutout.shape[1]
+        meta["cutout_size_y_pix"] = cutout.shape[0]
+        meta["pixel_scale_arcsec_per_pix"] = proj_plane_pixel_scales(cutout.wcs)[0] * 3600
 
+        if isinstance(coord, SkyCoord):
+            ra, dec = coord.ra.deg, coord.dec.deg
+        else:
+            ra, dec = coord.split()
         meta.update(
             {
-                "center_ra_deg": self._coordinates.ra.deg.item(),
-                "center_dec_deg": self._coordinates.dec.deg.item(),
+                "center_ra_deg": float(ra),
+                "center_dec_deg": float(dec),
                 "origin": "STScI/MAST",
                 "version": __version__,
             }
@@ -548,6 +552,8 @@ class ImageCutout(Cutout, ABC):
         # Performing the transform and then putting it into the integer range 0-255
         norm_img = transform(img_arr)
         np.multiply(255, norm_img, out=norm_img)
+        # Does the image have any NaN values? If so, set them to 0
+        norm_img = np.nan_to_num(norm_img, nan=0)
         norm_img = norm_img.astype(np.uint8)
 
         # Applying invert if requested

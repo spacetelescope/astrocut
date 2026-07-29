@@ -12,7 +12,9 @@ from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.modeling import models
 from astropy.nddata import Cutout2D
+from astropy.table import Table
 from astropy.time import Time
+from astropy.wcs import WCS
 from gwcs import coordinate_frames, wcs
 from PIL import Image
 
@@ -50,36 +52,30 @@ def make_wcs(xsize, ysize, ra=30.0, dec=45.0):
     return wcs.WCS([(detector_frame, det2sky), (sky_frame, None)])
 
 
-@pytest.fixture()
-def makefake():
+def make_fake(nx, ny, ra, dec, zero=False, asint=False):
     """Fixture factory to make a fake gwcs and dataset"""
+    wcsobj = make_wcs(nx / 2, ny / 2, ra=ra, dec=dec)
+    wcsobj.bounding_box = ((0, nx), (0, ny))
 
-    def _make_fake(nx, ny, ra, dec, zero=False, asint=False):
-        # create the wcs
-        wcsobj = make_wcs(nx / 2, ny / 2, ra=ra, dec=dec)
-        wcsobj.bounding_box = ((0, nx), (0, ny))
+    # create the data
+    if zero:
+        data = np.zeros([nx, ny])
+    else:
+        size = nx * ny
+        data = np.arange(size).reshape(nx, ny)
 
-        # create the data
-        if zero:
-            data = np.zeros([nx, ny])
-        else:
-            size = nx * ny
-            data = np.arange(size).reshape(nx, ny)
+    # make a quantity
+    data *= u.electron / u.second
 
-        # make a quantity
-        data *= u.electron / u.second
+    # make integer array
+    if asint:
+        data = data.astype(int)
 
-        # make integer array
-        if asint:
-            data = data.astype(int)
-
-        return data, wcsobj
-
-    yield _make_fake
+    return data, wcsobj
 
 
 @pytest.fixture()
-def fakedata(makefake):
+def fake_data():
     """Fixture to create fake data and wcs"""
     # set up initial parameters
     nx = 1000
@@ -87,41 +83,41 @@ def fakedata(makefake):
     ra = 30.0
     dec = 45.0
 
-    yield makefake(nx, ny, ra, dec)
+    yield make_fake(nx, ny, ra, dec)
 
 
 @pytest.fixture()
-def images(tmp_path, fakedata):
+def images(tmp_path):
     """Fixture to create a fake dataset of 3 images"""
-    # get the fake data
-    data, wcsobj = fakedata
-
-    # create meta
-    meta = {
-        "wcs": wcsobj,
-        "product_type": "l2",
-        "origin": "STSCI/SOC",
-        "file_date": Time("2023-10-01T00:00:00", format="isot"),
-    }
-
-    # create and write the asdf file
-    tree = {
-        "roman": {
-            "meta": meta,
-            "data": data,
-            "dq": data.astype(int),  # DQ is typically an integer array
-            "err": data,
-            "context": np.expand_dims(data, axis=0),
-            "invalid_dims": np.ndarray(shape=(10)),
-        }
-    }
-    af = asdf.AsdfFile(tree)
-
     path = tmp_path / "roman"
     path.mkdir(exist_ok=True)
 
     files = []
     for i in range(3):
+        # get the fake data
+        data, wcsobj = make_fake(1000, 1000, 30.0 + i * 0.001, 45.0 + i * 0.001)
+
+        # create meta
+        meta = {
+            "wcs": wcsobj,
+            "product_type": "l2",
+            "origin": "STSCI/SOC",
+            "file_date": Time("2023-10-01T00:00:00", format="isot"),
+        }
+
+        # create and write the asdf file
+        tree = {
+            "roman": {
+                "meta": meta,
+                "data": data,
+                "dq": data.astype(int),  # DQ is typically an integer array
+                "err": data,
+                "context": np.expand_dims(data, axis=0),
+                "invalid_dims": np.ndarray(shape=(10)),
+            }
+        }
+        af = asdf.AsdfFile(tree)
+
         filename = path / f"test_roman_{i}.asdf"
         af.write_to(filename)
         files.append(filename)
@@ -133,6 +129,16 @@ def images(tmp_path, fakedata):
 def center_coord():
     """Fixture to return a center coordinate"""
     return SkyCoord("29.99901792 44.99930555", unit="deg")
+
+
+@pytest.fixture
+def multi_coord():
+    """Fixture to return a list of coordinates"""
+    return [
+        SkyCoord("29.99901792 44.99930555", unit="deg"),
+        SkyCoord("30.00098208 44.99930555", unit="deg"),
+        SkyCoord("29.98201792 45.00069445", unit="deg"),
+    ]
 
 
 @pytest.fixture
@@ -148,27 +154,63 @@ def test_asdf_cutout(images, center_coord, cutout_size):
     assert isinstance(cutouts, list)
     assert isinstance(cutouts[0], Cutout2D)
     assert len(cutouts) == 3
-    assert isinstance(cutout.asdf_cutouts, list)
-    assert isinstance(cutout.asdf_cutouts[0], asdf.AsdfFile)
-    assert isinstance(cutout.fits_cutouts, list)
-    assert isinstance(cutout.fits_cutouts[0], fits.HDUList)
+    assert isinstance(cutout.asdf_cutouts, Table)
+    assert isinstance(cutout.asdf_cutouts["cutout"][0], asdf.AsdfFile)
+    assert isinstance(cutout.fits_cutouts, Table)
+    assert isinstance(cutout.fits_cutouts["cutout"][0], fits.HDUList)
 
     # Open output files
     for i, cutout in enumerate(cutouts):
         # Check shape of data
         cutout_data = cutout.data
         cutout_wcs = cutout.wcs
+        bbox = cutouts[i].bbox_original
         assert cutout_data.shape == (10, 10)
 
         # Check that data is equal between cutout and original image
         with asdf.open(images[i]) as input_af:
-            assert np.all(cutout_data == input_af["roman"]["data"].value[470:480, 471:481])
+            assert np.all(
+                cutout_data == input_af["roman"]["data"].value[bbox[0][0] : bbox[0][1] + 1, bbox[1][0] : bbox[1][1] + 1]
+            )
 
         # Check WCS and that center coordinate matches input
         s_coord = cutout_wcs.pixel_to_world(cutout_size / 2, cutout_size / 2)
         assert cutout_wcs.pixel_shape == (10, 10)
         assert np.isclose(s_coord.ra.deg, center_coord.ra.deg)
         assert np.isclose(s_coord.dec.deg, center_coord.dec.deg)
+
+
+def test_asdf_cutout_get_asdf_cutouts(images, multi_coord, cutout_size):
+    with pytest.warns(DataWarning, match="does not overlap the image"):
+        cutout = ASDFCutout(images, multi_coord, cutout_size)
+
+    # With input files and coordinates specified
+    # Choose 2 files and 2 coordinates
+    asdf_cutouts = cutout.get_asdf_cutouts(input_files=images[1:], coordinates=multi_coord[1:])
+    assert isinstance(asdf_cutouts, Table)
+    assert len(asdf_cutouts) == 3  # one coordinate will not have a cutout for one of the images
+    for af in asdf_cutouts["cutout"]:
+        assert isinstance(af, asdf.AsdfFile)
+        assert "roman" in af
+        assert "data" in af["roman"]
+        assert af["roman"]["data"].shape == (cutout_size, cutout_size)
+
+
+def test_asdf_cutout_get_fits_cutouts(images, multi_coord, cutout_size):
+    with pytest.warns(DataWarning, match="does not overlap the image"):
+        cutout = ASDFCutout(images, multi_coord, cutout_size)
+
+    # With input files and coordinates specified
+    # Choose 2 files and 2 coordinates
+    fits_cutouts = cutout.get_fits_cutouts(input_files=images[1:], coordinates=multi_coord[1:])
+    assert isinstance(fits_cutouts, Table)
+    assert len(fits_cutouts) == 3  # one coordinate will not have a cutout for one of the images
+    for hdul in fits_cutouts["cutout"]:
+        assert isinstance(hdul, fits.HDUList)
+        assert len(hdul) == 2 if not HAS_ASDF_IN_FITS else 3  # primary + cutout HDU + optional ASDF extension
+        assert hdul[0].name == "PRIMARY"
+        assert hdul[1].name == "CUTOUT"
+        assert hdul[1].data.shape == (cutout_size, cutout_size)
 
 
 def test_asdf_cutout_write_to_file(images, center_coord, cutout_size, tmpdir):
@@ -266,12 +308,12 @@ def test_asdf_cutout_lite(images, center_coord, cutout_size):
 
     # Write cutouts to ASDF objects in lite mode
     cutout = ASDFCutout(images, center_coord, cutout_size, lite=True)
-    for af in cutout.asdf_cutouts:
+    for af in cutout.asdf_cutouts["cutout"]:
         check_lite_metadata(af)
 
     # Write cutouts to HDUList objects in lite mode
     cutout = ASDFCutout(images, center_coord, cutout_size, lite=True)
-    for hdul in cutout.fits_cutouts:
+    for hdul in cutout.fits_cutouts["cutout"]:
         assert len(hdul) == 3 if HAS_ASDF_IN_FITS else 2  # primary HDU + cutout HDU + embedded ASDF extension
         assert hdul[0].name == "PRIMARY"
         assert hdul[1].name == "CUTOUT"
@@ -288,7 +330,7 @@ def test_asdf_cutout_partial(images, center_coord, cutout_size):
     center_coord = SkyCoord("29.99901792 44.9861", unit="deg")
     asdf_cutout = ASDFCutout(images[0], center_coord, cutout_size, lite=False)
     cutout = asdf_cutout.cutouts[0]
-    cutout_asdf = asdf_cutout.asdf_cutouts[0]
+    cutout_asdf = list(asdf_cutout.asdf_cutouts["cutout"])[0]
     assert cutout.data.shape == (10, 10)
     assert np.isnan(cutout.data[: cutout_size // 2, :]).all()
     assert np.isnan(cutout_asdf["roman"]["err"][: cutout_size // 2, :]).all()
@@ -310,20 +352,21 @@ def test_asdf_cutout_partial(images, center_coord, cutout_size):
     center_coord = SkyCoord("30.01961 44.99930555", unit="deg")
     asdf_cutout = ASDFCutout(images[0], center_coord, cutout_size, fill_value=1.5, lite=False)
     cutout = asdf_cutout.cutouts[0]
+    cutout_asdf = list(asdf_cutout.asdf_cutouts["cutout"])[0]
     assert np.all(cutout.data[:, cutout_size // 2 :] == 1.5)
     # Convert to integer fill value for DQ array
-    assert np.all(asdf_cutout.asdf_cutouts[0]["roman"]["dq"][:, cutout_size // 2 :] == 1)
+    assert np.all(cutout_asdf["roman"]["dq"][:, cutout_size // 2 :] == 1)
 
     # Error if unexpected fill value
     with pytest.raises(InvalidInputError, match="Fill value must be an integer or a float."):
         ASDFCutout(images[0], center_coord, cutout_size, fill_value="invalid")
 
 
-def test_asdf_cutout_poles(cutout_size, makefake, tmp_path):
+def test_asdf_cutout_poles(cutout_size, tmp_path):
     """Test we can make cutouts around poles"""
     # Make fake zero data around the pole
     ra, dec = 315.0, 89.995
-    data, gwcs = makefake(1000, 1000, ra, dec, zero=True)
+    data, gwcs = make_fake(1000, 1000, ra, dec, zero=True)
 
     # Add some values (5x5 array)
     data.value[245:250, 245:250] = 1
@@ -353,7 +396,7 @@ def test_asdf_cutout_poles(cutout_size, makefake, tmp_path):
 
 def test_asdf_cutout_not_in_footprint(images, center_coord, cutout_size):
     # Throw error if cutout location is not in image footprint
-    with pytest.warns(DataWarning, match="Cutout footprint does not overlap"):
+    with pytest.warns(DataWarning, match="does not overlap"):
         with pytest.raises(InvalidQueryError, match="Cutout contains no data!"):
             ASDFCutout(images[0], SkyCoord("0 0", unit="deg"), cutout_size)
 
@@ -403,12 +446,12 @@ def test_asdf_cutout_img_output(images, center_coord, cutout_size, tmpdir):
     # Save to memory only
     img_cutouts = ASDFCutout(images[0], center_coord, cutout_size).get_image_cutouts()
     assert len(img_cutouts) == 1
-    assert isinstance(img_cutouts[0], Image.Image)
-    assert np.array(img_cutouts[0]).shape == (10, 10)
+    assert isinstance(img_cutouts["cutout"][0], Image.Image)
+    assert np.array(img_cutouts["cutout"][0]).shape == (10, 10)
 
     # Color image
     color_jpg = ASDFCutout(images, center_coord, cutout_size).write_as_img(output_dir=tmpdir, colorize=True)
-    img = Image.open(color_jpg)
+    img = Image.open(color_jpg[0])
     assert img.mode == "RGB"
 
 
@@ -417,13 +460,13 @@ def test_asdf_cutout_cube_angular_size(images, center_coord):
     cutout = ASDFCutout(images[0], center_coord, 2 * u.arcsec, lite=False)
 
     assert cutout.cutouts[0].data.shape == (20, 20)
-    assert cutout.asdf_cutouts[0]["roman"]["context"].shape == (1, 20, 20)
+    assert list(cutout.asdf_cutouts["cutout"])[0]["roman"]["context"].shape == (1, 20, 20)
 
 
 def test_asdf_cutout_gwcs(images, center_coord):
     """Test creating a rectangular cutout to make sure cutout gwcs is correct"""
     cutout = ASDFCutout(images[0], center_coord, cutout_size=[20, 40])
-    asdf_cutouts = cutout.asdf_cutouts
+    asdf_cutouts = cutout.asdf_cutouts["cutout"]
     gwcs = asdf_cutouts[0]["roman"]["meta"]["wcs"]
     assert isinstance(gwcs, wcs.WCS)
     assert gwcs.pixel_shape == (20, 40)
@@ -451,7 +494,7 @@ def test_asdf_cutout_stdatamodels(images, center_coord, cutout_size, is_installe
         with patch("sys.version_info", (3, 11, 0)):
             with pytest.warns(ModuleWarning, match=warn_msg):
                 cutout = ASDFCutout(images, center_coord, cutout_size)
-                fits_cutouts = cutout.fits_cutouts
+                fits_cutouts = cutout.fits_cutouts["cutout"]
             assert len(fits_cutouts[0]) == 2  # primary + cutout HDU only
 
 
@@ -460,26 +503,39 @@ def test_asdf_cutout_python_version(images, center_coord, cutout_size):
     with patch("sys.version_info", (3, 10, 0)):
         with pytest.warns(ModuleWarning, match="requires Python 3.11 or higher"):
             cutout = ASDFCutout(images, center_coord, cutout_size)
-            fits_cutouts = cutout.fits_cutouts
+            fits_cutouts = cutout.fits_cutouts["cutout"]
         assert cutout._py311_or_higher is False
         assert cutout._asdf_in_fits is None
         assert len(fits_cutouts[0]) == 2  # primary + cutout HDU only
 
 
-def test_get_center_pixel(fakedata):
+def test_asdf_cutout_convert_gwcs_to_fits_wcs(fake_data):
+    """Test that we can convert a gwcs to a FITS WCS for cutout output"""
+    # Get the fake data
+    __, gwcs = fake_data
+
+    cutout = ASDFCutout.__new__(ASDFCutout)  # create instance without calling __init__
+    fits_wcs = cutout._convert_gwcs_to_fits_wcs(gwcs)
+    print(fits_wcs)
+    assert isinstance(fits_wcs, WCS)
+    assert fits_wcs.pixel_shape == (1001, 1001)
+    assert fits_wcs.wcs.crval[0] == 30.0
+    assert fits_wcs.wcs.crval[1] == 45.0
+
+
+def test_get_center_pixel(fake_data):
     """Test get_center_pixel function"""
     # Get the fake data
-    __, gwcs = fakedata
+    __, gwcs = fake_data
 
     # Using center coordinates
-    pixel_coordinates, wcs = get_center_pixel(gwcs, 30, 45)
+    pixel_coordinates = get_center_pixel(gwcs, 30, 45)
     assert np.allclose(pixel_coordinates, (np.array(500), np.array(500)))
-    assert np.allclose(wcs.celestial.wcs.crval, np.array([30, 45]))
 
     # Using upper left corner
     # Running this without parametrization to make sure that gwcs is not corrupted
-    ra, dec = wcs.all_pix2world(0, 0, 0)
-    pixel_coordinates, wcs = get_center_pixel(gwcs, ra, dec)
+    coord = gwcs.pixel_to_world(0, 0)
+    pixel_coordinates = get_center_pixel(gwcs, coord.ra.deg, coord.dec.deg)
     assert np.allclose(pixel_coordinates, (np.array(0), np.array(0)))
 
 
