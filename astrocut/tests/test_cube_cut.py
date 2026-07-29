@@ -192,6 +192,50 @@ def test_parse_table_info(cube_file, tmp_path):
     assert cutout_maker.center_coord.separation(coord) == 0
 
 
+def test_legacy_filenames(cube_file, tmp_path):
+    """Test that the legacy_filenames parameter restores the pre-1.2.0 filename format."""
+
+    tmpdir = str(tmp_path)
+
+    coord = "256.88 6.38"
+    cutout_size = [5, 3]
+
+    # CutoutFactory.cube_cut
+    cutout_maker = CutoutFactory()
+    out_file = cutout_maker.cube_cut(
+        cube_file,
+        coord,
+        cutout_size,
+        output_path=path.join(tmpdir, "factory_legacy"),
+        legacy_filenames=True,
+        verbose=False,
+    )
+    assert "256.880000_6.380000_5x3_astrocut.fits" in out_file
+    assert "-x-" not in out_file
+
+    # module-level cube_cut function
+    out_file = cube_cut(
+        cube_file,
+        coord,
+        cutout_size,
+        output_path=path.join(tmpdir, "func_legacy"),
+        legacy_filenames=True,
+        verbose=False,
+    )
+    assert "256.880000_6.380000_5x3_astrocut.fits" in out_file
+    assert "-x-" not in out_file
+
+    # Default behavior (legacy_filenames=False) is unaffected
+    out_file = cube_cut(
+        cube_file,
+        coord,
+        cutout_size,
+        output_path=path.join(tmpdir, "func_current"),
+        verbose=False,
+    )
+    assert "256.8800000_6.3800000_5-x-3_astrocut.fits" in out_file
+
+
 def test_header_keywords_quality(cube_file, tmp_path):
     """Test header keywords quality"""
 
