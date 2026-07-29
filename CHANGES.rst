@@ -10,6 +10,9 @@ Unreleased
 - Bugfix for incorrect data type of fill values in ``ASDFCutout`` when input data is an integer array. [#184]
 - The default value of the ``lite`` parameter in the ``ASDFCutout`` class is now True, resulting in cutouts that
   include only the science data and updated world coordinate system by default. [#186]
+- Added ``CubeCutout.parse_table_wcs`` static method to build a `~astropy.wcs.WCS` object from a cube's
+  image-header table (HDU 2) without needing to construct a full ``CubeCutout``/ ``TessCubeCutout`` instance.
+  ``CubeCutout._parse_table_info`` now delegates to this method internally. [#193]
 - Added ``legacy_filenames`` parameter to the ``TessCubeCutout.write_as_tpf`` /
   ``write_as_zip``, ``TessFootprintCutout.write_as_tpf`` / ``write_as_zip``, ``cube_cut``,
   ``CutoutFactory.cube_cut``, and ``cube_cut_from_footprint`` methods/functions to allow users
