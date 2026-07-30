@@ -586,7 +586,9 @@ class TessCubeCutout(CubeCutout):
 
         def build_entries():
             for file, tpf in self.tpf_cutouts_by_file.items():
-                arcname = self._make_cutout_filename(Path(file).stem.rstrip("-cube"), self._coordinates, legacy_filenames=legacy_filenames)
+                arcname = self._make_cutout_filename(
+                    Path(file).stem.rstrip("-cube"), self._coordinates, legacy_filenames=legacy_filenames
+                )
                 yield arcname, tpf
 
         return self._write_cutouts_to_zip(

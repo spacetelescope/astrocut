@@ -460,7 +460,7 @@ def test_asdf_cutout_cube_angular_size(images, center_coord):
     cutout = ASDFCutout(images[0], center_coord, 2 * u.arcsec, lite=False)
 
     assert cutout.cutouts[0].data.shape == (20, 20)
-    assert list(cutout.asdf_cutouts["cutout"])[0]["roman"]["context"].shape == (1, 20, 20)
+    assert cutout.asdf_cutouts["cutout"][0]["roman"]["context"].shape == (1, 20, 20)
 
 
 def test_asdf_cutout_gwcs(images, center_coord):
@@ -516,7 +516,6 @@ def test_asdf_cutout_convert_gwcs_to_fits_wcs(fake_data):
 
     cutout = ASDFCutout.__new__(ASDFCutout)  # create instance without calling __init__
     fits_wcs = cutout._convert_gwcs_to_fits_wcs(gwcs)
-    print(fits_wcs)
     assert isinstance(fits_wcs, WCS)
     assert fits_wcs.pixel_shape == (1001, 1001)
     assert fits_wcs.wcs.crval[0] == 30.0

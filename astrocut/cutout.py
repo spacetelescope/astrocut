@@ -75,6 +75,8 @@ class Cutout(BaseCutout, ABC):
         # Get coordinates as a SkyCoord object
         if not isinstance(coordinates, (list, tuple)):
             coordinates = [coordinates]
+        if len(coordinates) == 0:
+            raise InvalidInputError("At least one coordinate must be provided.")
         self._coordinates = [
             SkyCoord(coord, unit="deg") if not isinstance(coord, SkyCoord) else coord for coord in coordinates
         ]

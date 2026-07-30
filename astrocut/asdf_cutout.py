@@ -183,7 +183,7 @@ class ASDFCutout(ImageCutout):
                     "homepage": "https://astrocut.readthedocs.io/en/latest/",
                 },
             )
-            asdf_cutouts.append({"file": file, "coord": coord, "cutout": af})
+            asdf_cutouts.append({"file": file, "coord": SkyCoord(coord, unit="deg"), "cutout": af})
 
         # Make an astropy table
         cutout_table = Table(
@@ -232,11 +232,11 @@ class ASDFCutout(ImageCutout):
                     [
                         ("ORIGIN", "STScI/MAST"),
                         ("PROCVER", __version__),
-                        ("RA_OBJ", ra),
-                        ("DEC_OBJ", dec),
                     ]
                 )
             primary_header = self._primary_header_template.copy()
+            primary_header["RA_OBJ"] = float(ra)
+            primary_header["DEC_OBJ"] = float(dec)
             primary_header["DATE"] = today_str
             primary_hdu = fits.PrimaryHDU(header=primary_header)
 
@@ -251,7 +251,7 @@ class ASDFCutout(ImageCutout):
             else:
                 hdul_embed = hdul
 
-            fits_cutouts.append({"file": file, "coord": coord, "cutout": hdul_embed})
+            fits_cutouts.append({"file": file, "coord": SkyCoord(coord, unit="deg"), "cutout": hdul_embed})
 
         # Make an astropy table
         cutout_table = Table()
@@ -260,7 +260,6 @@ class ASDFCutout(ImageCutout):
         cutout_table.add_column(Column(length=len(fits_cutouts), dtype=object, name="cutout"))
         for i, item in enumerate(fits_cutouts):
             cutout_table["cutout"][i] = item["cutout"]
-        return cutout_table
         return cutout_table
 
     def get_image_cutouts(
@@ -330,7 +329,6 @@ class ASDFCutout(ImageCutout):
             for coordinate in coordinates:
                 # Collect all the input files that have cutouts for this coordinate
                 file_coord_pairs = self.get_file_coord_pairs(input_files=input_files, coordinates=coordinate)
-                coordinate = coordinate.to_string(precision=8)
 
                 coord_cutouts = []
                 coord_cutout_files = []
@@ -366,7 +364,9 @@ class ASDFCutout(ImageCutout):
                     # Flip the image vertically to match the orientation of the input cutouts
                     color_img = color_img.transpose(Transpose.FLIP_TOP_BOTTOM)
                 color_img.info.update(self._build_cutout_metadata(coord_cutout_files, coord_cutouts[0], coordinate))
-                image_cutouts.append({"file": ", ".join(coord_cutout_files), "coord": coord, "cutout": color_img})
+                image_cutouts.append(
+                    {"file": ", ".join(coord_cutout_files), "coord": SkyCoord(coord, unit="deg"), "cutout": color_img}
+                )
         else:  # one image per cutout
             file_coord_pairs = self.get_file_coord_pairs(input_files=input_files, coordinates=coordinates)
 
@@ -380,8 +380,7 @@ class ASDFCutout(ImageCutout):
                     # Flip the image vertically to match the orientation of the input cutouts
                     img = img.transpose(Transpose.FLIP_TOP_BOTTOM)
                 img.info.update(self._build_cutout_metadata([file], cutout, coord))
-
-                image_cutouts.append({"file": file, "coord": coord, "cutout": img})
+                image_cutouts.append({"file": file, "coord": SkyCoord(coord, unit="deg"), "cutout": img})
 
         cutout_table = Table()
         cutout_table["file"] = [item["file"] for item in image_cutouts]
@@ -740,7 +739,6 @@ class ASDFCutout(ImageCutout):
                     return
 
                 new_mission_tree = {"meta": mission_tree.get("meta", {})}
-                new_tree = {self._mission_kwd: new_mission_tree}
 
                 data_shape = mission_tree["data"].shape
 
@@ -763,8 +761,12 @@ class ASDFCutout(ImageCutout):
                         )
                         continue
 
+                    # Make a per-coordinate copy because _get_cutout_data may modify the mission_tree
+                    # in place if not in lite mode
+                    coord_mission_tree = dict(new_mission_tree)
+
                     try:
-                        data_cutout = self._get_cutout_data(new_mission_tree, wcs, pixel_coords)
+                        data_cutout = self._get_cutout_data(coord_mission_tree, wcs, pixel_coords)
                     except NoOverlapError:
                         warnings.warn(
                             f"Cutout of {input_file} at {coord} does not overlap the image. "
@@ -797,9 +799,9 @@ class ASDFCutout(ImageCutout):
                         }
                         self._asdf_trees.setdefault(input_file, {})[coord_key] = lite_tree
                     else:
-                        new_mission_tree["meta"]["wcs"] = sliced_gwcs
-                        new_mission_tree["meta"]["orig_file"] = input_file
-                        self._asdf_trees.setdefault(input_file, {})[coord_key] = new_tree
+                        coord_mission_tree["meta"]["wcs"] = sliced_gwcs
+                        coord_mission_tree["meta"]["orig_file"] = input_file
+                        self._asdf_trees.setdefault(input_file, {})[coord_key] = {self._mission_kwd: coord_mission_tree}
 
     def _resolve_selection(
         self,
@@ -821,7 +823,7 @@ class ASDFCutout(ImageCutout):
         files_to_include : list
             List of input files to include in the cutout results.
         coords_to_include : list
-            List of coordinates to include in the cutout results.
+            List of string coordinates to include in the cutout results.
         """
         # Determine which files to include
         if input_files is None:
@@ -835,17 +837,26 @@ class ASDFCutout(ImageCutout):
                     raise InvalidInputError(f"Input file {file} is not in the cutout results.")
 
         # Determine which coordinates to include
-        all_coords = set()
+        all_coords = []
         for file in files_to_include:
-            all_coords.update(self.cutouts_by_file[file].keys())
+            all_coords.extend(self.cutouts_by_file[file].keys())
+        # Remove duplicates while preserving order
+        all_coords = list(dict.fromkeys(all_coords))
 
         if coordinates is None:
             coords_to_include = all_coords
         else:
             coords_to_include = coordinates if isinstance(coordinates, (list, tuple)) else [coordinates]
-            coords_to_include = [
-                coord.to_string(precision=8) for coord in coords_to_include if isinstance(coord, SkyCoord)
-            ]
+            for i, coord in enumerate(coords_to_include):
+                if isinstance(coord, SkyCoord):
+                    coords_to_include[i] = coord.to_string(precision=8)
+                elif isinstance(coord, str):
+                    try:
+                        coords_to_include[i] = SkyCoord(coord).to_string(precision=8)
+                    except Exception as e:
+                        raise InvalidInputError(f"Invalid coordinate string: {coord}. Error: {e}")
+                else:
+                    raise InvalidInputError(f"Coordinate {coord} is not a valid SkyCoord or string.")
 
             for coord in coords_to_include:
                 if coord not in all_coords:
@@ -964,7 +975,7 @@ class ASDFCutout(ImageCutout):
             if coord not in self.cutouts_by_file[file]:
                 continue  # Skip coordinates that are not associated with this file
 
-            mask = (table["file"] == file) & (table["coordinate"] == coord)
+            mask = (table["file"] == file) & (table["coordinate"] == SkyCoord(coord, unit="deg"))
             cutout_obj = table["cutout"][mask][0]
 
             filename = self._make_cutout_filename(file, output_format, coord=coord)
@@ -1121,11 +1132,10 @@ class ASDFCutout(ImageCutout):
         if colorize:  # Combine first three cutouts into a single RGB image
             for _, coord, img in image_cutouts:
                 # Write the colorized cutout to disk
-                ra, dec = coord.split()
                 filename = "{}_{:.7f}_{:.7f}_{}-x-{}_astrocut{}".format(
                     cutout_prefix,
-                    float(ra),
-                    float(dec),
+                    coord.ra.deg,
+                    coord.dec.deg,
                     str(self._cutout_size[0]).replace(" ", ""),
                     str(self._cutout_size[1]).replace(" ", ""),
                     output_format,
@@ -1139,11 +1149,10 @@ class ASDFCutout(ImageCutout):
 
         else:  # Write each cutout to a separate image file
             for file, coord, img in image_cutouts:
-                ra, dec = coord.split()
                 filename = "{}_{:.7f}_{:.7f}_{}-x-{}_astrocut{}".format(
                     Path(file).stem,
-                    float(ra),
-                    float(dec),
+                    coord.ra.deg,
+                    coord.dec.deg,
                     str(self._cutout_size[0]).replace(" ", ""),
                     str(self._cutout_size[1]).replace(" ", ""),
                     output_format,
@@ -1213,7 +1222,7 @@ class ASDFCutout(ImageCutout):
                     continue  # Skip coordinates that are not associated with this file
 
                 arcname = self._make_cutout_filename(file, fmt, coord=coord)
-                mask = (table["file"] == file) & (table["coordinate"] == coord)
+                mask = (table["file"] == file) & (table["coordinate"] == SkyCoord(coord, unit="deg"))
                 yield arcname, table["cutout"][mask][0]
 
         return self._write_cutouts_to_zip(output_dir=output_dir, filename=filename, build_entries=build_entries)

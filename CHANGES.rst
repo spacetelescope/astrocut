@@ -19,6 +19,8 @@ Unreleased
   to opt into the pre-1.2.0 cutout/target pixel file filename format (``<ny>x<nx>`` size separator
   and 6-decimal RA/Dec precision) instead of the current format (``<ny>-x-<nx>`` size separator
   and 7-decimal RA/Dec precision). Default is False. [#194]
+- Extend the ASDF cutout workflow to accept multiple target coordinates and to expose downstream cutout products in
+  an ``astropy.table.Table`` object. [#196]
 
 Breaking Changes
 ^^^^^^^^^^^^^^^^
