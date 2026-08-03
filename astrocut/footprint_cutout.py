@@ -9,8 +9,7 @@ import numpy as np
 from astropy.coordinates import SkyCoord
 from astropy.table import Column, Table
 from cachetools import TTLCache, cached
-from spherical_geometry.polygon import SphericalPolygon
-from spherical_geometry.vector import radec_to_vector
+from sphersgeo import SphericalPoint, SphericalPolygon
 
 from .cutout import Cutout
 from .exceptions import InvalidInputError
@@ -73,7 +72,7 @@ class FootprintCutout(Cutout, ABC):
     @staticmethod
     def _s_region_to_polygon(s_region: Column) -> Column:
         """
-        Returns a column of `~spherical_geometry.polygon.SphericalPolygon` objects from a column of
+        Returns a column of `~sphersgeo.SphericalPolygon` objects from a column of
         s_region strings.
 
         Parameters
@@ -85,12 +84,12 @@ class FootprintCutout(Cutout, ABC):
         Returns
         -------
         polygon : `~astropy.table.Column`
-            Column containing `~spherical_geometry.polygon.SphericalPolygon` objects representing each s_region.
+            Column containing `~sphersgeo.SphericalPolygon` objects representing each s_region.
         """
 
         def ind_sregion_to_polygon(s_reg):
             """
-            Helper function to convert s_region string to a `~spherical_geometry.polygon.SphericalPolygon` object.
+            Helper function to convert s_region string to a `~sphersgeo.SphericalPolygon` object.
 
             Parameters
             ----------
@@ -99,7 +98,7 @@ class FootprintCutout(Cutout, ABC):
 
             Returns
             -------
-            `~spherical_geometry.polygon.SphericalPolygon`
+            `~sphersgeo.SphericalPolygon`
                 A SphericalPolygon object created from the provided coordinates.
 
             Raises
@@ -126,7 +125,7 @@ class FootprintCutout(Cutout, ABC):
                 decs = np.array(sr_list[2::2], dtype=float)
 
                 # Create SphericalPolygon object
-                return SphericalPolygon.from_radec(ras, decs)
+                return SphericalPolygon(np.stack((ras, decs), axis=1))
             else:
                 raise ValueError(f"Unsupported s_region type: {reg_type}.")
 
@@ -135,13 +134,13 @@ class FootprintCutout(Cutout, ABC):
     @staticmethod
     def _ffi_intersect(ffi_list: Table, polygon: SphericalPolygon) -> np.ndarray:
         """
-        Vectorizing the spherical_coordinate intersects_polygon function.
+        Vectorizing the `SphericalPolygon.intersects` function.
 
         Parameters
         ----------
         ffi_list : `~astropy.table.Table`
             Table containing information about FFIs and their footprints.
-        polygon : `~spherical_geometry.polygon.SphericalPolygon`
+        polygon : `~sphersgeo.SphericalPolygon`
             SphericalPolygon object representing the cutout's footprint.
 
         Returns
@@ -151,7 +150,7 @@ class FootprintCutout(Cutout, ABC):
         """
 
         def single_intersect(ffi, polygon):
-            return ffi.intersects_poly(polygon)
+            return ffi.intersects(polygon)
 
         return np.vectorize(single_intersect)(ffi_list["polygon"], polygon)
 
@@ -208,13 +207,13 @@ def _crossmatch_point(ra: SkyCoord, dec: SkyCoord, all_ffis: Table) -> np.ndarra
         Indices of FFIs that contain the given RA and Dec coordinates.
     """
     ffi_inds = []
-    vector_coord = radec_to_vector(ra, dec)
+    coord = SphericalPoint((ra, dec))
     for sector in np.unique(all_ffis["sequence_number"]):
         # Returns a 2-long array where the first element is indexes and the 2nd element is empty
         sector_ffi_inds = np.where(all_ffis["sequence_number"] == sector)[0]
 
         for ind in sector_ffi_inds:
-            if all_ffis[ind]["polygon"].contains_point(vector_coord):
+            if all_ffis[ind]["polygon"].contains(coord):
                 ffi_inds.append(ind)
                 break  # the ra/dec will only be on one ccd per sector
     return np.array(ffi_inds, dtype=int)
@@ -263,10 +262,10 @@ def _crossmatch_polygon(
     decs = [dec_bounds[0].value, dec_bounds[0].value, dec_bounds[1].value, dec_bounds[1].value]
 
     # Create SphericalPolygon for comparison
-    cutout_fp = SphericalPolygon.from_radec(ras, decs, center=(ra, dec))
+    cutout_fp = SphericalPolygon((np.stack((ras, decs), axis=1), (ra, dec)))
 
     # Find indices of FFIs that intersect with the cutout
-    ffi_inds = np.vectorize(lambda ffi: ffi.intersects_poly(cutout_fp))(all_ffis["polygon"])
+    ffi_inds = np.vectorize(lambda ffi: ffi.intersects(cutout_fp))(all_ffis["polygon"])
     ffi_inds = FootprintCutout._ffi_intersect(all_ffis, cutout_fp)
 
     return ffi_inds
