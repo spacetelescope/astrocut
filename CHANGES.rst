@@ -20,7 +20,7 @@ Unreleased
   and 6-decimal RA/Dec precision) instead of the current format (``<ny>-x-<nx>`` size separator
   and 7-decimal RA/Dec precision). Default is False. [#194]
 - Extend the ASDF cutout workflow to accept multiple target coordinates and to expose downstream cutout products in
-  an ``astropy.table.Table`` object. [#196]
+  an ``astropy.table.Table`` object with columns for input file, coordinate, and cutout object. [#196]
 
 Breaking Changes
 ^^^^^^^^^^^^^^^^
