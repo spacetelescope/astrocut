@@ -123,6 +123,7 @@ single coordinate or a list of coordinates, and Astrocut will generate one cutou
 The resulting `~astrocut.ASDFCutout` object can be used to access the cutout science data and metadata.
 The ``cutouts_by_file`` attribute is a nested dictionary keyed by input filename and coordinate string,
 where each value is a `~astropy.nddata.Cutout2D` object.
+
 The ``cutouts`` attribute is an `~astropy.table.Table` with columns ``file``, ``coordinate``, and ``cutout``.
 The ``cutout`` column stores `~astropy.nddata.Cutout2D` objects, with one row per valid
 ``(input file, coordinate)`` pair.
@@ -136,13 +137,23 @@ The ``cutout`` column stores `~astropy.nddata.Cutout2D` objects, with one row pe
   /path/to/input_0.asdf          <SkyCoord (ICRS): ...>          <astropy.nddata.utils.Cutout2D object at 0x11f216720>
   /path/to/input_1.asdf          <SkyCoord (ICRS): ...>          <astropy.nddata.utils.Cutout2D object at 0x11eb951c0>
 
+Use `~astrocut.ASDFCutout.get_cutouts` to retrieve a filtered subset of the base
+`~astropy.nddata.Cutout2D` table by input file and/or coordinate:
+
+.. code-block:: python
+
+  >>> subset = asdf_cutout.get_cutouts( #doctest: +SKIP
+  ...     input_files=input_files[:1],
+  ...     coordinates=coords[:1],
+  ... )
+  >>> len(subset) #doctest: +SKIP
+  1
+  >>> subset["cutout"][0].data.shape #doctest: +SKIP
+  (25, 25)
+
 The ``asdf_cutouts`` and ``fits_cutouts`` attributes also both return `~astropy.table.Table` objects
 with columns ``file``, ``coordinate``, and ``cutout``. The ``cutout`` column stores `~asdf.AsdfFile`
 or `~astropy.io.fits.HDUList` objects, respectively.
-
-.. note::
-  Although Astrocut supports writing ASDF cutouts as FITS objects, we recommend using the ASDF output format whenever possible. FITS files may not
-  accurately represent the ASDF world coordinate system, so saving cutouts in their original format will generally give the most reliable results.
 
 .. code-block:: python
 
@@ -195,11 +206,16 @@ cutout FITS files.
 By default, the cutouts are written to the current working directory. You can specify a different output directory using the ``output_dir`` parameter
 in either of the write functions.
 
+.. note::
+  Although Astrocut supports writing ASDF cutouts as FITS objects, we recommend using the ASDF output format whenever possible. FITS files may not
+  accurately represent the ASDF world coordinate system, so saving cutouts in their original format will generally give the most reliable results.
+
 Streaming Cutouts
 ^^^^^^^^^^^^^^^^^^
 
 For large batches, you can stream cutouts lazily using iterator methods rather than materializing full tables in memory:
 
+- ``iter_cutouts(...)`` yields tuples of ``(file, coordinate, cutout2D)``.
 - ``iter_asdf_cutouts(...)`` yields tuples of ``(file, coordinate, asdf_cutout)``.
 - ``iter_fits_cutouts(...)`` yields tuples of ``(file, coordinate, fits_cutout)``.
 - ``iter_image_cutouts(...)`` yields tuples of ``(file, coordinate, image_cutout)``.

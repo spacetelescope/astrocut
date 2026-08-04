@@ -181,6 +181,56 @@ def test_asdf_cutout(images, center_coord, cutout_size):
 
 
 @pytest.mark.parametrize("lite", [False, True])
+def test_asdf_cutout_get_cutouts(images, multi_coord, cutout_size, lite):
+    with pytest.warns(DataWarning, match="does not overlap the image"):
+        cutout = ASDFCutout(images, multi_coord, cutout_size, lite=lite)
+
+    # No filters returns all generated cutouts.
+    all_rows = cutout.get_cutouts()
+    assert isinstance(all_rows, Table)
+    assert len(all_rows) == len(cutout.cutouts)
+    for row in all_rows:
+        assert isinstance(row["coordinate"], SkyCoord)
+        assert isinstance(row["cutout"], Cutout2D)
+
+    # With input files and coordinates specified.
+    cutout_rows = cutout.get_cutouts(input_files=images[1:], coordinates=multi_coord[1:])
+    assert isinstance(cutout_rows, Table)
+    assert len(cutout_rows) == 3  # one coordinate will not have a cutout for one of the images
+    for row in cutout_rows:
+        assert row["file"] in {image.as_posix() for image in images[1:]}
+        assert isinstance(row["cutout"], Cutout2D)
+
+    # Error if a file is not found.
+    with pytest.raises(InvalidInputError, match="is not in the cutout results."):
+        cutout.get_cutouts(input_files=["nonexistent_file.asdf"], coordinates=multi_coord[1:])
+
+    # Error if a coordinate is not found.
+    with pytest.raises(InvalidInputError, match="is not in the cutout results."):
+        cutout.get_cutouts(input_files=images[1:], coordinates=[SkyCoord("0 0", unit="deg")])
+
+    # Error if invalid coordinate string is provided.
+    with pytest.raises(InvalidInputError, match="Invalid coordinate string"):
+        cutout.get_cutouts(input_files=images[1:], coordinates=["invalid_coord"])
+
+    # Error if invalid coordinate type is provided.
+    with pytest.raises(InvalidInputError, match="is not a valid SkyCoord or string"):
+        cutout.get_cutouts(input_files=images[1:], coordinates=[12345])
+
+
+def test_asdf_cutout_iter_cutouts(images, multi_coord, cutout_size):
+    with pytest.warns(DataWarning, match="does not overlap the image"):
+        cutout = ASDFCutout(images, multi_coord, cutout_size)
+
+    cutout_rows = list(cutout.iter_cutouts(input_files=images[1:], coordinates=multi_coord[1:]))
+    assert len(cutout_rows) == 3
+    for file, coordinate, cutout_obj in cutout_rows:
+        assert file in {image.as_posix() for image in images[1:]}
+        assert isinstance(coordinate, SkyCoord)
+        assert isinstance(cutout_obj, Cutout2D)
+
+
+@pytest.mark.parametrize("lite", [False, True])
 def test_asdf_cutout_get_asdf_cutouts(images, multi_coord, cutout_size, lite):
     with pytest.warns(DataWarning, match="does not overlap the image"):
         cutout = ASDFCutout(images, multi_coord, cutout_size, lite=lite)
@@ -195,22 +245,6 @@ def test_asdf_cutout_get_asdf_cutouts(images, multi_coord, cutout_size, lite):
         assert "roman" in af
         assert "data" in af["roman"]
         assert af["roman"]["data"].shape == (cutout_size, cutout_size)
-
-    # Error if a file is not found
-    with pytest.raises(InvalidInputError, match="is not in the cutout results."):
-        cutout.get_asdf_cutouts(input_files=["nonexistent_file.asdf"], coordinates=multi_coord[1:])
-
-    # Error if a coordinate is not found
-    with pytest.raises(InvalidInputError, match="is not in the cutout results."):
-        cutout.get_asdf_cutouts(input_files=images[1:], coordinates=[SkyCoord("0 0", unit="deg")])
-
-    # Error if invalid coordinate string is provided
-    with pytest.raises(InvalidInputError, match="Invalid coordinate string"):
-        cutout.get_asdf_cutouts(input_files=images[1:], coordinates=["invalid_coord"])
-
-    # Error if invalid coordinate type is provided
-    with pytest.raises(InvalidInputError, match="is not a valid SkyCoord or string"):
-        cutout.get_asdf_cutouts(input_files=images[1:], coordinates=[12345])
 
 
 def test_asdf_cutout_iter_asdf_cutouts(images, multi_coord, cutout_size):

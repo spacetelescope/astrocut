@@ -5,7 +5,7 @@ from copy import deepcopy
 from datetime import date
 from pathlib import Path
 from time import monotonic
-from typing import Dict, Iterator, List, Optional, Tuple, Union
+from typing import Iterator, List, Optional, Tuple, Union
 
 import asdf
 import gwcs
@@ -107,7 +107,7 @@ class ASDFCutout(ImageCutout):
         self._mission_kwd = "roman"
 
         # Store cutouts as a table
-        self.cutouts = Table(names=["file", "coordinate", "cutout"], dtype=["str", "object", "object"])
+        self._cutouts = None  # Store Cutout2D objects
         self._asdf_cutouts = None  # Store ASDF objects
         self._fits_cutouts = None  # Store FITS objects
         self._asdf_trees = {}  # Store ASDF trees for each cutout
@@ -120,7 +120,19 @@ class ASDFCutout(ImageCutout):
         self.cutout()
 
     @property
-    def asdf_cutouts(self) -> List[asdf.AsdfFile]:
+    def cutouts(self) -> Table:
+        """
+        Return the cutouts as an `astropy.table.Table` with columns for input file, coordinate, and the corresponding
+        `astropy.nddata.Cutout2D` object.
+        """
+        if self._cutouts is not None:
+            return self._cutouts
+
+        self._cutouts = self.get_cutouts()
+        return self._cutouts
+
+    @property
+    def asdf_cutouts(self) -> Table:
         """
         Return the cutouts as a list of `asdf.AsdfFile` objects.
         """
@@ -128,11 +140,10 @@ class ASDFCutout(ImageCutout):
             return self._asdf_cutouts
 
         self._asdf_cutouts = self.get_asdf_cutouts()
-
         return self._asdf_cutouts
 
     @property
-    def fits_cutouts(self) -> List[fits.HDUList]:
+    def fits_cutouts(self) -> Table:
         """
         Return the cutouts as a list `astropy.io.fits.HDUList` objects.
         """
@@ -140,17 +151,17 @@ class ASDFCutout(ImageCutout):
             return self._fits_cutouts
 
         self._fits_cutouts = self.get_fits_cutouts()
-
         return self._fits_cutouts
 
-    def get_asdf_cutouts(
+    def get_cutouts(
         self,
         *,
         input_files: Optional[List[Union[str, Path, S3Path]]] = None,
         coordinates: Optional[List[Union[SkyCoord, str]]] = None,
-    ) -> Dict[Tuple[str, str], asdf.AsdfFile]:
+    ) -> Table:
         """
-        Get the cutouts as `asdf.AsdfFile` objects.
+        Get the cutouts as an `astropy.table.Table` with columns for input file, coordinate, and the corresponding
+        `astropy.nddata.Cutout2D` object.
 
         Parameters
         ----------
@@ -162,7 +173,61 @@ class ASDFCutout(ImageCutout):
 
         Returns
         -------
-        asdf_cutouts : astropy.table.Table
+        cutouts : `astropy.table.Table`
+            Table with columns for input file, coordinate, and the corresponding `astropy.nddata.Cutout2D` object.
+        """
+        cutout_table = Table(
+            rows=list(self.iter_cutouts(input_files=input_files, coordinates=coordinates)),
+            names=["file", "coordinate", "cutout"],
+        )
+        return cutout_table
+
+    def iter_cutouts(
+        self,
+        *,
+        input_files: Optional[List[Union[str, Path, S3Path]]] = None,
+        coordinates: Optional[List[Union[SkyCoord, str]]] = None,
+    ) -> Iterator[Tuple[str, SkyCoord, Cutout2D]]:
+        """
+        Yield base `~astropy.nddata.Cutout2D` cutouts lazily for selected file/coordinate pairs.
+
+        Parameters
+        ----------
+        input_files : list
+            Optional. List of input image files to include in the output. If not specified, all input files will be
+            included.
+        coordinates : list
+            Optional. List of coordinates to include in the output. If not specified, all coordinates will be included.
+
+        Yields
+        ------
+        tuple
+            Tuples of (input file, coordinate, `astropy.nddata.Cutout2D`).
+        """
+        for file, coord in self.get_file_coord_pairs(input_files=input_files, coordinates=coordinates):
+            yield file, SkyCoord(coord, unit="deg"), self.cutouts_by_file[file][coord]
+
+    def get_asdf_cutouts(
+        self,
+        *,
+        input_files: Optional[List[Union[str, Path, S3Path]]] = None,
+        coordinates: Optional[List[Union[SkyCoord, str]]] = None,
+    ) -> Table:
+        """
+        Get the cutouts as an `astropy.table.Table` with columns for input file, coordinate,
+        and the corresponding `asdf.AsdfFile` object.
+
+        Parameters
+        ----------
+        input_files : list
+            Optional. List of input image files to include in the output. If not specified, all input files will be
+            included.
+        coordinates : list
+            Optional. List of coordinates to include in the output. If not specified, all coordinates will be included.
+
+        Returns
+        -------
+        asdf_cutouts : `astropy.table.Table`
             Table with columns for input file, coordinate, and the corresponding `asdf.AsdfFile` object representing
             the cutout.
         """
@@ -216,9 +281,10 @@ class ASDFCutout(ImageCutout):
         *,
         input_files: Optional[List[Union[str, Path, S3Path]]] = None,
         coordinates: Optional[List[Union[SkyCoord, str]]] = None,
-    ) -> Dict[Tuple[str, str], fits.HDUList]:
+    ) -> Table:
         """
-        Get the cutouts as `astropy.io.fits.HDUList` objects.
+        Get the cutouts as an `astropy.table.Table` with columns for input file, coordinate, and the
+        corresponding `astropy.io.fits.HDUList` object.
 
         Parameters
         ----------
@@ -230,7 +296,7 @@ class ASDFCutout(ImageCutout):
 
         Returns
         -------
-        fits_cutouts : Table
+        fits_cutouts : `astropy.table.Table`
             Table with columns for input file, coordinate, and the corresponding `astropy.io.fits.HDUList` object
             representing the cutout.
         """
@@ -347,10 +413,10 @@ class ASDFCutout(ImageCutout):
         invert: Optional[bool] = False,
         colorize: Optional[bool] = False,
         flip_orientation: Optional[bool] = True,
-    ) -> List[Image]:
+    ) -> Table:
         """
-        Get the cutouts as `~PIL.Image` objects given certain normalization parameters. This method also sets
-        the `image_cutouts` attribute.
+        Get the cutouts as an `astropy.table.Table` with columns for input file, coordinate, and the corresponding
+        `~PIL.Image` object representing the image cutout.
 
         Parameters
         ----------
@@ -382,7 +448,7 @@ class ASDFCutout(ImageCutout):
 
         Returns
         -------
-        image_cutouts : Table
+        image_cutouts : `astropy.table.Table`
             Table with columns for input file(s), coordinate, and the corresponding `~PIL.Image` object representing
             the image cutout.
         """
@@ -608,7 +674,7 @@ class ASDFCutout(ImageCutout):
             self._cutout_file(file)
 
         # If no cutouts contain data, raise exception
-        if not self.cutouts:
+        if not self.cutouts_by_file:
             raise InvalidQueryError("Cutout contains no data! (Check image footprint.)")
 
         # Log total time elapsed
@@ -953,7 +1019,6 @@ class ASDFCutout(ImageCutout):
 
                     # Store the Cutout2D object and associated metadata
                     coord_key = coord.to_string(precision=8)
-                    self.cutouts.add_row((input_file, coord, data_cutout))
                     file_cutouts[coord_key] = data_cutout
                     self.cutouts_by_file.setdefault(input_file, {})[coord_key] = data_cutout
 
