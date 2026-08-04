@@ -19,7 +19,7 @@ from gwcs import coordinate_frames, wcs
 from PIL import Image
 
 from astrocut.asdf_cutout import ASDFCutout, asdf_cut, get_center_pixel
-from astrocut.exceptions import DataWarning, InvalidInputError, InvalidQueryError, ModuleWarning
+from astrocut.exceptions import DataWarning, InputWarning, InvalidInputError, InvalidQueryError, ModuleWarning
 
 try:
     from stdatamodels import asdf_in_fits
@@ -137,7 +137,7 @@ def multi_coord():
     return [
         SkyCoord("29.99901792 44.99930555", unit="deg"),
         SkyCoord("30.00098208 44.99930555", unit="deg"),
-        SkyCoord("29.98201792 45.00069445", unit="deg"),
+        "29.98201792 45.00069445",
     ]
 
 
@@ -180,9 +180,10 @@ def test_asdf_cutout(images, center_coord, cutout_size):
         assert np.isclose(s_coord.dec.deg, center_coord.dec.deg)
 
 
-def test_asdf_cutout_get_asdf_cutouts(images, multi_coord, cutout_size):
+@pytest.mark.parametrize("lite", [False, True])
+def test_asdf_cutout_get_asdf_cutouts(images, multi_coord, cutout_size, lite):
     with pytest.warns(DataWarning, match="does not overlap the image"):
-        cutout = ASDFCutout(images, multi_coord, cutout_size)
+        cutout = ASDFCutout(images, multi_coord, cutout_size, lite=lite)
 
     # With input files and coordinates specified
     # Choose 2 files and 2 coordinates
@@ -194,6 +195,22 @@ def test_asdf_cutout_get_asdf_cutouts(images, multi_coord, cutout_size):
         assert "roman" in af
         assert "data" in af["roman"]
         assert af["roman"]["data"].shape == (cutout_size, cutout_size)
+
+    # Error if a file is not found
+    with pytest.raises(InvalidInputError, match="is not in the cutout results."):
+        cutout.get_asdf_cutouts(input_files=["nonexistent_file.asdf"], coordinates=multi_coord[1:])
+
+    # Error if a coordinate is not found
+    with pytest.raises(InvalidInputError, match="is not in the cutout results."):
+        cutout.get_asdf_cutouts(input_files=images[1:], coordinates=[SkyCoord("0 0", unit="deg")])
+
+    # Error if invalid coordinate string is provided
+    with pytest.raises(InvalidInputError, match="Invalid coordinate string"):
+        cutout.get_asdf_cutouts(input_files=images[1:], coordinates=["invalid_coord"])
+
+    # Error if invalid coordinate type is provided
+    with pytest.raises(InvalidInputError, match="is not a valid SkyCoord or string"):
+        cutout.get_asdf_cutouts(input_files=images[1:], coordinates=[12345])
 
 
 def test_asdf_cutout_iter_asdf_cutouts(images, multi_coord, cutout_size):
@@ -210,9 +227,10 @@ def test_asdf_cutout_iter_asdf_cutouts(images, multi_coord, cutout_size):
         assert af["roman"]["data"].shape == (cutout_size, cutout_size)
 
 
-def test_asdf_cutout_get_fits_cutouts(images, multi_coord, cutout_size):
+@pytest.mark.parametrize("lite", [False, True])
+def test_asdf_cutout_get_fits_cutouts(images, multi_coord, cutout_size, lite):
     with pytest.warns(DataWarning, match="does not overlap the image"):
-        cutout = ASDFCutout(images, multi_coord, cutout_size)
+        cutout = ASDFCutout(images, multi_coord, cutout_size, lite=lite)
 
     # With input files and coordinates specified
     # Choose 2 files and 2 coordinates
@@ -329,15 +347,16 @@ def test_asdf_cutout_write_to_file(images, center_coord, cutout_size, tmpdir):
 
 
 @pytest.mark.parametrize("output_format", [".asdf", ".fits"])
-def test_asdf_cutout_write_to_zip(tmpdir, images, center_coord, cutout_size, output_format):
+def test_asdf_cutout_write_to_zip(tmpdir, images, multi_coord, cutout_size, output_format):
     # Zip ASDF representations
-    cutout = ASDFCutout(images, center_coord, cutout_size)
+    cutout = ASDFCutout(images, multi_coord[:2], cutout_size)
     zip_path = cutout.write_as_zip(output_dir=tmpdir, output_format=output_format)
+    assert Path(zip_path).stem == f"astrocut_{output_format[1:]}_cutouts"
     assert Path(zip_path).exists()
 
     with zipfile.ZipFile(zip_path, "r") as zf:
         names = zf.namelist()
-        assert len(names) == len(images)
+        assert len(names) == 6  # 3 images * 2 coordinates = 6 cutouts
         for name in names:
             assert name.endswith(f"_astrocut{output_format}")
 
@@ -498,6 +517,10 @@ def test_asdf_cutout_invalid_params(images, center_coord, cutout_size, tmpdir):
     with pytest.raises(InvalidInputError, match="Cutout size unit meter is not supported."):
         ASDFCutout(images, center_coord, cutout_size)
 
+    # No coordinates provided
+    with pytest.raises(InvalidInputError, match="At least one coordinate must be provided."):
+        ASDFCutout(images, [], cutout_size)
+
 
 def test_asdf_cutout_img_output(images, center_coord, cutout_size, tmpdir):
     # Basic JPG image
@@ -518,10 +541,31 @@ def test_asdf_cutout_img_output(images, center_coord, cutout_size, tmpdir):
     assert isinstance(img_cutouts["cutout"][0], Image.Image)
     assert np.array(img_cutouts["cutout"][0]).shape == (10, 10)
 
+
+def test_asdf_cutout_img_output_colorize(images, multi_coord, cutout_size, tmpdir):
+    # Make a copy of one of the input images
+    with asdf.open(images[0], mode="rw") as af:
+        af["roman"]["data"] = af["roman"]["data"][::-1, ::-1]  # flip data to make it different
+        af.update()
+        af.write_to(images[0].with_name("test_roman_extra.asdf"))
+    images_extra = images + [images[0].with_name("test_roman_extra.asdf")]
+
     # Color image
-    color_jpg = ASDFCutout(images, center_coord, cutout_size).write_as_img(output_dir=tmpdir, colorize=True)
-    img = Image.open(color_jpg[0])
+    cutout = ASDFCutout(images_extra, multi_coord[:2], cutout_size)
+    color_jpgs = cutout.write_as_img(output_dir=tmpdir, colorize=True, input_files=images_extra[:3])
+    assert len(color_jpgs) == 2
+    img = Image.open(color_jpgs[0])
     assert img.mode == "RGB"
+
+    # Warn if not enough input files for colorization
+    with pytest.warns(InputWarning, match="Color cutouts require 3 input images"):
+        color_imgs = cutout.get_image_cutouts(colorize=True, input_files=images_extra[:2])
+    assert len(color_imgs) == 0
+
+    # Warn if too many input files for colorization
+    with pytest.warns(InputWarning, match="More than 3 cutouts found for coordinate"):
+        color_imgs = cutout.get_image_cutouts(colorize=True)
+    assert len(color_imgs) == 2
 
 
 def test_asdf_cutout_iter_image_cutouts(images, center_coord, cutout_size):
