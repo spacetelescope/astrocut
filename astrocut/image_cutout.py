@@ -531,9 +531,7 @@ class ImageCutout(Cutout, ABC):
                 coord_cutouts = grouped["cutouts"]
                 coord_cutout_files = grouped["files"]
 
-                print(len(coord_cutouts))
                 if len(coord_cutouts) > 3:
-                    print("here")
                     self._warn_too_many_color_cutouts(coord_obj)
                     coord_cutouts = coord_cutouts[:3]
                     coord_cutout_files = coord_cutout_files[:3]
