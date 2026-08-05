@@ -955,7 +955,7 @@ class ASDFCutout(ImageCutout):
             asdf_file = nullcontext(file)
 
         with asdf_file as file_handle:
-            with asdf.open(file_handle) as af:
+            with asdf.open(file_handle, memmap=True) as af:
                 # Load the data from the input file
                 tree = af.tree
                 mission_tree = tree[self._mission_kwd] if self._mission_kwd in tree else None
