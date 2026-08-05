@@ -1,0 +1,42 @@
+---
+name: Building & Publishing to Test PyPI
+    
+on:
+    push:
+      branches: "main"
+    pull_request:
+      types: [ labeled ]
+
+permissions:
+  contents: read
+
+jobs:
+    make_tag_and_publish:
+        runs-on: ubuntu-latest
+    
+        # We want a new tag to be made ONLY if we are ready to release to Test PyPI.
+        # I.e. A MERGE has been made into @spacetelescope/astrocut/main
+        if: contains(github.event.pull_request.labels.*.name, 'publish-to-test') || (github.repository_owner == 'spacetelescope' && github.event_name == 'push')
+        steps:
+            - name: Git checkout
+              uses: actions/checkout@v3
+              with:
+                  fetch-depth: 0
+            - name: Make the test.pypi release tag
+              run: |
+                  git config user.name github-actions
+                  git config user.email github-actions@github.com
+                  TAG=$(date +v'%Y%m%d.%H%M%S'.dev)
+                  git tag $TAG
+            - uses: actions/setup-python@v2
+            - name: Install dependencies
+              run: |
+                python -m pip install --upgrade pip
+                pip install setuptools wheel twine
+            - name: Build and publish
+              env:
+                TWINE_USERNAME: __token__
+                TWINE_PASSWORD: ${{ secrets.TEST_PYPI_TOKEN }}
+              run: |
+                python setup.py sdist bdist_wheel
+                twine upload --repository-url https://test.pypi.org/legacy/ dist/*
