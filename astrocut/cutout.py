@@ -73,8 +73,7 @@ class Cutout(BaseCutout, ABC):
         self._input_files = input_files
 
         # Get coordinates as a SkyCoord object
-        if not isinstance(coordinates, (list, tuple)):
-            coordinates = [coordinates]
+        coordinates = self._normalize_coordinates_input(coordinates)
         if len(coordinates) == 0:
             raise InvalidInputError("At least one coordinate must be provided.")
         self._coordinates = [
@@ -103,6 +102,31 @@ class Cutout(BaseCutout, ABC):
 
         # Initialize cutout dictionary
         self.cutouts_by_file = {}
+
+    @staticmethod
+    def _normalize_coordinates_input(
+        coordinates: Union[SkyCoord, str, List[Union[SkyCoord, str]], Tuple[Union[SkyCoord, str], ...]],
+    ) -> List[Union[SkyCoord, str]]:
+        """
+        Normalize coordinate inputs into a flat list.
+
+        Array-valued ``SkyCoord`` inputs are expanded into scalar coordinates so
+        workflows that provide one ``SkyCoord`` with many rows are handled the
+        same as a list of scalar coordinates.
+        """
+        if isinstance(coordinates, (list, tuple)):
+            raw_coords = list(coordinates)
+        else:
+            raw_coords = [coordinates]
+
+        normalized_coords: List[Union[SkyCoord, str]] = []
+        for coord in raw_coords:
+            if isinstance(coord, SkyCoord) and not coord.isscalar:
+                normalized_coords.extend(list(coord))
+            else:
+                normalized_coords.append(coord)
+
+        return normalized_coords
 
     def _get_cutout_limits(self, coordinates: SkyCoord, img_wcs: wcs.WCS) -> np.ndarray:
         """

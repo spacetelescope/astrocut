@@ -6,7 +6,7 @@ from typing import Iterator, List, Optional, Tuple, Union
 
 import numpy as np
 from astropy.coordinates import SkyCoord
-from astropy.table import Column, Table
+from astropy.table import Table
 from astropy.units import Quantity
 from astropy.visualization import (
     AsinhStretch,
@@ -326,13 +326,21 @@ class ImageCutout(Cutout, ABC):
         """
         Build a standard image cutout output table from iterator rows.
         """
-        image_table = Table()
-        image_table["file"] = [row[0] for row in image_rows]
-        image_table["coordinate"] = [row[1] for row in image_rows]
-        image_table.add_column(Column(length=len(image_rows), dtype=object, name="cutout"))
-        for i, row in enumerate(image_rows):
-            image_table["cutout"][i] = row[2]
-        return image_table
+        # Have to construct columns separately to avoid astropy.table trying to convert the
+        # Image objects to a numpy array
+        files = [row[0] for row in image_rows]
+        coordinates = [row[1] for row in image_rows]
+
+        cutouts = np.empty(len(image_rows), dtype=object)
+        cutouts[:] = [row[2] for row in image_rows]
+
+        return Table(
+            {
+                "file": files,
+                "coordinate": coordinates,
+                "cutout": cutouts,
+            }
+        )
 
     def _build_cutout_metadata(self, input_files: List[Union[str, Path, S3Path]], cutout, coord: str) -> dict:
         """

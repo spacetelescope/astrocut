@@ -124,8 +124,17 @@ The resulting `~astrocut.ASDFCutout` object can be used to access the cutout sci
 The ``cutouts_by_file`` attribute is a nested dictionary keyed by input filename and coordinate string,
 where each value is a `~astropy.nddata.Cutout2D` object.
 
+.. code-block:: python
+
+  >>> pprint(cutout.cutouts_by_file)  #doctest: +SKIP
+  {'/path/to/input_0.asdf': {"80.15189743 29.74561219": <astropy.nddata.utils.Cutout2D object at 0x11fb3bc80>,
+                             "80.15500000 29.75000000": <astropy.nddata.utils.Cutout2D object at 0x11fafff20>},
+   '/path/to/input_1.asdf': {"80.15189743 29.74561219": <astropy.nddata.utils.Cutout2D object at 0x11f99d610>,
+                             "80.15500000 29.75000000": <astropy.nddata.utils.Cutout2D object at 0x11f7da5d0>}}
+
+
 The ``cutouts`` attribute is an `~astropy.table.Table` with columns ``file``, ``coordinate``, and ``cutout``.
-The ``cutout`` column stores `~astropy.nddata.Cutout2D` objects, with one row per valid
+The ``cutout`` column stores `~astropy.nddata.Cutout2D` objects, with one row per unique cutout, defined by a valid
 ``(input file, coordinate)`` pair.
 
 .. code-block:: python
@@ -153,7 +162,8 @@ Use `~astrocut.ASDFCutout.get_cutouts` to retrieve a filtered subset of the base
 
 The ``asdf_cutouts`` and ``fits_cutouts`` attributes also both return `~astropy.table.Table` objects
 with columns ``file``, ``coordinate``, and ``cutout``. The ``cutout`` column stores `~asdf.AsdfFile`
-or `~astropy.io.fits.HDUList` objects, respectively.
+or `~astropy.io.fits.HDUList` objects, respectively. To retrieve a filtered subset of the ASDF or FITS cutouts,
+use `~astrocut.ASDFCutout.get_asdf_cutouts` or `~astrocut.ASDFCutout.get_fits_cutouts`, respectively.
 
 .. code-block:: python
 

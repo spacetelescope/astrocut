@@ -142,6 +142,15 @@ def multi_coord():
 
 
 @pytest.fixture
+def multi_coord_skycoord_array():
+    """Fixture to return coordinates as one array-valued SkyCoord."""
+    return SkyCoord(
+        ["29.99901792 44.99930555", "30.00098208 44.99930555", "29.98201792 45.00069445"],
+        unit="deg",
+    )
+
+
+@pytest.fixture
 def cutout_size():
     """Fixture to return a cutout size"""
     return 10
@@ -218,6 +227,98 @@ def test_asdf_cutout_get_cutouts(images, multi_coord, cutout_size, lite):
         cutout.get_cutouts(input_files=images[1:], coordinates=[12345])
 
 
+def test_asdf_cutout_with_skycoord_array_input(images, multi_coord_skycoord_array, cutout_size):
+    with pytest.warns(DataWarning, match="does not overlap the image"):
+        cutout = ASDFCutout(images, multi_coord_skycoord_array, cutout_size)
+    with pytest.warns(DataWarning, match="does not overlap the image"):
+        cutout_list_input = ASDFCutout(images, list(multi_coord_skycoord_array), cutout_size)
+
+    all_rows = cutout.get_cutouts()
+    list_rows = cutout_list_input.get_cutouts()
+    assert isinstance(all_rows, Table)
+    assert len(all_rows) == len(list_rows)
+
+    input_coord_keys = {coord.to_string(precision=8) for coord in multi_coord_skycoord_array}
+    output_coord_keys = {row["coordinate"].to_string(precision=8) for row in all_rows}
+    assert output_coord_keys.issubset(input_coord_keys)
+
+
+def test_asdf_cutout_get_cutouts_filter_with_skycoord_array(images, multi_coord, cutout_size):
+    with pytest.warns(DataWarning, match="does not overlap the image"):
+        cutout = ASDFCutout(images, multi_coord, cutout_size)
+
+    filter_coords = SkyCoord(["29.99901792 44.99930555", "30.00098208 44.99930555"], unit="deg")
+    filtered_rows = cutout.get_cutouts(input_files=images, coordinates=filter_coords)
+
+    assert isinstance(filtered_rows, Table)
+    assert len(filtered_rows) == 6
+    assert {row["coordinate"].to_string(precision=8) for row in filtered_rows} == {
+        coord.to_string(precision=8) for coord in filter_coords
+    }
+
+
+def test_asdf_cutout_get_cutouts_uses_cached_table_for_filtering(images, multi_coord, cutout_size):
+    with pytest.warns(DataWarning, match="does not overlap the image"):
+        cutout = ASDFCutout(images, multi_coord, cutout_size)
+
+    cached_rows = cutout.cutouts
+    selected_file = cached_rows[0]["file"]
+    selected_coord = cached_rows[0]["coordinate"]
+    selected_cutout = cached_rows[0]["cutout"]
+
+    with patch.object(ASDFCutout, "iter_cutouts", side_effect=AssertionError("iter_cutouts should not be used")):
+        filtered_rows = cutout.get_cutouts(input_files=[selected_file], coordinates=[selected_coord])
+
+    assert len(filtered_rows) == 1
+    assert filtered_rows[0]["file"] == selected_file
+    assert filtered_rows[0]["coordinate"].to_string(precision=8) == selected_coord.to_string(precision=8)
+    assert filtered_rows[0]["cutout"] is selected_cutout
+
+
+def test_asdf_cutout_get_asdf_cutouts_uses_cached_table_for_filtering(images, multi_coord, cutout_size):
+    with pytest.warns(DataWarning, match="does not overlap the image"):
+        cutout = ASDFCutout(images, multi_coord, cutout_size)
+
+    cached_rows = cutout.asdf_cutouts
+    selected_file = cached_rows[0]["file"]
+    selected_coord = cached_rows[0]["coordinate"]
+    selected_cutout = cached_rows[0]["cutout"]
+
+    with patch.object(
+        ASDFCutout,
+        "iter_asdf_cutouts",
+        side_effect=AssertionError("iter_asdf_cutouts should not be used"),
+    ):
+        filtered_rows = cutout.get_asdf_cutouts(input_files=[selected_file], coordinates=[selected_coord])
+
+    assert len(filtered_rows) == 1
+    assert filtered_rows[0]["file"] == selected_file
+    assert filtered_rows[0]["coordinate"].to_string(precision=8) == selected_coord.to_string(precision=8)
+    assert filtered_rows[0]["cutout"] is selected_cutout
+
+
+def test_asdf_cutout_get_fits_cutouts_uses_cached_table_for_filtering(images, multi_coord, cutout_size):
+    with pytest.warns(DataWarning, match="does not overlap the image"):
+        cutout = ASDFCutout(images, multi_coord, cutout_size)
+
+    cached_rows = cutout.fits_cutouts
+    selected_file = cached_rows[0]["file"]
+    selected_coord = cached_rows[0]["coordinate"]
+    selected_cutout = cached_rows[0]["cutout"]
+
+    with patch.object(
+        ASDFCutout,
+        "iter_fits_cutouts",
+        side_effect=AssertionError("iter_fits_cutouts should not be used"),
+    ):
+        filtered_rows = cutout.get_fits_cutouts(input_files=[selected_file], coordinates=[selected_coord])
+
+    assert len(filtered_rows) == 1
+    assert filtered_rows[0]["file"] == selected_file
+    assert filtered_rows[0]["coordinate"].to_string(precision=8) == selected_coord.to_string(precision=8)
+    assert filtered_rows[0]["cutout"] is selected_cutout
+
+
 def test_asdf_cutout_iter_cutouts(images, multi_coord, cutout_size):
     with pytest.warns(DataWarning, match="does not overlap the image"):
         cutout = ASDFCutout(images, multi_coord, cutout_size)
@@ -270,6 +371,7 @@ def test_asdf_cutout_get_fits_cutouts(images, multi_coord, cutout_size, lite):
     # Choose 2 files and 2 coordinates
     fits_cutouts = cutout.get_fits_cutouts(input_files=images[1:], coordinates=multi_coord[1:])
     assert isinstance(fits_cutouts, Table)
+    assert fits_cutouts["cutout"].dtype == object
     assert len(fits_cutouts) == 3  # one coordinate will not have a cutout for one of the images
     for hdul in fits_cutouts["cutout"]:
         assert isinstance(hdul, fits.HDUList)
@@ -695,6 +797,22 @@ def test_asdf_cutout_python_version(images, center_coord, cutout_size):
         assert cutout._py311_or_higher is False
         assert cutout._asdf_in_fits is None
         assert len(fits_cutouts[0]) == 2  # primary + cutout HDU only
+
+
+def test_asdf_cutout_passes_default_memmap_to_asdf_open(images, center_coord, cutout_size):
+    with patch("astrocut.asdf_cutout.asdf.open", wraps=asdf.open) as mock_asdf_open:
+        ASDFCutout(images[0], center_coord, cutout_size)
+
+    assert mock_asdf_open.call_count >= 1
+    assert all(call.kwargs.get("memmap") is True for call in mock_asdf_open.call_args_list)
+
+
+def test_asdf_cutout_passes_user_asdf_kwargs_to_asdf_open(images, center_coord, cutout_size):
+    with patch("astrocut.asdf_cutout.asdf.open", wraps=asdf.open) as mock_asdf_open:
+        ASDFCutout(images[0], center_coord, cutout_size, asdf_kwargs={"memmap": False})
+
+    assert mock_asdf_open.call_count >= 1
+    assert all(call.kwargs.get("memmap") is False for call in mock_asdf_open.call_args_list)
 
 
 def test_asdf_cutout_convert_gwcs_to_fits_wcs(fake_data):

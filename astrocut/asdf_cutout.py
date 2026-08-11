@@ -5,7 +5,7 @@ from copy import deepcopy
 from datetime import date
 from pathlib import Path
 from time import monotonic
-from typing import Iterator, List, Optional, Tuple, Union
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
 import asdf
 import gwcs
@@ -56,6 +56,9 @@ class ASDFCutout(ImageCutout):
         If False, cutouts will be made from all arrays in the input file (e.g., data, error,
         uncertainty, variance, etc.) where the last two dimensions match the shape of the science data array.
         It also preserves all of the metadata from the input file.
+    asdf_kwargs : dict, optional
+        Keyword arguments passed to `asdf.open` when reading input files. By default,
+        `memmap=True` is applied unless explicitly overridden.
     verbose : bool
         If True, log messages are printed to the console.
 
@@ -92,6 +95,7 @@ class ASDFCutout(ImageCutout):
         secret: Optional[str] = None,
         token: Optional[str] = None,
         lite: Optional[bool] = True,
+        asdf_kwargs: Optional[Dict[str, Any]] = None,
         verbose: bool = False,
     ):
         super().__init__(input_files, coordinates, cutout_size, fill_value, verbose=verbose)
@@ -112,6 +116,10 @@ class ASDFCutout(ImageCutout):
         self._fits_cutouts = None  # Store FITS objects
         self._asdf_trees = {}  # Store ASDF trees for each cutout
         self._lite = lite  # Flag for lite mode
+        if asdf_kwargs is not None and not isinstance(asdf_kwargs, dict):
+            raise InvalidInputError("asdf_kwargs must be a dictionary.")
+        self._asdf_open_kwargs = dict(asdf_kwargs or {})
+        self._asdf_open_kwargs.setdefault("memmap", True)
         self._primary_header_template = None  # Optional template for primary header keywords
         self._fill_value_cache = {}  # Cache for converted fill values based on input data types
         self._gwcs_to_fits_cache = {}  # Cache for converted GWCS to FITS WCS objects
@@ -176,11 +184,49 @@ class ASDFCutout(ImageCutout):
         cutouts : `astropy.table.Table`
             Table with columns for input file, coordinate, and the corresponding `astropy.nddata.Cutout2D` object.
         """
-        cutout_table = Table(
-            rows=list(self.iter_cutouts(input_files=input_files, coordinates=coordinates)),
+        if self._cutouts is not None:
+            # Filter existing cutouts by input_files and coordinates if provided
+            return self._return_filtered_table(self._cutouts, input_files=input_files, coordinates=coordinates)
+
+        return Table(
+            rows=self.iter_cutouts(input_files=input_files, coordinates=coordinates),
             names=["file", "coordinate", "cutout"],
         )
-        return cutout_table
+
+    def _return_filtered_table(
+        self,
+        table: Table,
+        input_files: Optional[List[Union[str, Path, S3Path]]],
+        coordinates: Optional[List[Union[SkyCoord, str]]],
+    ) -> Table:
+        """
+        Return a filtered version of the input table based on the specified input files and coordinates.
+
+        Parameters
+        ----------
+        table : `astropy.table.Table`
+            The input table to filter.
+        input_files : list, optional
+            List of input image files to include in the output. If not specified, all input files will be included.
+        coordinates : list, optional
+            List of coordinates to include in the output. If not specified, all coordinates will be included.
+
+        Returns
+        -------
+        filtered_table : `astropy.table.Table`
+            The filtered table containing only the specified input files and coordinates.
+        """
+        files_to_include, coords_to_include = self._resolve_selection(input_files, coordinates)
+        mask = np.ones(len(table), dtype=bool)
+
+        if input_files is not None:
+            mask &= np.isin(table["file"], files_to_include)
+
+        if coordinates is not None:
+            coord_keys = [coord.to_string(precision=8) for coord in table["coordinate"]]
+            mask &= np.isin(coord_keys, coords_to_include)
+
+        return table[mask]
 
     def iter_cutouts(
         self,
@@ -204,7 +250,7 @@ class ASDFCutout(ImageCutout):
         tuple
             Tuples of (input file, coordinate, `astropy.nddata.Cutout2D`).
         """
-        for file, coord in self.get_file_coord_pairs(input_files=input_files, coordinates=coordinates):
+        for file, coord in self.iter_file_coord_pairs(input_files=input_files, coordinates=coordinates):
             yield file, SkyCoord(coord, unit="deg"), self.cutouts_by_file[file][coord]
 
     def get_asdf_cutouts(
@@ -231,11 +277,13 @@ class ASDFCutout(ImageCutout):
             Table with columns for input file, coordinate, and the corresponding `asdf.AsdfFile` object representing
             the cutout.
         """
-        asdf_cutout_table = Table(
-            rows=list(self.iter_asdf_cutouts(input_files=input_files, coordinates=coordinates)),
+        if self._asdf_cutouts is not None:
+            return self._return_filtered_table(self._asdf_cutouts, input_files=input_files, coordinates=coordinates)
+
+        return Table(
+            rows=self.iter_asdf_cutouts(input_files=input_files, coordinates=coordinates),
             names=["file", "coordinate", "cutout"],
         )
-        return asdf_cutout_table
 
     def iter_asdf_cutouts(
         self,
@@ -259,7 +307,7 @@ class ASDFCutout(ImageCutout):
         tuple
             Tuples of (input file, coordinate, `asdf.AsdfFile`).
         """
-        for file, coord in self.get_file_coord_pairs(input_files=input_files, coordinates=coordinates):
+        for file, coord in self.iter_file_coord_pairs(input_files=input_files, coordinates=coordinates):
             cutout = self.cutouts_by_file[file][coord]
             tree = self._asdf_trees[file][coord]
 
@@ -300,14 +348,20 @@ class ASDFCutout(ImageCutout):
             Table with columns for input file, coordinate, and the corresponding `astropy.io.fits.HDUList` object
             representing the cutout.
         """
+        if self._fits_cutouts is not None:
+            return self._return_filtered_table(self._fits_cutouts, input_files=input_files, coordinates=coordinates)
+
         fits_cutouts = list(self.iter_fits_cutouts(input_files=input_files, coordinates=coordinates))
 
+        # Build a table with columns for file, coordinate, and cutout
+        # We construct this Table manually to avoid issues with heterogeneous data types in the cutout column
         fits_cutout_table = Table()
         fits_cutout_table["file"] = [item[0] for item in fits_cutouts]
         fits_cutout_table["coordinate"] = [item[1] for item in fits_cutouts]
         fits_cutout_table.add_column(Column(length=len(fits_cutouts), dtype=object, name="cutout"))
         for i, item in enumerate(fits_cutouts):
             fits_cutout_table["cutout"][i] = item[2]
+
         return fits_cutout_table
 
     def iter_fits_cutouts(
@@ -335,7 +389,7 @@ class ASDFCutout(ImageCutout):
         self._check_asdf_in_fits_support()
 
         today_str = str(date.today())
-        for file, coord in self.get_file_coord_pairs(input_files=input_files, coordinates=coordinates):
+        for file, coord in self.iter_file_coord_pairs(input_files=input_files, coordinates=coordinates):
             cutout = self.cutouts_by_file[file][coord]
 
             source_tree = self._asdf_trees[file][coord]
@@ -534,7 +588,7 @@ class ASDFCutout(ImageCutout):
         """
         Yield selected ASDF cutouts as (file, coordinate, cutout).
         """
-        for file, coord in self.get_file_coord_pairs(input_files=input_files, coordinates=coordinates):
+        for file, coord in self.iter_file_coord_pairs(input_files=input_files, coordinates=coordinates):
             yield file, SkyCoord(coord, unit="deg"), self.cutouts_by_file[file][coord]
 
     def _warn_too_many_color_cutouts(self, coord: SkyCoord):
@@ -558,14 +612,14 @@ class ASDFCutout(ImageCutout):
         )
         return False
 
-    def get_file_coord_pairs(
+    def iter_file_coord_pairs(
         self,
         *,
         input_files: Optional[List[Union[str, Path, S3Path]]] = None,
         coordinates: Optional[List[Union[SkyCoord, str]]] = None,
-    ) -> List[Tuple[str, str]]:
+    ) -> Iterator[Tuple[str, str]]:
         """
-        Get a list of tuples for each valid (input_file, coordinate) pair.
+        Yield tuples for each valid (input_file, coordinate) pair.
 
         Parameters
         ----------
@@ -577,19 +631,15 @@ class ASDFCutout(ImageCutout):
 
         Returns
         -------
-        keys : list
-            List of tuples for each valid (input_file, coordinate) pair.
+        iterator
+            Iterator of (input_file, coordinate) for valid pairs.
         """
         files_to_include, coords_to_include = self._resolve_selection(input_files, coordinates)
-
-        file_coord_pairs = []
         for file in files_to_include:
             for coord in coords_to_include:
                 if coord not in self.cutouts_by_file[file]:
                     continue  # Skip coordinates that are not associated with this file
-                file_coord_pairs.append((file, coord))
-
-        return file_coord_pairs
+                yield file, coord
 
     def _resolve_selection(
         self,
@@ -634,7 +684,7 @@ class ASDFCutout(ImageCutout):
         if coordinates is None:
             coords_to_include = all_coords
         else:
-            coords_to_include = coordinates if isinstance(coordinates, (list, tuple)) else [coordinates]
+            coords_to_include = self._normalize_coordinates_input(coordinates)
             for i, coord in enumerate(coords_to_include):
                 if isinstance(coord, SkyCoord):
                     coords_to_include[i] = coord.to_string(precision=8)
@@ -955,7 +1005,7 @@ class ASDFCutout(ImageCutout):
             asdf_file = nullcontext(file)
 
         with asdf_file as file_handle:
-            with asdf.open(file_handle, memmap=True) as af:
+            with asdf.open(file_handle, **self._asdf_open_kwargs) as af:
                 # Load the data from the input file
                 tree = af.tree
                 mission_tree = tree[self._mission_kwd] if self._mission_kwd in tree else None
