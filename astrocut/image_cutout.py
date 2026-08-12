@@ -2,7 +2,7 @@ import json
 import warnings
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Iterator, List, Optional, Tuple, Union
+from typing import Any, Iterator, List, Optional, Tuple, Union
 
 import numpy as np
 from astropy.coordinates import SkyCoord
@@ -322,23 +322,42 @@ class ImageCutout(Cutout, ABC):
         return [coordinates]
 
     @staticmethod
-    def _build_image_cutout_table(image_rows: List[Tuple[str, SkyCoord, Image]]) -> Table:
+    def _build_cutout_table(
+        rows: Iterator[Tuple[str, SkyCoord, Any]],
+        *,
+        object_cutout: bool = False,
+    ) -> Table:
         """
-        Build a standard image cutout output table from iterator rows.
-        """
-        # Have to construct columns separately to avoid astropy.table trying to convert the
-        # Image objects to a numpy array
-        files = [row[0] for row in image_rows]
-        coordinates = [row[1] for row in image_rows]
+        Build a standard cutout table with columns for file, coordinate, and cutout.
 
-        cutouts = np.empty(len(image_rows), dtype=object)
-        cutouts[:] = [row[2] for row in image_rows]
+        Parameters
+        ----------
+        rows : iterator
+            Iterator of (file, coordinate, cutout) tuples.
+        object_cutout : bool
+            If True, force the cutout column to object dtype.
+
+        Returns
+        -------
+        table : `astropy.table.Table`
+            The constructed cutout table.
+        """
+        if not object_cutout:
+            return Table(rows=rows, names=["file", "coordinate", "cutout"])
+
+        rows = list(rows)
+        if not rows:
+            return Table(names=["file", "coordinate", "cutout"])
+
+        files, coordinates, cutouts = zip(*rows)
+        cutouts_col = np.empty(len(rows), dtype=object)
+        cutouts_col[:] = cutouts
 
         return Table(
             {
                 "file": files,
                 "coordinate": coordinates,
-                "cutout": cutouts,
+                "cutout": cutouts_col,
             }
         )
 

@@ -15,7 +15,7 @@ from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.modeling import models
 from astropy.nddata.utils import Cutout2D, NoOverlapError
-from astropy.table import Column, Table
+from astropy.table import Table
 from astropy.units import Quantity
 from astropy.utils.decorators import deprecated_renamed_argument
 from astropy.wcs import WCS
@@ -188,9 +188,8 @@ class ASDFCutout(ImageCutout):
             # Filter existing cutouts by input_files and coordinates if provided
             return self._return_filtered_table(self._cutouts, input_files=input_files, coordinates=coordinates)
 
-        return Table(
-            rows=self.iter_cutouts(input_files=input_files, coordinates=coordinates),
-            names=["file", "coordinate", "cutout"],
+        return self._build_cutout_table(
+            self.iter_cutouts(input_files=input_files, coordinates=coordinates),
         )
 
     def _return_filtered_table(
@@ -280,9 +279,8 @@ class ASDFCutout(ImageCutout):
         if self._asdf_cutouts is not None:
             return self._return_filtered_table(self._asdf_cutouts, input_files=input_files, coordinates=coordinates)
 
-        return Table(
-            rows=self.iter_asdf_cutouts(input_files=input_files, coordinates=coordinates),
-            names=["file", "coordinate", "cutout"],
+        return self._build_cutout_table(
+            self.iter_asdf_cutouts(input_files=input_files, coordinates=coordinates),
         )
 
     def iter_asdf_cutouts(
@@ -307,12 +305,15 @@ class ASDFCutout(ImageCutout):
         tuple
             Tuples of (input file, coordinate, `asdf.AsdfFile`).
         """
-        for file, coord in self.iter_file_coord_pairs(input_files=input_files, coordinates=coordinates):
-            cutout = self.cutouts_by_file[file][coord]
-            tree = self._asdf_trees[file][coord]
+        for row in self._return_filtered_table(self.cutouts, input_files=input_files, coordinates=coordinates):
+            file = row["file"]
+            coord_obj = row["coordinate"]
+            cutout = row["cutout"]
+            coord_key = coord_obj.to_string(precision=8)
+            tree = self._asdf_trees[file][coord_key]
 
             af = asdf.AsdfFile(tree)
-            ra, dec = coord.split()
+            ra, dec = coord_key.split()
             af.add_history_entry(
                 f"Cutout of size {cutout.shape} at sky coordinates ({ra}, {dec})",
                 software={
@@ -322,7 +323,7 @@ class ASDFCutout(ImageCutout):
                     "homepage": "https://astrocut.readthedocs.io/en/latest/",
                 },
             )
-            yield file, SkyCoord(coord, unit="deg"), af
+            yield file, coord_obj, af
 
     def get_fits_cutouts(
         self,
@@ -351,18 +352,10 @@ class ASDFCutout(ImageCutout):
         if self._fits_cutouts is not None:
             return self._return_filtered_table(self._fits_cutouts, input_files=input_files, coordinates=coordinates)
 
-        fits_cutouts = list(self.iter_fits_cutouts(input_files=input_files, coordinates=coordinates))
-
-        # Build a table with columns for file, coordinate, and cutout
-        # We construct this Table manually to avoid issues with heterogeneous data types in the cutout column
-        fits_cutout_table = Table()
-        fits_cutout_table["file"] = [item[0] for item in fits_cutouts]
-        fits_cutout_table["coordinate"] = [item[1] for item in fits_cutouts]
-        fits_cutout_table.add_column(Column(length=len(fits_cutouts), dtype=object, name="cutout"))
-        for i, item in enumerate(fits_cutouts):
-            fits_cutout_table["cutout"][i] = item[2]
-
-        return fits_cutout_table
+        return self._build_cutout_table(
+            self.iter_fits_cutouts(input_files=input_files, coordinates=coordinates),
+            object_cutout=True,
+        )
 
     def iter_fits_cutouts(
         self,
@@ -389,14 +382,17 @@ class ASDFCutout(ImageCutout):
         self._check_asdf_in_fits_support()
 
         today_str = str(date.today())
-        for file, coord in self.iter_file_coord_pairs(input_files=input_files, coordinates=coordinates):
-            cutout = self.cutouts_by_file[file][coord]
+        for row in self._return_filtered_table(self.cutouts, input_files=input_files, coordinates=coordinates):
+            file = row["file"]
+            coord_obj = row["coordinate"]
+            cutout = row["cutout"]
+            coord_key = coord_obj.to_string(precision=8)
 
-            source_tree = self._asdf_trees[file][coord]
+            source_tree = self._asdf_trees[file][coord_key]
             # Build a metadata-only tree for FITS embedding without mutating cached ASDF trees.
             tree = {self._mission_kwd: {"meta": source_tree[self._mission_kwd]["meta"]}}
 
-            ra, dec = coord.split()
+            ra, dec = coord_key.split()
             if self._primary_header_template is None:
                 self._primary_header_template = fits.Header(
                     [
@@ -418,7 +414,7 @@ class ASDFCutout(ImageCutout):
             if self._asdf_in_fits is not None:
                 hdul = self._asdf_in_fits.to_hdulist(tree, hdul)
 
-            yield file, SkyCoord(coord, unit="deg"), hdul
+            yield file, coord_obj, hdul
 
     def _check_asdf_in_fits_support(self):
         """
@@ -506,19 +502,17 @@ class ASDFCutout(ImageCutout):
             Table with columns for input file(s), coordinate, and the corresponding `~PIL.Image` object representing
             the image cutout.
         """
-        image_rows = list(
-            self.iter_image_cutouts(
-                input_files=input_files,
-                coordinates=coordinates,
-                stretch=stretch,
-                minmax_percent=minmax_percent,
-                minmax_value=minmax_value,
-                invert=invert,
-                colorize=colorize,
-                flip_orientation=flip_orientation,
-            )
+        image_iter = self.iter_image_cutouts(
+            input_files=input_files,
+            coordinates=coordinates,
+            stretch=stretch,
+            minmax_percent=minmax_percent,
+            minmax_value=minmax_value,
+            invert=invert,
+            colorize=colorize,
+            flip_orientation=flip_orientation,
         )
-        return self._build_image_cutout_table(image_rows)
+        return self._build_cutout_table(image_iter, object_cutout=True)
 
     def iter_image_cutouts(
         self,
