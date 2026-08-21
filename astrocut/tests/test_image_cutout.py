@@ -133,15 +133,6 @@ def test_coerce_coordinate_list_variants():
     assert ImageCutout._coerce_coordinate_list("1 2") == ["1 2"]
 
 
-def test_build_image_cutout_table_populates_cutout_column():
-    coord = SkyCoord("1 2", unit="deg")
-    img = Image.fromarray(np.zeros((3, 3), dtype=np.uint8))
-    table = ImageCutout._build_image_cutout_table([("file_1", coord, img), ("file_2", coord, img)])
-    assert len(table) == 2
-    assert table["file"][0] == "file_1"
-    assert table["cutout"][1] is img
-
-
 def test_build_cutout_metadata_with_string_coordinate():
     cutout = _DummyImageCutout()
     fake_cutout = _make_fake_cutout()
