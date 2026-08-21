@@ -268,7 +268,7 @@ def test_roman_spectral_subset_asdf_subsets_source_file(spectral_files, lite):
         subset_file, subset_source_id = row["file"], row["source_id"]
         assert subset_file in spectral_files
         assert subset_source_id in ["420007", "420008"]
-        subset_af = row["asdf"]
+        subset_af = row["subset"]
         assert isinstance(subset_af, asdf.AsdfFile)
         # Check that the subset ASDF file contains the expected data structure
         assert "roman" in subset_af.tree
@@ -320,7 +320,7 @@ def test_roman_spectral_subset_asdf_subsets_file(spectral_files, lite):
     for row in subset_table:
         subset_file = row["file"]
         assert subset_file in spectral_files
-        subset_af = row["asdf"]
+        subset_af = row["subset"]
         assert isinstance(subset_af, asdf.AsdfFile)
         # Check that the subset ASDF file contains the expected data structure
         assert "roman" in subset_af.tree
@@ -346,7 +346,7 @@ def test_roman_spectral_subset_asdf_subsets_combined(spectral_files, lite):
     subset = RomanSpectralSubset(spectral_files=spectral_files, source_ids=[420007, 420008], lite=lite, max_workers=1)
     subset_table = subset.get_asdf_subsets(group_by="combined")
     assert len(subset_table) == 1  # Should have a single combined row
-    subset_af = subset_table[0]["asdf"]
+    subset_af = subset_table[0]["subset"]
     assert isinstance(subset_af, asdf.AsdfFile)
     # Check that the subset ASDF file contains the expected data structure
     assert "roman" in subset_af.tree
