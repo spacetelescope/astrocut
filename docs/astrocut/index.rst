@@ -394,38 +394,69 @@ The ``lite`` parameter controls the size of the subset and how much of the origi
 The resulting `~astrocut.RomanSpectralSubset` object can be used to access the subset data and metadata.
 The ``subset_data`` attribute is a dictionary that stores the subset data keyed by input filename and source ID.
 
-The `~astrocut.RomanSpectralSubset.get_asdf_subsets` method returns the subsets as `~asdf.AsdfFile` objects in memory,
-and the `~astrocut.RomanSpectralSubset.write_as_asdf` method writes the subsets to ASDF files on disk and returns a list
-of paths to the output files. Both methods support filtering the subsets by source ID and input file, as well as grouping the
-subsets in different ways. They accept the following parameters:
+.. code-block:: python
+
+  >>> print(spectral_subset.subset_data["/path/to/roman_spectral.asdf"]) #doctest: +SKIP
+  {'420007': {'flux': array([5.37157113e-17, 5.27060112e-17, 5.25740574e-17, 5.26136996e-17,
+          5.16123888e-17, 4.95479633e-17, 4.80292887e-17]),
+                'flux_error': array([2.50778703e-20, 2.46148251e-20, 2.43618767e-20, 2.41538018e-20,
+          2.37139925e-20, 2.30359954e-20, 2.24894059e-20]),
+                'wl': array([881.42062338, 884.32981611, 887.24861084, 890.17703926,
+          893.11513318, 896.06292449, 899.0204452 ])},
+    '420022': {'flux': array([5.37157113e-17, 5.27060112e-17, 5.25740574e-17, 5.26136996e-17,
+          5.16123888e-17, 4.95479633e-17, 4.80292887e-17]),
+                'flux_error': array([2.50778703e-20, 2.46148251e-20, 2.43618767e-20, 2.41538018e-20,
+          2.37139925e-20, 2.30359954e-20, 2.24894059e-20]),
+                'wl': array([881.42062338, 884.32981611, 887.24861084, 890.17703926,
+          893.11513318, 896.06292449, 899.0204452 ])}}
+
+The `~astrocut.RomanSpectralSubset.get_asdf_subsets` method returns the subsets as an `~astropy.table.Table`, with each
+row holding an `~asdf.AsdfFile` object in a ``subset`` column, and the `~astrocut.RomanSpectralSubset.write_as_asdf` method
+writes the subsets to ASDF files on disk and returns a list of paths to the output files. For lazy iteration without
+building the full table in memory, use `~astrocut.RomanSpectralSubset.iter_asdf_subsets`, which yields the same rows
+one at a time. All three methods support filtering the subsets by source ID and input file, as well as grouping the
+parameters:
 
 - ``source_ids``: A list of source IDs to include in the output. If None, all source IDs will be included.
 - ``spectral_files``: A list of input spectral files to include in the output. If None, all input files will be included.
-- ``group_by``: Controls how subsets are grouped in an `~asdf.AsdfFile` object in memory or in an output file.
+- ``group_by``: Controls how subsets are grouped into rows of the output table (or output files on disk).
 
-  - ``group_by='source_file'``: Groups subsets by source ID and input file, resulting in one subset object per source ID per input file.
-    In memory, these subsets are returned in a dictionary keyed by deterministic string keys, and each key maps
-    to one unique ``(input_file, source_id)`` pair. Use `~astrocut.RomanSpectralSubset.get_source_file_keys` to retrieve the valid keys and
-    their ``(input_file, source_id)`` mappings.
-  - ``group_by='file'``: Groups all subsets from each input file together, resulting in one subset object per input file.
-  - ``group_by='combined'``: Combines all subsets from all input files into a single subset object. See the :ref:`Spectral Subset File Formats <spectral-subsets>` for more details on the structure of subset objects.
+  - ``group_by='source_file'``: Groups subsets by source ID and input file, resulting in one table row per source ID per
+    input file, with ``file``, ``source_id``, and ``subset`` columns.
+  - ``group_by='file'``: Groups all subsets from each input file together, resulting in one table row per input file, with
+    ``file``, ``source_ids``, and ``subset`` columns.
+  - ``group_by='combined'``: Combines all subsets from all input files into a single table row, with ``files``, ``source_ids``,
+    and ``subset`` columns. See the :ref:`Spectral Subset File Formats <spectral-subsets>` for more details on the structure of subset objects.
 
 .. code-block:: python
 
-  >>> asdf_cut = spectral_subset.get_asdf_subsets(source_ids=[420007, 420022], group_by='file')[spectral_files[0]] #doctest: +SKIP
-  >>> pprint(asdf_cut['roman']['data']) #doctest: +SKIP
-   {420007: {'flux': array([5.37157113e-17, 5.27060112e-17, 5.25740574e-17, 5.26136996e-17,
-          5.16123888e-17, 4.95479633e-17, 4.80292887e-17]),
-              'flux_error': array([2.50778703e-20, 2.46148251e-20, 2.43618767e-20, 2.41538018e-20,
-          2.37139925e-20, 2.30359954e-20, 2.24894059e-20]),
-              'wl': array([881.42062338, 884.32981611, 887.24861084, 890.17703926,
-          893.11513318, 896.06292449, 899.0204452 ])},
-    420022: {'flux': array([5.37157113e-17, 5.27060112e-17, 5.25740574e-17, 5.26136996e-17,
-          5.16123888e-17, 4.95479633e-17, 4.80292887e-17]),
-              'flux_error': array([2.50778703e-20, 2.46148251e-20, 2.43618767e-20, 2.41538018e-20,
-          2.37139925e-20, 2.30359954e-20, 2.24894059e-20]),
-              'wl': array([881.42062338, 884.32981611, 887.24861084, 890.17703926,
-          893.11513318, 896.06292449, 899.0204452 ])}}
+  >>> subset_table = spectral_subset.get_asdf_subsets(source_ids=[420007, 420022], group_by='file') #doctest: +SKIP
+  >>> asdf_cut = subset_table[0]['subset'] #doctest: +SKIP
+  >>> asdf_cut.info() #doctest: +SKIP
+  root (AsdfObject)
+  ├─roman (dict)
+  │ ├─data (dict)
+  │ │ ├─420007 (dict) ...
+  │ │ └─420022 (dict) ...
+  │ └─meta (dict)
+  │   ├─file_creation_date (str): 2025-07-07T18:44:15.421941
+  │   ├─file_name (str): r0000201001001001001_00002_01001_WFI01_cal_1d_coadd.asdf
+  │   ├─file_wfi_phot_catalog_level_3 (list) ...
+  │   ├─file_wfi_phot_catalog_level_4 (list) ...
+  │   ├─file_wfi_spec_level_2_primary (str): june2_2025_prism_0000201001001001001_roll0/r0000201001001001001_0 (truncated)
+  │   ├─id_g2dp_run (str): 1
+  │   ├─id_obs (str): 0000201001001001001
+  │   ├─id_program (str): 00002
+  │   ├─instr_obsty (str): test
+  │   ├─optical_element (str): PRISM
+  │   ├─phot_filter_cut_off (str): F158
+  │   ├─pos_wcs_field_center_dec (float): 66.0
+  │   ├─pos_wcs_field_center_ra (float): 270.0
+  │   ├─program_complete (bool): False
+  │   └─10 not shown
+  └─history (dict)
+    └─entries (list) ...
+  Some nodes not shown.
 
 Multiprocessing
 ----------------
