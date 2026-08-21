@@ -888,7 +888,7 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
             for row in subset_table:
                 file, sid = row["file"], row["source_id"]
                 filename = f"{Path(file).stem}_subset_{sid}{'_lite' if self._lite else ''}.asdf"
-                write_jobs.append((row["asdf"], str(output_dir / filename)))
+                write_jobs.append((row["subset"], str(output_dir / filename)))
 
         elif group_by == "file":
             # Write one ASDF file per input file, containing all specified source IDs from that file
@@ -899,7 +899,7 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
             )
             for row in subset_table:
                 filename = f"{Path(row['file']).stem}_subset{'_lite' if self._lite else ''}.asdf"
-                write_jobs.append((row["asdf"], str(output_dir / filename)))
+                write_jobs.append((row["subset"], str(output_dir / filename)))
 
         elif group_by == "combined":
             # Write a single ASDF file containing all specified source IDs from all input files
@@ -909,7 +909,7 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
                 spectral_files=spectral_files,
             )
             filename = f"combined_spectral_subset{'_lite' if self._lite else ''}.asdf"
-            write_jobs.append((subset_table[0]["asdf"], str(output_dir / filename)))
+            write_jobs.append((subset_table[0]["subset"], str(output_dir / filename)))
 
         else:
             raise InvalidInputError(self._invalid_group_by_msg.format(group_by))
