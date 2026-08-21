@@ -532,7 +532,11 @@ class ImageCutout(Cutout, ABC):
             stretch, minmax_percent, minmax_value
         )
 
-        selected_cutouts = list(self._iter_selected_cutouts(input_files=input_files, coordinates=coordinates))
+        selected_cutouts = (
+            self._iter_selected_cutouts(input_files=input_files, coordinates=coordinates)
+            if not colorize
+            else list(self._iter_selected_cutouts(input_files=input_files, coordinates=coordinates))
+        )
 
         if colorize:
             grouped_cutouts = {}

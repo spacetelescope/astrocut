@@ -126,7 +126,7 @@ where each value is a `~astropy.nddata.Cutout2D` object.
 
 .. code-block:: python
 
-  >>> pprint(cutout.cutouts_by_file)  #doctest: +SKIP
+  >>> pprint(asdf_cutout.cutouts_by_file)  #doctest: +SKIP
   {'/path/to/input_0.asdf': {"80.15189743 29.74561219": <astropy.nddata.utils.Cutout2D object at 0x11fb3bc80>,
                              "80.15500000 29.75000000": <astropy.nddata.utils.Cutout2D object at 0x11fafff20>},
    '/path/to/input_1.asdf': {"80.15189743 29.74561219": <astropy.nddata.utils.Cutout2D object at 0x11f99d610>,
@@ -139,7 +139,7 @@ The ``cutout`` column stores `~astropy.nddata.Cutout2D` objects, with one row pe
 
 .. code-block:: python
 
-  >>> cutout_table = cutout.cutouts #doctest: +SKIP
+  >>> cutout_table = asdf_cutout.cutouts #doctest: +SKIP
   >>> cutout_table.pprint_all() #doctest: +SKIP
            file                         coordinate                                      cutout
   ------------------------------ ------------------------------- -----------------------------------------------------

@@ -142,7 +142,8 @@ class ASDFCutout(ImageCutout):
     @property
     def asdf_cutouts(self) -> Table:
         """
-        Return the cutouts as a list of `asdf.AsdfFile` objects.
+        Return the cutouts as a `astropy.table.Table` with columns for input file, coordinate, and
+        the corresponding `asdf.AsdfFile` object.
         """
         if self._asdf_cutouts is not None:
             return self._asdf_cutouts
@@ -153,7 +154,8 @@ class ASDFCutout(ImageCutout):
     @property
     def fits_cutouts(self) -> Table:
         """
-        Return the cutouts as a list `astropy.io.fits.HDUList` objects.
+        Return the cutouts as a `astropy.table.Table` with columns for input file, coordinate, and
+        the corresponding `astropy.io.fits.HDUList` object.
         """
         if self._fits_cutouts is not None:
             return self._fits_cutouts
@@ -1043,6 +1045,7 @@ class ASDFCutout(ImageCutout):
                     # Make a per-coordinate copy because _get_cutout_data may modify the mission_tree
                     # in place if not in lite mode
                     coord_mission_tree = dict(new_mission_tree)
+                    coord_mission_tree["meta"] = dict(new_mission_tree["meta"])
 
                     try:
                         data_cutout = self._get_cutout_data(coord_mission_tree, wcs, pixel_coords)
@@ -1501,7 +1504,7 @@ def asdf_cut(
         )
 
 
-def get_center_pixel(gwcsobj: gwcs.wcs.WCS, ra: float, dec: float) -> Tuple[Tuple[int, int], WCS]:
+def get_center_pixel(gwcsobj: gwcs.wcs.WCS, ra: float, dec: float) -> Tuple[int, int]:
     """
     Get the closest pixel location on an input image for a given set of coordinates.
 
@@ -1517,7 +1520,7 @@ def get_center_pixel(gwcsobj: gwcs.wcs.WCS, ra: float, dec: float) -> Tuple[Tupl
     Returns
     -------
     pixel_coords : tuple
-        The (row, col) pixel coordinates of the input coordinates.
+        The (row, col) pixel coordinates of the input coordinates on the image.
     """
     # Map the coordinates to a pixel's location on the 2d image
     row, col = gwcsobj.invert(np.atleast_1d(ra), np.atleast_1d(dec), with_bounding_box=False)
