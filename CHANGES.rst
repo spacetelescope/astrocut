@@ -3,6 +3,8 @@ Unreleased
 
 - Extend the ASDF cutout workflow to accept multiple target coordinates and to expose downstream cutout products in
   an ``astropy.table.Table`` object with columns for input file, coordinate, and cutout object. [#196]
+- Update the ``wcsinfo`` section of the ASDF metadata dictionary to reflect the cutout's spatial extent and local WCS properties
+  when creating full cutouts from ASDF images. [#199]
 
 1.3.0 (2026-09-02)
 -------------------

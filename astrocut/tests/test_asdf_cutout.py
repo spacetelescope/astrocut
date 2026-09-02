@@ -137,6 +137,32 @@ def images(tmp_path):
     return files
 
 
+@pytest.fixture()
+def l3_image(tmp_path):
+    data, wcsobj = make_fake(1000, 1000, 30.0, 45.0)
+    wcsinfo = {
+        "ra_ref": 30.0,
+        "dec_ref": 45.0,
+        "x_ref": 500.0,
+        "y_ref": 500.0,
+        "rotation_matrix": [[1.0, 0.0], [0.0, 1.0]],
+        "pixel_scale": -1.0,
+        "pixel_scale_ref": 0.1 / 3600.0,
+        "projection": "TAN",
+        "s_region": "POLYGON ICRS 0 0 0 1 1 1 1 0",
+        "image_shape": [1000, 1000],
+        "ra": -1.0,
+        "dec": -1.0,
+        "orientation": -1.0,
+        "orientation_ref": 0.0,
+        "skycell_name": "030p45x00y00",
+    }
+
+    filename = tmp_path / "test_roman_l3.asdf"
+    asdf.AsdfFile({"roman": {"meta": {"wcs": wcsobj, "wcsinfo": wcsinfo}, "data": data}}).write_to(filename)
+    return filename
+
+
 @pytest.fixture
 def center_coord():
     """Fixture to return a center coordinate"""
@@ -521,6 +547,36 @@ def test_asdf_cutout_s_region_is_independent_for_each_coordinate(images, multi_c
         footprint = np.asarray(meta["wcs"].footprint(axis_type="spatial"))
         expected_coordinates = " ".join(f"{value:.9f}" for value in footprint.ravel())
         assert meta["wcsinfo"]["s_region"] == f"POLYGON ICRS {expected_coordinates}"
+
+
+def test_asdf_cutout_updates_l3_wcsinfo(l3_image):
+    cutout_size = (12, 8)
+    cutout = ASDFCutout(l3_image, SkyCoord(30.0, 45.0, unit="deg"), cutout_size, lite=False)
+    meta = cutout.asdf_cutouts["cutout"][0]["roman"]["meta"]
+    wcsinfo = meta["wcsinfo"]
+    cutout_wcs = meta["wcs"]
+
+    assert wcsinfo["ra_ref"] == 30.0
+    assert wcsinfo["dec_ref"] == 45.0
+    assert wcsinfo["pixel_scale_ref"] == 0.1 / 3600.0
+    assert wcsinfo["rotation_matrix"] == [[1.0, 0.0], [0.0, 1.0]]
+    assert wcsinfo["projection"] == "TAN"
+    assert wcsinfo["orientation_ref"] == 0.0
+    assert wcsinfo["skycell_name"] == "030p45x00y00"
+
+    reference_pixel = cutout_wcs.invert(30.0, 45.0, with_bounding_box=False)
+    assert np.allclose([wcsinfo["x_ref"], wcsinfo["y_ref"]], reference_pixel)
+    assert wcsinfo["image_shape"] == list(cutout_wcs.array_shape)
+    assert wcsinfo["image_shape"] == [8, 12]
+
+    center_pixel = tuple((size - 1) / 2 for size in cutout_wcs.pixel_shape)
+    assert np.allclose([wcsinfo["ra"], wcsinfo["dec"]], cutout_wcs(*center_pixel))
+    assert wcsinfo["pixel_scale"] > 0
+    assert wcsinfo["orientation"] >= 0
+
+    footprint = np.asarray(cutout_wcs.footprint(axis_type="spatial"))
+    expected_coordinates = " ".join(f"{value:.9f}" for value in footprint.ravel())
+    assert wcsinfo["s_region"] == f"POLYGON ICRS {expected_coordinates}"
 
 
 @pytest.mark.parametrize("output_format", [".asdf", ".fits"])
