@@ -135,7 +135,7 @@ def _subset_single_file(
     out_trees_for_file = {}
     emitted_warnings = []
 
-    with asdf.open(file) as af:
+    with asdf.open(file, memmap=True) as af:
         in_tree = af.tree
         mission_data = in_tree[mission_keyword]["data"]
 
