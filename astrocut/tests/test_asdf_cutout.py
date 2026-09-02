@@ -100,6 +100,18 @@ def images(tmp_path):
         # create meta
         meta = {
             "wcs": wcsobj,
+            "wcsinfo": {
+                "aperture_name": "WFI01_FULL",
+                "v2_ref": 1312.9491452484797,
+                "v3_ref": -1040.7853726755036,
+                "vparity": -1,
+                "v3yangle": -60.0,
+                "ra_ref": 30.0 + i * 0.001,
+                "dec_ref": 45.0 + i * 0.001,
+                "roll_ref": 59.84660742516984,
+                "s_region": "POLYGON ICRS 0 0 0 1 1 1 1 0",
+                "pa_aperture": 0,
+            },
             "product_type": "l2",
             "origin": "STSCI/SOC",
             "file_date": Time("2023-10-01T00:00:00", format="isot"),
@@ -480,6 +492,35 @@ def test_asdf_cutout_write_to_file(images, center_coord, cutout_size, tmpdir):
         if HAS_ASDF_IN_FITS:
             with asdf_in_fits.open(fits_file) as af:
                 check_asdf_metadata(af, images[i], cutout.cutouts["cutout"][i].data, meta_only=True)
+
+
+def test_asdf_cutout_updates_only_wcsinfo_s_region(images, center_coord, cutout_size):
+    cutout = ASDFCutout(images[0], center_coord, cutout_size, lite=False)
+    output_meta = cutout.asdf_cutouts["cutout"][0]["roman"]["meta"]
+
+    with asdf.open(images[0]) as original:
+        original_wcsinfo = original["roman"]["meta"]["wcsinfo"]
+        for key, value in original_wcsinfo.items():
+            if key != "s_region":
+                assert output_meta["wcsinfo"][key] == value
+        assert output_meta["wcsinfo"]["s_region"] != original_wcsinfo["s_region"]
+
+    footprint = np.asarray(output_meta["wcs"].footprint(axis_type="spatial"))
+    expected_coordinates = " ".join(f"{value:.9f}" for value in footprint.ravel())
+    assert output_meta["wcsinfo"]["s_region"] == f"POLYGON ICRS {expected_coordinates}"
+
+
+def test_asdf_cutout_s_region_is_independent_for_each_coordinate(images, multi_coord, cutout_size):
+    cutout = ASDFCutout(images[0], multi_coord[:2], cutout_size, lite=False)
+    output_metadata = [asdf_file["roman"]["meta"] for asdf_file in cutout.asdf_cutouts["cutout"]]
+
+    assert output_metadata[0]["wcsinfo"] is not output_metadata[1]["wcsinfo"]
+    assert output_metadata[0]["wcsinfo"]["s_region"] != output_metadata[1]["wcsinfo"]["s_region"]
+
+    for meta in output_metadata:
+        footprint = np.asarray(meta["wcs"].footprint(axis_type="spatial"))
+        expected_coordinates = " ".join(f"{value:.9f}" for value in footprint.ravel())
+        assert meta["wcsinfo"]["s_region"] == f"POLYGON ICRS {expected_coordinates}"
 
 
 @pytest.mark.parametrize("output_format", [".asdf", ".fits"])

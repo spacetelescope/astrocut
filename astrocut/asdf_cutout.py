@@ -980,6 +980,27 @@ class ASDFCutout(ImageCutout):
         tmp.array_shape = shape[::-1]
         return tmp
 
+    @staticmethod
+    def _update_s_region(meta: dict, cutout_wcs: gwcs.wcs.WCS) -> None:
+        """
+        This method updates the 's_region' entry in the 'wcsinfo' metadata
+        dictionary to reflect the spatial footprint of the cutout WCS.
+
+        Parameters
+        ----------
+        meta : dict
+            The metadata dictionary containing the 'wcsinfo' section.
+        cutout_wcs : gwcs.wcs.WCS
+            The WCS object of the cutout.
+        """
+        if "wcsinfo" not in meta:
+            return
+
+        footprint = np.asarray(cutout_wcs.footprint(axis_type="spatial"))
+        coordinates = " ".join(f"{value:.9f}" for value in footprint.ravel())
+        meta["wcsinfo"] = deepcopy(meta["wcsinfo"])
+        meta["wcsinfo"]["s_region"] = f"POLYGON ICRS {coordinates}"
+
     def _cutout_file(self, file: Union[str, Path, S3Path]):
         """
         Create a cutout from a single input file.
@@ -1081,6 +1102,7 @@ class ASDFCutout(ImageCutout):
                         self._asdf_trees.setdefault(input_file, {})[coord_key] = lite_tree
                     else:
                         coord_mission_tree["meta"]["wcs"] = sliced_gwcs
+                        self._update_s_region(coord_mission_tree["meta"], sliced_gwcs)
                         coord_mission_tree["meta"]["orig_file"] = input_file
                         coord_mission_tree["meta"]["coordinate"] = coord_key
                         self._asdf_trees.setdefault(input_file, {})[coord_key] = {self._mission_kwd: coord_mission_tree}
