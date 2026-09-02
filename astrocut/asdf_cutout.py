@@ -981,10 +981,9 @@ class ASDFCutout(ImageCutout):
         return tmp
 
     @staticmethod
-    def _update_s_region(meta: dict, cutout_wcs: gwcs.wcs.WCS) -> None:
+    def _update_wcsinfo(meta: dict, cutout_wcs: gwcs.wcs.WCS) -> None:
         """
-        This method updates the 's_region' entry in the 'wcsinfo' metadata
-        dictionary to reflect the spatial footprint of the cutout WCS.
+        Update spatial metadata that depends on the cutout array extent.
 
         Parameters
         ----------
@@ -996,10 +995,45 @@ class ASDFCutout(ImageCutout):
         if "wcsinfo" not in meta:
             return
 
+        wcsinfo = deepcopy(meta["wcsinfo"])
         footprint = np.asarray(cutout_wcs.footprint(axis_type="spatial"))
         coordinates = " ".join(f"{value:.9f}" for value in footprint.ravel())
-        meta["wcsinfo"] = deepcopy(meta["wcsinfo"])
-        meta["wcsinfo"]["s_region"] = f"POLYGON ICRS {coordinates}"
+        wcsinfo["s_region"] = f"POLYGON ICRS {coordinates}"
+
+        # Check if the required L3 fields are present in the wcsinfo before updating them
+        l3_fields = {"x_ref", "y_ref", "image_shape", "pixel_scale", "orientation"}
+        if l3_fields.issubset(wcsinfo):
+
+            def as_float(value):
+                # Convert the value to a float, handling Quantity objects
+                return float(value.value) if isinstance(value, Quantity) else float(value)
+
+            pixel_shape = tuple(cutout_wcs.pixel_shape)
+            center_pixel = tuple((size - 1) / 2 for size in pixel_shape)
+            center_world = cutout_wcs(*center_pixel)
+
+            reference_pixel = cutout_wcs.invert(wcsinfo["ra_ref"], wcsinfo["dec_ref"], with_bounding_box=False)
+            wcsinfo["x_ref"] = as_float(reference_pixel[0])
+            wcsinfo["y_ref"] = as_float(reference_pixel[1])
+
+            center_coord = SkyCoord(*center_world, unit="deg")
+            x_world = cutout_wcs(center_pixel[0] + 1, center_pixel[1], with_bounding_box=False)
+            y_world = cutout_wcs(center_pixel[0], center_pixel[1] + 1, with_bounding_box=False)
+            x_scale = center_coord.separation(SkyCoord(*x_world, unit="deg")).degree
+            y_scale = center_coord.separation(SkyCoord(*y_world, unit="deg")).degree
+            local_scale = float(np.sqrt(x_scale * y_scale))
+
+            orientation_pixel = (center_pixel[0], center_pixel[1] + 100)
+            orientation_world = cutout_wcs(*orientation_pixel, with_bounding_box=False)
+            local_orientation = center_coord.position_angle(SkyCoord(*orientation_world, unit="deg")).degree
+
+            wcsinfo["image_shape"] = list(cutout_wcs.array_shape)
+            wcsinfo["ra"] = as_float(center_world[0])
+            wcsinfo["dec"] = as_float(center_world[1])
+            wcsinfo["pixel_scale"] = local_scale
+            wcsinfo["orientation"] = local_orientation
+
+        meta["wcsinfo"] = wcsinfo
 
     def _cutout_file(self, file: Union[str, Path, S3Path]):
         """
@@ -1102,7 +1136,7 @@ class ASDFCutout(ImageCutout):
                         self._asdf_trees.setdefault(input_file, {})[coord_key] = lite_tree
                     else:
                         coord_mission_tree["meta"]["wcs"] = sliced_gwcs
-                        self._update_s_region(coord_mission_tree["meta"], sliced_gwcs)
+                        self._update_wcsinfo(coord_mission_tree["meta"], sliced_gwcs)
                         coord_mission_tree["meta"]["orig_file"] = input_file
                         coord_mission_tree["meta"]["coordinate"] = coord_key
                         self._asdf_trees.setdefault(input_file, {})[coord_key] = {self._mission_kwd: coord_mission_tree}
