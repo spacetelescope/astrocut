@@ -1,9 +1,44 @@
 import numpy as np
 import pytest
+from astropy.coordinates import SkyCoord
+from astropy.wcs import WCS
+from PIL import Image
 
-from astrocut.image_cutout import ImageCutout
+from astrocut.image_cutout import ImageCutout, normalize_img
 
 from ..exceptions import InputWarning, InvalidInputError
+
+
+class _DummyImageCutout(ImageCutout):
+    """Minimal concrete ImageCutout for testing helper methods."""
+
+    def __init__(self):
+        # Avoid parent initialization and set only what tests need.
+        self._coordinates = SkyCoord("1 2", unit="deg")
+        self.cutouts_by_file = {}
+
+    def _cutout_file(self, file):
+        return None
+
+    def cutout(self):
+        return None
+
+
+def _make_fake_cutout(shape=(4, 6)):
+    wcs = WCS(naxis=2)
+    wcs.wcs.crpix = [1.0, 1.0]
+    wcs.wcs.crval = [30.0, 45.0]
+    wcs.wcs.cdelt = [-0.0002777778, 0.0002777778]
+    wcs.wcs.ctype = ["RA---TAN", "DEC--TAN"]
+
+    class _FakeCutout:
+        pass
+
+    cutout = _FakeCutout()
+    cutout.shape = shape
+    cutout.wcs = wcs
+    cutout.data = np.arange(shape[0] * shape[1], dtype=float).reshape(shape)
+    return cutout
 
 
 def test_normalize_img():
@@ -83,3 +118,79 @@ def test_normalize_img_errors():
     img_arr = np.array([])
     with pytest.raises(InvalidInputError):
         ImageCutout.normalize_img(img_arr)
+
+
+def test_prepare_render_options_invalid_stretch():
+    cutout = _DummyImageCutout()
+    with pytest.raises(InvalidInputError, match="is not recognized"):
+        cutout._prepare_image_render_options("bad-stretch", None, None)
+
+
+def test_coerce_coordinate_list_variants():
+    assert ImageCutout._coerce_coordinate_list(None) == []
+    assert ImageCutout._coerce_coordinate_list(["1 2"]) == ["1 2"]
+    assert ImageCutout._coerce_coordinate_list(("1 2", "3 4")) == ["1 2", "3 4"]
+    assert ImageCutout._coerce_coordinate_list("1 2") == ["1 2"]
+
+
+def test_build_cutout_metadata_with_string_coordinate():
+    cutout = _DummyImageCutout()
+    fake_cutout = _make_fake_cutout()
+    meta = cutout._build_cutout_metadata(["input_a.fits", "input_b.fits"], fake_cutout, "30.0 45.0")
+    assert "input_files" in meta
+    assert meta["center_ra_deg"] == 30.0
+    assert meta["center_dec_deg"] == 45.0
+
+
+def test_iter_selected_cutouts_branches_and_errors():
+    cutout = _DummyImageCutout()
+    fake_cutout = _make_fake_cutout()
+    cutout.cutouts_by_file = {"file_a": [fake_cutout], "file_b": [fake_cutout]}
+
+    with pytest.raises(InvalidInputError, match="Selecting image cutouts by coordinates is not supported"):
+        list(cutout._iter_selected_cutouts(coordinates=[SkyCoord("1 2", unit="deg")]))
+
+    with pytest.raises(InvalidInputError, match="is not in the cutout results"):
+        list(cutout._iter_selected_cutouts(input_files=["missing_file"]))
+
+    rows = list(cutout._iter_selected_cutouts(input_files="file_a"))
+    assert len(rows) == 1
+    assert rows[0][0] == "file_a"
+    assert rows[0][2] is fake_cutout
+
+    # Default path selects all files from cutouts_by_file.
+    all_rows = list(cutout._iter_selected_cutouts())
+    assert len(all_rows) == 2
+
+
+def test_coord_object_and_colorize_helper_warnings():
+    cutout = _DummyImageCutout()
+
+    coord = cutout._coerce_coord_object("30.0 45.0")
+    assert isinstance(coord, SkyCoord)
+
+    with pytest.warns(InputWarning, match="Too many inputs for a color cutout"):
+        cutout._warn_too_many_color_cutouts(coord)
+
+    with pytest.raises(InvalidInputError, match="Color cutouts require 3 input images"):
+        cutout._handle_insufficient_color_cutouts(coord)
+
+
+def test_get_img_save_kwargs_without_metadata_and_save_oserror(tmp_path):
+    cutout = _DummyImageCutout()
+    img = Image.fromarray(np.zeros((4, 4), dtype=np.uint8))
+
+    assert cutout._get_img_save_kwargs(img, "no_meta.png") == {}
+
+    def _raise_oserror(*args, **kwargs):
+        raise OSError("disk full")
+
+    img.save = _raise_oserror
+    with pytest.warns(Warning, match="Cutout could not be saved"):
+        success = cutout._save_img_to_file(img, (tmp_path / "x.png").as_posix())
+    assert success is False
+
+
+def test_module_normalize_img_wrapper():
+    img_arr = np.array([[1.0, 0.0], [0.25, 0.75]])
+    assert (normalize_img(img_arr, stretch="linear") == ImageCutout.normalize_img(img_arr, stretch="linear")).all()
