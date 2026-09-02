@@ -472,7 +472,7 @@ def build_default_combine_function(template_hdu_arr, no_data_val=np.nan):
         templates = (img_arrs != no_data_val).astype(float)
 
     multiplier_arr = np.sum(templates, axis=0)
-    multiplier_arr = np.divide(1, multiplier_arr, where=(multiplier_arr != 0))
+    np.divide(1, multiplier_arr, out=multiplier_arr, where=multiplier_arr != 0)
     for t_arr in templates:
         t_arr *= multiplier_arr
 

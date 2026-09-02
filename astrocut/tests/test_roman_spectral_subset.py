@@ -1,4 +1,3 @@
-import re
 from copy import deepcopy
 
 import asdf
@@ -212,52 +211,7 @@ def test_roman_spectral_subset_parallel(subset, spectral_files):
     assert np.array_equal(parallel_flux, non_parallel_flux)
 
 
-def test_roman_spectral_subset_source_file_keys(spectral_files):
-    # Test the get_source_file_keys method of RomanSpectralsubset
-    subset = RomanSpectralSubset(
-        spectral_files=spectral_files,
-        source_ids=[420007, 420008, 430000],
-        wl_range=(550, 850),
-        lite=True,
-        max_workers=1,
-    )
-
-    source_file_keys = subset.get_source_file_keys()
-    assert len(source_file_keys) == 5  # Should have one key for each combination of source ID and file
-
-    for subset_file, subset_source_id in source_file_keys.values():
-        assert subset_file in spectral_files
-        assert subset_source_id in ["420007", "420008", "430000"]
-
-    print(subset._out_trees[spectral_files[1]])
-
-    # Filter by source IDs
-    source_file_keys = subset.get_source_file_keys(source_ids=["420007", "430000"])
-    assert len(source_file_keys) == 3  # Should only have keys for the specified source IDs
-    for subset_file, subset_source_id in source_file_keys.values():
-        assert subset_source_id == "420007" or subset_source_id == "430000"
-
-    # Filter by source files
-    source_file_keys = subset.get_source_file_keys(spectral_files=[spectral_files[0]])
-    assert len(source_file_keys) == 2  # Should only have keys for the specified file
-    for subset_file, subset_source_id in source_file_keys.values():
-        assert subset_file == spectral_files[0]
-        assert subset_source_id in ["420007", "420008"]
-
-    # Error if a file is not found in results
-    with pytest.raises(
-        InvalidQueryError, match=r"Spectral file .*temp_spectral_nonexistent\.asdf " r"not found in subset results\."
-    ):
-        subset.get_source_file_keys(
-            spectral_files=[spectral_files[0], spectral_files[1], "temp_spectral_nonexistent.asdf"]
-        )
-
-    # Error if a source ID is not found in results
-    with pytest.raises(InvalidQueryError, match=r"Source ID 999999 not found in subset results\."):
-        subset.get_source_file_keys(source_ids=["420007", "999999"])
-
-
-def test_roman_spectral_subset_source_file_keys_duplicate_stems(tmp_path):
+def test_roman_spectral_subset_asdf_subsets_duplicate_stems(tmp_path):
     def _write_spectral_file(path):
         with asdf.AsdfFile() as af:
             af["roman"] = {
@@ -293,20 +247,12 @@ def test_roman_spectral_subset_source_file_keys_duplicate_stems(tmp_path):
         max_workers=1,
     )
 
-    source_file_keys = subset.get_source_file_keys()
-
-    assert len(source_file_keys) == 2
-    assert set(source_file_keys.values()) == {
+    subset_table = subset.get_asdf_subsets(group_by="source_file")
+    assert len(subset_table) == 2
+    assert set(zip(subset_table["file"], subset_table["source_id"])) == {
         (str(prism_file_1), "402849"),
         (str(prism_file_2), "402849"),
     }
-
-    keys = list(source_file_keys.keys())
-    assert all(re.match(r"^402849_spectrum_[0-9a-f]{8}$", key) for key in keys)
-    assert len(set(keys)) == 2
-
-    asdf_subsets = subset.get_asdf_subsets(group_by="source_file")
-    assert set(asdf_subsets.keys()) == set(source_file_keys.keys())
 
 
 @pytest.mark.parametrize("lite", [True, False])
@@ -314,17 +260,15 @@ def test_roman_spectral_subset_asdf_subsets_source_file(spectral_files, lite):
     # Test the get_asdf_subsets method of RomanSpectralsubset with group_by='source_file'
     subset = RomanSpectralSubset(spectral_files=spectral_files, source_ids=[420007, 420008], lite=lite, max_workers=1)
 
-    asdf_subsets = subset.get_asdf_subsets(group_by="source_file")
-    source_file_keys = subset.get_source_file_keys()
+    subset_table = subset.get_asdf_subsets(group_by="source_file")
     # Should make a subset for every combination of source ID and file, so 2 sources x 2 files = 4 subsets
-    assert len(asdf_subsets) == 4
-    assert len(source_file_keys) == 4
+    assert len(subset_table) == 4
 
-    for key, subset_af in asdf_subsets.items():
-        assert key in source_file_keys
-        subset_file, subset_source_id = source_file_keys[key]
+    for row in subset_table:
+        subset_file, subset_source_id = row["file"], row["source_id"]
         assert subset_file in spectral_files
         assert subset_source_id in ["420007", "420008"]
+        subset_af = row["subset"]
         assert isinstance(subset_af, asdf.AsdfFile)
         # Check that the subset ASDF file contains the expected data structure
         assert "roman" in subset_af.tree
@@ -342,33 +286,27 @@ def test_roman_spectral_subset_asdf_subsets_source_file(spectral_files, lite):
         assert history_entry["description"] == expected_entry
 
     # Only select certain source files
-    asdf_subsets = subset.get_asdf_subsets(group_by="source_file", spectral_files=[spectral_files[0]])
-    source_file_keys = subset.get_source_file_keys(spectral_files=[spectral_files[0]])
-    assert len(asdf_subsets) == 2  # Should only have subsets for the specified file
-    for key in asdf_subsets.keys():
-        subset_file, subset_source_id = source_file_keys[key]
-        assert subset_file == spectral_files[0]
-        assert subset_source_id in ["420007", "420008"]
+    subset_table = subset.get_asdf_subsets(group_by="source_file", spectral_files=[spectral_files[0]])
+    assert len(subset_table) == 2  # Should only have subsets for the specified file
+    for row in subset_table:
+        assert row["file"] == spectral_files[0]
+        assert row["source_id"] in ["420007", "420008"]
 
     # Only select certain source IDs
-    asdf_subsets = subset.get_asdf_subsets(group_by="source_file", source_ids=["420007"])
-    source_file_keys = subset.get_source_file_keys(source_ids=["420007"])
-    assert len(asdf_subsets) == 2  # Should only have subsets for the specified source ID
-    for key in asdf_subsets.keys():
-        subset_file, subset_source_id = source_file_keys[key]
-        assert subset_source_id == "420007"
-        assert subset_file in spectral_files
+    subset_table = subset.get_asdf_subsets(group_by="source_file", source_ids=["420007"])
+    assert len(subset_table) == 2  # Should only have subsets for the specified source ID
+    for row in subset_table:
+        assert row["source_id"] == "420007"
+        assert row["file"] in spectral_files
 
     # Only select certain source files and source IDs
-    asdf_subsets = subset.get_asdf_subsets(
+    subset_table = subset.get_asdf_subsets(
         group_by="source_file", spectral_files=[spectral_files[0]], source_ids=["420007"]
     )
-    source_file_keys = subset.get_source_file_keys(spectral_files=[spectral_files[0]], source_ids=["420007"])
-    assert len(asdf_subsets) == 1  # Should only have one subset for the specified file and source ID
-    for key in asdf_subsets.keys():
-        subset_file, subset_source_id = source_file_keys[key]
-        assert subset_file == spectral_files[0]
-        assert subset_source_id == "420007"
+    assert len(subset_table) == 1  # Should only have one subset for the specified file and source ID
+    for row in subset_table:
+        assert row["file"] == spectral_files[0]
+        assert row["source_id"] == "420007"
 
 
 @pytest.mark.parametrize("lite", [True, False])
@@ -376,12 +314,13 @@ def test_roman_spectral_subset_asdf_subsets_file(spectral_files, lite):
     # Test the get_asdf_subsets method of RomanSpectralsubset with group_by='file'
     subset = RomanSpectralSubset(spectral_files=spectral_files, source_ids=[420007, 420008], lite=lite, max_workers=1)
 
-    asdf_subsets = subset.get_asdf_subsets(group_by="file")
-    assert len(asdf_subsets) == 2  # Should have one subset per file
+    subset_table = subset.get_asdf_subsets(group_by="file")
+    assert len(subset_table) == 2  # Should have one subset per file
 
-    for subset_file in asdf_subsets.keys():
+    for row in subset_table:
+        subset_file = row["file"]
         assert subset_file in spectral_files
-        subset_af = asdf_subsets[subset_file]
+        subset_af = row["subset"]
         assert isinstance(subset_af, asdf.AsdfFile)
         # Check that the subset ASDF file contains the expected data structure
         assert "roman" in subset_af.tree
@@ -405,7 +344,9 @@ def test_roman_spectral_subset_asdf_subsets_file(spectral_files, lite):
 def test_roman_spectral_subset_asdf_subsets_combined(spectral_files, lite):
     # Test the get_asdf_subsets method of RomanSpectralsubset with group_by='combined'
     subset = RomanSpectralSubset(spectral_files=spectral_files, source_ids=[420007, 420008], lite=lite, max_workers=1)
-    subset_af = subset.get_asdf_subsets(group_by="combined")
+    subset_table = subset.get_asdf_subsets(group_by="combined")
+    assert len(subset_table) == 1  # Should have a single combined row
+    subset_af = subset_table[0]["subset"]
     assert isinstance(subset_af, asdf.AsdfFile)
     # Check that the subset ASDF file contains the expected data structure
     assert "roman" in subset_af.tree

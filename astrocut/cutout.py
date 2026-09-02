@@ -59,7 +59,7 @@ class Cutout(BaseCutout, ABC):
     def __init__(
         self,
         input_files: List[Union[str, Path, S3Path]],
-        coordinates: Union[SkyCoord, str],
+        coordinates: Union[SkyCoord, str, List[Union[SkyCoord, str]]],
         cutout_size: Union[int, np.ndarray, u.Quantity, List[int], Tuple[int]] = 25,
         fill_value: Union[int, float] = np.nan,
         limit_rounding_method: str = "round",
@@ -73,9 +73,12 @@ class Cutout(BaseCutout, ABC):
         self._input_files = input_files
 
         # Get coordinates as a SkyCoord object
-        if not isinstance(coordinates, SkyCoord):
-            coordinates = SkyCoord(coordinates, unit="deg")
-        self._coordinates = coordinates
+        coordinates = self._normalize_coordinates_input(coordinates)
+        if len(coordinates) == 0:
+            raise InvalidInputError("At least one coordinate must be provided.")
+        self._coordinates = [
+            SkyCoord(coord, unit="deg") if not isinstance(coord, SkyCoord) else coord for coord in coordinates
+        ]
         log.debug("Coordinates: %s", self._coordinates)
 
         # Turning the cutout size into an array of two values
@@ -100,7 +103,32 @@ class Cutout(BaseCutout, ABC):
         # Initialize cutout dictionary
         self.cutouts_by_file = {}
 
-    def _get_cutout_limits(self, img_wcs: wcs.WCS) -> np.ndarray:
+    @staticmethod
+    def _normalize_coordinates_input(
+        coordinates: Union[SkyCoord, str, List[Union[SkyCoord, str]], Tuple[Union[SkyCoord, str], ...]],
+    ) -> List[Union[SkyCoord, str]]:
+        """
+        Normalize coordinate inputs into a flat list.
+
+        Array-valued ``SkyCoord`` inputs are expanded into scalar coordinates so
+        workflows that provide one ``SkyCoord`` with many rows are handled the
+        same as a list of scalar coordinates.
+        """
+        if isinstance(coordinates, (list, tuple)):
+            raw_coords = list(coordinates)
+        else:
+            raw_coords = [coordinates]
+
+        normalized_coords: List[Union[SkyCoord, str]] = []
+        for coord in raw_coords:
+            if isinstance(coord, SkyCoord) and not coord.isscalar:
+                normalized_coords.extend(list(coord))
+            else:
+                normalized_coords.append(coord)
+
+        return normalized_coords
+
+    def _get_cutout_limits(self, coordinates: SkyCoord, img_wcs: wcs.WCS) -> np.ndarray:
         """
         Returns the x and y pixel limits for the cutout.
 
@@ -109,6 +137,8 @@ class Cutout(BaseCutout, ABC):
 
         Parameters
         ----------
+        coordinates : `~astropy.coordinates.SkyCoord`
+            The coordinates of the center of the cutout.
         img_wcs : `~astropy.wcs.WCS`
             The WCS for the image or cube that the cutout is being cut from.
 
@@ -121,7 +151,7 @@ class Cutout(BaseCutout, ABC):
         try:
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", message="All-NaN slice encountered")
-                center_pixel = self._coordinates.to_pixel(img_wcs)
+                center_pixel = coordinates.to_pixel(img_wcs)
         except wcs.NoConvergence:  # If wcs can't converge, center coordinate is far from the footprint
             raise InvalidQueryError("Cutout location is not in image footprint!")
 
@@ -154,7 +184,7 @@ class Cutout(BaseCutout, ABC):
                 lims[axis, 1] = lims[axis, 0] + 1
         return lims
 
-    def _make_cutout_filename(self, file_stem: str, legacy_filenames: bool = False) -> str:
+    def _make_cutout_filename(self, file_stem: str, coordinates: SkyCoord, legacy_filenames: bool = False) -> str:
         """
         Create a cutout filename based on a file stem, coordinates, and cutout size.
 
@@ -162,6 +192,8 @@ class Cutout(BaseCutout, ABC):
         ----------
         file_stem : str
             The stem of the input file to use in the cutout filename.
+        coordinates : `~astropy.coordinates.SkyCoord`
+            The coordinates of the cutout center.
         legacy_filenames : bool
             If True, use the pre-1.2.0 format (``<ny>x<nx>`` size separator and 6-decimal
             RA/Dec precision) instead of the current format (``<ny>-x-<nx>`` size separator
@@ -178,8 +210,8 @@ class Cutout(BaseCutout, ABC):
             separator = "x"
             precision = 6
 
-        ra = self._coordinates.ra.value
-        dec = self._coordinates.dec.value
+        ra = coordinates.ra.value
+        dec = coordinates.dec.value
         ny = str(self._cutout_size[0]).replace(" ", "")
         nx = str(self._cutout_size[1]).replace(" ", "")
         return f"{file_stem}_{ra:.{precision}f}_{dec:.{precision}f}_{ny}{separator}{nx}_astrocut.fits"
@@ -217,6 +249,7 @@ class Cutout(BaseCutout, ABC):
         self,
         output_dir: Union[str, Path] = ".",
         filename: Optional[Union[str, Path]] = None,
+        coordinates: Optional[SkyCoord] = None,
         build_entries: Optional[Callable[[], Iterable[Tuple[str, Any]]]] = None,
     ) -> str:
         """
@@ -227,9 +260,11 @@ class Cutout(BaseCutout, ABC):
         output_dir : str | Path, optional
             Directory where the zip will be created. Default '.'
         filename : str | Path | None, optional
-            Name (or path) of the output zip file. If not provided, defaults to
+            'astrocut_{ra}_{dec}_{size}.zip'. If not provided, defaults to
             'astrocut_{ra}_{dec}_{size}.zip'. If provided without a '.zip' suffix,
             the suffix is added automatically.
+        coordinates : `~astropy.coordinates.SkyCoord`
+            The coordinates of the cutout center.
         build_entries : callable -> iterable of (arcname, payload), optional
             Function that yields entries lazily. Useful to build streams on demand.
 
@@ -240,12 +275,15 @@ class Cutout(BaseCutout, ABC):
         """
         # Resolve zip path and ensure directory exists
         if filename is None:
-            filename = "astrocut_{:.7f}_{:.7f}_{}-x-{}.zip".format(
-                self._coordinates.ra.value,
-                self._coordinates.dec.value,
-                str(self._cutout_size[0]).replace(" ", ""),
-                str(self._cutout_size[1]).replace(" ", ""),
-            )
+            if coordinates is None:
+                filename = "astrocut.zip"
+            else:
+                filename = "astrocut_{:.7f}_{:.7f}_{}-x-{}.zip".format(
+                    coordinates.ra.value,
+                    coordinates.dec.value,
+                    str(self._cutout_size[0]).replace(" ", ""),
+                    str(self._cutout_size[1]).replace(" ", ""),
+                )
         filename = Path(filename)
         if filename.suffix.lower() != ".zip":
             filename = filename.with_suffix(".zip")

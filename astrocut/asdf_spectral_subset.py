@@ -6,13 +6,13 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from contextlib import contextmanager, nullcontext
 from copy import deepcopy
 from datetime import datetime, timezone
-from hashlib import blake2s
 from pathlib import Path
-from typing import Dict, List, Literal, Optional, Tuple, Union
+from typing import Dict, Iterator, List, Literal, Optional, Tuple, Union
 
 import asdf
 import asdf.schema as asdf_schema
 import numpy as np
+from astropy.table import Table
 from s3path import S3Path
 
 from . import __version__, log
@@ -135,7 +135,7 @@ def _subset_single_file(
     out_trees_for_file = {}
     emitted_warnings = []
 
-    with asdf.open(file) as af:
+    with asdf.open(file, memmap=True) as af:
         in_tree = af.tree
         mission_data = in_tree[mission_keyword]["data"]
 
@@ -161,7 +161,6 @@ def _subset_single_file(
                             f"Source ID {sid} not found in file {file}. Skipping this source for this file."
                         )
                     continue
-
             source = mission_data[mission_key]
             wl = source["wl"]
 
@@ -339,6 +338,9 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
     get_asdf_subsets(group_by=group_by, source_ids=source_ids, spectral_files=spectral_files)
         Get ASDF subset(s) for specified source IDs and input files, grouped by source and file,
         file, or combined.
+    iter_asdf_subsets(group_by=group_by, source_ids=source_ids, spectral_files=spectral_files)
+        Lazily yield ASDF subset rows for specified source IDs and input files, grouped by source
+        and file, file, or combined.
     write_as_asdf(output_dir=output_dir, group_by=group_by, source_ids=source_ids, spectral_files=spectral_files)
         Write the ASDF subset(s) to files in the specified output directory, grouped by source
         and file, file, or combined.
@@ -451,60 +453,24 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
                 "the spectral files and that the wavelength range overlaps with the data."
             )
 
-    def get_source_file_keys(
-        self,
-        *,
-        spectral_files: Union[str, Path, S3Path, List[Union[str, Path, S3Path]]] = None,
-        source_ids: Union[str, int, List[Union[str, int]]] = None,
-    ) -> Dict[str, Tuple[str, str]]:
-        """
-        Get valid string keys for source/file subset selection.
-
-        Parameters
-        ----------
-        spectral_files : str or Path or S3Path or list, optional
-            Specific spectral files to include. If None, all available files are included.
-        source_ids : str or int or list, optional
-            Specific source IDs to include. If None, all available source IDs are included.
-
-        Returns
-        -------
-        dict
-            Mapping from a user-friendly key string to ``(file, source_id)`` tuples.
-        """
-        files_to_include, sources_to_include = self._resolve_selection(
-            spectral_files=spectral_files, source_ids=source_ids
-        )
-
-        source_file_pairs = []
-        for file in files_to_include:
-            for sid in sources_to_include:
-                if sid not in self._out_trees[file]:
-                    log.debug(f"Source ID {sid} not found in file {file}. Skipping this source for this file.")
-                    continue
-                source_file_pairs.append((file, sid))
-
-        keys = self._build_source_file_keys(source_file_pairs)
-
-        return keys
-
-    def get_asdf_subsets(
+    def iter_asdf_subsets(
         self,
         *,
         group_by: Literal["source_file", "file", "combined"] = "combined",
         spectral_files: Union[str, Path, S3Path, List[Union[str, Path, S3Path]]] = None,
         source_ids: Union[str, int, List[Union[str, int]]] = None,
-    ) -> dict:
+    ) -> Iterator[Tuple]:
         """
-        Get ASDF subset objects for specified source IDs and input files, grouped by source and file, file, or combined.
+        Yield ASDF subset rows lazily for specified source IDs and input files, grouped by source and
+        file, file, or combined.
 
         Parameters
         ----------
         group_by : {'source_file', 'file', 'combined'}, optional
-            Determines how the subsets are grouped in the output ASDF objects. Default is 'combined'.
-            - 'source_file': Separate ASDF object for each source ID and input file combination.
-            - 'file': One ASDF object per input file, containing all specified source IDs from that file.
-            - 'combined': A single ASDF object containing all specified source IDs from all input files.
+            Determines how the subsets are grouped. Default is 'combined'.
+            - 'source_file': One row per source ID and input file combination.
+            - 'file': One row per input file, containing all specified source IDs from that file.
+            - 'combined': A single row containing all specified source IDs from all input files.
         spectral_files : str or Path or S3Path or list, optional
             Specific spectral files to include in the output. If None, all input spectral files will be included.
             Can be a single file or a list of files.
@@ -512,35 +478,33 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
             Specific source IDs to include in the output. If None, all source IDs from the subset
             results will be included. Can be a single ID or a list of IDs.
 
-        Returns
-        -------
-        dict or asdf.AsdfFile
-            Depending on the value of `group_by`, this method returns either a dictionary of ASDF subset objects keyed
-            by source ID and input file combination ('source_file'), a dictionary of ASDF subset objects
-            keyed by input file ('file'), or a single ASDF subset object containing all subsets ('combined').
+        Yields
+        ------
+        tuple
+            For 'source_file': ``(file, source_id, asdf.AsdfFile)``. For 'file': ``(file, source_ids, asdf.AsdfFile)``.
+            For 'combined': a single ``(files, source_ids, asdf.AsdfFile)`` tuple.
         """
-        asdf_subsets = {}
-        if group_by == "source_file":
-            # Build deterministic keys for the source/file combinations and disambiguate if needed
-            source_file_keys = self.get_source_file_keys(spectral_files=spectral_files, source_ids=source_ids)
-
-            # Create separate ASDF objects for each source/file combination
-            for string_key, (file, sid) in source_file_keys.items():
-                tree = deepcopy(self._out_trees[file][sid])
-                af = asdf.AsdfFile(tree)
-                af.tree["history"] = _append_history_entry(
-                    tree.get("history", {}),
-                    f"Spectral subset created for source ID {sid} from file {file}"
-                    f"{f' with wavelength range {self._wl_range is not None}' if self._wl_range else ''}.",
-                )
-                asdf_subsets[string_key] = af
-
-            return asdf_subsets
-
         files_to_include, sources_to_include = self._resolve_selection(
             spectral_files=spectral_files, source_ids=source_ids
         )
-        if group_by == "file":
+        if group_by == "source_file":
+            # Yield a separate ASDF object for each source/file combination
+            for file in files_to_include:
+                for sid in sources_to_include:
+                    if sid not in self._out_trees[file]:
+                        log.debug(f"Source ID {sid} not found in file {file}. Skipping this source for this file.")
+                        continue
+
+                    tree = deepcopy(self._out_trees[file][sid])
+                    af = asdf.AsdfFile(tree)
+                    af.tree["history"] = _append_history_entry(
+                        tree.get("history", {}),
+                        f"Spectral subset created for source ID {sid} from file {file}"
+                        f"{f' with wavelength range {self._wl_range is not None}' if self._wl_range else ''}.",
+                    )
+                    yield file, sid, af
+
+        elif group_by == "file":
             # Group by file, combining all sources in each file
             for file in files_to_include:
                 source_ids = [sid for sid in sources_to_include if sid in self._out_trees[file]]
@@ -575,7 +539,8 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
                     f"Spectral subset created for source IDs {source_ids} from file {file}"
                     f"{f' with wavelength range {self._wl_range}' if self._wl_range is not None else ''}.",
                 )
-                asdf_subsets[file] = af
+                yield file, source_ids, af
+
         elif group_by == "combined":
             # Group all sources and spectral files into a single ASDF file
             # ASDF data should be keyed by file and then source_id to avoid key collisions
@@ -640,85 +605,132 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
                 f"Spectral subset created for source IDs {sources_to_include} from files {', '.join(files_to_include)}"
                 f"{f' with wavelength range {self._wl_range}' if self._wl_range is not None else ''}.",
             )
-            asdf_subsets = af
+            yield files_to_include, sources_to_include, af
+
         else:
             raise InvalidInputError(self._invalid_group_by_msg.format(group_by))
 
-        return asdf_subsets
-
-    def _build_write_jobs(
+    def _resolve_selection(
         self,
-        output_dir: Union[str, Path],
-        group_by: Literal["source_file", "file", "combined"],
-        spectral_files: List[Union[str, Path]],
-        source_ids: Union[str, int, List[Union[str, int]]],
-    ) -> List[Tuple[asdf.AsdfFile, str]]:
+        spectral_files: Union[str, Path, S3Path, List[Union[str, Path, S3Path]]] = None,
+        source_ids: Union[str, int, List[Union[str, int]]] = None,
+    ) -> Tuple[List[str], List[str]]:
         """
-        Build a list of ASDF subset objects and corresponding output file paths to write, based
-        on the specified grouping.
+        Resolve and validate file/source selections against available subset results.
 
         Parameters
         ----------
-        output_dir : str or Path
-            The directory where the output ASDF files will be written.
-        group_by : {'source_file', 'file', 'combined'}
-            Determines how the subsets are grouped in the output ASDF objects. Must be
-            one of 'source_file', 'file', or 'combined'.
-        spectral_files : list of str or Path
-            The list of input spectral files to include in the output subsets.
-        source_ids : str or int or list
-            Specific source IDs to include in the output. Can be a single ID or a list of IDs.
+        spectral_files : str or Path or S3Path or list, optional
+            Specific spectral files to include. If None, all available files are included.
+        source_ids : str or int or list, optional
+            Specific source IDs to include. If None, all available source IDs are included.
 
         Returns
         -------
-        list of tuples
-            A list of tuples, where each tuple contains an ASDF subset object and the corresponding
-            output file path to which it should be written.
+        tuple
+            A tuple containing two lists: (files_to_include, sources_to_include), where each list contains the
+            validated string keys for the selected files and source IDs, respectively.
         """
-        write_jobs = []  # List of tuples: (asdf.AsdfFile, output_file_path)
-        if group_by == "source_file":
-            # Write separate ASDF files for each source/file combination, using the deterministic keys
-            # for the source/file combinations
-            af_by_source_file = self.get_asdf_subsets(
-                group_by="source_file",
-                source_ids=source_ids,
-                spectral_files=spectral_files,
-            )
-            source_file_keys = self.get_source_file_keys(
-                spectral_files=spectral_files,
-                source_ids=source_ids,
-            )
-
-            for key, af in af_by_source_file.items():
-                file, sid = source_file_keys[key]
-                filename = f"{Path(file).stem}_subset_{sid}{'_lite' if self._lite else ''}.asdf"
-                write_jobs.append((af, str(output_dir / filename)))
-
-        elif group_by == "file":
-            # Write one ASDF file per input file, containing all specified source IDs from that file
-            af_by_file = self.get_asdf_subsets(
-                group_by="file",
-                source_ids=source_ids,
-                spectral_files=spectral_files,
-            )
-            for file, af in af_by_file.items():
-                filename = f"{Path(file).stem}_subset{'_lite' if self._lite else ''}.asdf"
-                write_jobs.append((af, str(output_dir / filename)))
-
-        elif group_by == "combined":
-            # Write a single ASDF file containing all specified source IDs from all input files
-            af = self.get_asdf_subsets(
-                group_by="combined",
-                source_ids=source_ids,
-                spectral_files=spectral_files,
-            )
-            filename = f"combined_spectral_subset{'_lite' if self._lite else ''}.asdf"
-            write_jobs.append((af, str(output_dir / filename)))
-
+        if spectral_files is None:
+            files_to_include = list(self._out_trees.keys())
         else:
+            files_to_include = spectral_files if isinstance(spectral_files, list) else [spectral_files]
+            files_to_include = [str(file) for file in files_to_include]
+
+            for file in files_to_include:
+                if file not in self._out_trees:
+                    raise InvalidQueryError(f"Spectral file {file} not found in subset results.")
+
+        all_source_ids = set()
+        for file in files_to_include:
+            all_source_ids.update(str(sid) for sid in self._out_trees[file].keys())
+        all_source_ids = sorted(all_source_ids)
+
+        if source_ids is None:
+            sources_to_include = all_source_ids
+        else:
+            sources_to_include = source_ids if isinstance(source_ids, list) else [source_ids]
+            sources_to_include = [str(sid) for sid in sources_to_include]
+
+            for sid in sources_to_include:
+                if sid not in all_source_ids:
+                    raise InvalidQueryError(f"Source ID {sid} not found in subset results.")
+
+        return files_to_include, sources_to_include
+
+    _SUBSET_TABLE_COLUMNS = {
+        "source_file": ["file", "source_id", "subset"],
+        "file": ["file", "source_ids", "subset"],
+        "combined": ["files", "source_ids", "subset"],
+    }
+
+    def get_asdf_subsets(
+        self,
+        *,
+        group_by: Literal["source_file", "file", "combined"] = "combined",
+        spectral_files: Union[str, Path, S3Path, List[Union[str, Path, S3Path]]] = None,
+        source_ids: Union[str, int, List[Union[str, int]]] = None,
+    ) -> Table:
+        """
+        Get ASDF subset objects for specified source IDs and input files, grouped by source and file, file, or combined.
+
+        Parameters
+        ----------
+        group_by : {'source_file', 'file', 'combined'}, optional
+            Determines how the subsets are grouped in the output table. Default is 'combined'.
+            - 'source_file': One row per source ID and input file combination.
+            - 'file': One row per input file, containing all specified source IDs from that file.
+            - 'combined': A single row containing all specified source IDs from all input files.
+        spectral_files : str or Path or S3Path or list, optional
+            Specific spectral files to include in the output. If None, all input spectral files will be included.
+            Can be a single file or a list of files.
+        source_ids : str or int or list, optional
+            Specific source IDs to include in the output. If None, all source IDs from the subset
+            results will be included. Can be a single ID or a list of IDs.
+
+        Returns
+        -------
+        `astropy.table.Table`
+            Depending on the value of `group_by`, this method returns a table with columns
+            ``file``, ``source_id``, ``subset`` ('source_file'), ``file``, ``source_ids``,
+            ``subset`` ('file'), or ``files``, ``source_ids``, ``subset`` ('combined'), where the ``subset``
+            column holds the corresponding `asdf.AsdfFile` subset object(s).
+        """
+        columns = self._SUBSET_TABLE_COLUMNS.get(group_by)
+        if columns is None:
             raise InvalidInputError(self._invalid_group_by_msg.format(group_by))
 
-        return write_jobs
+        rows = list(self.iter_asdf_subsets(group_by=group_by, spectral_files=spectral_files, source_ids=source_ids))
+        return self._build_subset_table(rows, columns)
+
+    @staticmethod
+    def _build_subset_table(rows: List[Tuple], columns: List[str]) -> Table:
+        """
+        Build a table of ASDF subset results with an object-typed ``subset`` column, where each
+        row corresponds to a specific grouping of source IDs and input files.
+
+        Parameters
+        ----------
+        rows : list of tuples
+            Row values, with the ``asdf.AsdfFile`` subset object as the last element of each tuple.
+        columns : list of str
+            Column names for the table, with ``subset`` as the last entry.
+
+        Returns
+        -------
+        table : `astropy.table.Table`
+            The constructed subset table.
+        """
+        if not rows:
+            return Table(names=columns)
+
+        *other_columns, asdf_files = zip(*rows)
+        asdf_col = np.empty(len(rows), dtype=object)
+        asdf_col[:] = asdf_files
+
+        data = dict(zip(columns[:-1], other_columns))
+        data[columns[-1]] = asdf_col
+        return Table(data)
 
     def write_as_asdf(
         self,
@@ -835,117 +847,71 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
             paths.extend(batch_paths)
         return paths
 
-    def _build_source_file_keys(self, source_file_pairs: List[Tuple[str, str]]) -> Dict[str, Tuple[str, str]]:
-        """
-        Build deterministic source/file keys and disambiguate collisions when needed.
-
-        Parameters
-        ----------
-        source_file_pairs : list of tuples
-            List of (file, source_id) pairs for which to build keys.
-
-        Returns
-        -------
-        dict
-            Mapping from string keys to (file, source_id) tuples.
-        """
-        key_candidates = []
-        base_counts = {}
-        for file, sid in source_file_pairs:
-            base_key = self._make_source_file_key(file, sid)
-            key_candidates.append((base_key, file, sid))
-            base_counts[base_key] = base_counts.get(base_key, 0) + 1
-
-        keys = {}
-        for base_key, file, sid in key_candidates:
-            if base_counts[base_key] == 1 and base_key not in keys:
-                keys[base_key] = (file, sid)
-                continue
-
-            file_hash = blake2s(str(file).encode("utf-8"), digest_size=4).hexdigest()
-            disambiguated_key = self._make_source_file_key(
-                file,
-                sid,
-                disambiguator=file_hash,
-            )
-            keys[disambiguated_key] = (file, sid)
-
-        return keys
-
-    def _resolve_selection(
+    def _build_write_jobs(
         self,
-        spectral_files: Union[str, Path, S3Path, List[Union[str, Path, S3Path]]] = None,
-        source_ids: Union[str, int, List[Union[str, int]]] = None,
-    ) -> Tuple[List[str], List[str]]:
+        output_dir: Union[str, Path],
+        group_by: Literal["source_file", "file", "combined"],
+        spectral_files: List[Union[str, Path]],
+        source_ids: Union[str, int, List[Union[str, int]]],
+    ) -> List[Tuple[asdf.AsdfFile, str]]:
         """
-        Resolve and validate file/source selections against available subset results.
+        Build a list of ASDF subset objects and corresponding output file paths to write, based
+        on the specified grouping.
 
         Parameters
         ----------
-        spectral_files : str or Path or S3Path or list, optional
-            Specific spectral files to include. If None, all available files are included.
-        source_ids : str or int or list, optional
-            Specific source IDs to include. If None, all available source IDs are included.
+        output_dir : str or Path
+            The directory where the output ASDF files will be written.
+        group_by : {'source_file', 'file', 'combined'}
+            Determines how the subsets are grouped in the output ASDF objects. Must be
+            one of 'source_file', 'file', or 'combined'.
+        spectral_files : list of str or Path
+            The list of input spectral files to include in the output subsets.
+        source_ids : str or int or list
+            Specific source IDs to include in the output. Can be a single ID or a list of IDs.
 
         Returns
         -------
-        tuple
-            A tuple containing two lists: (files_to_include, sources_to_include), where each list contains the
-            validated string keys for the selected files and source IDs, respectively.
+        list of tuples
+            A list of tuples, where each tuple contains an ASDF subset object and the corresponding
+            output file path to which it should be written.
         """
-        if spectral_files is None:
-            files_to_include = list(self._out_trees.keys())
+        write_jobs = []  # List of tuples: (asdf.AsdfFile, output_file_path)
+        if group_by == "source_file":
+            # Write separate ASDF files for each source/file combination
+            subset_table = self.get_asdf_subsets(
+                group_by="source_file",
+                source_ids=source_ids,
+                spectral_files=spectral_files,
+            )
+
+            for row in subset_table:
+                file, sid = row["file"], row["source_id"]
+                filename = f"{Path(file).stem}_subset_{sid}{'_lite' if self._lite else ''}.asdf"
+                write_jobs.append((row["subset"], str(output_dir / filename)))
+
+        elif group_by == "file":
+            # Write one ASDF file per input file, containing all specified source IDs from that file
+            subset_table = self.get_asdf_subsets(
+                group_by="file",
+                source_ids=source_ids,
+                spectral_files=spectral_files,
+            )
+            for row in subset_table:
+                filename = f"{Path(row['file']).stem}_subset{'_lite' if self._lite else ''}.asdf"
+                write_jobs.append((row["subset"], str(output_dir / filename)))
+
+        elif group_by == "combined":
+            # Write a single ASDF file containing all specified source IDs from all input files
+            subset_table = self.get_asdf_subsets(
+                group_by="combined",
+                source_ids=source_ids,
+                spectral_files=spectral_files,
+            )
+            filename = f"combined_spectral_subset{'_lite' if self._lite else ''}.asdf"
+            write_jobs.append((subset_table[0]["subset"], str(output_dir / filename)))
+
         else:
-            files_to_include = spectral_files if isinstance(spectral_files, list) else [spectral_files]
-            files_to_include = [str(file) for file in files_to_include]
+            raise InvalidInputError(self._invalid_group_by_msg.format(group_by))
 
-            for file in files_to_include:
-                if file not in self._out_trees:
-                    raise InvalidQueryError(f"Spectral file {file} not found in subset results.")
-
-        all_source_ids = set()
-        for file in files_to_include:
-            all_source_ids.update(str(sid) for sid in self._out_trees[file].keys())
-        all_source_ids = sorted(all_source_ids)
-
-        if source_ids is None:
-            sources_to_include = all_source_ids
-        else:
-            sources_to_include = source_ids if isinstance(source_ids, list) else [source_ids]
-            sources_to_include = [str(sid) for sid in sources_to_include]
-
-            for sid in sources_to_include:
-                if sid not in all_source_ids:
-                    raise InvalidQueryError(f"Source ID {sid} not found in subset results.")
-
-        return files_to_include, sources_to_include
-
-    @staticmethod
-    def _make_source_file_key(
-        file: Union[str, Path, S3Path],
-        source_id: Union[str, int],
-        disambiguator: Optional[str] = None,
-    ) -> str:
-        """
-        Create a stable string key for a source ID and input spectral file combination.
-
-        Parameters
-        ----------
-        file : str or Path or S3Path
-            The input spectral file path.
-        source_id : str or int
-            The source ID.
-        disambiguator : str, optional
-            Additional suffix used only when needed to disambiguate duplicate keys.
-
-        Returns
-        -------
-        str
-            A string key combining the source ID and the input file name, suitable for use as a dictionary key
-        """
-        components = [str(source_id), Path(str(file)).stem]
-
-        if disambiguator:
-            components.append(disambiguator)
-
-        return "_".join(components)
+        return write_jobs

@@ -77,6 +77,8 @@ class CubeCutout(Cutout, ABC):
         self._wcs_axes_value = None  # Expected value for the WCS axis keyword
         self._skip_kwds = []  # Keywords to skip when adding to the TPF headers
 
+        self._coordinates = self._coordinates[0]
+
     @property
     def cutouts(self):
         """
@@ -372,7 +374,7 @@ class CubeCutout(Cutout, ABC):
             }
 
             # Get cutout limits
-            self.cutout_lims = self._parent._get_cutout_limits(cube_wcs)
+            self.cutout_lims = self._parent._get_cutout_limits(parent._coordinates, cube_wcs)
 
             # Get cutout data
             self.data, self.uncertainty, self.aperture = self._get_cutout_data(cube[1].section, self._parent._threads)
