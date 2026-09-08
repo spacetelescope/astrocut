@@ -98,7 +98,8 @@ The Advanced Scientific Data Format (ASDF) is a flexible format for storing scie
 and return the results in memory or as a written file, depending on the user's preference. The cutout ASDF file format is
 described in the :ref:`Astrocut File Formats <asdf-cutout-files>` page.
 
-To make a cutout from an ASDF file or files, use the `~astrocut.ASDFCutout` class.
+To make cutouts from an ASDF file or files, use the `~astrocut.ASDFCutout` class. The ``coordinates`` argument can be a
+single coordinate or a list of coordinates, and Astrocut will generate one cutout for each coordinate in each input file.
 
 .. code-block:: python
 
@@ -107,10 +108,11 @@ To make a cutout from an ASDF file or files, use the `~astrocut.ASDFCutout` clas
 
   >>> input_files = [""]  # Path(s) to local ASDF file, URL, or S3 URI
 
-  >>> center_coord = SkyCoord("80.15189743 29.74561219", unit="deg")
+  >>> coords = [SkyCoord("80.15189743 29.74561219", unit="deg"),
+  ...           SkyCoord("80.15500000 29.75000000", unit="deg")]
   >>> cutout_size = 25
   >>> asdf_cutout = ASDFCutout(input_files=input_files,
-  ...                          coordinates=center_coord,
+  ...                          coordinates=coords,
   ...                          cutout_size=cutout_size) #doctest: +SKIP
 
 .. warning::
@@ -118,21 +120,54 @@ To make a cutout from an ASDF file or files, use the `~astrocut.ASDFCutout` clas
   cutouts that are more accurately centered on the target coordinates than even values
   for ``cutout_size``.
 
-The resulting `~astrocut.ASDFCutout` object can be used to access the cutout science data and metadata. The ``cutouts_by_file`` attribute is a dictionary that
-stores the individual science data cutouts as a list of `~astropy.nddata.Cutout2D` objects by input filename. The `~astropy.nddata.Cutout2D`
-object contains the science cutout data, shape, world coordinate system (WCS) and other helpful properties. The ``cutouts`` attribute is a list of
-science data cutouts as `~astropy.nddata.Cutout2D` objects, one for each input file.
-
-The ``asdf_cutouts`` attribute is a list of cutouts as `~asdf.AsdfFile` objects, and the ``fits_cutout`` attribute is a list of cutouts as
-`~astropy.io.fits.HDUList` objects. The cutout objects in these lists can be used to access cutout data and metadata, as shown below.
-
-.. note::
-  Although Astrocut supports writing ASDF cutouts as FITS objects, we recommend using the ASDF output format whenever possible. FITS files may not
-  accurately represent the ASDF world coordinate system, so saving cutouts in their original format will generally give the most reliable results.
+The resulting `~astrocut.ASDFCutout` object can be used to access the cutout science data and metadata.
+The ``cutouts_by_file`` attribute is a nested dictionary keyed by input filename and coordinate string,
+where each value is a `~astropy.nddata.Cutout2D` object.
 
 .. code-block:: python
 
-  >>> cutout_asdf = asdf_cutout.asdf_cutouts[0] #doctest: +SKIP
+  >>> pprint(asdf_cutout.cutouts_by_file)  #doctest: +SKIP
+  {'/path/to/input_0.asdf': {"80.15189743 29.74561219": <astropy.nddata.utils.Cutout2D object at 0x11fb3bc80>,
+                             "80.15500000 29.75000000": <astropy.nddata.utils.Cutout2D object at 0x11fafff20>},
+   '/path/to/input_1.asdf': {"80.15189743 29.74561219": <astropy.nddata.utils.Cutout2D object at 0x11f99d610>,
+                             "80.15500000 29.75000000": <astropy.nddata.utils.Cutout2D object at 0x11f7da5d0>}}
+
+
+The ``cutouts`` attribute is an `~astropy.table.Table` with columns ``file``, ``coordinate``, and ``cutout``.
+The ``cutout`` column stores `~astropy.nddata.Cutout2D` objects, with one row per unique cutout, defined by a valid
+``(input file, coordinate)`` pair.
+
+.. code-block:: python
+
+  >>> cutout_table = asdf_cutout.cutouts #doctest: +SKIP
+  >>> cutout_table.pprint_all() #doctest: +SKIP
+           file                         coordinate                                      cutout
+  ------------------------------ ------------------------------- -----------------------------------------------------
+  /path/to/input_0.asdf          <SkyCoord (ICRS): ...>          <astropy.nddata.utils.Cutout2D object at 0x11f216720>
+  /path/to/input_1.asdf          <SkyCoord (ICRS): ...>          <astropy.nddata.utils.Cutout2D object at 0x11eb951c0>
+
+Use `~astrocut.ASDFCutout.get_cutouts` to retrieve a filtered subset of the base
+`~astropy.nddata.Cutout2D` table by input file and/or coordinate:
+
+.. code-block:: python
+
+  >>> subset = asdf_cutout.get_cutouts( #doctest: +SKIP
+  ...     input_files=input_files[:1],
+  ...     coordinates=coords[:1],
+  ... )
+  >>> len(subset) #doctest: +SKIP
+  1
+  >>> subset["cutout"][0].data.shape #doctest: +SKIP
+  (25, 25)
+
+The ``asdf_cutouts`` and ``fits_cutouts`` attributes also both return `~astropy.table.Table` objects
+with columns ``file``, ``coordinate``, and ``cutout``. The ``cutout`` column stores `~asdf.AsdfFile`
+or `~astropy.io.fits.HDUList` objects, respectively. To retrieve a filtered subset of the ASDF or FITS cutouts,
+use `~astrocut.ASDFCutout.get_asdf_cutouts` or `~astrocut.ASDFCutout.get_fits_cutouts`, respectively.
+
+.. code-block:: python
+
+  >>> cutout_asdf = asdf_cutout.asdf_cutouts["cutout"][0] #doctest: +SKIP
   >>> cutout_asdf.info() #doctest: +SKIP
   root (AsdfObject)
   └─roman (dict)
@@ -140,7 +175,7 @@ The ``asdf_cutouts`` attribute is a list of cutouts as `~asdf.AsdfFile` objects,
     │ └─wcs (WCS)
     └─data (ndarray): shape=(25, 25), dtype=float32
 
-  >>> cutout_fits = asdf_cutout.fits_cutouts[0] #doctest: +SKIP
+  >>> cutout_fits = asdf_cutout.fits_cutouts["cutout"][0] #doctest: +SKIP
   >>> cutout_fits.info() #doctest: +SKIP
   Filename: (No file associated with this HDUList)
   No.    Name      Ver    Type      Cards   Dimensions   Format
@@ -181,10 +216,32 @@ cutout FITS files.
 By default, the cutouts are written to the current working directory. You can specify a different output directory using the ``output_dir`` parameter
 in either of the write functions.
 
+.. note::
+  Although Astrocut supports writing ASDF cutouts as FITS objects, we recommend using the ASDF output format whenever possible. FITS files may not
+  accurately represent the ASDF world coordinate system, so saving cutouts in their original format will generally give the most reliable results.
+
+Streaming Cutouts
+^^^^^^^^^^^^^^^^^^
+
+For large batches, you can stream cutouts lazily using iterator methods rather than materializing full tables in memory:
+
+- ``iter_cutouts(...)`` yields tuples of ``(file, coordinate, cutout2D)``.
+- ``iter_asdf_cutouts(...)`` yields tuples of ``(file, coordinate, asdf_cutout)``.
+- ``iter_fits_cutouts(...)`` yields tuples of ``(file, coordinate, fits_cutout)``.
+- ``iter_image_cutouts(...)`` yields tuples of ``(file, coordinate, image_cutout)``.
+
+.. code-block:: python
+
+  >>> for file, coordinate, af in asdf_cutout.iter_asdf_cutouts(): #doctest: +SKIP
+  ...     print(file, coordinate.ra.deg, af["roman"]["data"].shape) #doctest: +SKIP
+
+All ``get_*_cutouts(...)`` and ``iter_*_cutouts(...)`` methods support optional ``input_files`` and
+``coordinates`` filters to limit the cutouts returned to a subset of the original input files and coordinates.
+
 Lite Mode
 ^^^^^^^^^
 By default, `~astrocut.ASDFCutout` creates lite cutouts that include only the science data array and the updated world coordinate system. These cutouts
-can be accessed through the `asdf_cutouts` attribute.
+can be accessed through the ``asdf_cutouts`` table (in its ``cutout`` column).
 
 If you need the full ASDF tree, including other arrays in the input file (e.g., data, error, uncertainty, variance, etc.) and the original metadata,
 set the ``lite`` parameter to False. This produces larger cutouts, but preserves the full set of arrays and metadata for downstream analysis.
@@ -192,10 +249,10 @@ set the ``lite`` parameter to False. This produces larger cutouts, but preserves
 .. code-block:: python
 
   >>> asdf_cutout_full = ASDFCutout(input_files=input_files,
-  ...                               coordinates=center_coord,
+  ...                               coordinates=coords,
   ...                               cutout_size=cutout_size,
   ...                               lite=False) #doctest: +SKIP
-  >>> cutout_asdf_full = asdf_cutout_full.asdf_cutouts[0] #doctest: +SKIP
+  >>> cutout_asdf_full = asdf_cutout_full.asdf_cutouts["cutout"][0] #doctest: +SKIP
   >>> cutout_asdf_full.info() #doctest: +SKIP
   root (AsdfObject)
   ├─asdf_library (Software)
@@ -226,10 +283,11 @@ Image Outputs
 -------------
 
 Both the `~astrocut.FITSCutout` and `~astrocut.ASDFCutout` classes provide methods to normalize the cutout data and write it as an image,
-either as a a `~PIL.Image.Image` object or a file.
+either as a `~PIL.Image.Image` object or a file.
 
-To create cutouts as `~PIL.Image.Image` objects, use the `~astrocut.FITSCutout.get_image_cutouts` method. You can provide the following
-normalization parameters:
+To create image cutouts in memory, use ``get_image_cutouts``. For `~astrocut.FITSCutout`, this returns a list of `~PIL.Image.Image` objects,
+one for each input file. For `~astrocut.ASDFCutout`, this returns an `~astropy.table.Table` with columns ``file``, ``coordinate``, and ``cutout``
+(where ``cutout`` is a `~PIL.Image.Image` object). You can provide the following normalization parameters:
 
 - ``stretch``: The stretch function to apply to the image array. Options include "asinh", "sinh", "sqrt", "log", and "linear".
 - ``minmax_percent``: Defines an interval for scaling the image based on percentiles. The format is [lower percentile, upper percentile],
@@ -246,6 +304,23 @@ normalization parameters:
   >>> fits_img.show() #doctest: +SKIP
 
 .. image:: imgs/img_cutout.png
+
+For `~astrocut.ASDFCutout`, ``get_image_cutouts`` returns a table. Access the image object from the
+``cutout`` column:
+
+.. code-block:: python
+
+  >>> img_table = asdf_cutout.get_image_cutouts(stretch='linear', minmax_percent=[10, 99]) #doctest: +SKIP
+  >>> asdf_img = img_table["cutout"][0] #doctest: +SKIP
+  >>> print(asdf_img.size) #doctest: +SKIP
+  (50, 50)
+
+For large batches, use ``iter_image_cutouts`` to stream one cutout at a time:
+
+.. code-block:: python
+
+  >>> for file, coordinate, img in asdf_cutout.iter_image_cutouts(): #doctest: +SKIP
+  ...     print(file, coordinate.ra.deg, img.size) #doctest: +SKIP
 
 To produce a colorized RGB image, set the ``colorize`` parameter to True. Color images require three cutouts,
 which will be treated as the R, G, and B channels, respectively.

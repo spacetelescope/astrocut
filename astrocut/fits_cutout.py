@@ -88,6 +88,7 @@ class FITSCutout(ImageCutout):
         self._fits_cutouts = None
         self.hdu_cutouts_by_file = {}
         self._fsspec_kwargs = fsspec_kwargs
+        self._coordinates = self._coordinates[0]
 
         # Make the cutouts upon initialization
         self.cutout()
@@ -446,7 +447,7 @@ class FITSCutout(ImageCutout):
             log.debug("Returning cutout as a single FITS file.")
 
             cutout_fits = self.fits_cutouts[0]
-            filename = self._make_cutout_filename(cutout_prefix)
+            filename = self._make_cutout_filename(cutout_prefix, self._coordinates)
             cutout_path = Path(output_dir, filename)
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
@@ -460,7 +461,7 @@ class FITSCutout(ImageCutout):
             cutout_paths = []
             for i, file in enumerate(self.hdu_cutouts_by_file):
                 cutout_fits = self.fits_cutouts[i]
-                filename = self._make_cutout_filename(Path(file).stem)
+                filename = self._make_cutout_filename(Path(file).stem, self._coordinates)
                 cutout_path = Path(output_dir, filename)
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
@@ -493,17 +494,19 @@ class FITSCutout(ImageCutout):
         def build_entries():
             if self._single_outfile:
                 # Mirror the single-file naming used by write_as_fits
-                arcname = self._make_cutout_filename("cutout")
+                arcname = self._make_cutout_filename("cutout", self._coordinates)
                 hdu = self.fits_cutouts[0]
                 yield arcname, hdu
             else:
                 # One file per input; mirror write_as_fits naming
                 for i, file in enumerate(self.hdu_cutouts_by_file):
-                    arcname = self._make_cutout_filename(Path(file).stem)
+                    arcname = self._make_cutout_filename(Path(file).stem, self._coordinates)
                     hdu = self.fits_cutouts[i]
                     yield arcname, hdu
 
-        return self._write_cutouts_to_zip(output_dir=output_dir, filename=filename, build_entries=build_entries)
+        return self._write_cutouts_to_zip(
+            output_dir=output_dir, filename=filename, coordinates=self._coordinates, build_entries=build_entries
+        )
 
     class CutoutInstance:
         """
@@ -543,7 +546,7 @@ class FITSCutout(ImageCutout):
 
         def __init__(self, img_data: fits.Section, img_wcs: WCS, parent: "FITSCutout"):
             # Calculate cutout limits
-            cutout_lims = parent._get_cutout_limits(img_wcs)
+            cutout_lims = parent._get_cutout_limits(parent._coordinates, img_wcs)
 
             # Extract data from Section
             self.data = self._get_cutout_data(img_data, cutout_lims, parent)

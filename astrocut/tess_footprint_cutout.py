@@ -75,6 +75,9 @@ class TessFootprintCutout(FootprintCutout):
         verbose: bool = False,
     ):
         super().__init__(coordinates, cutout_size, fill_value, limit_rounding_method, sequence, verbose)
+
+        self._coordinates = self._coordinates[0]
+
         # Make the cutouts upon initialization
         self.cutout()
 

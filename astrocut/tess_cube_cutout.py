@@ -531,7 +531,7 @@ class TessCubeCutout(CubeCutout):
             # Determine file name
             if not output_file or len(self._input_files) > 1:
                 filename = self._make_cutout_filename(
-                    Path(file).stem.rstrip("-cube"), legacy_filenames=legacy_filenames
+                    Path(file).stem.rstrip("-cube"), self._coordinates, legacy_filenames=legacy_filenames
                 )
             else:
                 filename = output_file
@@ -586,10 +586,14 @@ class TessCubeCutout(CubeCutout):
 
         def build_entries():
             for file, tpf in self.tpf_cutouts_by_file.items():
-                arcname = self._make_cutout_filename(Path(file).stem.rstrip("-cube"), legacy_filenames=legacy_filenames)
+                arcname = self._make_cutout_filename(
+                    Path(file).stem.rstrip("-cube"), self._coordinates, legacy_filenames=legacy_filenames
+                )
                 yield arcname, tpf
 
-        return self._write_cutouts_to_zip(output_dir=output_dir, filename=filename, build_entries=build_entries)
+        return self._write_cutouts_to_zip(
+            output_dir=output_dir, filename=filename, coordinates=self._coordinates, build_entries=build_entries
+        )
 
     class CubeCutoutInstance(CubeCutout.CubeCutoutInstance):
         """
