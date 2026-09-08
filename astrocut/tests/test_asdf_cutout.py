@@ -100,6 +100,18 @@ def images(tmp_path):
         # create meta
         meta = {
             "wcs": wcsobj,
+            "wcsinfo": {
+                "aperture_name": "WFI01_FULL",
+                "v2_ref": 1312.9491452484797,
+                "v3_ref": -1040.7853726755036,
+                "vparity": -1,
+                "v3yangle": -60.0,
+                "ra_ref": 30.0 + i * 0.001,
+                "dec_ref": 45.0 + i * 0.001,
+                "roll_ref": 59.84660742516984,
+                "s_region": "POLYGON ICRS 0 0 0 1 1 1 1 0",
+                "pa_aperture": 0,
+            },
             "product_type": "l2",
             "origin": "STSCI/SOC",
             "file_date": Time("2023-10-01T00:00:00", format="isot"),
@@ -123,6 +135,32 @@ def images(tmp_path):
         files.append(filename)
 
     return files
+
+
+@pytest.fixture()
+def l3_image(tmp_path):
+    data, wcsobj = make_fake(1000, 1000, 30.0, 45.0)
+    wcsinfo = {
+        "ra_ref": 30.0,
+        "dec_ref": 45.0,
+        "x_ref": 500.0,
+        "y_ref": 500.0,
+        "rotation_matrix": [[1.0, 0.0], [0.0, 1.0]],
+        "pixel_scale": -1.0,
+        "pixel_scale_ref": 0.1 / 3600.0,
+        "projection": "TAN",
+        "s_region": "POLYGON ICRS 0 0 0 1 1 1 1 0",
+        "image_shape": [1000, 1000],
+        "ra": -1.0,
+        "dec": -1.0,
+        "orientation": -1.0,
+        "orientation_ref": 0.0,
+        "skycell_name": "030p45x00y00",
+    }
+
+    filename = tmp_path / "test_roman_l3.asdf"
+    asdf.AsdfFile({"roman": {"meta": {"wcs": wcsobj, "wcsinfo": wcsinfo}, "data": data}}).write_to(filename)
+    return filename
 
 
 @pytest.fixture
@@ -480,6 +518,65 @@ def test_asdf_cutout_write_to_file(images, center_coord, cutout_size, tmpdir):
         if HAS_ASDF_IN_FITS:
             with asdf_in_fits.open(fits_file) as af:
                 check_asdf_metadata(af, images[i], cutout.cutouts["cutout"][i].data, meta_only=True)
+
+
+def test_asdf_cutout_updates_only_wcsinfo_s_region(images, center_coord, cutout_size):
+    cutout = ASDFCutout(images[0], center_coord, cutout_size, lite=False)
+    output_meta = cutout.asdf_cutouts["cutout"][0]["roman"]["meta"]
+
+    with asdf.open(images[0]) as original:
+        original_wcsinfo = original["roman"]["meta"]["wcsinfo"]
+        for key, value in original_wcsinfo.items():
+            if key != "s_region":
+                assert output_meta["wcsinfo"][key] == value
+        assert output_meta["wcsinfo"]["s_region"] != original_wcsinfo["s_region"]
+
+    footprint = np.asarray(output_meta["wcs"].footprint(axis_type="spatial"))
+    expected_coordinates = " ".join(f"{value:.9f}" for value in footprint.ravel())
+    assert output_meta["wcsinfo"]["s_region"] == f"POLYGON ICRS {expected_coordinates}"
+
+
+def test_asdf_cutout_s_region_is_independent_for_each_coordinate(images, multi_coord, cutout_size):
+    cutout = ASDFCutout(images[0], multi_coord[:2], cutout_size, lite=False)
+    output_metadata = [asdf_file["roman"]["meta"] for asdf_file in cutout.asdf_cutouts["cutout"]]
+
+    assert output_metadata[0]["wcsinfo"] is not output_metadata[1]["wcsinfo"]
+    assert output_metadata[0]["wcsinfo"]["s_region"] != output_metadata[1]["wcsinfo"]["s_region"]
+
+    for meta in output_metadata:
+        footprint = np.asarray(meta["wcs"].footprint(axis_type="spatial"))
+        expected_coordinates = " ".join(f"{value:.9f}" for value in footprint.ravel())
+        assert meta["wcsinfo"]["s_region"] == f"POLYGON ICRS {expected_coordinates}"
+
+
+def test_asdf_cutout_updates_l3_wcsinfo(l3_image):
+    cutout_size = (12, 8)
+    cutout = ASDFCutout(l3_image, SkyCoord(30.0, 45.0, unit="deg"), cutout_size, lite=False)
+    meta = cutout.asdf_cutouts["cutout"][0]["roman"]["meta"]
+    wcsinfo = meta["wcsinfo"]
+    cutout_wcs = meta["wcs"]
+
+    assert wcsinfo["ra_ref"] == 30.0
+    assert wcsinfo["dec_ref"] == 45.0
+    assert wcsinfo["pixel_scale_ref"] == 0.1 / 3600.0
+    assert wcsinfo["rotation_matrix"] == [[1.0, 0.0], [0.0, 1.0]]
+    assert wcsinfo["projection"] == "TAN"
+    assert wcsinfo["orientation_ref"] == 0.0
+    assert wcsinfo["skycell_name"] == "030p45x00y00"
+
+    reference_pixel = cutout_wcs.invert(30.0, 45.0, with_bounding_box=False)
+    assert np.allclose([wcsinfo["x_ref"], wcsinfo["y_ref"]], reference_pixel)
+    assert wcsinfo["image_shape"] == list(cutout_wcs.array_shape)
+    assert wcsinfo["image_shape"] == [8, 12]
+
+    center_pixel = tuple((size - 1) / 2 for size in cutout_wcs.pixel_shape)
+    assert np.allclose([wcsinfo["ra"], wcsinfo["dec"]], cutout_wcs(*center_pixel))
+    assert wcsinfo["pixel_scale"] > 0
+    assert wcsinfo["orientation"] >= 0
+
+    footprint = np.asarray(cutout_wcs.footprint(axis_type="spatial"))
+    expected_coordinates = " ".join(f"{value:.9f}" for value in footprint.ravel())
+    assert wcsinfo["s_region"] == f"POLYGON ICRS {expected_coordinates}"
 
 
 @pytest.mark.parametrize("output_format", [".asdf", ".fits"])
