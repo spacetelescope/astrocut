@@ -1,5 +1,5 @@
 :orphan:
-   
+
 *********************
 Astrocut File Formats
 *********************
@@ -18,15 +18,15 @@ PRIMARY PrimaryHDU (Extension 0)
 ========= ===================================================
 Keyword   Value
 ========= ===================================================
-SIMPLE    T (conforms to FITS standard)                     
-BITPIX    8 (array data type)                               
-NAXIS     0 (number of array dimensions)                    
-EXTEND    Number of standard extensions                                                  
+SIMPLE    T (conforms to FITS standard)
+BITPIX    8 (array data type)
+NAXIS     0 (number of array dimensions)
+EXTEND    Number of standard extensions
 ORIGIN    STScI/MAST
-DATE      File creation date                             
-PROCVER   Software version                      
-RA_OBJ    Center coordinate right ascension (deg)                         
-DEC_OBJ   Center coordinate declination (deg)                             
+DATE      File creation date
+PROCVER   Software version
+RA_OBJ    Center coordinate right ascension (deg)
+DEC_OBJ   Center coordinate declination (deg)
 CHECKSUM  HDU checksum
 DATASUM   Data unit checksum
 ========= ===================================================
@@ -49,7 +49,7 @@ Image Cutouts
 ^^^^^^^^^^^^^
 
 ASDF and FITS image cutout files are output by the `~astrocut.ASDFCutout` class.
-The output format (ASDF vs FITS) impacts the structure of the cutout file. Additionally, the ``lite`` parameter controls 
+The output format (ASDF vs FITS) impacts the structure of the cutout file. Additionally, the ``lite`` parameter controls
 whether the cutout contains only essential data or all data and metadata from the original file.
 The ``lite`` parameter has the following effects on the cutout content:
 
@@ -106,12 +106,12 @@ sliced and adjusted to account for the cutout's position and shape.
 FITS Format Output
 -------------------
 
-When writing to FITS format, the output structure differs from ASDF. The cutout data is stored in an ``ImageHDU`` extension, 
-with WCS information encoded in standard FITS headers. With Python 3.11+ and ``stdatamodels>=4.1.0``, the ASDF metadata tree is embedded in the FITS file. 
-When ``lite=True``, the embedded ASDF tree contains only the cutout WCS and original filename; when ``lite=False``, the full 
+When writing to FITS format, the output structure differs from ASDF. The cutout data is stored in an ``ImageHDU`` extension,
+with WCS information encoded in standard FITS headers. With Python 3.11+ and ``stdatamodels>=4.1.0``, the ASDF metadata tree is embedded in the FITS file.
+When ``lite=True``, the embedded ASDF tree contains only the cutout WCS and original filename; when ``lite=False``, the full
 ASDF metadata is embedded.
 
-Note that FITS output files only contain the cutout image data in the ``ImageHDU`` extension, and do not include any additional 
+Note that FITS output files only contain the cutout image data in the ``ImageHDU`` extension, and do not include any additional
 data arrays from the original ASDF file, even when ``lite=False``. This is a key difference from ASDF output.
 
 **FITS Structure:**
@@ -139,13 +139,13 @@ Spectral Subsets
 ^^^^^^^^^^^^^^^^
 
 ASDF spectral subsets are produced by the `~astrocut.RomanSpectralSubset` class.
-The amount of information in each subset file is controlled by the ``lite`` parameter, which determines whether only essential data 
+The amount of information in each subset file is controlled by the ``lite`` parameter, which determines whether only essential data
 or all data and metadata from the original file are included in the subset. The ``lite`` parameter has the following effects on the subset content:
 
 - ``lite=True`` (default): The subset data only includes the "wl", "flux", and "flux_error" arrays. All original
   metadata is preserved, but all other data arrays and top-level keys from the original file are omitted from the subset.
 
-- ``lite=False``: The subset includes all data and metadata from the original ASDF file(s), with all arrays that match the 
+- ``lite=False``: The subset includes all data and metadata from the original ASDF file(s), with all arrays that match the
   dimensions of the ``wl`` array being sliced to the subset shape if a ``wl_range`` was specified.
   The full tree structure and metadata from the original file(s) are preserved.
 
@@ -156,12 +156,12 @@ This parameter has three options and controls how the subset data is organized a
 Group by Source ID and Input File
 ----------------------------------
 
-Setting ``group_by='source_file'`` writes one ASDF file per unique combination of input file and source ID. 
-This means that if multiple source IDs are selected from the same input file, each will be written to a separate ASDF file. 
+Setting ``group_by='source_file'`` writes one ASDF file per unique combination of input file and source ID.
+This means that if multiple source IDs are selected from the same input file, each will be written to a separate ASDF file.
 The output filename pattern for this grouping is: ``<input_stem>_subset_<source_id>[_lite].asdf``
 
-When returned in memory through `~astrocut.RomanSpectralSubset.get_asdf_subsets`, these subsets are keyed by deterministic
-string keys (for example, ``<source_id>_<input_stem>``). If key collisions occur, a short hash suffix is added automatically.
+When returned in memory through `~astrocut.RomanSpectralSubset.get_asdf_subsets`, these subsets are returned as an
+`~astropy.table.Table` with one row per ``(input_file, source_id)`` pair, and columns ``file``, ``source_id``, and ``subset``.
 
 **Lite Structure:**
 
@@ -208,6 +208,9 @@ Group by Input File
 
 Setting ``group_by='file'`` writes one ASDF file per input spectral file, combining selected source IDs from that file into a single ASDF file.
 The output filename pattern for this grouping is: ``<input_stem>_subset[_lite].asdf``
+
+When returned in memory through `~astrocut.RomanSpectralSubset.get_asdf_subsets`, these subsets are returned as an
+`~astropy.table.Table` with one row per ``input_file``, and columns ``file``, ``source_ids``, and ``subset``.
 
 **Lite Structure:**
 
@@ -268,8 +271,11 @@ The output filename pattern for this grouping is: ``<input_stem>_subset[_lite].a
 Combined File for All Sources and Input Files
 ----------------------------------------------
 
-Setting ``group_by='combined'`` writes one ASDF file containing all requested files and sources. 
+Setting ``group_by='combined'`` writes one ASDF file containing all requested files and sources.
 The output filename pattern for this grouping is: ``combined_spectral_subset[_lite].asdf``
+
+When returned in memory through `~astrocut.RomanSpectralSubset.get_asdf_subsets`, these subsets are returned as an
+`~astropy.table.Table` with one row for the combined subset, and columns ``files``, ``source_ids``, and ``subset``.
 
 **Lite Structure:**
 
@@ -397,7 +403,7 @@ The cube dimensions are ordered in the FITS format as follows:
 ========= ===================================================
 Keyword   Value
 ========= ===================================================
-NAXIS     4 (number of array dimensions)                    
+NAXIS     4 (number of array dimensions)
 NAXIS1    2 (data value, error value)
 NAXIS2    Total number of FFIs
 NAXIS3    Length of first array dimension (NAXIS1 from FFIs)
@@ -408,10 +414,10 @@ NAXIS4    Length of second array dimension (NAXIS2 from FFIs)
 BinTableHDU (Extension 2)
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The BinTableHDU extension contains a table that 
-holds all of the image extension header keywords from the individual FFIs. There 
-is one column for each keyword plus one additional column called "FFI_FILE" that 
-contains FFI filename for each row. Each column name keyword also has an entry in the 
+The BinTableHDU extension contains a table that
+holds all of the image extension header keywords from the individual FFIs. There
+is one column for each keyword plus one additional column called "FFI_FILE" that
+contains FFI filename for each row. Each column name keyword also has an entry in the
 Image extension header, with the value being the keyword value from the FFI header.
 This last column allows the FFI Image extension headers to be recreated completely if desired.
 

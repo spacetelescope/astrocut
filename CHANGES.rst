@@ -3,6 +3,8 @@ Unreleased
 
 - Extend the ASDF cutout workflow to accept multiple target coordinates and to expose downstream cutout products in
   an ``astropy.table.Table`` object with columns for input file, coordinate, and cutout object. [#196]
+- ``RomanSpectralSubset`` class now returns spectral subsets in memory as an `~astropy.table.Table` with columns for
+  source ID(s), input file(s), and the corresponding subset. [#198]
 
 1.3.0 (2026-09-02)
 -------------------
