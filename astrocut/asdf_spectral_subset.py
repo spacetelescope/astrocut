@@ -724,11 +724,17 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
         if not rows:
             return Table(names=columns)
 
-        *other_columns, asdf_files = zip(*rows)
+        data = {}
+        for index, column in enumerate(columns[:-1]):
+            values = [row[index] for row in rows]
+            if column in {"files", "source_ids"}:
+                column_data = np.empty(len(values), dtype=object)
+                column_data[:] = values
+                data[column] = column_data
+            else:
+                data[column] = values
         asdf_col = np.empty(len(rows), dtype=object)
-        asdf_col[:] = asdf_files
-
-        data = dict(zip(columns[:-1], other_columns))
+        asdf_col[:] = [row[-1] for row in rows]
         data[columns[-1]] = asdf_col
         return Table(data)
 
