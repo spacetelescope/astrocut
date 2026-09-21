@@ -211,6 +211,74 @@ def test_roman_spectral_subset_parallel(subset, spectral_files):
     assert np.array_equal(parallel_flux, non_parallel_flux)
 
 
+@pytest.mark.parametrize(
+    ("group_by", "expected_row_count"),
+    [("source_file", 4), ("file", 2), ("combined", 1)],
+)
+def test_roman_spectral_subset_iter_asdf_subsets_grouping(subset, spectral_files, group_by, expected_row_count):
+    rows = list(subset.iter_asdf_subsets(group_by=group_by))
+
+    assert len(rows) == expected_row_count
+    for row in rows:
+        assert len(row) == 3
+        grouping, source_ids, subset_af = row
+        assert isinstance(subset_af, asdf.AsdfFile)
+        assert "roman" in subset_af.tree
+        assert "data" in subset_af.tree["roman"]
+
+        if group_by == "source_file":
+            assert grouping in spectral_files
+            assert source_ids in {"420007", "420008"}
+        elif group_by == "file":
+            assert grouping in spectral_files
+            assert source_ids == ["420007", "420008"]
+        else:
+            assert grouping == spectral_files
+            assert source_ids == ["420007", "420008"]
+
+    with pytest.raises(InvalidInputError):
+        list(subset.iter_asdf_subsets(group_by="invalid_group_by"))
+
+
+@pytest.mark.parametrize(
+    ("selection", "expected_source_file_rows", "expected_file_rows"),
+    [
+        ({"spectral_files": "{file}"}, 2, 1),
+        ({"source_ids": "420007"}, 2, 2),
+        ({"spectral_files": "{file}", "source_ids": ["420007"]}, 1, 1),
+    ],
+)
+def test_roman_spectral_subset_iter_asdf_subsets_selection_filters(
+    subset, spectral_files, selection, expected_source_file_rows, expected_file_rows
+):
+    selection = {
+        key: value.format(file=spectral_files[0]) if isinstance(value, str) and "{file}" in value else value
+        for key, value in selection.items()
+    }
+    expected_source_ids = ["420007"] if "source_ids" in selection else ["420007", "420008"]
+
+    for group_by, expected_row_count in [
+        ("source_file", expected_source_file_rows),
+        ("file", expected_file_rows),
+        ("combined", 1),
+    ]:
+        rows = list(subset.iter_asdf_subsets(group_by=group_by, **selection))
+        assert len(rows) == expected_row_count
+        for row in rows:
+            assert len(row) == 3
+            grouping, source_ids, subset_af = row
+            assert isinstance(subset_af, asdf.AsdfFile)
+            if group_by == "source_file":
+                assert grouping == spectral_files[0] if "spectral_files" in selection else grouping in spectral_files
+                assert source_ids in expected_source_ids
+            elif group_by == "file":
+                assert grouping == spectral_files[0] if "spectral_files" in selection else grouping in spectral_files
+                assert source_ids == expected_source_ids
+            else:
+                assert grouping == [spectral_files[0]] if "spectral_files" in selection else grouping == spectral_files
+                assert source_ids == expected_source_ids
+
+
 def test_roman_spectral_subset_asdf_subsets_duplicate_stems(tmp_path):
     def _write_spectral_file(path):
         with asdf.AsdfFile() as af:
