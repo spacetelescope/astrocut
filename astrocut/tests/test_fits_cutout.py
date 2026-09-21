@@ -34,6 +34,50 @@ def test_image_bad_sip(tmpdir):
     return create_test_imgs(50, 1, dir_name=tmpdir, basename="img_badsip_{:04d}.fits", bad_sip_keywords=True)[0]
 
 
+# Fixture to create a test image with Pan-STARRS-style asinh flux scaling keywords
+@pytest.fixture
+def test_image_asinh(tmpdir):
+    img_path = create_test_imgs(50, 1, dir_name=tmpdir, basename="img_asinh_{:04d}.fits")[0]
+    with fits.open(img_path, mode="update") as hdulist:
+        # Rescale to a realistic range of asinh-scaled pixel values (avoids overflow in sinh)
+        hdulist[0].data = (hdulist[0].data / 250 - 5).astype(np.float32)
+        hdulist[0].header["BSOFTEN"] = 87.39592975627
+        hdulist[0].header["BOFFSET"] = 2.654963016510
+    return img_path
+
+
+# Fixture to create a test image with archaic AIPS-style PC matrix keywords
+@pytest.fixture
+def test_image_archaic_wcs(tmpdir):
+    img_size = 50
+    img = np.arange(img_size * img_size, dtype=np.float32).reshape((img_size, img_size))
+
+    primary_hdu = fits.PrimaryHDU(data=img)
+    primary_hdu.header.extend(
+        [
+            ("WCSAXES", 2, "Number of coordinate axes"),
+            ("CRPIX1", img_size / 2, "Pixel coordinate of reference point"),
+            ("CRPIX2", img_size / 2, "Pixel coordinate of reference point"),
+            ("PC001001", -1.666667e-05, "Coordinate transformation matrix element"),
+            ("PC001002", 0.0, "Coordinate transformation matrix element"),
+            ("PC002001", 0.0, "Coordinate transformation matrix element"),
+            ("PC002002", 1.666667e-05, "Coordinate transformation matrix element"),
+            ("CDELT1", 1.0, "[deg] Coordinate increment at reference point"),
+            ("CDELT2", 1.0, "[deg] Coordinate increment at reference point"),
+            ("CUNIT1", "deg", "Units of coordinate increment and value"),
+            ("CUNIT2", "deg", "Units of coordinate increment and value"),
+            ("CTYPE1", "RA---TAN", "Right ascension, gnomonic projection"),
+            ("CTYPE2", "DEC--TAN", "Declination, gnomonic projection"),
+            ("CRVAL1", 150.1163213, "[deg] Coordinate value at reference point"),
+            ("CRVAL2", 2.200973097, "[deg] Coordinate value at reference point"),
+        ]
+    )
+
+    img_path = path.join(tmpdir, "img_archaic_wcs_0000.fits")
+    primary_hdu.writeto(img_path, overwrite=True, checksum=True)
+    return img_path
+
+
 # Fixture to return a center coordinate
 @pytest.fixture
 def center_coord():
@@ -129,6 +173,47 @@ def test_fits_cutout_memory_only(test_images, center_coord, cutout_size):
     assert len(cutout_list) == len(test_images)
     assert isinstance(cutout_list[0], fits.HDUList)
     assert not path.exists(nonexisting_dir)  # no files should be written
+
+
+def test_fits_cutout_asinh_linearization(test_image_asinh, center_coord, cutout_size):
+    # Pan-STARRS stack images carry BSOFTEN/BOFFSET keywords that indicate asinh flux scaling
+    with fits.open(test_image_asinh) as hdulist:
+        bsoften = hdulist[0].header["BSOFTEN"]
+        boffset = hdulist[0].header["BOFFSET"]
+        raw_data = hdulist[0].data[19:29, 19:29]
+
+    cutout = FITSCutout(test_image_asinh, center_coord, cutout_size, single_outfile=True).fits_cutouts[0]
+    cutout_data = cutout[1].data
+
+    # Cutout data should be converted from asinh-scaled flux to standard linear flux
+    x = raw_data * 0.4 * np.log(10)
+    expected = boffset + bsoften * (np.exp(x) - np.exp(-x))
+    assert np.allclose(cutout_data, expected)
+
+    # A HISTORY note documents the conversion
+    history = [str(card) for card in cutout[1].header.get("HISTORY", [])]
+    assert any("asinh" in h.lower() for h in history)
+
+
+def test_fits_cutout_no_asinh_linearization(test_images, center_coord, cutout_size):
+    # Images without BSOFTEN/BOFFSET keywords (e.g. single-epoch warp images) are left untouched
+    cutout = FITSCutout(test_images, center_coord, cutout_size, single_outfile=True).fits_cutouts[0]
+    assert "HISTORY" not in cutout[1].header
+
+
+def test_fits_cutout_modernizes_archaic_wcs_keywords(test_image_archaic_wcs, center_coord, cutout_size):
+    # Archaic PC00i00j keywords should be replaced by their modern PCi_j equivalents
+    cutout = FITSCutout(test_image_archaic_wcs, center_coord, cutout_size, single_outfile=True).fits_cutouts[0]
+    header = cutout[1].header
+
+    for archaic_key in ("PC001001", "PC001002", "PC002001", "PC002002"):
+        assert archaic_key not in header
+
+    for modern_key in ("PC1_1", "PC1_2", "PC2_1", "PC2_2"):
+        assert modern_key in header
+
+    assert header["PC1_1"] == pytest.approx(-1.666667e-05)
+    assert header["PC2_2"] == pytest.approx(1.666667e-05)
 
 
 def test_fits_cutout_return_paths(test_images, center_coord, cutout_size, tmpdir):
