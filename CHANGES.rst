@@ -5,6 +5,13 @@ Unreleased
   an ``astropy.table.Table`` object with columns for input file, coordinate, and cutout object. [#196]
 - Update the ``wcsinfo`` section of the ASDF metadata dictionary to reflect the cutout's spatial extent and local WCS properties
   when creating full cutouts from ASDF images. [#199]
+- ``FITSCutout`` now detects the ``BSOFTEN``/``BOFFSET`` header keywords used by Pan-STARRS stack images to
+  encode asinh ("luptitude") flux scaling, and converts cutout pixel data to standard linear flux. Images
+  without these keywords (e.g. Pan-STARRS single-epoch warp images) are left unchanged. [#200]
+- Added ``utils.modernize_wcs_keywords`` to convert archaic AIPS-style WCS transformation matrix
+  keywords (e.g. ``PC001001``) to their modern equivalents (e.g. ``PC1_1``) before parsing a header's WCS.
+  ``FITSCutout`` now applies this conversion so cutout headers no longer contain a confusing mix of archaic
+  and modern WCS matrix keywords. [#200]
 
 1.3.0 (2026-09-02)
 -------------------

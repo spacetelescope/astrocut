@@ -1,3 +1,4 @@
+import math
 import warnings
 from datetime import date
 from pathlib import Path
@@ -18,6 +19,7 @@ from s3path import S3Path
 from . import __version__, log
 from .exceptions import DataWarning, InvalidQueryError
 from .image_cutout import ImageCutout
+from .utils.utils import modernize_wcs_keywords
 
 
 class FITSCutout(ImageCutout):
@@ -231,6 +233,10 @@ class FITSCutout(ImageCutout):
         no_sip : bool
             Whether the image WCS has no SIP information.
         """
+        # Convert archaic PC00i00j/CD00i00j keywords to their modern equivalents before
+        # handing off to WCS(), which otherwise translates them itself, incompletely.
+        modernize_wcs_keywords(hdu_header)
+
         # We are going to reroute the logging to a string stream temporarily so we can
         # intercept any message from astropy, chiefly the "Inconsistent SIP distortion information"
         # INFO message which will indicate that we need to remove existing SIP keywords
@@ -255,6 +261,29 @@ class FITSCutout(ImageCutout):
                     astropy_log.log(log_rec.levelno, log_rec.msg, extra={"origin": log_rec.name})
 
         return (img_wcs, no_sip)
+
+    @staticmethod
+    def _linearize_asinh_flux(data: np.ndarray, header: fits.Header) -> np.ndarray:
+        """
+        Convert asinh-scaled (asinh magnitude/"luptitude") pixel values to standard linear
+        flux, using the BSOFTEN/BOFFSET keywords from the image header.
+
+        Parameters
+        ----------
+        data : `numpy.ndarray`
+            The asinh-scaled pixel data (after BZERO/BSCALE have already been applied).
+        header : `~astropy.io.fits.Header`
+            The image header containing the BSOFTEN and BOFFSET keywords.
+
+        Returns
+        -------
+        response : `numpy.ndarray`
+            The pixel data converted to standard linear flux.
+        """
+        bsoften = header["BSOFTEN"]
+        boffset = header["BOFFSET"]
+        x = data * 0.4 * math.log(10)
+        return boffset + bsoften * (np.exp(x) - np.exp(-x))
 
     def _hducut(
         self,
@@ -357,6 +386,15 @@ class FITSCutout(ImageCutout):
                 if is_empty:
                     num_empty += 1
                 else:
+                    # Check whether an image header indicates asinh-scaled flux (e.g. Pan-STARRS stack
+                    # images), which is signaled by the presence of the BSOFTEN and BOFFSET keywords.
+                    # Single-epoch warp images do not use this scaling and lack these keywords.
+                    if "BSOFTEN" in hdu_header and "BOFFSET" in hdu_header:
+                        cutout.data = self._linearize_asinh_flux(cutout.data, hdu_header)
+                        hdu_header["HISTORY"] = (
+                            "Pixel values converted from asinh-scaled flux to linear flux "
+                            "using the BSOFTEN/BOFFSET keywords."
+                        )
                     cutouts.append(cutout)
 
                 # Also save the cutouts as ImageHDU objects for FITS output

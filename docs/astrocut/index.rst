@@ -91,6 +91,22 @@ cutout FITS files.
 By default, the cutouts are written to the current working directory. You can specify a different output directory using the ``output_dir`` parameter.
 You can also set the prefix of the cutout file paths using the ``cutout_prefix`` parameter. The default value is "cutout".
 
+FITS Header Handling
+^^^^^^^^^^^^^^^^^^^^
+
+`~astrocut.FITSCutout` makes a couple of adjustments to the cutout header and data beyond updating the WCS
+for the cutout footprint:
+
+- Archaic AIPS-style WCS transformation matrix keywords (e.g. ``PC001001``) are converted to their modern
+  equivalents (e.g. ``PC1_1``) before the WCS is parsed, so the cutout header does not end up with a mix of
+  archaic and modern WCS matrix keywords.
+- If the input header contains the ``BSOFTEN`` and ``BOFFSET`` keywords used by Pan-STARRS stack images to
+  encode asinh ("luptitude") flux scaling, the cutout pixel data is converted to standard linear flux and a
+  ``HISTORY`` keyword documenting the conversion is added to the header. Images without these keywords (e.g.
+  Pan-STARRS single-epoch warp images) are unaffected.
+
+See the :ref:`Astrocut File Formats <fits-cutout-files>` page for more details on the CUTOUT header contents.
+
 ASDF Cutouts
 ------------
 

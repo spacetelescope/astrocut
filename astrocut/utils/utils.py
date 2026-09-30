@@ -3,6 +3,7 @@
 """This module includes a variety of functions that may be used by multiple modules."""
 
 import logging
+import re
 import warnings
 from datetime import date
 
@@ -57,6 +58,40 @@ def parse_size_input(cutout_size):
         )
 
     return cutout_size
+
+
+def modernize_wcs_keywords(header: fits.Header) -> fits.Header:
+    """
+    Replace archaic WCS transformation matrix keywords (e.g. ``PC001001``,
+    ``CD002001``) with their modern equivalents (e.g. ``PC1_1``, ``CD2_1``), in place.
+
+    This conversion is normally left to `~astropy.wcs.WCS`/wcslib, which silently
+    generates the modern keywords but may only do so for a subset of the matrix
+    elements, leaving the header with a confusing mix of archaic and modern keywords.
+
+    Parameters
+    ----------
+    header : `~astropy.io.fits.Header`
+        The FITS header to modernize. Modified in place.
+
+    Returns
+    -------
+    header : `~astropy.io.fits.Header`
+        The same header object, for convenience.
+    """
+    old_matrix_keyword = re.compile(r"^(PC|CD)(\d{3})(\d{3})$")
+    for old_key in list(header.keys()):
+        match = old_matrix_keyword.match(old_key)
+        if not match:
+            continue
+
+        prefix, i, j = match.groups()
+        new_key = f"{prefix}{int(i)}_{int(j)}"
+        if new_key not in header:  # don't override an existing modern keyword
+            header[new_key] = (header[old_key], header.comments[old_key])
+        del header[old_key]
+
+    return header
 
 
 def get_cutout_limits(img_wcs, center_coord, cutout_size):

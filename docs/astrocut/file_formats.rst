@@ -39,6 +39,15 @@ keywords from the extension that the cutout image was drawn from, with WCS keywo
 updated to match the cutout image. Additionally the keyword ``ORIG_FLE`` has been added,
 it contains the name of the file the cutout comes from.
 
+Any archaic AIPS-style WCS transformation matrix keywords in the original header (e.g. ``PC001001``)
+are replaced with their modern equivalents (e.g. ``PC1_1``) before the cutout WCS is computed, so the
+CUTOUT header will not contain a mix of archaic and modern WCS matrix keywords.
+
+If the original image header contains the ``BSOFTEN`` and ``BOFFSET`` keywords used by Pan-STARRS
+stack images to encode asinh ("luptitude") flux scaling, the cutout pixel data is converted to standard
+linear flux and a ``HISTORY`` keyword documenting the conversion is added to the header. Images without
+these keywords (e.g. Pan-STARRS single-epoch warp images) are unaffected.
+
 
 .. _asdf-cutout-files:
 

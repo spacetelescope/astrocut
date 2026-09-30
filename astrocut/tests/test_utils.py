@@ -52,6 +52,55 @@ def test_parse_size_input_invalid():
         utils.parse_size_input((0, 5))
 
 
+def test_modernize_wcs_keywords():
+    """Test that archaic PC00i00j/CD00i00j keywords are replaced with modern equivalents."""
+    header = fits.Header(
+        cards=[
+            ("PC001001", 1.0, "Coordinate transformation matrix element"),
+            ("PC001002", 0.0, "Coordinate transformation matrix element"),
+            ("PC002001", 0.0, "Coordinate transformation matrix element"),
+            ("CD002002", 2.0, "Coordinate transformation matrix element"),
+            ("CRVAL1", 100, "[deg] Coordinate value at reference point"),  # not a matrix keyword, untouched
+        ]
+    )
+
+    result = utils.modernize_wcs_keywords(header)
+
+    # Same header object returned
+    assert result is header
+
+    # Archaic keywords are gone
+    assert "PC001001" not in header
+    assert "PC001002" not in header
+    assert "PC002001" not in header
+    assert "CD002002" not in header
+
+    # Modern equivalents are present with the original values/comments
+    assert header["PC1_1"] == 1.0
+    assert header["PC1_2"] == 0.0
+    assert header["PC2_1"] == 0.0
+    assert header["CD2_2"] == 2.0
+    assert header.comments["PC1_1"] == "Coordinate transformation matrix element"
+
+    # Non-matrix keywords are untouched
+    assert header["CRVAL1"] == 100
+
+
+def test_modernize_wcs_keywords_does_not_override_existing():
+    """Test that a pre-existing modern keyword is not overridden by the archaic conversion."""
+    header = fits.Header(
+        cards=[
+            ("PC001001", 999.0, "Coordinate transformation matrix element"),
+            ("PC1_1", 1.0, "Coordinate transformation matrix element"),
+        ]
+    )
+
+    utils.modernize_wcs_keywords(header)
+
+    assert "PC001001" not in header
+    assert header["PC1_1"] == 1.0  # modern value preserved, not overridden by archaic one
+
+
 def test_get_cutout_limits():
     test_img_wcs_kwds = fits.Header(
         cards=[
