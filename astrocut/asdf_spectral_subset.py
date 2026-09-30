@@ -885,37 +885,37 @@ class ASDFSpectralSubset(SpectralSubset, ABC):
         write_jobs = []  # List of tuples: (asdf.AsdfFile, output_file_path)
         if group_by == "source_file":
             # Write separate ASDF files for each source/file combination
-            subset_table = self.get_asdf_subsets(
+            subset_rows = self.iter_asdf_subsets(
                 group_by="source_file",
                 source_ids=source_ids,
                 spectral_files=spectral_files,
             )
 
-            for row in subset_table:
-                file, sid = row["file"], row["source_id"]
+            for file, sid, subset in subset_rows:
                 filename = f"{Path(file).stem}_subset_{sid}{'_lite' if self._lite else ''}.asdf"
-                write_jobs.append((row["subset"], str(output_dir / filename)))
+                write_jobs.append((subset, str(output_dir / filename)))
 
         elif group_by == "file":
             # Write one ASDF file per input file, containing all specified source IDs from that file
-            subset_table = self.get_asdf_subsets(
+            subset_rows = self.iter_asdf_subsets(
                 group_by="file",
                 source_ids=source_ids,
                 spectral_files=spectral_files,
             )
-            for row in subset_table:
-                filename = f"{Path(row['file']).stem}_subset{'_lite' if self._lite else ''}.asdf"
-                write_jobs.append((row["subset"], str(output_dir / filename)))
+            for file, _, subset in subset_rows:
+                filename = f"{Path(file).stem}_subset{'_lite' if self._lite else ''}.asdf"
+                write_jobs.append((subset, str(output_dir / filename)))
 
         elif group_by == "combined":
             # Write a single ASDF file containing all specified source IDs from all input files
-            subset_table = self.get_asdf_subsets(
+            subset_rows = self.iter_asdf_subsets(
                 group_by="combined",
                 source_ids=source_ids,
                 spectral_files=spectral_files,
             )
+            _, _, subset = next(subset_rows)
             filename = f"combined_spectral_subset{'_lite' if self._lite else ''}.asdf"
-            write_jobs.append((subset_table[0]["subset"], str(output_dir / filename)))
+            write_jobs.append((subset, str(output_dir / filename)))
 
         else:
             raise InvalidInputError(self._invalid_group_by_msg.format(group_by))
