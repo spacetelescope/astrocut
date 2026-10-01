@@ -216,6 +216,8 @@ class Cutout(BaseCutout, ABC):
         ra = coordinates.ra.value
         dec = coordinates.dec.value
         if legacy_filenames:
+            if cutout_lims is None:
+                raise InvalidInputError("Cutout limits are required when using legacy filenames.")
             width = int(cutout_lims[0, 1] - cutout_lims[0, 0])
             height = int(cutout_lims[1, 1] - cutout_lims[1, 0])
             return f"{file_stem}_{float(ra):.6f}_{float(dec):.6f}_{width}x{height}_astrocut.fits"
