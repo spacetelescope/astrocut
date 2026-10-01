@@ -225,6 +225,19 @@ def test_legacy_filenames(cube_file, tmp_path):
     assert "256.880000_6.380000_5x3_astrocut.fits" in out_file
     assert "-x-" not in out_file
 
+    # Pixel Quantities use the integer pixel window, not "5.0pix"
+    out_file = cube_cut(
+        cube_file,
+        coord,
+        [5 * u.pixel, 3 * u.pixel],
+        output_path=path.join(tmpdir, "func_legacy_quantity"),
+        legacy_filenames=True,
+        verbose=False,
+    )
+    assert "256.880000_6.380000_5x3_astrocut.fits" in out_file
+    assert "pix" not in out_file
+    assert "-x-" not in out_file
+
     # Default behavior (legacy_filenames=False) is unaffected
     out_file = cube_cut(
         cube_file,

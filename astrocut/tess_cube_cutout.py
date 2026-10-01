@@ -510,10 +510,9 @@ class TessCubeCutout(CubeCutout):
             will be generated based on the input filename. This parameter is included so that
             ``CubeCutout`` is backwards compatible with ``CutoutFactory.cube_cut``.
         legacy_filenames : bool
-            If True, generated cutout filenames use the pre-1.2.0 format (``<ny>x<nx>`` size separator
-            and 6-decimal RA/Dec precision) instead of the current format (``<ny>-x-<nx>`` size separator
-            and 7-decimal RA/Dec precision). Default is False. Ignored when ``output_file`` is provided
-            for a single cutout.
+            Optional. If True, generated cutout filenames use the 0.11.1 filename: 6-decimal RA/Dec and the integer
+            pixel window (``<width>x<height>``) instead of the requested size (``<ny>-x-<nx>``,
+            including units). Default is False. Ignored when ``output_file`` is provided for a single cutout.
 
         Returns
         -------
@@ -531,7 +530,10 @@ class TessCubeCutout(CubeCutout):
             # Determine file name
             if not output_file or len(self._input_files) > 1:
                 filename = self._make_cutout_filename(
-                    Path(file).stem.rstrip("-cube"), self._coordinates, legacy_filenames=legacy_filenames
+                    Path(file).stem.rstrip("-cube"),
+                    self._coordinates,
+                    legacy_filenames=legacy_filenames,
+                    cutout_lims=cutout.cutout_lims,
                 )
             else:
                 filename = output_file
@@ -573,10 +575,9 @@ class TessCubeCutout(CubeCutout):
             'astrocut_{ra}_{dec}_{size}.zip'. If provided without a '.zip' suffix,
             the suffix is added automatically.
         legacy_filenames : bool
-            If True, generated cutout filenames inside the zip use the pre-1.2.0 format
-            (``<ny>x<nx>`` size separator and 6-decimal RA/Dec precision) instead of the
-            current format (``<ny>-x-<nx>`` size separator and 7-decimal RA/Dec precision).
-            Default is False.
+            Optional. If True, generated cutout filenames inside the zip use the 0.11.1 filename:
+            6-decimal RA/Dec and the integer pixel window (``<width>x<height>``) instead of the
+            requested size (``<ny>-x-<nx>``, including units). Default is False.
 
         Returns
         -------
@@ -587,7 +588,10 @@ class TessCubeCutout(CubeCutout):
         def build_entries():
             for file, tpf in self.tpf_cutouts_by_file.items():
                 arcname = self._make_cutout_filename(
-                    Path(file).stem.rstrip("-cube"), self._coordinates, legacy_filenames=legacy_filenames
+                    Path(file).stem.rstrip("-cube"),
+                    self._coordinates,
+                    legacy_filenames=legacy_filenames,
+                    cutout_lims=self.cutouts_by_file[file].cutout_lims,
                 )
                 yield arcname, tpf
 

@@ -144,9 +144,9 @@ class TessFootprintCutout(FootprintCutout):
         output_dir : str | Path
             The output directory where the cutout files will be saved.
         legacy_filenames : bool
-            If True, generated cutout filenames use the pre-1.2.0 format (``<ny>x<nx>`` size separator
-            and 6-decimal RA/Dec precision) instead of the current format (``<ny>-x-<nx>`` size separator
-            and 7-decimal RA/Dec precision). Default is False.
+            Optional. If True, generated cutout filenames use the 0.11.1 filename: 6-decimal RA/Dec and the integer
+            pixel window (``<width>x<height>``) instead of the requested size (``<ny>-x-<nx>``,
+            including units). Default is False.
 
         Returns
         -------
@@ -173,10 +173,9 @@ class TessFootprintCutout(FootprintCutout):
             'astrocut_{ra}_{dec}_{size}.zip'. If provided without a '.zip' suffix,
             the suffix is added automatically.
         legacy_filenames : bool
-            If True, generated cutout filenames inside the zip use the pre-1.2.0 format
-            (``<ny>x<nx>`` size separator and 6-decimal RA/Dec precision) instead of the
-            current format (``<ny>-x-<nx>`` size separator and 7-decimal RA/Dec precision).
-            Default is False.
+            Optional. If True, generated cutout filenames inside the zip use the 0.11.1 filename: 6-decimal RA/Dec and
+            the integer pixel window (``<width>x<height>``) instead of the requested size (``<ny>-x-<nx>``,
+            including units). Default is False.
 
         Returns
         -------
@@ -321,9 +320,9 @@ def cube_cut_from_footprint(
     verbose : bool, optional
         Default False. If True, intermediate information is printed.
     legacy_filenames : bool, optional
-        If True, generated cutout filenames use the pre-1.2.0 format (``<ny>x<nx>`` size
-        separator and 6-decimal RA/Dec precision) instead of the current format
-        (``<ny>-x-<nx>`` size separator and 7-decimal RA/Dec precision). Default is False.
+        If True, use the astrocut 0.11.1 filename: 6-decimal RA/Dec and the integer pixel
+        window (``<width>x<height>``) instead of the requested size (``<ny>-x-<nx>``,
+        including units). Default is False.
 
     Returns
     -------

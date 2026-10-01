@@ -1,6 +1,8 @@
 Unreleased
 -----------
 
+- ``legacy_filenames=True`` now uses the astrocut 0.11.1 filename: 6-decimal RA/Dec and the
+  integer pixel window (``<width>x<height>``) and pixel ``Quantity`` sizes are not included.
 - Extend the ASDF cutout workflow to accept multiple target coordinates and to expose downstream cutout products in
   an ``astropy.table.Table`` object with columns for input file, coordinate, and cutout object. [#196]
 - Update the ``wcsinfo`` section of the ASDF metadata dictionary to reflect the cutout's spatial extent and local WCS properties
