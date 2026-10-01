@@ -266,7 +266,6 @@ def _crossmatch_polygon(
     cutout_fp = SphericalPolygon.from_radec(ras, decs, center=(ra, dec))
 
     # Find indices of FFIs that intersect with the cutout
-    ffi_inds = np.vectorize(lambda ffi: ffi.intersects_poly(cutout_fp))(all_ffis["polygon"])
     ffi_inds = FootprintCutout._ffi_intersect(all_ffis, cutout_fp)
 
     return ffi_inds
