@@ -2,7 +2,7 @@ Unreleased
 -----------
 
 - Added ``allow_empty`` to ``FITSCutout`` and ``fits_cut`` to optionally retain all-zero or
-  all-NaN cutouts with ``EMPTY=True`` in their FITS headers. Default behavior is unchanged.
+  all-NaN cutouts with ``EMPTY=True`` in their FITS headers. Default behavior is unchanged [#204].
 - ``legacy_filenames=True`` now uses the astrocut 0.11.1 filename: 6-decimal RA/Dec and the
   integer pixel window (``<width>x<height>``) and pixel ``Quantity`` sizes are not included. [#203]
 - Extend the ASDF cutout workflow to accept multiple target coordinates and to expose downstream cutout products in
