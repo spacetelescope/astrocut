@@ -66,7 +66,9 @@ class CutoutFactory:
             Optional. The name for the output target pixel file.
             If no name is supplied, the file will be named:
             ``<cube_file_base>_<ra>_<dec>_<cutout_size>_astrocut.fits``
-            (or ``<cube_file_base>_<ra>_<dec>_<ny>x<nx>_astrocut.fits`` if ``legacy_filenames`` is True).
+            (or ``<cube_file_base>_<ra>_<dec>_<width>x<height>_astrocut.fits``
+            if ``legacy_filenames`` is True, where width and height are the
+            integer pixel window).
         output_path : str
             Optional. The path where the output file is saved.
             The current directory is default.
@@ -80,9 +82,9 @@ class CutoutFactory:
         verbose : bool
             Optional. If true intermediate information is printed.
         legacy_filenames : bool
-            Optional. If True, generated cutout filenames use the pre-1.2.0 format (``<ny>x<nx>`` size
-            separator and 6-decimal RA/Dec precision) instead of the current format (``<ny>-x-<nx>`` size
-            separator and 7-decimal RA/Dec precision). Default is False.
+            Optional. If True, generated cutout filenames use the 0.11.1 filename: 6-decimal RA/Dec and the integer
+            pixel window (``<width>x<height>``) instead of the requested size (``<ny>-x-<nx>``,
+            including units). Default is False.
 
         Returns
         -------
@@ -154,7 +156,8 @@ def cube_cut(
         Optional. The name for the output target pixel file.
         If no name is supplied, the file will be named:
         ``<cube_file_base>_<ra>_<dec>_<cutout_size>_astrocut.fits``
-        (or ``<cube_file_base>_<ra>_<dec>_<ny>x<nx>_astrocut.fits`` if ``legacy_filenames`` is True).
+        (or ``<cube_file_base>_<ra>_<dec>_<width>x<height>_astrocut.fits`` if ``legacy_filenames``
+        is True, where width and height are the integer pixel window).
     output_path : str
         Optional. The path where the output file is saved.
         The current directory is default.
@@ -168,9 +171,9 @@ def cube_cut(
     verbose : bool
         Optional. If true intermediate information is printed.
     legacy_filenames : bool
-        Optional. If True, generated cutout filenames use the pre-1.2.0 format (``<ny>x<nx>`` size
-        separator and 6-decimal RA/Dec precision) instead of the current format (``<ny>-x-<nx>`` size
-        separator and 7-decimal RA/Dec precision). Default is False.
+        Optional. If True, generated cutout filenames use the 0.11.1 filename: 6-decimal RA/Dec and the integer
+        pixel window (``<width>x<height>``) instead of the requested size (``<ny>-x-<nx>``,
+        including units). Default is False.
 
     Returns
     -------

@@ -184,7 +184,13 @@ class Cutout(BaseCutout, ABC):
                 lims[axis, 1] = lims[axis, 0] + 1
         return lims
 
-    def _make_cutout_filename(self, file_stem: str, coordinates: SkyCoord, legacy_filenames: bool = False) -> str:
+    def _make_cutout_filename(
+        self,
+        file_stem: str,
+        coordinates: SkyCoord,
+        legacy_filenames: bool = False,
+        cutout_lims: Optional[np.ndarray] = None,
+    ) -> str:
         """
         Create a cutout filename based on a file stem, coordinates, and cutout size.
 
@@ -195,26 +201,30 @@ class Cutout(BaseCutout, ABC):
         coordinates : `~astropy.coordinates.SkyCoord`
             The coordinates of the cutout center.
         legacy_filenames : bool
-            If True, use the pre-1.2.0 format (``<ny>x<nx>`` size separator and 6-decimal
-            RA/Dec precision) instead of the current format (``<ny>-x-<nx>`` size separator
-            and 7-decimal RA/Dec precision). Default is False.
+            If True, use the astrocut 0.11.1 format: 6-decimal RA/Dec and the integer pixel
+            window from ``cutout_lims`` (``<width>x<height>``). Default is False, which uses
+            7-decimal RA/Dec and the requested size (``<ny>-x-<nx>``, including units).
+        cutout_lims : `~numpy.ndarray`, optional
+            Pixel limits ``[[xmin, xmax], [ymin, ymax]]``. Required when ``legacy_filenames``
+            is True.
 
         Returns
         -------
         filename : str
             The generated cutout filename.
         """
-        separator = "-x-"
-        precision = 7
-        if legacy_filenames:
-            separator = "x"
-            precision = 6
-
         ra = coordinates.ra.value
         dec = coordinates.dec.value
+        if legacy_filenames:
+            if cutout_lims is None:
+                raise InvalidInputError("Cutout limits are required when using legacy filenames.")
+            width = int(cutout_lims[0, 1] - cutout_lims[0, 0])
+            height = int(cutout_lims[1, 1] - cutout_lims[1, 0])
+            return f"{file_stem}_{float(ra):.6f}_{float(dec):.6f}_{width}x{height}_astrocut.fits"
+
         ny = str(self._cutout_size[0]).replace(" ", "")
         nx = str(self._cutout_size[1]).replace(" ", "")
-        return f"{file_stem}_{ra:.{precision}f}_{dec:.{precision}f}_{ny}{separator}{nx}_astrocut.fits"
+        return f"{file_stem}_{ra:.7f}_{dec:.7f}_{ny}-x-{nx}_astrocut.fits"
 
     def _obj_to_bytes(self, obj: Union[fits.HDUList, asdf.AsdfFile]) -> bytes:
         """
