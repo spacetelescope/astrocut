@@ -46,6 +46,10 @@ class FITSCutout(ImageCutout):
         If True, log messages are printed to the console.
     fsspec_kwargs : dict
         Optional, default None. Keyword arguments to pass through to `s3fs` for cloud-hosted files.
+    allow_empty : bool
+        Optional, default False. If True, retain cutouts whose pixels are all zero or all NaN.
+        These cutouts have ``EMPTY=True`` in their FITS headers. The requested footprint must
+        still overlap an image extension with data.
 
     Attributes
     ----------
@@ -76,6 +80,7 @@ class FITSCutout(ImageCutout):
         verbose: bool = False,
         *,
         fsspec_kwargs: Optional[dict] = None,
+        allow_empty: bool = False,
     ):
         # Superclass constructor
         super().__init__(input_files, coordinates, cutout_size, fill_value, limit_rounding_method, verbose)
@@ -90,6 +95,7 @@ class FITSCutout(ImageCutout):
         self._fits_cutouts = None
         self.hdu_cutouts_by_file = {}
         self._fsspec_kwargs = fsspec_kwargs
+        self._allow_empty = allow_empty
         self._coordinates = self._coordinates[0]
 
         # Make the cutouts upon initialization
@@ -383,9 +389,9 @@ class FITSCutout(ImageCutout):
                 # Save the cutout data to use when outputting as an image
                 # Eventually, the values here will be a list of Cutout2D objects
                 is_empty = (cutout.data == 0).all() or (np.isnan(cutout.data)).all()
-                if is_empty:
+                if is_empty and not self._allow_empty:
                     num_empty += 1
-                else:
+                if not is_empty:
                     # Check whether an image header indicates asinh-scaled flux (e.g. Pan-STARRS stack
                     # images), which is signaled by the presence of the BSOFTEN and BOFFSET keywords.
                     # Single-epoch warp images do not use this scaling and lack these keywords.
@@ -395,6 +401,7 @@ class FITSCutout(ImageCutout):
                             "Pixel values converted from asinh-scaled flux to linear flux "
                             "using the BSOFTEN/BOFFSET keywords."
                         )
+                if not is_empty or self._allow_empty:
                     cutouts.append(cutout)
 
                 # Also save the cutouts as ImageHDU objects for FITS output
@@ -452,7 +459,7 @@ class FITSCutout(ImageCutout):
         Raises
         ------
         InvalidQueryError
-            If no cutouts contain data.
+            If no cutouts overlap image data, or all cutouts are empty and ``allow_empty=False``.
         """
         # Track start time
         start_time = monotonic()
@@ -713,6 +720,7 @@ def fits_cut(
     verbose=False,
     *,
     fsspec_kwargs: Optional[dict] = None,
+    allow_empty: bool = False,
 ) -> Union[str, List[str], List[HDUList]]:
     """
     Takes one or more FITS files with the same WCS/pointing, makes the same cutout in each file,
@@ -765,6 +773,9 @@ def fits_cut(
         Default False. If true intermediate information is printed.
     fsspec_kwargs : dict
         Optional, default None. Keyword arguments to pass through to `s3fs` for cloud-hosted files.
+    allow_empty : bool
+        Optional, default False. If True, retain cutouts whose pixels are all zero or all NaN,
+        marking their FITS headers with ``EMPTY=True``. Non-overlapping requests are still rejected.
 
     Returns
     -------
@@ -784,6 +795,7 @@ def fits_cut(
         single_outfile,
         verbose=verbose,
         fsspec_kwargs=fsspec_kwargs,
+        allow_empty=allow_empty,
     )
 
     if memory_only:

@@ -15,7 +15,7 @@ from astropy.io import fits
 from astropy.table import Table
 from PIL import Image
 
-from astrocut.fits_cutout import FITSCutout
+from astrocut.fits_cutout import FITSCutout, fits_cut
 
 from .. import __version__
 from ..exceptions import DataWarning, InputWarning, InvalidInputError, InvalidQueryError
@@ -458,6 +458,27 @@ def test_fits_cutout_no_data(tmpdir, test_images, cutout_size):
     with pytest.warns(DataWarning, match="contains no data, skipping..."):
         with pytest.raises(InvalidQueryError, match="Cutout contains no data!"):
             FITSCutout(test_images, center_coord, cutout_size, single_outfile=True)
+
+
+@pytest.mark.parametrize("empty_value", [0.0, np.nan])
+def test_fits_cutout_allow_empty(test_images, center_coord, cutout_size, empty_value):
+    with fits.open(test_images[0], mode="update") as hdul:
+        hdul[0].data = np.full(hdul[0].data.shape, empty_value)
+
+    cutout = FITSCutout(test_images[0], center_coord, cutout_size, allow_empty=True)
+    assert len(cutout.cutouts_by_file[test_images[0]]) == 1
+    assert cutout.fits_cutouts[0][1].header["EMPTY"]
+    np.testing.assert_equal(cutout.fits_cutouts[0][1].data, np.full((cutout_size, cutout_size), empty_value))
+
+
+def test_fits_cut_allow_empty(test_images, center_coord, cutout_size):
+    with fits.open(test_images[0], mode="update") as hdul:
+        hdul[0].data[:] = 0
+
+    cutouts = fits_cut(test_images[0], center_coord, cutout_size, memory_only=True, allow_empty=True)
+    assert len(cutouts) == 1
+    assert cutouts[0][1].header["EMPTY"]
+    assert (cutouts[0][1].data == 0).all()
 
 
 def test_fits_cutout_bad_sip(tmpdir, caplog, test_image_bad_sip):
