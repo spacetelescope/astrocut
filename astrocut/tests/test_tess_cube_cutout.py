@@ -423,14 +423,14 @@ def test_parse_table_wcs():
     ctype2_values = ["INVALID", "INVALID", "DEC--TAN-SIP", "INVALID", "INVALID"]
     table_data = _make_table_data(ctype2_values)
 
-    table_wcs = CubeCutout.parse_table_wcs(table_data, "CTYPE2", "DEC--TAN-SIP")
+    table_wcs = TessCubeCutout.parse_table_wcs(table_data, "CTYPE2", "DEC--TAN-SIP")
     assert isinstance(table_wcs, WCS)
     assert (table_wcs.wcs.crval == [100.0, 20.0]).all()
     assert (table_wcs.wcs.crpix == [10.0, 15.0]).all()
 
     # return_header=True should also give back the header the WCS was built from, including
     # non-WCS columns like FFI_FILE
-    table_wcs, wcs_header = CubeCutout.parse_table_wcs(table_data, "CTYPE2", "DEC--TAN-SIP", return_header=True)
+    table_wcs, wcs_header = TessCubeCutout.parse_table_wcs(table_data, return_header=True)
     assert isinstance(table_wcs, WCS)
     assert wcs_header["FFI_FILE"] == "ffi_2.fits"
 
@@ -442,7 +442,7 @@ def test_parse_table_wcs_walks_outward_from_middle():
     ctype2_values = ["DEC--TAN-SIP", "INVALID", "INVALID", "INVALID", "INVALID"]
     table_data = _make_table_data(ctype2_values)
 
-    table_wcs, wcs_header = CubeCutout.parse_table_wcs(table_data, "CTYPE2", "DEC--TAN-SIP", return_header=True)
+    table_wcs, wcs_header = TessCubeCutout.parse_table_wcs(table_data, return_header=True)
     assert wcs_header["FFI_FILE"] == "ffi_0.fits"
 
 
@@ -453,4 +453,4 @@ def test_parse_table_wcs_no_valid_row():
     table_data = _make_table_data(ctype2_values)
 
     with pytest.raises(NoWcsKeywordsFoundError, match="No FFI rows contain valid WCS keywords."):
-        CubeCutout.parse_table_wcs(table_data, "CTYPE2", "DEC--TAN-SIP")
+        TessCubeCutout.parse_table_wcs(table_data)

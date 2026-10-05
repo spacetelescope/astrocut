@@ -1,6 +1,7 @@
 Unreleased
 -----------
 
+- Added default values for ``wcs_axes_keyword`` and ``wcs_axes_value`` in ``TessCubeCutout.parse_table_wcs`` [#205].
 - Added ``allow_empty`` to ``FITSCutout`` and ``fits_cut`` to optionally retain all-zero or
   all-NaN cutouts with ``EMPTY=True`` in their FITS headers. Default behavior is unchanged [#204].
 - ``legacy_filenames=True`` now uses the astrocut 0.11.1 filename: 6-decimal RA/Dec and the
