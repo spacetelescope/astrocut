@@ -136,6 +136,31 @@ class TessCubeCutout(CubeCutout):
         """
         return list(self.tpf_cutouts_by_file.values())
 
+    @staticmethod
+    def parse_table_wcs(table_data, wcs_axes_keyword="CTYPE2", wcs_axes_value="DEC--TAN-SIP", return_header=False):
+        """
+        Parse the WCS information from a table data object.
+
+        Parameters
+        ----------
+        table_data : object
+            The table data containing WCS information.
+        wcs_axes_keyword : str, optional
+            The keyword for the WCS axes, by default "CTYPE2".
+        wcs_axes_value : str, optional
+            The expected value for the WCS axes, by default "DEC--TAN-SIP".
+        return_header : bool, optional
+            Whether to return the header along with the WCS object, by default False.
+
+        Returns
+        -------
+        wcs : `~astropy.wcs.WCS`
+            The parsed WCS object.
+        header : `~astropy.io.fits.Header`, optional
+            The header containing the WCS information, if `return_header` is True.
+        """
+        return CubeCutout.parse_table_wcs(table_data, wcs_axes_keyword, wcs_axes_value, return_header)
+
     def _get_cutout_wcs_dict(self, cutout_wcs: WCS, cutout_lims: np.ndarray) -> dict:
         """
         Create a dictionary of WCS keywords for the cutout.
