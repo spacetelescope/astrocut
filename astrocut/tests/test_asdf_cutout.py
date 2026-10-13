@@ -1,4 +1,5 @@
 import io
+import warnings
 import zipfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -721,6 +722,11 @@ def test_asdf_cutout_not_in_footprint(images, center_coord, cutout_size):
         with pytest.raises(InvalidQueryError, match="Cutout contains no data!"):
             ASDFCutout(images[0], SkyCoord("0 0", unit="deg"), cutout_size)
 
+    # Still an error with allow_empty, which only retains cutouts that overlap the image
+    with pytest.warns(DataWarning, match="does not overlap"):
+        with pytest.raises(InvalidQueryError, match="Cutout contains no data!"):
+            ASDFCutout(images[0], SkyCoord("0 0", unit="deg"), cutout_size, allow_empty=True)
+
     # Alter one of the test images to only contain zeros in cutout footprint
     with asdf.open(images[0], mode="rw") as af:
         af["roman"]["data"][470:480, 471:481] = 0
@@ -730,6 +736,58 @@ def test_asdf_cutout_not_in_footprint(images, center_coord, cutout_size):
     with pytest.warns(DataWarning, match="contains no data, skipping..."):
         cutouts = ASDFCutout(images, center_coord, cutout_size).cutouts
     assert len(cutouts) == 2
+
+
+@pytest.mark.parametrize("lite", [True, False])
+@pytest.mark.parametrize("empty_value", [0.0, np.nan])
+def test_asdf_cutout_allow_empty(images, center_coord, cutout_size, empty_value, lite):
+    # Alter one of the test images to contain no data in cutout footprint
+    with asdf.open(images[0], mode="rw") as af:
+        af["roman"]["data"][470:480, 471:481] = empty_value
+        af.update()
+
+    # Empty cutout is kept without warning
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DataWarning)
+        cutout = ASDFCutout(images, center_coord, cutout_size, lite=lite, allow_empty=True)
+    assert len(cutout.cutouts) == 3
+
+    empty_file = str(images[0])
+    empty_cutout = cutout.cutouts_by_file[empty_file]
+    assert len(empty_cutout) == 1
+    empty_data = next(iter(empty_cutout.values())).data
+    assert not np.any(np.nan_to_num(empty_data, nan=0.0))
+
+    # Only the empty cutout is marked as empty in ASDF and FITS outputs
+    for row in cutout.asdf_cutouts:
+        is_empty = row["file"] == empty_file
+        assert row["cutout"]["roman"]["meta"].get("empty", False) is is_empty
+    for row in cutout.fits_cutouts:
+        is_empty = row["file"] == empty_file
+        assert row["cutout"]["CUTOUT"].header.get("EMPTY", False) is is_empty
+
+
+def test_asdf_cut_allow_empty(images, center_coord, cutout_size, tmpdir):
+    # Alter one of the test images to contain no data in cutout footprint
+    with asdf.open(images[0], mode="rw") as af:
+        af["roman"]["data"][470:480, 471:481] = 0
+        af.update()
+
+    ra, dec = center_coord.ra.deg, center_coord.dec.deg
+
+    # Written ASDF cutout is marked as empty
+    asdf_paths = asdf_cut(images, ra, dec, cutout_size, output_dir=tmpdir, allow_empty=True)
+    assert len(asdf_paths) == 3
+    with asdf.open(asdf_paths[0]) as af:
+        assert af["roman"]["meta"]["empty"] is True
+        assert not np.any(af["roman"]["data"])
+
+    # Written FITS cutout is marked as empty
+    fits_paths = asdf_cut(images, ra, dec, cutout_size, output_dir=tmpdir, output_format="fits", allow_empty=True)
+    assert len(fits_paths) == 3
+    with fits.open(fits_paths[0]) as hdul:
+        assert hdul["CUTOUT"].header["EMPTY"] is True
+        assert not np.any(hdul["CUTOUT"].data)
 
 
 def test_asdf_cutout_no_gwcs(images, center_coord, cutout_size):
