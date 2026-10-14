@@ -61,6 +61,11 @@ class ASDFCutout(ImageCutout):
         `memmap=True` is applied unless explicitly overridden.
     verbose : bool
         If True, log messages are printed to the console.
+    allow_empty : bool
+        Optional, default False. If True, retain cutouts whose pixels are all zero and/or NaN.
+        These cutouts have ``empty=True`` in their ASDF metadata and ``EMPTY=True`` in the
+        cutout extension header when written as FITS. The requested footprint must still
+        overlap the image.
 
     Attributes
     ----------
@@ -97,6 +102,8 @@ class ASDFCutout(ImageCutout):
         lite: Optional[bool] = True,
         asdf_kwargs: Optional[Dict[str, Any]] = None,
         verbose: bool = False,
+        *,
+        allow_empty: bool = False,
     ):
         super().__init__(input_files, coordinates, cutout_size, fill_value, verbose=verbose)
 
@@ -116,6 +123,7 @@ class ASDFCutout(ImageCutout):
         self._fits_cutouts = None  # Store FITS objects
         self._asdf_trees = {}  # Store ASDF trees for each cutout
         self._lite = lite  # Flag for lite mode
+        self._allow_empty = allow_empty  # Flag to retain cutouts with no data
         if asdf_kwargs is not None and not isinstance(asdf_kwargs, dict):
             raise InvalidInputError("asdf_kwargs must be a dictionary.")
         self._asdf_open_kwargs = dict(asdf_kwargs or {})
@@ -411,6 +419,8 @@ class ASDFCutout(ImageCutout):
             image_hdu = fits.ImageHDU(data=cutout.data, header=cutout.wcs.to_header(relax=True))
             image_hdu.header["ORIG_FLE"] = file
             image_hdu.header["EXTNAME"] = "CUTOUT"
+            if tree[self._mission_kwd]["meta"].get("empty", False):
+                image_hdu.header["EMPTY"] = (True, "Indicates no data in cutout image.")
             hdul = fits.HDUList([primary_hdu, image_hdu])
 
             if self._asdf_in_fits is not None:
@@ -710,7 +720,7 @@ class ASDFCutout(ImageCutout):
         Raises
         ------
         InvalidQueryError
-            If no cutouts contain data.
+            If no cutouts overlap image data, or all cutouts are empty and ``allow_empty=False``.
         """
         # Track start time
         start_time = monotonic()
@@ -1114,7 +1124,8 @@ class ASDFCutout(ImageCutout):
                         continue
 
                     data = data_cutout.data
-                    if not np.any(np.nan_to_num(data, nan=0.0)):
+                    is_empty = not np.any(np.nan_to_num(data, nan=0.0))
+                    if is_empty and not self._allow_empty:
                         # No useful data for this coordinate in this file
                         warnings.warn(f"Cutout of {input_file} at {coord} contains no data, skipping...", DataWarning)
                         continue
@@ -1127,18 +1138,18 @@ class ASDFCutout(ImageCutout):
                     sliced_gwcs = self._slice_gwcs(data_cutout, gwcs)
 
                     if self._lite:
-                        lite_tree = {
-                            self._mission_kwd: {
-                                "meta": {"wcs": sliced_gwcs, "orig_file": input_file, "coordinate": coord_key},
-                                "data": data,
-                            }
-                        }
+                        lite_meta = {"wcs": sliced_gwcs, "orig_file": input_file, "coordinate": coord_key}
+                        if is_empty:
+                            lite_meta["empty"] = True
+                        lite_tree = {self._mission_kwd: {"meta": lite_meta, "data": data}}
                         self._asdf_trees.setdefault(input_file, {})[coord_key] = lite_tree
                     else:
                         coord_mission_tree["meta"]["wcs"] = sliced_gwcs
                         self._update_wcsinfo(coord_mission_tree["meta"], sliced_gwcs)
                         coord_mission_tree["meta"]["orig_file"] = input_file
                         coord_mission_tree["meta"]["coordinate"] = coord_key
+                        if is_empty:
+                            coord_mission_tree["meta"]["empty"] = True
                         self._asdf_trees.setdefault(input_file, {})[coord_key] = {self._mission_kwd: coord_mission_tree}
 
     def _make_cutout_filename(self, file: str, output_format: str, coord: str) -> str:
@@ -1473,6 +1484,8 @@ def asdf_cut(
     token: str = None,
     lite: bool = True,
     verbose: bool = False,
+    *,
+    allow_empty: bool = False,
 ) -> Cutout2D:
     """
     Takes one of more ASDF input files (`input_files`) and generates a cutout of designated size `cutout_size`
@@ -1524,6 +1537,10 @@ def asdf_cut(
         It also preserves all of the metadata from the input file.
     verbose : bool
         Default False. If True, intermediate information is printed.
+    allow_empty : bool
+        Optional, default False. If True, retain cutouts whose pixels are all zero and/or NaN,
+        marking them with ``empty=True`` in their ASDF metadata (``EMPTY=True`` in FITS output).
+        Non-overlapping requests are still rejected.
 
     Returns
     -------
@@ -1540,6 +1557,7 @@ def asdf_cut(
         token=token,
         lite=lite,
         verbose=verbose,
+        allow_empty=allow_empty,
     )
 
     if not write_file:  # Returns as Cutout2D objects
