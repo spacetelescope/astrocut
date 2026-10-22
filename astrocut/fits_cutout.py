@@ -11,6 +11,7 @@ from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.io.fits import HDUList
 from astropy.nddata import NoOverlapError
+from astropy.time import Time
 from astropy.units import Quantity
 from astropy.utils.decorators import deprecated_renamed_argument
 from astropy.wcs import WCS
@@ -221,6 +222,16 @@ class FITSCutout(ImageCutout):
         infile_exts = np.where([hdu.is_image and hdu.size > 0 for hdu in hdulist])[0]
         cutout_inds = self._parse_extensions(input_file, infile_exts)
 
+        # Check if any of the cutout extensions require scaling due to BSCALE, BZERO, or BLANK keywords
+        # If any of the cutout extensions have these keywords, we need to reopen the file without memory mapping
+        # to ensure that the scaling is applied correctly.
+        requires_scaling = any(
+            any(keyword in hdulist[index].header for keyword in ("BSCALE", "BZERO", "BLANK")) for index in cutout_inds
+        )
+        if requires_scaling:
+            hdulist.close()
+            hdulist = fits.open(input_file, mode="denywrite", memmap=False, fsspec_kwargs=fsspec_kwargs)
+
         return (hdulist, cutout_inds)
 
     def _get_img_wcs(self, hdu_header: fits.Header) -> Tuple[WCS, bool]:
@@ -242,6 +253,9 @@ class FITSCutout(ImageCutout):
         # Convert archaic PC00i00j/CD00i00j keywords to their modern equivalents before
         # handing off to WCS(), which otherwise translates them itself, incompletely.
         modernize_wcs_keywords(hdu_header)
+
+        if "DATE-OBS" not in hdu_header and "MJD-OBS" in hdu_header:
+            hdu_header["DATE-OBS"] = Time(hdu_header["MJD-OBS"], format="mjd").isot
 
         # We are going to reroute the logging to a string stream temporarily so we can
         # intercept any message from astropy, chiefly the "Inconsistent SIP distortion information"
@@ -333,12 +347,14 @@ class FITSCutout(ImageCutout):
             hdu_header.update(cutout_wcs.to_header(relax=True))  # relax arg is for sip distortions if they exist
 
         # Naming the extension and preserving the original name
-        hdu_header["O_EXT_NM"] = (hdu_header.get("EXTNAME"), "Original extension name.")
+        if "EXTNAME" in hdu_header:
+            hdu_header["O_EXT_NM"] = (hdu_header["EXTNAME"], "Original extension name.")
         hdu_header["EXTNAME"] = "CUTOUT"
 
         # Moving the filename, if present, into the ORIG_FLE keyword
-        hdu_header["ORIG_FLE"] = (hdu_header.get("FILENAME"), "Original image filename.")
-        hdu_header.remove("FILENAME", ignore_missing=True)
+        if "FILENAME" in hdu_header:
+            hdu_header["ORIG_FLE"] = (hdu_header.get("FILENAME"), "Original image filename.")
+            hdu_header.remove("FILENAME", ignore_missing=True)
 
         # Check that there is data in the cutout image
         if is_empty:
@@ -397,6 +413,11 @@ class FITSCutout(ImageCutout):
                     # Single-epoch warp images do not use this scaling and lack these keywords.
                     if "BSOFTEN" in hdu_header and "BOFFSET" in hdu_header:
                         cutout.data = self._linearize_asinh_flux(cutout.data, hdu_header)
+                        # Remove the BSOFTEN, BOFFSET, and BLANK keywords from the header after linearizing the flux
+                        del hdu_header["BSOFTEN"]
+                        del hdu_header["BOFFSET"]
+                        del hdu_header["BLANK"]
+                        # Add a HISTORY entry to indicate that the flux has been linearized
                         hdu_header["HISTORY"] = (
                             "Pixel values converted from asinh-scaled flux to linear flux "
                             "using the BSOFTEN/BOFFSET keywords."
