@@ -43,9 +43,10 @@ def test_image_asinh(tmpdir):
     img_path = create_test_imgs(50, 1, dir_name=tmpdir, basename="img_asinh_{:04d}.fits")[0]
     with fits.open(img_path, mode="update") as hdulist:
         # Rescale to a realistic range of asinh-scaled pixel values (avoids overflow in sinh)
-        hdulist[0].data = (hdulist[0].data / 250 - 5).astype(np.float32)
+        hdulist[0].data = (hdulist[0].data / 250 - 5).astype(np.int16)
         hdulist[0].header["BSOFTEN"] = 87.39592975627
         hdulist[0].header["BOFFSET"] = 2.654963016510
+        hdulist[0].header["BLANK"] = 32767
     return img_path
 
 
@@ -139,6 +140,24 @@ def test_fits_cutout_adds_date_obs_from_mjd_obs(test_images, center_coord, cutou
 
     with fits.open(input_file) as hdulist:
         assert "DATE-OBS" not in hdulist[0].header
+
+
+def test_fits_cutout_adds_mjd_obs_from_date_obs(test_images, center_coord, cutout_size):
+    input_file = test_images[0]
+    date_obs = "2012-03-22T12:02:38.563"
+    with fits.open(input_file, mode="update") as hdulist:
+        hdulist[0].header["DATE-OBS"] = date_obs
+        hdulist[0].header.pop("MJD-OBS", None)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        cutout = FITSCutout(input_file, center_coord, cutout_size).fits_cutouts[0]
+
+    assert not any(issubclass(item.category, FITSFixedWarning) for item in caught)
+    assert cutout[1].header["MJD-OBS"] == pytest.approx(Time(date_obs).mjd)
+
+    with fits.open(input_file) as hdulist:
+        assert "MJD-OBS" not in hdulist[0].header
 
 
 def test_fits_cutout_multiple_files(tmpdir, test_images, center_coord, cutout_size):

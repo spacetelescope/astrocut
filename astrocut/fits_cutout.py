@@ -256,6 +256,8 @@ class FITSCutout(ImageCutout):
 
         if "DATE-OBS" not in hdu_header and "MJD-OBS" in hdu_header:
             hdu_header["DATE-OBS"] = Time(hdu_header["MJD-OBS"], format="mjd").isot
+        elif "MJD-OBS" not in hdu_header and "DATE-OBS" in hdu_header:
+            hdu_header["MJD-OBS"] = Time(hdu_header["DATE-OBS"]).mjd
 
         # We are going to reroute the logging to a string stream temporarily so we can
         # intercept any message from astropy, chiefly the "Inconsistent SIP distortion information"
@@ -347,14 +349,12 @@ class FITSCutout(ImageCutout):
             hdu_header.update(cutout_wcs.to_header(relax=True))  # relax arg is for sip distortions if they exist
 
         # Naming the extension and preserving the original name
-        if "EXTNAME" in hdu_header:
-            hdu_header["O_EXT_NM"] = (hdu_header["EXTNAME"], "Original extension name.")
+        hdu_header["O_EXT_NM"] = (hdu_header.get("EXTNAME", ""), "Original extension name.")
         hdu_header["EXTNAME"] = "CUTOUT"
 
         # Moving the filename, if present, into the ORIG_FLE keyword
-        if "FILENAME" in hdu_header:
-            hdu_header["ORIG_FLE"] = (hdu_header.get("FILENAME"), "Original image filename.")
-            hdu_header.remove("FILENAME", ignore_missing=True)
+        hdu_header["ORIG_FLE"] = (hdu_header.get("FILENAME", primary_filename), "Original image filename.")
+        hdu_header.remove("FILENAME", ignore_missing=True)
 
         # Check that there is data in the cutout image
         if is_empty:
@@ -365,8 +365,6 @@ class FITSCutout(ImageCutout):
 
         # Adding a few more keywords
         cutout_hdu.header["ORIG_EXT"] = (ind, "Extension in original file.")
-        if not cutout_hdu.header.get("ORIG_FLE") and primary_filename:
-            cutout_hdu.header["ORIG_FLE"] = primary_filename
 
         return cutout_hdu
 
@@ -396,7 +394,7 @@ class FITSCutout(ImageCutout):
                 img_hdu = hdulist[ind]
                 hdu_header = fits.Header(img_hdu.header, copy=True)
                 img_wcs, no_sip = self._get_img_wcs(hdu_header)
-                primary_filename = hdulist[0].header.get("FILENAME")
+                primary_filename = hdulist[0].header.get("FILENAME", Path(file).name)
 
                 # Create the cutout
                 # Eventually, this will be replaced by a call to Cutout2D
@@ -416,7 +414,8 @@ class FITSCutout(ImageCutout):
                         # Remove the BSOFTEN, BOFFSET, and BLANK keywords from the header after linearizing the flux
                         del hdu_header["BSOFTEN"]
                         del hdu_header["BOFFSET"]
-                        del hdu_header["BLANK"]
+                        if "BLANK" in hdu_header:
+                            del hdu_header["BLANK"]
                         # Add a HISTORY entry to indicate that the flux has been linearized
                         hdu_header["HISTORY"] = (
                             "Pixel values converted from asinh-scaled flux to linear flux "

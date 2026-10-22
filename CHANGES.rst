@@ -1,6 +1,10 @@
 Unreleased
 -----------
 
+- Improved ``FITSCutout`` handling of Pan-STARRS FITS data: scaled images are opened without memory mapping,
+  missing ``DATE-OBS`` values are derived from ``MJD-OBS`` and vice versa, original image filename in cutout
+  header falls back to the original image's filename if not already present, and asinh-linearized cutouts no
+  longer retain scaling keywords [#208].
 - Added default values for ``wcs_axes_keyword`` and ``wcs_axes_value`` in ``TessCubeCutout.parse_table_wcs`` [#205].
 - Added ``allow_empty`` to ``FITSCutout`` and ``fits_cut`` to optionally retain all-zero or
   all-NaN cutouts with ``EMPTY=True`` in their FITS headers. Default behavior is unchanged [#204].
