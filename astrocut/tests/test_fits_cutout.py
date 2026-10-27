@@ -1,5 +1,6 @@
 import io
 import json
+import warnings
 import zipfile
 from os import path
 from pathlib import Path
@@ -13,6 +14,8 @@ from astropy import wcs
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.table import Table
+from astropy.time import Time
+from astropy.wcs import FITSFixedWarning
 from PIL import Image
 
 from astrocut.fits_cutout import FITSCutout, fits_cut
@@ -40,9 +43,10 @@ def test_image_asinh(tmpdir):
     img_path = create_test_imgs(50, 1, dir_name=tmpdir, basename="img_asinh_{:04d}.fits")[0]
     with fits.open(img_path, mode="update") as hdulist:
         # Rescale to a realistic range of asinh-scaled pixel values (avoids overflow in sinh)
-        hdulist[0].data = (hdulist[0].data / 250 - 5).astype(np.float32)
+        hdulist[0].data = (hdulist[0].data / 250 - 5).astype(np.int16)
         hdulist[0].header["BSOFTEN"] = 87.39592975627
         hdulist[0].header["BOFFSET"] = 2.654963016510
+        hdulist[0].header["BLANK"] = 32767
     return img_path
 
 
@@ -121,6 +125,41 @@ def test_fits_cutout_single_outfile(test_images, center_coord, cutout_size, tmpd
     assert round(float(sdec), 4) == round(center_coord.dec.deg, 4)
 
 
+def test_fits_cutout_adds_date_obs_from_mjd_obs(test_images, center_coord, cutout_size):
+    input_file = test_images[0]
+    with fits.open(input_file, mode="update") as hdulist:
+        hdulist[0].header.pop("DATE-OBS", None)
+        hdulist[0].header["MJD-OBS"] = 60000.0
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        cutout = FITSCutout(input_file, center_coord, cutout_size).fits_cutouts[0]
+
+    assert not any(issubclass(item.category, FITSFixedWarning) for item in caught)
+    assert cutout[1].header["DATE-OBS"] == Time(60000.0, format="mjd").isot
+
+    with fits.open(input_file) as hdulist:
+        assert "DATE-OBS" not in hdulist[0].header
+
+
+def test_fits_cutout_adds_mjd_obs_from_date_obs(test_images, center_coord, cutout_size):
+    input_file = test_images[0]
+    date_obs = "2012-03-22T12:02:38.563"
+    with fits.open(input_file, mode="update") as hdulist:
+        hdulist[0].header["DATE-OBS"] = date_obs
+        hdulist[0].header.pop("MJD-OBS", None)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        cutout = FITSCutout(input_file, center_coord, cutout_size).fits_cutouts[0]
+
+    assert not any(issubclass(item.category, FITSFixedWarning) for item in caught)
+    assert cutout[1].header["MJD-OBS"] == pytest.approx(Time(date_obs).mjd)
+
+    with fits.open(input_file) as hdulist:
+        assert "MJD-OBS" not in hdulist[0].header
+
+
 def test_fits_cutout_multiple_files(tmpdir, test_images, center_coord, cutout_size):
     # Output is multiple files
     cutouts = FITSCutout(test_images, center_coord, cutout_size, single_outfile=False).fits_cutouts
@@ -193,6 +232,11 @@ def test_fits_cutout_asinh_linearization(test_image_asinh, center_coord, cutout_
     # A HISTORY note documents the conversion
     history = [str(card) for card in cutout[1].header.get("HISTORY", [])]
     assert any("asinh" in h.lower() for h in history)
+
+    # Keywords BSOFTEN, BOFFSET, and BLANK should be removed from the cutout header
+    assert "BSOFTEN" not in cutout[1].header
+    assert "BOFFSET" not in cutout[1].header
+    assert "BLANK" not in cutout[1].header
 
 
 def test_fits_cutout_no_asinh_linearization(test_images, center_coord, cutout_size):
