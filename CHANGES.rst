@@ -1,6 +1,8 @@
 Unreleased
 -----------
 
+- Added support for ``stretch_kwargs`` in ``get_image_cutouts`` and ``write_as_img`` methods to control image 
+  normalization and stretching [#209].
 - Improved ``FITSCutout`` handling of Pan-STARRS FITS data: scaled images are opened without memory mapping,
   missing ``DATE-OBS`` values are derived from ``MJD-OBS`` and vice versa, original image filename in cutout
   header falls back to the original image's filename if not already present, and asinh-linearized cutouts no

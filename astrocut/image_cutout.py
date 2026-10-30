@@ -2,7 +2,7 @@ import json
 import warnings
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Iterator, List, Optional, Tuple, Union
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
 import numpy as np
 from astropy.coordinates import SkyCoord
@@ -96,11 +96,12 @@ class ImageCutout(Cutout, ABC):
     def get_image_cutouts(
         self,
         stretch: Optional[str] = "asinh",
-        minmax_percent: Optional[List[int]] = None,
-        minmax_value: Optional[List[int]] = None,
+        minmax_percent: Optional[List[float]] = None,
+        minmax_value: Optional[List[float]] = None,
         invert: Optional[bool] = False,
         colorize: Optional[bool] = False,
         flip_orientation: Optional[bool] = True,
+        stretch_kwargs: Optional[Dict[str, Any]] = None,
     ) -> List[Image]:
         """
         Get the cutouts as `~PIL.Image` objects given certain normalization parameters. This method also sets
@@ -111,12 +112,12 @@ class ImageCutout(Cutout, ABC):
         stretch : str
             Optional, default 'asinh'. The stretch to apply to the image array.
             Valid values are: asinh, sinh, sqrt, log, linear
-        minmax_percent : array
+        minmax_percent : List[float]
             Optional. Interval based on a keeping a specified fraction of pixels (can be asymmetric)
             when scaling the image. The format is [lower percentile, upper percentile], where pixel
             values below the lower percentile and above the upper percentile are clipped.
             Only one of minmax_percent and minmax_value should be specified.
-        minmax_value : array
+        minmax_value : List[float]
             Optional. Interval based on user-specified pixel values when scaling the image.
             The format is [min value, max value], where pixel values below the min value and above
             the max value are clipped.
@@ -128,6 +129,8 @@ class ImageCutout(Cutout, ABC):
         flip_orientation : bool
             Optional, default True. If True, the cutout images are flipped vertically to match the orientation
             of the input images.
+        stretch_kwargs : dict, optional
+            Optional keyword arguments to pass to the stretch function.
 
         Returns
         -------
@@ -172,7 +175,11 @@ class ImageCutout(Cutout, ABC):
             img_arrs = []
             for cutout in all_cutouts:
                 # Image output, applying the appropriate normalization parameters
-                img_arrs.append(self.normalize_img(cutout.data, stretch, minmax_percent, minmax_value, invert))
+                img_arrs.append(
+                    self.normalize_img(
+                        cutout.data, stretch, minmax_percent, minmax_value, invert, stretch_kwargs=stretch_kwargs
+                    )
+                )
 
             # Combine the three cutouts into a single RGB image
             color_img = fromarray(np.dstack([img_arrs[0], img_arrs[1], img_arrs[2]]).astype(np.uint8))
@@ -186,7 +193,9 @@ class ImageCutout(Cutout, ABC):
             for file, cutout_list in self.cutouts_by_file.items():
                 for i, cutout in enumerate(cutout_list):
                     # Apply the appropriate normalization parameters
-                    img_arr = self.normalize_img(cutout.data, stretch, minmax_percent, minmax_value, invert)
+                    img_arr = self.normalize_img(
+                        cutout.data, stretch, minmax_percent, minmax_value, invert, stretch_kwargs=stretch_kwargs
+                    )
                     img = fromarray(img_arr)
                     # Flip the image vertically to match the orientation of the input cutouts
                     if flip_orientation:
@@ -203,9 +212,10 @@ class ImageCutout(Cutout, ABC):
     def normalize_img(
         img_arr: np.ndarray,
         stretch: str = "asinh",
-        minmax_percent: Optional[List[int]] = None,
-        minmax_value: Optional[List[int]] = None,
+        minmax_percent: Optional[List[float]] = None,
+        minmax_value: Optional[List[float]] = None,
         invert: bool = False,
+        stretch_kwargs: Optional[Dict[str, Any]] = None,
     ) -> np.ndarray:
         """
         Apply given stretch and scaling to an image array.
@@ -217,18 +227,20 @@ class ImageCutout(Cutout, ABC):
         stretch : str
             Optional, default 'asinh'. The stretch to apply to the image array.
             Valid values are: asinh, sinh, sqrt, log, linear
-        minmax_percent : array
+        minmax_percent : List[float]
             Optional. Interval based on a keeping a specified fraction of pixels (can be asymmetric)
             when scaling the image. The format is [lower percentile, upper percentile], where pixel
             values below the lower percentile and above the upper percentile are clipped.
             Only one of minmax_percent and minmax_value shoul be specified.
-        minmax_value : array
+        minmax_value : List[float]
             Optional. Interval based on user-specified pixel values when scaling the image.
             The format is [min value, max value], where pixel values below the min value and above
             the max value are clipped.
             Only one of minmax_percent and minmax_value should be specified.
         invert : bool
             Optional, default False.  If True the image is inverted (light pixels become dark and vice versa).
+        stretch_kwargs : dict, optional
+            Keyword arguments to pass to the stretch transform.
 
         Returns
         -------
@@ -246,16 +258,17 @@ class ImageCutout(Cutout, ABC):
             raise InvalidInputError("Input image array is empty.")
 
         # Setting up the transform with the stretch
+        stretch_kwargs = {} if stretch_kwargs is None else stretch_kwargs
         if stretch == "asinh":
-            transform = AsinhStretch()
+            transform = AsinhStretch(**stretch_kwargs)
         elif stretch == "sinh":
-            transform = SinhStretch()
+            transform = SinhStretch(**stretch_kwargs)
         elif stretch == "sqrt":
-            transform = SqrtStretch()
+            transform = SqrtStretch(**stretch_kwargs)
         elif stretch == "log":
-            transform = LogStretch()
+            transform = LogStretch(**stretch_kwargs)
         elif stretch == "linear":
-            transform = LinearStretch()
+            transform = LinearStretch(**stretch_kwargs)
         else:
             raise InvalidInputError(
                 f"Stretch {stretch} is not supported!Valid options are: asinh, sinh, sqrt, log, linear."
@@ -289,9 +302,9 @@ class ImageCutout(Cutout, ABC):
     def _prepare_image_render_options(
         self,
         stretch: Optional[str],
-        minmax_percent: Optional[List[int]],
-        minmax_value: Optional[List[int]],
-    ) -> Tuple[str, Optional[List[int]], Optional[List[int]]]:
+        minmax_percent: Optional[List[float]],
+        minmax_value: Optional[List[float]],
+    ) -> Tuple[str, Optional[List[float]], Optional[List[float]]]:
         """
         Validate image-render parameters and apply defaults.
 
@@ -414,15 +427,18 @@ class ImageCutout(Cutout, ABC):
         coord: Union[SkyCoord, str],
         cutout,
         stretch: str,
-        minmax_percent: Optional[List[int]],
-        minmax_value: Optional[List[int]],
+        minmax_percent: Optional[List[float]],
+        minmax_value: Optional[List[float]],
         invert: bool,
         flip_orientation: bool,
+        stretch_kwargs: Optional[Dict[str, Any]] = None,
     ) -> Image:
         """
         Render one cutout as a PIL image and attach metadata.
         """
-        img_arr = self.normalize_img(cutout.data, stretch, minmax_percent, minmax_value, invert)
+        img_arr = self.normalize_img(
+            cutout.data, stretch, minmax_percent, minmax_value, invert, stretch_kwargs=stretch_kwargs
+        )
         img = fromarray(img_arr)
         if flip_orientation:
             img = img.transpose(Transpose.FLIP_TOP_BOTTOM)
@@ -436,16 +452,20 @@ class ImageCutout(Cutout, ABC):
         coord_cutout_files: List[Union[str, Path, S3Path]],
         coordinate: Union[SkyCoord, str],
         stretch: str,
-        minmax_percent: Optional[List[int]],
-        minmax_value: Optional[List[int]],
+        minmax_percent: Optional[List[float]],
+        minmax_value: Optional[List[float]],
         invert: bool,
         flip_orientation: bool,
+        stretch_kwargs: Optional[Dict[str, Any]] = None,
     ) -> Image:
         """
         Render three cutouts as one RGB image and attach metadata.
         """
         img_arrs = [
-            self.normalize_img(cutout.data, stretch, minmax_percent, minmax_value, invert) for cutout in coord_cutouts
+            self.normalize_img(
+                cutout.data, stretch, minmax_percent, minmax_value, invert, stretch_kwargs=stretch_kwargs
+            )
+            for cutout in coord_cutouts
         ]
 
         color_img = fromarray(np.dstack([img_arrs[0], img_arrs[1], img_arrs[2]]).astype(np.uint8))
@@ -519,11 +539,12 @@ class ImageCutout(Cutout, ABC):
         input_files: Optional[List[Union[str, Path, S3Path]]] = None,
         coordinates: Optional[List[Union[SkyCoord, str]]] = None,
         stretch: Optional[str] = "asinh",
-        minmax_percent: Optional[List[int]] = None,
-        minmax_value: Optional[List[int]] = None,
+        minmax_percent: Optional[List[float]] = None,
+        minmax_value: Optional[List[float]] = None,
         invert: Optional[bool] = False,
         colorize: Optional[bool] = False,
         flip_orientation: Optional[bool] = True,
+        stretch_kwargs: Optional[Dict[str, Any]] = None,
     ) -> Iterator[Tuple[str, SkyCoord, Image]]:
         """
         Generic iterator that renders selected cutouts to image rows.
@@ -580,6 +601,7 @@ class ImageCutout(Cutout, ABC):
                     minmax_value=minmax_value,
                     invert=invert,
                     flip_orientation=flip_orientation,
+                    stretch_kwargs=stretch_kwargs,
                 )
                 yield ", ".join(coord_cutout_files), coord_obj, color_img
         else:
@@ -594,6 +616,7 @@ class ImageCutout(Cutout, ABC):
                     minmax_value=minmax_value,
                     invert=invert,
                     flip_orientation=flip_orientation,
+                    stretch_kwargs=stretch_kwargs,
                 )
                 yield file, coord_obj, img
 
@@ -618,14 +641,15 @@ class ImageCutout(Cutout, ABC):
     def write_as_img(
         self,
         stretch: Optional[str] = "asinh",
-        minmax_percent: Optional[List[int]] = None,
-        minmax_value: Optional[List[int]] = None,
+        minmax_percent: Optional[List[float]] = None,
+        minmax_value: Optional[List[float]] = None,
         invert: Optional[bool] = False,
         colorize: Optional[bool] = False,
         output_format: str = ".jpg",
         output_dir: Union[str, Path] = ".",
         cutout_prefix: str = "cutout",
         flip_orientation: Optional[bool] = True,
+        stretch_kwargs: Optional[Dict[str, Any]] = None,
     ) -> Union[str, List[str]]:
         """
         Write the cutout to memory or to a file in an image format. If colorize is set, the first 3 cutouts
@@ -636,12 +660,12 @@ class ImageCutout(Cutout, ABC):
         stretch : str
             Optional, default 'asinh'. The stretch to apply to the image array.
             Valid values are: asinh, sinh, sqrt, log, linear
-        minmax_percent : array
+        minmax_percent : List[float]
             Optional. Interval based on a keeping a specified fraction of pixels (can be asymmetric)
             when scaling the image. The format is [lower percentile, upper percentile], where pixel
             values below the lower percentile and above the upper percentile are clipped.
             Only one of minmax_percent and minmax_value shoul be specified.
-        minmax_value : array
+        minmax_value : List[float]
             Optional. Interval based on user-specified pixel values when scaling the image.
             The format is [min value, max value], where pixel values below the min value and above
             the max value are clipped.
@@ -659,6 +683,8 @@ class ImageCutout(Cutout, ABC):
             Optional, default '.'. The directory to write the cutout image(s) to.
         cutout_prefix : str
             Optional, default 'cutout'. The prefix to add to the cutout image file name.
+        stretch_kwargs : dict, optional
+            Optional keyword arguments to pass to the stretch function.
 
         Returns
         -------
@@ -675,7 +701,13 @@ class ImageCutout(Cutout, ABC):
 
         # Get the image cutouts with the given normalization parameters
         image_cutouts = self.get_image_cutouts(
-            stretch, minmax_percent, minmax_value, invert, colorize, flip_orientation
+            stretch,
+            minmax_percent,
+            minmax_value,
+            invert,
+            colorize,
+            flip_orientation,
+            stretch_kwargs=stretch_kwargs,
         )
 
         # Create the output directory if it does not exist
@@ -831,38 +863,46 @@ class ImageCutout(Cutout, ABC):
 def normalize_img(
     img_arr: np.ndarray,
     stretch: str = "asinh",
-    minmax_percent: Optional[List[int]] = None,
-    minmax_value: Optional[List[int]] = None,
+    minmax_percent: Optional[List[float]] = None,
+    minmax_value: Optional[List[float]] = None,
     invert: bool = False,
+    stretch_kwargs: Optional[Dict[str, Any]] = None,
 ) -> np.ndarray:
     """
     Apply given stretch and scaling to an image array.
 
     Parameters
     ----------
-    img_arr : array
+    img_arr : np.ndarray
         The input image array.
     stretch : str
         Optional, default 'asinh'. The stretch to apply to the image array.
         Valid values are: asinh, sinh, sqrt, log, linear
-    minmax_percent : array
+    minmax_percent : List[float]
         Optional. Interval based on a keeping a specified fraction of pixels (can be asymmetric)
         when scaling the image. The format is [lower percentile, upper percentile], where pixel
         values below the lower percentile and above the upper percentile are clipped.
         Only one of minmax_percent and minmax_value shoul be specified.
-    minmax_value : array
+    minmax_value : List[float]
         Optional. Interval based on user-specified pixel values when scaling the image.
         The format is [min value, max value], where pixel values below the min value and above
         the max value are clipped.
         Only one of minmax_percent and minmax_value should be specified.
     invert : bool
         Optional, default False.  If True the image is inverted (light pixels become dark and vice versa).
+    stretch_kwargs : dict, optional
+        Keyword arguments to pass to the stretch transform.
 
     Returns
     -------
-    response : array
+    response : np.ndarray
         The normalized image array, in the form in an integer arrays with values in the range 0-255.
     """
     return ImageCutout.normalize_img(
-        img_arr=img_arr, stretch=stretch, minmax_percent=minmax_percent, minmax_value=minmax_value, invert=invert
+        img_arr=img_arr,
+        stretch=stretch,
+        minmax_percent=minmax_percent,
+        minmax_value=minmax_value,
+        invert=invert,
+        stretch_kwargs=stretch_kwargs,
     )
