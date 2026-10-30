@@ -101,7 +101,7 @@ class ImageCutout(Cutout, ABC):
         invert: Optional[bool] = False,
         colorize: Optional[bool] = False,
         flip_orientation: Optional[bool] = True,
-        stretch_kwargs: Dict[str, Any] = {},
+        stretch_kwargs: Optional[Dict[str, Any]] = None,
     ) -> List[Image]:
         """
         Get the cutouts as `~PIL.Image` objects given certain normalization parameters. This method also sets
@@ -215,7 +215,7 @@ class ImageCutout(Cutout, ABC):
         minmax_percent: Optional[List[float]] = None,
         minmax_value: Optional[List[float]] = None,
         invert: bool = False,
-        stretch_kwargs: Dict[str, Any] = {},
+        stretch_kwargs: Optional[Dict[str, Any]] = None,
     ) -> np.ndarray:
         """
         Apply given stretch and scaling to an image array.
@@ -258,6 +258,7 @@ class ImageCutout(Cutout, ABC):
             raise InvalidInputError("Input image array is empty.")
 
         # Setting up the transform with the stretch
+        stretch_kwargs = {} if stretch_kwargs is None else stretch_kwargs
         if stretch == "asinh":
             transform = AsinhStretch(**stretch_kwargs)
         elif stretch == "sinh":
@@ -430,7 +431,7 @@ class ImageCutout(Cutout, ABC):
         minmax_value: Optional[List[float]],
         invert: bool,
         flip_orientation: bool,
-        stretch_kwargs: Dict[str, Any] = {},
+        stretch_kwargs: Optional[Dict[str, Any]] = None,
     ) -> Image:
         """
         Render one cutout as a PIL image and attach metadata.
@@ -455,7 +456,7 @@ class ImageCutout(Cutout, ABC):
         minmax_value: Optional[List[float]],
         invert: bool,
         flip_orientation: bool,
-        stretch_kwargs: Dict[str, Any] = {},
+        stretch_kwargs: Optional[Dict[str, Any]] = None,
     ) -> Image:
         """
         Render three cutouts as one RGB image and attach metadata.
@@ -543,7 +544,7 @@ class ImageCutout(Cutout, ABC):
         invert: Optional[bool] = False,
         colorize: Optional[bool] = False,
         flip_orientation: Optional[bool] = True,
-        stretch_kwargs: Dict[str, Any] = {},
+        stretch_kwargs: Optional[Dict[str, Any]] = None,
     ) -> Iterator[Tuple[str, SkyCoord, Image]]:
         """
         Generic iterator that renders selected cutouts to image rows.
@@ -648,7 +649,7 @@ class ImageCutout(Cutout, ABC):
         output_dir: Union[str, Path] = ".",
         cutout_prefix: str = "cutout",
         flip_orientation: Optional[bool] = True,
-        stretch_kwargs: Dict[str, Any] = {},
+        stretch_kwargs: Optional[Dict[str, Any]] = None,
     ) -> Union[str, List[str]]:
         """
         Write the cutout to memory or to a file in an image format. If colorize is set, the first 3 cutouts
@@ -865,7 +866,7 @@ def normalize_img(
     minmax_percent: Optional[List[float]] = None,
     minmax_value: Optional[List[float]] = None,
     invert: bool = False,
-    stretch_kwargs: Dict[str, Any] = {},
+    stretch_kwargs: Optional[Dict[str, Any]] = None,
 ) -> np.ndarray:
     """
     Apply given stretch and scaling to an image array.

@@ -475,7 +475,7 @@ class ASDFCutout(ImageCutout):
         invert: Optional[bool] = False,
         colorize: Optional[bool] = False,
         flip_orientation: Optional[bool] = True,
-        stretch_kwargs: Dict[str, Any] = {},
+        stretch_kwargs: Optional[Dict[str, Any]] = None,
     ) -> Table:
         """
         Get the cutouts as an `astropy.table.Table` with columns for input file, coordinate, and the corresponding
@@ -541,7 +541,7 @@ class ASDFCutout(ImageCutout):
         invert: Optional[bool] = False,
         colorize: Optional[bool] = False,
         flip_orientation: Optional[bool] = True,
-        stretch_kwargs: Dict[str, Any] = {},
+        stretch_kwargs: Optional[Dict[str, Any]] = None,
     ) -> Iterator[Tuple[str, SkyCoord, Image]]:
         """
         Yield image cutouts lazily for the selected file/coordinate pairs.
@@ -1309,7 +1309,7 @@ class ASDFCutout(ImageCutout):
         output_dir: Union[str, Path] = ".",
         cutout_prefix: str = "cutout",
         flip_orientation: Optional[bool] = True,
-        stretch_kwargs: Dict[str, Any] = {},
+        stretch_kwargs: Optional[Dict[str, Any]] = None,
     ) -> Union[str, List[str]]:
         """
         Write the cutout to memory or to a file in an image format. If colorize is set, the first 3 cutouts
