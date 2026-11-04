@@ -830,8 +830,8 @@ def img_cut(
     coordinates: Union[SkyCoord, str],
     cutout_size: Union[int, np.ndarray, Quantity, List[int], Tuple[int]] = 25,
     stretch: str = "asinh",
-    minmax_percent: Optional[List[int]] = None,
-    minmax_value: Optional[List[int]] = None,
+    minmax_percent: Optional[List[float]] = None,
+    minmax_value: Optional[List[float]] = None,
     invert: bool = False,
     img_format: str = ".jpg",
     colorize: bool = False,
@@ -870,12 +870,12 @@ def img_cut(
     stretch : str
         Optional, default 'asinh'. The stretch to apply to the image array.
         Valid values are: asinh, sinh, sqrt, log, linear
-    minmax_percent : array
+    minmax_percent : List[float]
         Optional, default [0.5,99.5]. Interval based on a keeping a specified fraction of pixels
         (can be asymmetric) when scaling the image. The format is [lower percentile, upper percentile],
         where pixel values below the lower percentile and above the upper percentile are clipped.
         Only one of minmax_percent and minmax_value should be specified.
-    minmax_value : array
+    minmax_value : List[float]
         Optional. Interval based on user-specified pixel values when scaling the image.
         The format is [min value, max value], where pixel values below the min value and above
         the max value are clipped.

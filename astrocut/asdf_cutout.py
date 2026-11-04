@@ -470,11 +470,12 @@ class ASDFCutout(ImageCutout):
         input_files: Optional[List[Union[str, Path, S3Path]]] = None,
         coordinates: Optional[List[Union[SkyCoord, str]]] = None,
         stretch: Optional[str] = "asinh",
-        minmax_percent: Optional[List[int]] = None,
-        minmax_value: Optional[List[int]] = None,
+        minmax_percent: Optional[List[float]] = None,
+        minmax_value: Optional[List[float]] = None,
         invert: Optional[bool] = False,
         colorize: Optional[bool] = False,
         flip_orientation: Optional[bool] = True,
+        stretch_kwargs: Optional[Dict[str, Any]] = None,
     ) -> Table:
         """
         Get the cutouts as an `astropy.table.Table` with columns for input file, coordinate, and the corresponding
@@ -490,12 +491,12 @@ class ASDFCutout(ImageCutout):
         stretch : str
             Optional, default 'asinh'. The stretch to apply to the image array.
             Valid values are: asinh, sinh, sqrt, log, linear
-        minmax_percent : array
+        minmax_percent : List[float]
             Optional. Interval based on a keeping a specified fraction of pixels (can be asymmetric)
             when scaling the image. The format is [lower percentile, upper percentile], where pixel
             values below the lower percentile and above the upper percentile are clipped.
             Only one of minmax_percent and minmax_value should be specified.
-        minmax_value : array
+        minmax_value : List[float]
             Optional. Interval based on user-specified pixel values when scaling the image.
             The format is [min value, max value], where pixel values below the min value and above
             the max value are clipped.
@@ -507,6 +508,8 @@ class ASDFCutout(ImageCutout):
         flip_orientation : bool
             Optional, default True. If True, the cutout images are flipped vertically to match the orientation
             of the input images.
+        stretch_kwargs : dict, optional
+            Optional keyword arguments to pass to the stretch function.
 
         Returns
         -------
@@ -523,6 +526,7 @@ class ASDFCutout(ImageCutout):
             invert=invert,
             colorize=colorize,
             flip_orientation=flip_orientation,
+            stretch_kwargs=stretch_kwargs,
         )
         return self._build_cutout_table(image_iter, object_cutout=True)
 
@@ -532,11 +536,12 @@ class ASDFCutout(ImageCutout):
         input_files: Optional[List[Union[str, Path, S3Path]]] = None,
         coordinates: Optional[List[Union[SkyCoord, str]]] = None,
         stretch: Optional[str] = "asinh",
-        minmax_percent: Optional[List[int]] = None,
-        minmax_value: Optional[List[int]] = None,
+        minmax_percent: Optional[List[float]] = None,
+        minmax_value: Optional[List[float]] = None,
         invert: Optional[bool] = False,
         colorize: Optional[bool] = False,
         flip_orientation: Optional[bool] = True,
+        stretch_kwargs: Optional[Dict[str, Any]] = None,
     ) -> Iterator[Tuple[str, SkyCoord, Image]]:
         """
         Yield image cutouts lazily for the selected file/coordinate pairs.
@@ -551,12 +556,12 @@ class ASDFCutout(ImageCutout):
         stretch : str
             Optional, default 'asinh'. The stretch to apply to the image array.
             Valid values are: asinh, sinh, sqrt, log, linear
-        minmax_percent : array
+        minmax_percent : List[float]
             Optional. Interval based on a keeping a specified fraction of pixels (can be asymmetric)
             when scaling the image. The format is [lower percentile, upper percentile], where pixel
             values below the lower percentile and above the upper percentile are clipped.
             Only one of minmax_percent and minmax_value should be specified.
-        minmax_value : array
+        minmax_value : List[float]
             Optional. Interval based on user-specified pixel values when scaling the image.
             The format is [min value, max value], where pixel values below the min value and above
             the max value are clipped.
@@ -568,6 +573,8 @@ class ASDFCutout(ImageCutout):
         flip_orientation : bool
             Optional, default True. If True, the cutout images are flipped vertically to match the orientation
             of the input images.
+        stretch_kwargs : dict, optional
+            Optional keyword arguments to pass to the stretch function.
 
         Yields
         ------
@@ -583,6 +590,7 @@ class ASDFCutout(ImageCutout):
             invert=invert,
             colorize=colorize,
             flip_orientation=flip_orientation,
+            stretch_kwargs=stretch_kwargs,
         )
 
     def _iter_selected_cutouts(
@@ -1293,14 +1301,15 @@ class ASDFCutout(ImageCutout):
         input_files: Optional[List[Union[str, Path, S3Path]]] = None,
         coordinates: Optional[List[Union[SkyCoord, str]]] = None,
         stretch: Optional[str] = "asinh",
-        minmax_percent: Optional[List[int]] = None,
-        minmax_value: Optional[List[int]] = None,
+        minmax_percent: Optional[List[float]] = None,
+        minmax_value: Optional[List[float]] = None,
         invert: Optional[bool] = False,
         colorize: Optional[bool] = False,
         output_format: str = ".jpg",
         output_dir: Union[str, Path] = ".",
         cutout_prefix: str = "cutout",
         flip_orientation: Optional[bool] = True,
+        stretch_kwargs: Optional[Dict[str, Any]] = None,
     ) -> Union[str, List[str]]:
         """
         Write the cutout to memory or to a file in an image format. If colorize is set, the first 3 cutouts
@@ -1316,12 +1325,12 @@ class ASDFCutout(ImageCutout):
         stretch : str
             Optional, default 'asinh'. The stretch to apply to the image array.
             Valid values are: asinh, sinh, sqrt, log, linear
-        minmax_percent : array
+        minmax_percent : List[float]
             Optional. Interval based on a keeping a specified fraction of pixels (can be asymmetric)
             when scaling the image. The format is [lower percentile, upper percentile], where pixel
             values below the lower percentile and above the upper percentile are clipped.
             Only one of minmax_percent and minmax_value shoul be specified.
-        minmax_value : array
+        minmax_value : List[float]
             Optional. Interval based on user-specified pixel values when scaling the image.
             The format is [min value, max value], where pixel values below the min value and above
             the max value are clipped.
@@ -1339,6 +1348,8 @@ class ASDFCutout(ImageCutout):
             Optional, default '.'. The directory to write the cutout image(s) to.
         cutout_prefix : str
             Optional, default 'cutout'. The prefix to add to the cutout image file name.
+        stretch_kwargs : dict, optional
+            Optional keyword arguments to pass to the stretch function.
 
         Returns
         -------
@@ -1362,6 +1373,7 @@ class ASDFCutout(ImageCutout):
             invert=invert,
             colorize=colorize,
             flip_orientation=flip_orientation,
+            stretch_kwargs=stretch_kwargs,
         )
 
         # Create the output directory if it does not exist

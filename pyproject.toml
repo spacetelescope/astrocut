@@ -29,6 +29,7 @@ Repository = "https://github.com/spacetelescope/astrocut"
 
 [project.optional-dependencies]
 test = [
+    "pytest<9.2; python_version < '3.11'",  # pytest-remotedata 0.4.2 compatibility
     "pytest-astropy",
     "astroquery>=0.4.6",
 ]

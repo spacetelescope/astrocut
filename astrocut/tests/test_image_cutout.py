@@ -194,3 +194,30 @@ def test_get_img_save_kwargs_without_metadata_and_save_oserror(tmp_path):
 def test_module_normalize_img_wrapper():
     img_arr = np.array([[1.0, 0.0], [0.25, 0.75]])
     assert (normalize_img(img_arr, stretch="linear") == ImageCutout.normalize_img(img_arr, stretch="linear")).all()
+
+
+def test_normalize_img_stretch_kwargs():
+    img_arr = np.array([[1.0, 0.0], [0.25, 0.75]])
+    stretch_a = 0.5
+    expected = (np.arcsinh(img_arr / stretch_a) / np.arcsinh(1 / stretch_a) * 255).astype(np.uint8)
+
+    class_result = ImageCutout.normalize_img(
+        img_arr, stretch="asinh", minmax_value=[0, 1], stretch_kwargs={"a": stretch_a}
+    )
+    module_result = normalize_img(img_arr, stretch="asinh", minmax_value=[0, 1], stretch_kwargs={"a": stretch_a})
+
+    assert (class_result == expected).all()
+    assert (module_result == expected).all()
+    assert not (class_result == ImageCutout.normalize_img(img_arr, stretch="asinh", minmax_value=[0, 1])).all()
+
+    cutout = _DummyImageCutout()
+    fake_cutout = _make_fake_cutout(shape=img_arr.shape)
+    fake_cutout.data = img_arr
+    cutout.cutouts_by_file = {"input.fits": [fake_cutout]}
+    image = cutout.get_image_cutouts(
+        stretch="asinh",
+        minmax_value=[0, 1],
+        flip_orientation=False,
+        stretch_kwargs={"a": stretch_a},
+    )[0]
+    assert (np.asarray(image) == expected).all()
