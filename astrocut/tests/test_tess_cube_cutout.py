@@ -181,6 +181,13 @@ def test_tess_cube_cutout_tpf(cube_file, num_images, cutout_size, coordinates, c
     assert aper.shape == (cutout_size, cutout_size)
     assert aper.dtype.type == np.int32
 
+    # Check for WCS keywords in PIXELS extension header
+    assert "WCAX4" in ext1_header
+    assert "1CTYP4" in ext1_header
+    assert "1CRPX4" in ext1_header
+    assert "1CRVL4" in ext1_header
+    assert "1CUNI4" in ext1_header
+
     tpf.close()
 
 
