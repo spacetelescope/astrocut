@@ -788,7 +788,7 @@ returns a list of paths to the cutout TPF files.
   Filename: tess-s0001-4-4_83.4063097_-62.4897713_10-x-10_astrocut.fits
   No.    Name      Ver    Type      Cards   Dimensions   Format
     0  PRIMARY       1 PrimaryHDU      57   ()
-    1  PIXELS        1 BinTableHDU    146   1282R x 12C   [D, E, J, 100J, 100E, 100E, 100E, 100E, J, E, E, 38A]
+    1  PIXELS        1 BinTableHDU    281   1282R x 12C   [D, E, J, 100J, 100E, 100E, 100E, 100E, J, E, E, 38A]
     2  APERTURE      1 ImageHDU        82   (10, 10)   int32
 
 By default, the cutouts are written to the current working directory. You can specify a different output directory using the
