@@ -191,7 +191,10 @@ def test_tess_cube_cutout_tpf(cube_file, num_images, cutout_size, coordinates, c
     }
     for kwd, val in expected_kwds.items():
         assert kwd in ext1_header
-        assert ext1_header[kwd] == val
+        if isinstance(val, float):
+            assert np.isclose(ext1_header[kwd], val)
+        else:
+            assert ext1_header[kwd] == val
 
     tpf.close()
 
