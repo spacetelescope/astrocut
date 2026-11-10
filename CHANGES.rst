@@ -1,6 +1,7 @@
 Unreleased
 -----------
 
+- Bugfix so that WCS columns are properly added to the PIXELS header of TESS cube cutouts. [#211]
 - Added support for ``stretch_kwargs`` in ``get_image_cutouts`` and ``write_as_img`` methods to control image 
   normalization and stretching [#209].
 - Improved ``FITSCutout`` handling of Pan-STARRS FITS data: scaled images are opened without memory mapping,

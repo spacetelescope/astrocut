@@ -249,17 +249,22 @@ class CubeCutout(Cutout, ABC):
             "TNULL": "null value",
         }
 
+        wcs_col = False
         for kwd in table_header:
             # Set header comment if the keyword matches
             for key, comment in keyword_comments.items():
                 if key in kwd:
                     table_header.comments[kwd] = comment
-                    break
 
-            # If the column is a 2D array (indicated by 'TDIM'), add WCS info
-            if "TDIM" in kwd and kwd[:-1] == "TTYPE":
-                for wcs_key, (val, com) in wcs_dict.items():
-                    table_header.insert(kwd, (wcs_key.format(int(kwd[-1]) - 1), val, com))
+                    if key == "TDIM":
+                        wcs_col = True
+
+                    if wcs_col and kwd[:-1] == "TTYPE":
+                        wcs_col = False
+                        for wcs_key, (val, com) in wcs_dict.items():
+                            table_header.insert(kwd, (wcs_key.format(int(kwd[-1]) - 1), val, com))
+
+                    break
 
     def _add_img_kwds(self, table_header: fits.Header):
         """
