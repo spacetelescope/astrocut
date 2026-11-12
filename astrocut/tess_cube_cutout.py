@@ -389,7 +389,7 @@ class TessCubeCutout(CubeCutout):
         )
 
         # Pixel columns are allocated once, inside the output table (fill=True).
-        # Passing full-size zero and sentinel arrays here kept those copies alive next to the table and the stacked cube.
+        # Passing full-size zero and sentinel arrays here kept those copies alive next to the table and the stacked cube
         cols.append(fits.Column(name="CADENCENO", format="J", disp="I10"))
         cols.extend(
             [
