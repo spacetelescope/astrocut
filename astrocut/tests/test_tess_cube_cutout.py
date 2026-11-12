@@ -1,6 +1,8 @@
+import gc
 import io
 import shutil
 import warnings
+import weakref
 import zipfile
 from pathlib import Path
 from typing import List
@@ -469,3 +471,18 @@ def test_parse_table_wcs_no_valid_row():
 
     with pytest.raises(NoWcsKeywordsFoundError, match="No FFI rows contain valid WCS keywords."):
         TessCubeCutout.parse_table_wcs(table_data)
+
+
+def test_tess_cube_cutout_no_reference_cycle(cube_file, coordinates, cutout_size):
+    """Ensure TessCubeCutout is freed by refcounting without cyclic GC."""
+
+    was_enabled = gc.isenabled()
+    gc.disable()
+    try:
+        cutout = TessCubeCutout(cube_file, coordinates, cutout_size)
+        ref = weakref.ref(cutout)
+        del cutout
+        assert ref() is None
+    finally:
+        if was_enabled:
+            gc.enable()
