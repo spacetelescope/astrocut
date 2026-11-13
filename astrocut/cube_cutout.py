@@ -370,7 +370,7 @@ class CubeCutout(Cutout, ABC):
         """
 
         def __init__(self, cube: fits.HDUList, file: Union[str, Path, S3Path], cube_wcs: WCS, parent: "CubeCutout"):
-            self._parent = parent
+            self._fill_value = parent._fill_value
             self.cube_filename = file
             self.cube_wcs = cube_wcs
             self.wcs_fit = {
@@ -379,10 +379,10 @@ class CubeCutout(Cutout, ABC):
             }
 
             # Get cutout limits
-            self.cutout_lims = self._parent._get_cutout_limits(parent._coordinates, cube_wcs)
+            self.cutout_lims = parent._get_cutout_limits(parent._coordinates, cube_wcs)
 
             # Get cutout data
-            self.data, self.uncertainty, self.aperture = self._get_cutout_data(cube[1].section, self._parent._threads)
+            self.data, self.uncertainty, self.aperture = self._get_cutout_data(cube[1].section, parent._threads)
             self.shape = self.data.shape
 
             # Get cutout WCS
@@ -461,8 +461,8 @@ class CubeCutout(Cutout, ABC):
 
             # Apply padding if needed
             if padding.any():
-                img_cutout = np.pad(img_cutout, padding, "constant", constant_values=self._parent._fill_value)
-                uncert_cutout = np.pad(uncert_cutout, padding, "constant", constant_values=self._parent._fill_value)
+                img_cutout = np.pad(img_cutout, padding, "constant", constant_values=self._fill_value)
+                uncert_cutout = np.pad(uncert_cutout, padding, "constant", constant_values=self._fill_value)
                 aperture = np.pad(aperture, padding[1:], "constant", constant_values=0)
 
             log.debug("Image cutout cube shape: %s", img_cutout.shape)
