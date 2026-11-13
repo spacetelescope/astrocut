@@ -364,12 +364,12 @@ class TessCubeCutout(CubeCutout):
 
         cols = []  # list to store FITS table columns
         img_cube = cutout.data
-        empty_arr = np.zeros_like(img_cube)  # precompute empty array for missing data
-        empty_single = empty_arr[:, 0, 0]  # extract single-value empty array for time & position
+        n_rows = img_cube.shape[0]
 
         # Define FITS column format and dimension
         pixel_format = f"{img_cube[0].size}E"
         pixel_dim = f"{img_cube[0].shape[::-1]}"
+        pixel_unit = "e-/s"
 
         # Define time-related keywords
         start, stop = ("TSTART", "TSTOP")
@@ -388,13 +388,9 @@ class TessCubeCutout(CubeCutout):
             )
         )
 
-        # Define cadence number (zero-filled for SPOC)
-        cadence_array = empty_single
-        cols.append(fits.Column(name="CADENCENO", format="J", disp="I10", array=cadence_array))
-
-        # Define flux-related columns
-        pixel_unit = "e-/s"
-        flux_err_array = cutout.uncertainty
+        # Pixel columns are allocated once, inside the output table (fill=True).
+        # Passing full-size zero and sentinel arrays here kept those copies alive next to the table and the stacked cube
+        cols.append(fits.Column(name="CADENCENO", format="J", disp="I10"))
         cols.extend(
             [
                 fits.Column(
@@ -403,30 +399,14 @@ class TessCubeCutout(CubeCutout):
                     unit="count",
                     dim=pixel_dim,
                     disp="I8",
-                    array=empty_arr - 1,
                     null=-1,
                 ),
-                fits.Column(
-                    name="FLUX", format=pixel_format, dim=pixel_dim, unit=pixel_unit, disp="E14.7", array=img_cube
-                ),
-                fits.Column(
-                    name="FLUX_ERR",
-                    format=pixel_format,
-                    dim=pixel_dim,
-                    unit=pixel_unit,
-                    disp="E14.7",
-                    array=flux_err_array,
-                ),
+                fits.Column(name="FLUX", format=pixel_format, dim=pixel_dim, unit=pixel_unit, disp="E14.7"),
+                fits.Column(name="FLUX_ERR", format=pixel_format, dim=pixel_dim, unit=pixel_unit, disp="E14.7"),
+                fits.Column(name="FLUX_BKG", format=pixel_format, dim=pixel_dim, unit=pixel_unit, disp="E14.7"),
+                fits.Column(name="FLUX_BKG_ERR", format=pixel_format, dim=pixel_dim, unit=pixel_unit, disp="E14.7"),
             ]
         )
-
-        # Add background columns (identical zero arrays)
-        for col_name in ["FLUX_BKG", "FLUX_BKG_ERR"]:
-            cols.append(
-                fits.Column(
-                    name=col_name, format=pixel_format, dim=pixel_dim, unit=pixel_unit, disp="E14.7", array=empty_arr
-                )
-            )
 
         # Add the quality flags
         data_quality = "DQUALITY"
@@ -436,15 +416,25 @@ class TessCubeCutout(CubeCutout):
 
         # Add position correction info (zero-filled)
         for col_name in ["POS_CORR1", "POS_CORR2"]:
-            cols.append(fits.Column(name=col_name, format="E", unit="pixel", disp="E14.7", array=empty_single))
+            cols.append(fits.Column(name=col_name, format="E", unit="pixel", disp="E14.7"))
 
         # Add the FFI_FILE column (not in the pipeline tpfs)
         cols.append(
             fits.Column(name="FFI_FILE", format="38A", unit="pixel", array=cube_fits[2].columns["FFI_FILE"].array)
         )
 
-        # Create the table HDU
-        table_hdu = fits.BinTableHDU.from_columns(cols)
+        # Pixel columns have no input arrays, so from_columns allocates the row buffer
+        # once (zeros) and does not keep full-size scratch cubes. Real values are copied in after.
+        table_hdu = fits.BinTableHDU.from_columns(cols, nrows=n_rows)
+        table_hdu.data["FLUX"] = img_cube
+        table_hdu.data["FLUX_ERR"] = cutout.uncertainty
+        table_hdu.data["RAW_CNTS"][:] = -1
+        # Views of the table, not a second copy of the cube.
+        cutout.data = table_hdu.data["FLUX"]
+        cutout.uncertainty = table_hdu.data["FLUX_ERR"]
+        # FITS_rec.__del__ copies every still-referenced column. Those copies are as
+        # large as the table and overlap the next cutout. Nothing reads them.
+        table_hdu.data._col_weakrefs.clear()
         table_hdu.header["EXTNAME"] = "PIXELS"
         table_hdu.header["INHERIT"] = True
 

@@ -473,6 +473,24 @@ def test_parse_table_wcs_no_valid_row():
         TessCubeCutout.parse_table_wcs(table_data)
 
 
+def test_cutout_arrays_share_tpf_table_memory(cube_file, coordinates, cutout_size):
+    """The image and uncertainty arrays must be views of the TPF table.
+
+    A separate stacked cube kept alongside the table doubles the cutout's resident size.
+    """
+    cutout = TessCubeCutout(cube_file, coordinates, cutout_size)
+    inst = cutout.cutouts[0]
+    table = cutout.tpf_cutouts[0][1].data
+
+    assert np.shares_memory(inst.data, table)
+    assert np.shares_memory(inst.uncertainty, table)
+    assert np.array_equal(inst.data, table["FLUX"])
+    assert np.array_equal(inst.uncertainty, table["FLUX_ERR"])
+    assert np.all(table["RAW_CNTS"] == -1)
+    assert np.all(table["FLUX_BKG"] == 0)
+    assert np.all(table["FLUX_BKG_ERR"] == 0)
+
+
 def test_tess_cube_cutout_no_reference_cycle(cube_file, coordinates, cutout_size):
     """Ensure TessCubeCutout is freed by refcounting without cyclic GC."""
 

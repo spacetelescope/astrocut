@@ -109,11 +109,14 @@ class CutoutFactory:
         self.cutout_wcs = cutout_obj.wcs
 
         if memory_only:
-            return cube_cutout.tpf_cutouts[0]
-
-        return cube_cutout.write_as_tpf(
-            output_dir=output_path, output_file=target_pixel_file, legacy_filenames=legacy_filenames
-        )[0]
+            result = cube_cutout.tpf_cutouts[0]
+        else:
+            result = cube_cutout.write_as_tpf(
+                output_dir=output_path, output_file=target_pixel_file, legacy_filenames=legacy_filenames
+            )[0]
+        # Drop the cutout (and its table) before the caller starts the next footprint.
+        del cube_cutout
+        return result
 
 
 def cube_cut(

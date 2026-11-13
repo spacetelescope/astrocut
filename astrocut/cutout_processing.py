@@ -157,50 +157,66 @@ def _moving_target_focus(path, size, cutout_fles, verbose=False):
     for fle in cutout_fles:
         log.debug("Processing file: %s", fle)
 
-        # Get the stuff we need from the cutout file
-        hdu = fits.open(fle)
-        cutout_table = Table(hdu[1].data)
-        cutout_wcs = WCS(hdu[2].header)
-        hdu.close()
+        # Memmap the footprint file and copy only the rows and pixel windows we need
+        # using Table(hdu[1].data) would duplicate every column of the full footprint
+        with fits.open(fle, memmap=True) as hdu:
+            footprint_rec = hdu[1].data
+            cutout_wcs = WCS(hdu[2].header)
+            col_units = {col.name: col.unit for col in hdu[1].columns}
 
-        path["x"], path["y"] = cutout_wcs.world_to_pixel(path["position"])
-        # This line might need to be refined
-        rel_pts = (
-            (path["x"] - size[0] / 2 >= 0)
-            & (path["x"] + size[0] / 2 < cutout_wcs.array_shape[1])
-            & (path["y"] - size[1] / 2 >= 0)
-            & (path["y"] + size[1] / 2 < cutout_wcs.array_shape[0])
-        )
+            path["x"], path["y"] = cutout_wcs.world_to_pixel(path["position"])
+            rel_pts = (
+                (path["x"] - size[0] / 2 >= 0)
+                & (path["x"] + size[0] / 2 < cutout_wcs.array_shape[1])
+                & (path["y"] - size[1] / 2 >= 0)
+                & (path["y"] + size[1] / 2 < cutout_wcs.array_shape[0])
+            )
+            if sum(rel_pts) == 0:
+                continue
 
-        if sum(rel_pts) == 0:
-            continue
+            time_jd = np.asarray(footprint_rec["TIME"], dtype=np.float64) + 2457000  # TESS specific code
+            keep = np.flatnonzero(
+                (time_jd >= np.min(path["time"][rel_pts].jd)) & (time_jd <= np.max(path["time"][rel_pts].jd))
+            )
+            if keep.size == 0:
+                continue
+            kept_time_jd = time_jd[keep]
 
-        cutout_table["time_jd"] = cutout_table["TIME"] + 2457000  # TESS specific code
-        cutout_table = cutout_table[
-            (cutout_table["time_jd"] >= np.min(path["time"][rel_pts].jd))
-            & (cutout_table["time_jd"] <= np.max(path["time"][rel_pts].jd))
-        ]
+            positions = SkyCoord(*splev(kept_time_jd, tck_tuple), unit="deg")
+            x, y = cutout_wcs.world_to_pixel(positions)
+            bounds = _get_bounds(x, y, size)
 
-        cutout_table["positions"] = SkyCoord(*splev(cutout_table["time_jd"], tck_tuple), unit="deg")
-        cutout_table["x"], cutout_table["y"] = cutout_wcs.world_to_pixel(cutout_table["positions"])
-        cutout_table["bounds"] = _get_bounds(cutout_table["x"], cutout_table["y"], size)
+            pixel_names = ("RAW_CNTS", "FLUX", "FLUX_ERR", "FLUX_BKG", "FLUX_BKG_ERR")
+            sliced = {}
+            for name in pixel_names:
+                sample = footprint_rec[name][keep[0]][slice(*bounds[0, 1]), slice(*bounds[0, 0])]
+                pieces = np.empty((keep.size,) + sample.shape, dtype=sample.dtype)
+                for i, row in enumerate(keep):
+                    pieces[i] = footprint_rec[name][row][slice(*bounds[i, 1]), slice(*bounds[i, 0])]
+                sliced[name] = pieces
+                del sample
 
-        cutout_table["TGT_X"] = cutout_table["x"] - cutout_table["bounds"][:, 0, 0]
-        cutout_table["TGT_Y"] = cutout_table["y"] - cutout_table["bounds"][:, 1, 0]
+            columns = {}
+            for name in footprint_rec.names:
+                if name in sliced:
+                    columns[name] = sliced[name]
+                else:
+                    # copy=True so a view cannot keep the footprint file mapped
+                    columns[name] = np.array(footprint_rec[name][keep], copy=True)
+            # Release the footprint buffer before the next file is opened.
+            # Clearing the weakrefs stops FITS_rec.__del__ from copying every column.
+            footprint_rec._col_weakrefs.clear()
+            del footprint_rec, time_jd, sliced
 
-        cutout_table["TGT_RA"] = cutout_table["positions"].ra.value
-        cutout_table["TGT_DEC"] = cutout_table["positions"].dec.value
+        columns["TGT_X"] = x - bounds[:, 0, 0]
+        columns["TGT_Y"] = y - bounds[:, 1, 0]
+        columns["TGT_RA"] = positions.ra.value
+        columns["TGT_DEC"] = positions.dec.value
 
-        # This is y vs x beacuse of the way the pixels are stored by fits
-        cutout_table["bounds"] = [(slice(*y), slice(*x)) for x, y in cutout_table["bounds"]]
-
-        cutout_table["RAW_CNTS"] = [x["RAW_CNTS"][tuple(x["bounds"])] for x in cutout_table]
-        cutout_table["FLUX"] = [x["FLUX"][tuple(x["bounds"])] for x in cutout_table]
-        cutout_table["FLUX_ERR"] = [x["FLUX_ERR"][tuple(x["bounds"])] for x in cutout_table]
-        cutout_table["FLUX_BKG"] = [x["FLUX_BKG"][tuple(x["bounds"])] for x in cutout_table]
-        cutout_table["FLUX_BKG_ERR"] = [x["FLUX_BKG_ERR"][tuple(x["bounds"])] for x in cutout_table]
-
-        cutout_table.remove_columns(["time_jd", "bounds", "x", "y", "positions"])
+        cutout_table = Table(columns)
+        for name, unit in col_units.items():
+            if unit and name in cutout_table.colnames:
+                cutout_table[name].unit = unit
         cutout_table_list.append(cutout_table)
 
     cutout_table = vstack(cutout_table_list)
