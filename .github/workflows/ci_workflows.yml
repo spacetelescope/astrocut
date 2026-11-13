@@ -20,11 +20,6 @@ jobs:
       fail-fast: true
       matrix:
         include:
-          - name: PR Python 3.10 baseline
-            os: ubuntu-latest
-            python: "3.10"
-            toxenv: py310-test
-
           - name: PR Python 3.11 baseline
             os: ubuntu-latest
             python: "3.11"
@@ -44,6 +39,11 @@ jobs:
             os: ubuntu-latest
             python: "3.14"
             toxenv: py314-test
+
+          - name: PR Python 3.15 baseline
+            os: ubuntu-latest
+            python: "3.15"
+            toxenv: py315-test
 
           - name: PR Python 3.14 on macOS
             os: macos-latest
@@ -100,11 +100,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Nightly Python 3.10 baseline
-            os: ubuntu-latest
-            python: "3.10"
-            toxenv: py310-test
-
           - name: Nightly Python 3.11 baseline
             os: ubuntu-latest
             python: "3.11"
@@ -125,6 +120,11 @@ jobs:
             python: "3.14"
             toxenv: py314-test
 
+          - name: Nightly Python 3.15 baseline
+            os: ubuntu-latest
+            python: "3.15"
+            toxenv: py315-test
+
           - name: Nightly Python 3.14 dev dependencies
             os: ubuntu-latest
             python: "3.14"
@@ -140,10 +140,10 @@ jobs:
             python: "3.12"
             toxenv: linkcheck
 
-          - name: Nighly Python 3.10 numpy 1.23 pin
+          - name: Nightly Python 3.11 numpy 1.23 pin
             os: ubuntu-latest
-            python: "3.10"
-            toxenv: py310-test-numpy123
+            python: "3.11"
+            toxenv: py311-test-numpy123
 
           - name: Nightly Python 3.12 astropy 5.2 pin
             os: ubuntu-latest
