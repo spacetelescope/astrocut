@@ -3,19 +3,33 @@ Unreleased
 
 - Bugfix so moving-target cutouts no longer keep full-size extra copies of each footprint while building the TPF and centering on the path. [#216]
 - Bugfix so cube cutouts release memory when dropped by breaking the ``CubeCutoutInstance`` parent reference cycle. [#214]
+
+Breaking Changes
+^^^^^^^^^^^^^^^^
+
+- Removed support for Python 3.10. [#217]
+
+
+1.5.0 (2026-11-12)
+-------------------
+
 - Bugfix so that WCS columns are properly added to the PIXELS header of TESS cube cutouts. [#211]
-- Added support for ``stretch_kwargs`` in ``get_image_cutouts`` and ``write_as_img`` methods to control image 
+- Added support for ``stretch_kwargs`` in ``get_image_cutouts`` and ``write_as_img`` methods to control image
   normalization and stretching [#209].
 - Improved ``FITSCutout`` handling of Pan-STARRS FITS data: scaled images are opened without memory mapping,
   missing ``DATE-OBS`` values are derived from ``MJD-OBS`` and vice versa, original image filename in cutout
   header falls back to the original image's filename if not already present, and asinh-linearized cutouts no
   longer retain scaling keywords [#208].
-- Added default values for ``wcs_axes_keyword`` and ``wcs_axes_value`` in ``TessCubeCutout.parse_table_wcs`` [#205].
-- Added ``allow_empty`` to ``FITSCutout`` and ``fits_cut`` to optionally retain all-zero or
-  all-NaN cutouts with ``EMPTY=True`` in their FITS headers. Default behavior is unchanged [#204].
 - Added ``allow_empty`` to ``ASDFCutout`` and ``asdf_cut`` to optionally retain cutouts whose pixels are all
   zero and/or NaN. These cutouts have ``empty=True`` in their ASDF metadata and ``EMPTY=True`` in the cutout
   extension header when written as FITS. Default behavior is unchanged. [#207]
+
+
+1.4.0 (2026-10-07)
+-------------------
+- Added default values for ``wcs_axes_keyword`` and ``wcs_axes_value`` in ``TessCubeCutout.parse_table_wcs`` [#205].
+- Added ``allow_empty`` to ``FITSCutout`` and ``fits_cut`` to optionally retain all-zero or
+  all-NaN cutouts with ``EMPTY=True`` in their FITS headers. Default behavior is unchanged [#204].
 - ``legacy_filenames=True`` now uses the astrocut 0.11.1 filename: 6-decimal RA/Dec and the
   integer pixel window (``<width>x<height>``) and pixel ``Quantity`` sizes are not included. [#203]
 - Extend the ASDF cutout workflow to accept multiple target coordinates and to expose downstream cutout products in
@@ -31,6 +45,7 @@ Unreleased
   keywords (e.g. ``PC001001``) to their modern equivalents (e.g. ``PC1_1``) before parsing a header's WCS.
   ``FITSCutout`` now applies this conversion so cutout headers no longer contain a confusing mix of archaic
   and modern WCS matrix keywords. [#200]
+
 
 1.3.0 (2026-09-02)
 -------------------
